@@ -1,0 +1,57 @@
+# Node modules (root + all workspaces)
+node_modules/
+**/node_modules/
+
+# Build outputs
+dist/
+**/dist/
+
+# Logs
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment variables
+.env
+.env.*.local
+apps/*/.env
+libs/*/.env
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# VSCode settings (optional, if personal)
+.vscode/
+
+# Prisma
+**/prisma/dev.db
+**/prisma/dev.db-journal
+**/prisma/migrations/
+
+# Output from build or tooling
+coverage/
+**/coverage/
+.cache/
+.next/
+out/
+turbo/
+.pnp.*
+.pnp/
+
+# TypeScript build artifacts
+*.tsbuildinfo
+
+# IDE configs
+.idea/
+*.sw?
+
+# E2E testing artifacts
+playwright-report/
+test-results/
+
+# Optional: lockfile per workspace if using npm workspaces
+apps/*/package-lock.json
+libs/*/package-lock.json

@@ -1,0 +1,32 @@
+PlayaPlan Project Summary:
+
+This project involves building a full-stack web application for managing annual camp registrations called PlayaPlan. The application enables user registration, profile management, and authentication using JWT and Passport.js. Users will sign up for camp job shifts scheduled within admin-defined camp sessions. Each job has categories and location attributes, and not all jobs are available on all camp dates.
+
+The application stack includes:
+
+- Frontend: React with TypeScript and Tailwind CSS
+- Backend API: NestJS with TypeScript
+- Database: PostgreSQL managed via Prisma ORM
+- Authentication: Passport.js (Local and JWT strategies)
+- Payments: Stripe and PayPal integrations
+- Notifications: Transactional emails via SendGrid, Mailgun, or Postmark
+- Documentation: Swagger (OpenAPI)
+
+Backend modules planned:
+
+- Users: User profiles and management
+- Roles: Admin, Staff, Participant
+- Authentication: User login, JWT handling, password reset, email verification
+- Optionally admins may enable magic link logins
+- Notifications: Email sending for authentication and payments
+- Camp: Camp session dates (admin-defined)
+- Jobs: Definitions of jobs, categories, and locations
+- Shifts: Scheduling and management of job shifts within camp sessions
+- Signups: User registrations for available shifts
+- Payments: Handling camp registration fees via Stripe and PayPal
+
+Implementation will proceed incrementally, starting from the backend API, with database schemas defined using Prisma, followed by frontend integration and comprehensive testing.
+
+Planned project structure is outlined in [Project Structure](./prompts/project-structure.prompt.md).
+
+APIs, controllers, modules, etc., should be individually testable.
