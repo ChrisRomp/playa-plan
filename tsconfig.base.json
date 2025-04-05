@@ -11,7 +11,8 @@
       "moduleResolution": "node",
       "declaration": true,
       "sourceMap": true,
-      "composite": true
+      "composite": true,
+      "experimentalDecorators": true,
+      "emitDecoratorMetadata": true
     }
   }
-  

@@ -1,0 +1,17 @@
+{
+  "collection": "@nestjs/schematics",
+  "sourceRoot": "src",
+  "compilerOptions": {
+    "deleteOutDir": true,
+    "webpack": false,
+    "tsConfigPath": "tsconfig.json",
+    "builder": "tsc",
+    "assets": [
+      {
+        "include": "**/*.proto",
+        "outDir": "dist"
+      }
+    ],
+    "watchAssets": true
+  }
+}
