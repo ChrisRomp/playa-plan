@@ -1,0 +1,193 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User models
+model User {
+  id                String    @id @default(uuid())
+  email             String    @unique
+  password          String?
+  firstName         String
+  lastName          String
+  playaName         String?
+  profilePicture    String?
+  role              UserRole  @default(PARTICIPANT)
+  isEmailVerified   Boolean   @default(false)
+  verificationToken String?
+  resetToken        String?
+  resetTokenExpiry  DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  signups           Signup[]
+  payments          Payment[]
+
+  @@map("users")
+}
+
+enum UserRole {
+  ADMIN
+  STAFF
+  PARTICIPANT
+}
+
+// Camp models
+model Camp {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  startDate   DateTime
+  endDate     DateTime
+  location    String
+  capacity    Int
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  shifts      Shift[]
+
+  @@map("camps")
+}
+
+// Job Category model
+model JobCategory {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  jobs        Job[]
+
+  @@map("job_categories")
+}
+
+// Job models
+model Job {
+  id          String     @id @default(uuid())
+  name        String
+  description String?
+  location    String
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  // Relations
+  categoryId  String
+  category    JobCategory @relation(fields: [categoryId], references: [id])
+  shifts      Shift[]
+
+  @@map("jobs")
+}
+
+// Shift models
+model Shift {
+  id          String   @id @default(uuid())
+  startTime   DateTime
+  endTime     DateTime
+  maxSignups  Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  campId      String
+  camp        Camp     @relation(fields: [campId], references: [id])
+  jobId       String
+  job         Job      @relation(fields: [jobId], references: [id])
+  signups     Signup[]
+
+  @@map("shifts")
+}
+
+// Signup models
+model Signup {
+  id        String   @id @default(uuid())
+  status    SignupStatus @default(PENDING)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  shiftId   String
+  shift     Shift    @relation(fields: [shiftId], references: [id])
+  payment   Payment? @relation(fields: [paymentId], references: [id])
+  paymentId String?  @unique
+
+  @@map("signups")
+}
+
+enum SignupStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  WAITLISTED
+}
+
+// Payment models
+model Payment {
+  id            String        @id @default(uuid())
+  amount        Float
+  currency      String        @default("USD")
+  status        PaymentStatus @default(PENDING)
+  provider      PaymentProvider
+  providerRefId String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  // Relations
+  userId        String
+  user          User          @relation(fields: [userId], references: [id])
+  signup        Signup?
+
+  @@map("payments")
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+enum PaymentProvider {
+  STRIPE
+  PAYPAL
+}
+
+// Notification models
+model Notification {
+  id        String            @id @default(uuid())
+  type      NotificationType
+  content   String
+  recipient String
+  status    NotificationStatus @default(PENDING)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  @@map("notifications")
+}
+
+enum NotificationType {
+  EMAIL_VERIFICATION
+  PASSWORD_RESET
+  SIGNUP_CONFIRMATION
+  PAYMENT_CONFIRMATION
+  SHIFT_REMINDER
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+}

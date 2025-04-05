@@ -2,6 +2,11 @@ PlayaPlan Project Summary:
 
 This project involves building a full-stack web application for managing annual camp registrations called PlayaPlan. The application enables user registration, profile management, and authentication using JWT and Passport.js. Users will sign up for camp job shifts scheduled within admin-defined camp sessions. Each job has categories and location attributes, and not all jobs are available on all camp dates.
 
+Development instructions
+
+- Use clear, easily-readable code whereever possible
+- Document the code
+
 The application stack includes:
 
 - Frontend: React with TypeScript and Tailwind CSS

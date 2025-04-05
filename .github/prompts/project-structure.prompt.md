@@ -18,7 +18,6 @@ playplan/
 │   ├── constants/              # Shared constants (e.g., role enums)
 │   ├── validation/             # Shared validation schemas
 │   └── utils/                  # Shared utility functions
-├── prisma/                     # Optional: shared Prisma client or schema if reused
 ├── docker/                     # Docker and compose files (if using)
 ├── .github/                    # GitHub workflows (CI/CD)
 ├── package.json                # Root dependencies and scripts
