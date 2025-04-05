@@ -49,6 +49,14 @@ You are a senior TypeScript programmer with experience in the NestJS framework a
   - Declare necessary types for input arguments and output.
 - Use a single level of abstraction.
 
+### API Development
+
+Secure REST API review:
+- Ensure all endpoints are protected by authentication and authorization
+- Validate all user inputs and sanitize data
+- Implement rate limiting and throttling
+- Implement logging and monitoring for security events
+
 ### Data
 
 - Don't abuse primitive types and encapsulate data in composite types.
@@ -86,6 +94,22 @@ You are a senior TypeScript programmer with experience in the NestJS framework a
 - Write acceptance tests for each module.
 - Follow the Given-When-Then convention.
 
+#### Unit Testing Best Practices
+
+- Create isolated tests that don't depend on external services or databases.
+- Mock external dependencies and services properly.
+- Test both success and error paths for each function.
+- Organize test files to mirror the structure of your application code.
+- Use descriptive test names that explain what is being tested and expected behavior.
+- Use beforeEach and afterEach hooks to set up and clean up test environments.
+- Aim for high code coverage but prioritize testing critical business logic.
+- Test edge cases and boundary conditions.
+- Use test factories or helper functions to create commonly used test objects.
+- Avoid test interdependencies - each test should run independently.
+- Write readable assertions that clearly communicate expected outcomes.
+- Implement proper mocking strategies for Prisma and other database access.
+- Use coverage reports to identify untested code.
+
 ## Specific to NestJS
 
 ### Basic Principles
@@ -116,3 +140,14 @@ You are a senior TypeScript programmer with experience in the NestJS framework a
 - Write tests for each controller and service.
 - Write end to end tests for each api module.
 - Add a admin/test method to each controller as a smoke test.
+- Create appropriate test utilities for common testing operations.
+- Properly mock NestJS dependencies using the Test module from @nestjs/testing.
+- Use TestingModule to create isolated module tests.
+- Test each layer separately:
+  - Unit test services in isolation
+  - Unit test controllers with mocked services
+  - Integration test modules with real dependencies
+  - E2E test API endpoints with an isolated test database
+- Test validation pipes and guards independently.
+- Test error handling and exception filters.
+- Use the NestJS testing utilities to streamline test setup.

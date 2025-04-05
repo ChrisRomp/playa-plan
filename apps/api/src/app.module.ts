@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { PrismaModule } from './common/prisma/prisma.module';
+import { UsersModule } from './users/users.module';
 
 /**
  * Root module of the PlayaPlan API application
@@ -15,7 +16,9 @@ import { PrismaModule } from './common/prisma/prisma.module';
     }),
     // Prisma module for database access
     PrismaModule,
-    // Feature modules will be added here as they are implemented
+    // Feature modules
+    UsersModule,
+    // Other feature modules will be added here as they are implemented
   ],
 })
 export class AppModule {}
