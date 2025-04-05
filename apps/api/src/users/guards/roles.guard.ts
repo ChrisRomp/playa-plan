@@ -1,4 +1,4 @@
-import { Injectable, CanActivate, ExecutionContext, ForbiddenException } from '@nestjs/common';
+import { Injectable, CanActivate, ExecutionContext, ForbiddenException, SetMetadata } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { UserRole } from '@prisma/client';
 
@@ -11,13 +11,7 @@ export const ROLES_KEY = 'roles';
  * Decorator to specify required roles for an endpoint
  * @param roles - Array of roles that can access the endpoint
  */
-export const Roles = (...roles: UserRole[]) => {
-  return (target: any, key?: string, descriptor?: any) => {
-    const reflector = new Reflector();
-    reflector.set(ROLES_KEY, roles, descriptor.value);
-    return descriptor;
-  };
-};
+export const Roles = (...roles: UserRole[]) => SetMetadata(ROLES_KEY, roles);
 
 /**
  * Guard that checks if the user has any of the required roles

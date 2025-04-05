@@ -11,6 +11,9 @@ import * as bcrypt from 'bcrypt';
  */
 @Injectable()
 export class UserService {
+  // Protected fields that cannot be updated directly
+  private readonly protectedFields = ['id', 'createdAt', 'updatedAt'];
+
   constructor(private readonly prisma: PrismaService) {}
 
   /**
@@ -96,8 +99,17 @@ export class UserService {
       }
     }
     
-    // Create data object for update
-    const updateData: any = { ...updateUserDto };
+    // Create a clean update data object without protected fields
+    const updateData: Record<string, any> = {};
+    
+    // Type safe way to iterate through DTO properties
+    Object.keys(updateUserDto).forEach(key => {
+      if (!this.protectedFields.includes(key)) {
+        // Use type assertion to tell TypeScript this is a valid key
+        const typedKey = key as keyof UpdateUserDto;
+        updateData[key] = updateUserDto[typedKey];
+      }
+    });
     
     // Hash password if it's included in the update
     if (updateData.password) {

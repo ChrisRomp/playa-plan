@@ -26,6 +26,17 @@ import { SelfOrAdminGuard } from '../guards/self-or-admin.guard';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 
 /**
+ * Type definition for authenticated request
+ */
+interface AuthRequest extends Request {
+  user: {
+    id: string;
+    email: string;
+    role: UserRole;
+  };
+}
+
+/**
  * Controller for handling user-related HTTP requests
  */
 @ApiTags('users')
@@ -51,7 +62,7 @@ export class UserController {
     isArray: true
   })
   @ApiResponse({ status: 403, description: 'Forbidden - Insufficient privileges' })
-  async findAll(@Request() req): Promise<User[]> {
+  async findAll(@Request() req: AuthRequest): Promise<User[]> {
     const users = await this.userService.findAll();
     return users.map(user => new User(user));
   }
@@ -92,8 +103,11 @@ export class UserController {
     description: 'Returns the current authenticated user',
     type: User
   })
-  async getProfile(@Request() req): Promise<User> {
+  async getProfile(@Request() req: AuthRequest): Promise<User> {
     const user = await this.userService.findById(req.user.id);
+    if (!user) {
+      throw new NotFoundException('User profile not found');
+    }
     return new User(user);
   }
 
@@ -111,7 +125,7 @@ export class UserController {
   })
   @ApiResponse({ status: 409, description: 'Email already registered' })
   @ApiResponse({ status: 403, description: 'Forbidden - Insufficient privileges' })
-  async create(@Body() createUserDto: CreateUserDto, @Request() req): Promise<User> {
+  async create(@Body() createUserDto: CreateUserDto, @Request() req: AuthRequest): Promise<User> {
     // Only admins can create users with roles other than PARTICIPANT
     if (createUserDto.role && createUserDto.role !== UserRole.PARTICIPANT) {
       if (!req.user || req.user.role !== UserRole.ADMIN) {
@@ -143,12 +157,17 @@ export class UserController {
   async update(
     @Param('id') id: string,
     @Body() updateUserDto: UpdateUserDto,
-    @Request() req
+    @Request() req: AuthRequest
   ): Promise<User> {
+    // First check if the user exists
+    const userExists = await this.userService.findById(id);
+    if (!userExists) {
+      throw new NotFoundException('User not found');
+    }
+    
     // Staff can only update participants, not other staff or admins
     if (req.user && req.user.role === UserRole.STAFF) {
-      const userToUpdate = await this.userService.findById(id);
-      if (!userToUpdate || userToUpdate.role !== UserRole.PARTICIPANT) {
+      if (userExists.role !== UserRole.PARTICIPANT) {
         throw new ForbiddenException('Staff can only update participant accounts');
       }
     }

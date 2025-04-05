@@ -8,16 +8,16 @@ import { UserRole } from '@prisma/client';
  */
 export class User {
   @ApiProperty({ description: 'Unique identifier for the user' })
-  id: string;
+  id: string = '';
 
   @ApiProperty({ description: 'User email address', example: 'user@example.com' })
-  email: string;
+  email: string = '';
 
   @ApiProperty({ description: 'User first name', example: 'John' })
-  firstName: string;
+  firstName: string = '';
 
   @ApiProperty({ description: 'User last name', example: 'Doe' })
-  lastName: string;
+  lastName: string = '';
 
   @ApiProperty({ description: 'User playa name (optional)', example: 'Dusty', required: false })
   playaName?: string | null;
@@ -26,16 +26,16 @@ export class User {
   profilePicture?: string | null;
 
   @ApiProperty({ enum: UserRole, description: 'User role in the system', default: UserRole.PARTICIPANT })
-  role: UserRole;
+  role: UserRole = UserRole.PARTICIPANT;
 
   @ApiProperty({ description: 'Flag indicating if email is verified', default: false })
-  isEmailVerified: boolean;
+  isEmailVerified: boolean = false;
 
   @Exclude()
   verificationToken?: string | null;
 
   @Exclude()
-  password?: string;
+  password?: string | null;
   
   @Exclude()
   resetToken?: string | null;
@@ -44,10 +44,10 @@ export class User {
   resetTokenExpiry?: Date | null;
 
   @ApiProperty({ description: 'When the user was created' })
-  createdAt: Date;
+  createdAt: Date = new Date();
 
   @ApiProperty({ description: 'When the user was last updated' })
-  updatedAt: Date;
+  updatedAt: Date = new Date();
 
   constructor(partial: Partial<User>) {
     Object.assign(this, partial);

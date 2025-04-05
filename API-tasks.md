@@ -43,14 +43,18 @@
 
 ### 🛠️ Users Module
 
-- [ ] Implement `User` entity definition (`user.entity.ts`)
-- [ ] Implement additional DTOs (e.g., `update-user.dto.ts`)
-- [ ] Implement additional validation schemas as needed
-- [ ] Implement authorization guards for user endpoints
+- [x] Implement `User` entity definition (`user.entity.ts`)
+- [x] Implement additional DTOs (e.g., `update-user.dto.ts`)
+- [x] Implement additional validation schemas as needed
+- [x] Implement authorization guards for user endpoints
+- [x] Fix TypeScript errors and type safety issues in User module
+- [x] Implement user data serialization with class-transformer
+- [x] Implement UserTransformInterceptor to exclude sensitive fields
 - [ ] Implement user-specific middleware or interceptors if needed
-- [ ] Write unit tests for additional DTOs, guards, middleware, and interceptors
+- [x] Write unit tests for User controllers, services, and guards
+- [x] Write unit tests for UserTransformInterceptor
 - [ ] Complete integration (e2e) tests for all user endpoints
-- [ ] Add admin/test method to controller as a smoke test
+- [x] Add admin/test method to controller as a smoke test
 - [ ] Update Swagger documentation for all user endpoints
 - [ ] Document user module usage and endpoints in README.md
 
