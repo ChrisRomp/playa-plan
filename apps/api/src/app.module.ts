@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { PrismaModule } from './common/prisma/prisma.module';
 import { UsersModule } from './users/users.module';
@@ -6,6 +6,7 @@ import { AuthModule } from './auth/auth.module';
 import { APP_FILTER } from '@nestjs/core';
 import { GlobalExceptionFilter } from './common/filters/http-exception.filter';
 import { ThrottlingModule } from './common/throttling/throttling.module';
+import { SecurityHeadersMiddleware } from './common/middleware/security-headers.middleware';
 import configuration from './config/configuration';
 import validationSchema from './config/validation.schema';
 
@@ -44,6 +45,17 @@ import validationSchema from './config/validation.schema';
       provide: APP_FILTER,
       useClass: GlobalExceptionFilter,
     },
+    // Security headers middleware provider
+    SecurityHeadersMiddleware,
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  /**
+   * Configure global middleware
+   * @param consumer - The middleware consumer
+   */
+  configure(consumer: MiddlewareConsumer) {
+    // Apply security headers middleware to all routes
+    consumer.apply(SecurityHeadersMiddleware).forRoutes('*');
+  }
+}

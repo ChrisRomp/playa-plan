@@ -1,19 +1,17 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
+import { GlobalValidationPipe } from './common/pipes/validation.pipe';
+import helmet from 'helmet';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   
-  // Global validation pipe
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      transform: true,
-      forbidNonWhitelisted: true,
-    }),
-  );
+  // Apply helmet middleware for security headers
+  app.use(helmet());
+  
+  // Global validation and sanitization pipe
+  app.useGlobalPipes(new GlobalValidationPipe());
 
   // CORS configuration
   app.enableCors();

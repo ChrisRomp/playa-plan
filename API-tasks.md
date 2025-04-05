@@ -37,7 +37,7 @@
 - [x] Implement DTOs for login and registration
 - [x] Implement email verification flow
 - [x] Implement password reset flow
-- [ ] Implement optional magic link login
+- [ ] Implement optional magic link or email code verification login
 - [x] Write unit tests for authentication controller and service
 - [ ] Write integration (e2e) tests for authentication endpoints
 
@@ -62,9 +62,9 @@
 
 - [x] Implement global exception filters for standardized error handling
 - [x] Implement rate limiting for API endpoints
-- [ ] Add request validation pipes and sanitization
-- [ ] Implement API security headers (CSRF protection, etc.)
-- [ ] Set up input sanitization to prevent injection attacks
+- [x] Add request validation pipes and sanitization
+- [x] Implement API security headers (CSRF protection, etc.)
+- [x] Set up input sanitization to prevent injection attacks
 
 ## 3. 📚 Core Domain Modules
 

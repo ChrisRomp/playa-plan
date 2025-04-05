@@ -1,16 +1,16 @@
-# PlayPlan planned project folder structure
+# PlayaPlan planned project folder structure
 
 ## Top-level planned project structure
 
 ```text
-playplan/
+playaplan/
 ├── apps/
-│   ├── api/                    # NestJS backend (PlayPlan API)
+│   ├── api/                    # NestJS backend (PlayaPlan API)
 │   │   ├── src/
 │   │   ├── prisma/
 │   │   ├── test/
 │   │   └── ...
-│   └── web/                    # React frontend (PlayPlan UI)
+│   └── web/                    # React frontend (PlayaPlan UI)
 │       ├── src/
 │       └── public/
 ├── libs/                       # Shared libraries between frontend and backend

@@ -48,12 +48,14 @@
     "bcrypt": "^5.1.1",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
+    "helmet": "^8.1.0",
     "joi": "^17.13.3",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "passport-local": "^1.0.0",
     "reflect-metadata": "^0.1.14",
     "rxjs": "^7.8.2",
+    "sanitize-html": "^2.15.0",
     "uuid": "^11.1.0"
   },
   "devDependencies": {
@@ -66,6 +68,7 @@
     "@types/node": "^20.17.30",
     "@types/passport-jwt": "^4.0.1",
     "@types/passport-local": "^1.0.38",
+    "@types/sanitize-html": "^2.15.0",
     "@types/supertest": "^6.0.3",
     "@types/uuid": "^10.0.0",
     "dotenv-cli": "^8.0.0",
