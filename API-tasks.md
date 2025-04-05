@@ -31,14 +31,14 @@
 
 ### 🔐 Authentication Module
 
-- [ ] Implement Local authentication strategy (Passport.js)
-- [ ] Implement JWT authentication strategy (Passport.js)
-- [ ] Implement authentication controller and service
-- [ ] Implement DTOs for login and registration
-- [ ] Implement email verification flow
-- [ ] Implement password reset flow
+- [x] Implement Local authentication strategy (Passport.js)
+- [x] Implement JWT authentication strategy (Passport.js)
+- [x] Implement authentication controller and service
+- [x] Implement DTOs for login and registration
+- [x] Implement email verification flow
+- [x] Implement password reset flow
 - [ ] Implement optional magic link login
-- [ ] Write unit tests for authentication controller and service
+- [x] Write unit tests for authentication controller and service
 - [ ] Write integration (e2e) tests for authentication endpoints
 
 ### 🛠️ Users Module
