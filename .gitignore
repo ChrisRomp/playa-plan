@@ -55,3 +55,4 @@ test-results/
 # Optional: lockfile per workspace if using npm workspaces
 apps/*/package-lock.json
 libs/*/package-lock.json
+apps/api/.env.test
