@@ -205,31 +205,33 @@ export abstract class BackupService {
    * @param schemaOnly Whether to only dump schema (no data)
    * @returns pg_dump command string
    */
-  protected buildPgDumpCommand(outputFile: string, schemaOnly = false): string {
+  protected buildPgDumpCommand(outputFile: string, schemaOnly = false): { command: string, args: string[] } {
     const { host, port, name, username, password, schema } = this.config.database;
     const compression = this.config.storage.compression;
     
-    let command = `PGPASSWORD=${password} pg_dump -h ${host} -p ${port} -U ${username} -d ${name}`;
+    const command = 'pg_dump';
+    const args = [
+      `-h`, host,
+      `-p`, port.toString(),
+      `-U`, username,
+      `-d`, name,
+      `-Fp` // Plain text format
+    ];
     
-    // Add options
     if (schema) {
-      command += ` -n ${schema}`;
+      args.push(`-n`, schema);
     }
     
     if (schemaOnly) {
-      command += ' --schema-only';
+      args.push(`--schema-only`);
     }
     
-    // Add format
-    command += ' -Fp'; // Plain text format
-    
-    // Handle compression
     if (compression.enabled) {
-      command += ` | gzip -${compression.level} > ${outputFile}`;
+      args.push(`|`, `gzip`, `-${compression.level}`, `>`, outputFile);
     } else {
-      command += ` > ${outputFile}`;
+      args.push(`>`, outputFile);
     }
     
-    return command;
+    return { command, args };
   }
 }
