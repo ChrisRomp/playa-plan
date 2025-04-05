@@ -28,7 +28,7 @@ model User {
   updatedAt         DateTime  @updatedAt
 
   // Relations
-  signups           Signup[]
+  registrations     Registration[]
   payments          Payment[]
 
   @@map("users")
@@ -95,7 +95,7 @@ model Shift {
   id          String   @id @default(uuid())
   startTime   DateTime
   endTime     DateTime
-  maxSignups  Int
+  maxRegistrations  Int
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -104,15 +104,15 @@ model Shift {
   camp        Camp     @relation(fields: [campId], references: [id])
   jobId       String
   job         Job      @relation(fields: [jobId], references: [id])
-  signups     Signup[]
+  registrations Registration[]
 
   @@map("shifts")
 }
 
-// Signup models
-model Signup {
+// Registration models
+model Registration {
   id        String   @id @default(uuid())
-  status    SignupStatus @default(PENDING)
+  status    RegistrationStatus @default(PENDING)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -124,10 +124,10 @@ model Signup {
   payment   Payment? @relation(fields: [paymentId], references: [id])
   paymentId String?  @unique
 
-  @@map("signups")
+  @@map("registrations")
 }
 
-enum SignupStatus {
+enum RegistrationStatus {
   PENDING
   CONFIRMED
   CANCELLED
@@ -148,7 +148,7 @@ model Payment {
   // Relations
   userId        String
   user          User          @relation(fields: [userId], references: [id])
-  signup        Signup?
+  registration  Registration?
 
   @@map("payments")
 }
@@ -181,7 +181,7 @@ model Notification {
 enum NotificationType {
   EMAIL_VERIFICATION
   PASSWORD_RESET
-  SIGNUP_CONFIRMATION
+  REGISTRATION_CONFIRMATION
   PAYMENT_CONFIRMATION
   SHIFT_REMINDER
 }

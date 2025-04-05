@@ -1,4 +1,4 @@
-import { PrismaClient, UserRole, SignupStatus, PaymentStatus, PaymentProvider, NotificationType, NotificationStatus } from '@prisma/client';
+import { PrismaClient, UserRole, RegistrationStatus, PaymentStatus, PaymentProvider, NotificationType, NotificationStatus } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
@@ -14,7 +14,7 @@ async function main() {
   // Clean up existing data (in reverse order to respect foreign key constraints)
   await prisma.notification.deleteMany({});
   await prisma.payment.deleteMany({});
-  await prisma.signup.deleteMany({});
+  await prisma.registration.deleteMany({});
   await prisma.shift.deleteMany({});
   await prisma.job.deleteMany({});
   await prisma.jobCategory.deleteMany({});
@@ -201,7 +201,7 @@ async function main() {
     data: {
       startTime: new Date('2025-08-26T08:00:00Z'),
       endTime: new Date('2025-08-26T12:00:00Z'),
-      maxSignups: 5,
+      maxRegistrations: 5,
       campId: camp.id,
       jobId: kitchenJob.id
     }
@@ -211,7 +211,7 @@ async function main() {
     data: {
       startTime: new Date('2025-08-26T13:00:00Z'),
       endTime: new Date('2025-08-26T17:00:00Z'),
-      maxSignups: 5,
+      maxRegistrations: 5,
       campId: camp.id,
       jobId: kitchenJob.id
     }
@@ -221,7 +221,7 @@ async function main() {
     data: {
       startTime: new Date('2025-08-26T09:00:00Z'),
       endTime: new Date('2025-08-26T13:00:00Z'),
-      maxSignups: 3,
+      maxRegistrations: 3,
       campId: camp.id,
       jobId: greeterJob.id
     }
@@ -231,7 +231,7 @@ async function main() {
     data: {
       startTime: new Date('2025-08-26T22:00:00Z'),
       endTime: new Date('2025-08-27T02:00:00Z'),
-      maxSignups: 4,
+      maxRegistrations: 4,
       campId: camp.id,
       jobId: rangerJob.id
     }
@@ -239,7 +239,7 @@ async function main() {
 
   console.log(`Created ${await prisma.shift.count()} shifts`);
 
-  // Create a signup with payment
+  // Create a registration with payment
   const payment = await prisma.payment.create({
     data: {
       amount: 50.0,
@@ -251,33 +251,33 @@ async function main() {
     }
   });
 
-  const signup = await prisma.signup.create({
+  const registration = await prisma.registration.create({
     data: {
-      status: SignupStatus.CONFIRMED,
+      status: RegistrationStatus.CONFIRMED,
       userId: participantUser1.id,
       shiftId: morningKitchenShift.id,
       paymentId: payment.id
     }
   });
 
-  console.log(`Created signup for user ${participantUser1.firstName} ${participantUser1.lastName} for ${kitchenJob.name} shift`);
+  console.log(`Created registration for user ${participantUser1.firstName} ${participantUser1.lastName} for ${kitchenJob.name} shift`);
   
-  // Create another signup without payment
-  const pendingSignup = await prisma.signup.create({
+  // Create another registration without payment
+  const pendingRegistration = await prisma.registration.create({
     data: {
-      status: SignupStatus.PENDING,
+      status: RegistrationStatus.PENDING,
       userId: participantUser2.id,
       shiftId: nightRangerShift.id
     }
   });
 
-  console.log(`Created pending signup for user ${participantUser2.firstName} ${participantUser2.lastName} for ${rangerJob.name} shift`);
+  console.log(`Created pending registration for user ${participantUser2.firstName} ${participantUser2.lastName} for ${rangerJob.name} shift`);
 
   // Create a notification
   const notification = await prisma.notification.create({
     data: {
-      type: NotificationType.SIGNUP_CONFIRMATION,
-      content: 'Your signup for Kitchen Helper on Aug 26, 2025 has been confirmed.',
+      type: NotificationType.REGISTRATION_CONFIRMATION,
+      content: 'Your registration for Kitchen Helper on Aug 26, 2025 has been confirmed.',
       recipient: participantUser1.email,
       status: NotificationStatus.SENT
     }

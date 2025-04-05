@@ -38,7 +38,7 @@ api/
 │   ├── camps/
 │   ├── jobs/
 │   ├── shifts/
-│   ├── signups/
+│   ├── registrations/
 │   ├── payments/
 │   ├── notifications/
 │   └── common/                 # Global guards, interceptors, decorators

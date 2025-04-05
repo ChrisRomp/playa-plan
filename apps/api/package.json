@@ -23,6 +23,9 @@
     "prisma:studio": "prisma studio --schema=./prisma/schema.prisma",
     "seed": "ts-node ./prisma/seeds/seed.ts"
   },
+  "prisma": {
+    "seed": "ts-node ./prisma/seeds/seed.ts"
+  },
   "dependencies": {
     "@nestjs/common": "^10.3.3",
     "@nestjs/config": "^4.0.2",
