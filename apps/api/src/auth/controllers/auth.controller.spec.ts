@@ -2,8 +2,14 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { AuthController } from './auth.controller';
 import { AuthService } from '../services/auth.service';
 import { RegisterDto } from '../dto/register.dto';
-import { UserRole } from '@prisma/client';
+import { User, UserRole } from '@prisma/client';
 import { UnauthorizedException } from '@nestjs/common';
+import { Request } from 'express';
+
+// Define the request with user interface to match controller type
+interface RequestWithUser extends Request {
+  user: Omit<User, 'password'>;
+}
 
 describe('AuthController', () => {
   let controller: AuthController;
@@ -24,7 +30,7 @@ describe('AuthController', () => {
     createdAt: new Date(),
     updatedAt: new Date(),
     profilePicture: null,
-  };
+  } as Omit<User, 'password'>;
 
   // Mock auth response
   const mockAuthResponse = {
@@ -91,7 +97,7 @@ describe('AuthController', () => {
     it('should return auth response for authenticated user', async () => {
       mockAuthService.login.mockResolvedValue(mockAuthResponse);
 
-      const req = { user: mockUser };
+      const req = { user: mockUser } as RequestWithUser;
       const result = await controller.login(req);
       
       expect(result).toEqual(mockAuthResponse);
@@ -150,7 +156,7 @@ describe('AuthController', () => {
 
   describe('getProfile', () => {
     it('should return user profile', async () => {
-      const req = { user: mockUser };
+      const req = { user: mockUser } as RequestWithUser;
       
       const result = await controller.getProfile(req);
       

@@ -19,7 +19,7 @@ export class RegisterDto {
   })
   @IsEmail({}, { message: 'Please provide a valid email address' })
   @IsNotEmpty({ message: 'Email is required' })
-  readonly email: string;
+  readonly email: string = '';
 
   @ApiProperty({
     example: 'Password123!',
@@ -34,7 +34,7 @@ export class RegisterDto {
       message: 'Password must contain at least 1 uppercase letter, 1 lowercase letter, and 1 number',
     },
   )
-  readonly password: string;
+  readonly password: string = '';
 
   @ApiProperty({
     example: 'John',
@@ -43,7 +43,7 @@ export class RegisterDto {
   @IsString()
   @IsNotEmpty({ message: 'First name is required' })
   @MaxLength(50, { message: 'First name cannot exceed 50 characters' })
-  readonly firstName: string;
+  readonly firstName: string = '';
 
   @ApiProperty({
     example: 'Doe',
@@ -52,7 +52,7 @@ export class RegisterDto {
   @IsString()
   @IsNotEmpty({ message: 'Last name is required' })
   @MaxLength(50, { message: 'Last name cannot exceed 50 characters' })
-  readonly lastName: string;
+  readonly lastName: string = '';
 
   @ApiProperty({
     example: 'Sparky',
@@ -63,4 +63,8 @@ export class RegisterDto {
   @IsOptional()
   @MaxLength(50, { message: 'Playa name cannot exceed 50 characters' })
   readonly playaName?: string;
+  
+  constructor(partial: Partial<RegisterDto>) {
+    Object.assign(this, partial);
+  }
 }

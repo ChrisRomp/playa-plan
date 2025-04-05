@@ -47,8 +47,8 @@ export class AuthService {
       // Return user without password
       const { password: _, ...result } = user;
       return result;
-    } catch (error) {
-      this.logger.error(`Error validating user credentials: ${error.message}`);
+    } catch (error: unknown) {
+      this.logger.error(`Error validating user credentials: ${this.getErrorMessage(error)}`);
       return null;
     }
   }
@@ -93,8 +93,8 @@ export class AuthService {
       // Return user without password
       const { password: _, ...result } = newUser;
       return result;
-    } catch (error) {
-      this.logger.error(`Error during user registration: ${error.message}`);
+    } catch (error: unknown) {
+      this.logger.error(`Error during user registration: ${this.getErrorMessage(error)}`);
       throw new BadRequestException('User registration failed');
     }
   }
@@ -158,8 +158,8 @@ export class AuthService {
       });
 
       return true;
-    } catch (error) {
-      this.logger.error(`Error during email verification: ${error.message}`);
+    } catch (error: unknown) {
+      this.logger.error(`Error during email verification: ${this.getErrorMessage(error)}`);
       return false;
     }
   }
@@ -198,8 +198,8 @@ export class AuthService {
       // TODO: Send email with reset link (will be implemented in notifications module)
 
       return true;
-    } catch (error) {
-      this.logger.error(`Error initiating password reset: ${error.message}`);
+    } catch (error: unknown) {
+      this.logger.error(`Error initiating password reset: ${this.getErrorMessage(error)}`);
       return false;
     }
   }
@@ -240,8 +240,8 @@ export class AuthService {
       });
 
       return true;
-    } catch (error) {
-      this.logger.error(`Error resetting password: ${error.message}`);
+    } catch (error: unknown) {
+      this.logger.error(`Error resetting password: ${this.getErrorMessage(error)}`);
       return false;
     }
   }
@@ -254,5 +254,17 @@ export class AuthService {
   private async hashPassword(password: string): Promise<string> {
     const saltRounds = 10;
     return bcrypt.hash(password, saltRounds);
+  }
+  
+  /**
+   * Helper method to safely extract message from error objects
+   * @param error Unknown error object
+   * @returns Error message string
+   */
+  private getErrorMessage(error: unknown): string {
+    if (error instanceof Error) {
+      return error.message;
+    }
+    return String(error);
   }
 }

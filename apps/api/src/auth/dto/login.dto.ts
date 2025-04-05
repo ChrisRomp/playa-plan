@@ -11,7 +11,7 @@ export class LoginDto {
   })
   @IsEmail({}, { message: 'Please provide a valid email address' })
   @IsNotEmpty({ message: 'Email is required' })
-  readonly email: string;
+  readonly email: string = '';
 
   @ApiProperty({
     example: 'Password123!',
@@ -20,5 +20,9 @@ export class LoginDto {
   @IsString()
   @IsNotEmpty({ message: 'Password is required' })
   @MinLength(8, { message: 'Password must be at least 8 characters long' })
-  readonly password: string;
+  readonly password: string = '';
+  
+  constructor(partial: Partial<LoginDto>) {
+    Object.assign(this, partial);
+  }
 }

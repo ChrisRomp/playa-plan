@@ -4,16 +4,16 @@
  */
 export default () => ({
   // Server configuration
-  port: parseInt(process.env.PORT, 10) || 3000,
+  port: parseInt(process.env.PORT || '3000', 10) || 3000,
   nodeEnv: process.env.NODE_ENV || 'development',
 
   // Database configuration 
   database: {
     url: process.env.DATABASE_URL,
-    connectionLimit: parseInt(process.env.DATABASE_CONNECTION_LIMIT, 10) || 10,
-    poolMin: parseInt(process.env.DATABASE_POOL_MIN, 10) || 2,
-    poolMax: parseInt(process.env.DATABASE_POOL_MAX, 10) || 10,
-    idleTimeout: parseInt(process.env.DATABASE_IDLE_TIMEOUT, 10) || 30000,
+    connectionLimit: parseInt(process.env.DATABASE_CONNECTION_LIMIT || '10', 10) || 10,
+    poolMin: parseInt(process.env.DATABASE_POOL_MIN || '2', 10) || 2,
+    poolMax: parseInt(process.env.DATABASE_POOL_MAX || '10', 10) || 10,
+    idleTimeout: parseInt(process.env.DATABASE_IDLE_TIMEOUT || '30000', 10) || 30000,
   },
 
   // Frontend configuration for CORS
@@ -31,7 +31,7 @@ export default () => ({
     allowedHeaders: process.env.CORS_ALLOWED_HEADERS || 'Content-Type,Accept,Authorization',
     exposedHeaders: process.env.CORS_EXPOSED_HEADERS || '',
     credentials: process.env.CORS_CREDENTIALS === 'true',
-    maxAge: parseInt(process.env.CORS_MAX_AGE, 10) || 3600,
+    maxAge: parseInt(process.env.CORS_MAX_AGE || '3600', 10) || 3600,
   },
 
   // JWT authentication
@@ -43,7 +43,7 @@ export default () => ({
   // Email service configuration
   email: {
     host: process.env.MAIL_HOST,
-    port: parseInt(process.env.MAIL_PORT, 10) || 587,
+    port: parseInt(process.env.MAIL_PORT || '587', 10) || 587,
     user: process.env.MAIL_USER,
     password: process.env.MAIL_PASSWORD,
     from: process.env.MAIL_FROM || 'noreply@example.com',

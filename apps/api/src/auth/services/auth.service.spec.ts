@@ -4,7 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { AuthService } from './auth.service';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { RegisterDto } from '../dto/register.dto';
-import { UserRole } from '@prisma/client';
+import { User, UserRole } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
 // Mock external dependencies
@@ -31,7 +31,7 @@ describe('AuthService', () => {
     createdAt: new Date(),
     updatedAt: new Date(),
     profilePicture: null,
-  };
+  } as User;
 
   // Mock prisma service
   const mockPrismaService = {
@@ -166,8 +166,22 @@ describe('AuthService', () => {
   });
 
   describe('login', () => {
-    const userWithoutPassword = { ...mockUser };
-    delete userWithoutPassword.password;
+    // Create a type-safe user without password property
+    const userWithoutPassword: Omit<User, 'password'> = {
+      id: mockUser.id,
+      email: mockUser.email,
+      firstName: mockUser.firstName,
+      lastName: mockUser.lastName,
+      playaName: mockUser.playaName,
+      role: mockUser.role,
+      isEmailVerified: mockUser.isEmailVerified,
+      verificationToken: mockUser.verificationToken,
+      resetToken: mockUser.resetToken,
+      resetTokenExpiry: mockUser.resetTokenExpiry,
+      createdAt: mockUser.createdAt,
+      updatedAt: mockUser.updatedAt,
+      profilePicture: mockUser.profilePicture,
+    };
 
     it('should return user data with JWT token', async () => {
       const result = await service.login(userWithoutPassword);

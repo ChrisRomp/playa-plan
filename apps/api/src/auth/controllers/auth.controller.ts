@@ -7,6 +7,13 @@ import { LocalAuthGuard } from '../guards/local-auth.guard';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { Public } from '../decorators/public.decorator';
 import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiBearerAuth } from '@nestjs/swagger';
+import { Request as ExpressRequest } from 'express';
+import { User, UserRole } from '@prisma/client';
+
+// Define the user type for request objects
+interface RequestWithUser extends ExpressRequest {
+  user: Omit<User, 'password'>;
+}
 
 /**
  * Controller for authentication-related endpoints
@@ -64,7 +71,7 @@ export class AuthController {
     status: HttpStatus.UNAUTHORIZED, 
     description: 'Invalid credentials'
   })
-  async login(@Request() req): Promise<AuthResponseDto> {
+  async login(@Request() req: RequestWithUser): Promise<AuthResponseDto> {
     return this.authService.login(req.user);
   }
 
@@ -140,7 +147,7 @@ export class AuthController {
   @ApiOperation({ summary: 'Get current user profile' })
   @ApiResponse({ status: HttpStatus.OK, description: 'User profile retrieved successfully' })
   @ApiResponse({ status: HttpStatus.UNAUTHORIZED, description: 'Unauthorized' })
-  async getProfile(@Request() req): Promise<any> {
+  async getProfile(@Request() req: RequestWithUser): Promise<any> {
     // User is already injected in request by JWT strategy
     return req.user;
   }
