@@ -3,7 +3,9 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { PrismaModule } from './common/prisma/prisma.module';
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_FILTER } from '@nestjs/core';
+import { GlobalExceptionFilter } from './common/filters/http-exception.filter';
+import { ThrottlingModule } from './common/throttling/throttling.module';
 import configuration from './config/configuration';
 import validationSchema from './config/validation.schema';
 
@@ -25,13 +27,23 @@ import validationSchema from './config/validation.schema';
     }),
     // Prisma module for database access
     PrismaModule,
+    // Security modules
+    ThrottlingModule.register({
+      ttl: 60, // 60 second window
+      limit: 100, // 100 requests per minute by default
+      ignoreGetRequests: true, // Don't throttle GET requests
+    }),
     // Feature modules
     UsersModule,
     AuthModule,
     // Other feature modules will be added here as they are implemented
   ],
   providers: [
-    // Global providers will be added here
+    // Global exception filter
+    {
+      provide: APP_FILTER,
+      useClass: GlobalExceptionFilter,
+    },
   ],
 })
 export class AppModule {}

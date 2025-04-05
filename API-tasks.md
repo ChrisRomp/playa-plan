@@ -60,8 +60,8 @@
 
 ### 🛡️ Security Foundations
 
-- [ ] Implement global exception filters for standardized error handling
-- [ ] Implement rate limiting for API endpoints
+- [x] Implement global exception filters for standardized error handling
+- [x] Implement rate limiting for API endpoints
 - [ ] Add request validation pipes and sanitization
 - [ ] Implement API security headers (CSRF protection, etc.)
 - [ ] Set up input sanitization to prevent injection attacks
