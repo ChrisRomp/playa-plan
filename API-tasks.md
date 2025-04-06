@@ -77,9 +77,16 @@
 
 ### 🛠️ Jobs Module
 
-- [ ] Implement CRUD operations for jobs
+- [x] Implement CRUD operations for jobs
+  - [x] Create jobs module structure
+  - [x] Implement jobs controller with CRUD endpoints
+  - [x] Implement jobs service with Prisma integration
+  - [x] Create DTOs for job creation and updates
 - [ ] Implement job categories and locations management
-- [ ] Implement DTOs and validation schemas
+  - [ ] Create category and location entities
+  - [ ] Implement category and location controllers
+  - [ ] Implement category and location services
+  - [ ] Create DTOs for categories and locations
 - [ ] Write unit tests for job controllers and services
 - [ ] Write integration (e2e) tests for job endpoints
 
