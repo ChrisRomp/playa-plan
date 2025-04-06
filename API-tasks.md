@@ -74,6 +74,9 @@
 - [x] Implement DTOs and validation schemas
 - [x] Write unit tests for camp controllers and services
 - [ ] Write integration (e2e) tests for camp endpoints
+  - [ ] Create e2e test files following project patterns
+  - [ ] Implement proper test data creation and cleanup
+  - [ ] Test permissions (admin vs. regular users)
 
 ### 🛠️ Jobs Module
 
@@ -99,7 +102,14 @@
   - [x] Create DTOs for shift creation and updates
 - [x] Implement DTOs and validation schemas
 - [x] Write unit tests for shift controllers and services
-- [x] Write integration (e2e) tests for shift endpoints
+- [ ] Fix integration (e2e) tests for shift endpoints
+  - [x] Create e2e test files
+  - [ ] Fix authentication issues in the e2e tests
+    - [ ] Ensure test users exist in test database
+    - [ ] Verify JWT token generation in test environment
+    - [ ] Update test setup to handle authentication properly
+  - [ ] Update tests to handle proper test data creation and teardown
+  - [ ] Ensure all shift e2e tests pass
 
 ### 📝 Registrations Module
 
@@ -147,8 +157,19 @@
 
 - [ ] Complete unit tests for all controllers, services, guards, pipes, and filters
 - [ ] Complete integration (e2e) tests for all API endpoints
+  - [ ] Create shared e2e testing utilities and helper functions
+  - [ ] Implement consistent test data seeding/cleanup for e2e tests
+  - [ ] Create standardized authentication setup for all e2e tests
+  - [ ] Implement test database handling (reset between test suites)
+  - [ ] Add test reporting and coverage for e2e tests
 - [ ] Implement shared testing utilities and mock factories
+  - [ ] Create reusable entity factories for testing (users, camps, jobs, etc.)
+  - [ ] Create standardized mock services for common dependencies
+  - [ ] Implement helper functions for JWT token generation in tests
 - [ ] Implement test data fixtures for consistent testing scenarios
+  - [ ] Create sample data fixtures for each entity type
+  - [ ] Implement seed/cleanup utilities for test data
+  - [ ] Ensure test isolation between test suites
 
 ## 7. 📚 Shared Libraries and Documentation
 
