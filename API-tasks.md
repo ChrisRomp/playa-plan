@@ -82,13 +82,13 @@
   - [x] Implement jobs controller with CRUD endpoints
   - [x] Implement jobs service with Prisma integration
   - [x] Create DTOs for job creation and updates
-- [ ] Implement job categories and locations management
-  - [ ] Create category and location entities
-  - [ ] Implement category and location controllers
-  - [ ] Implement category and location services
-  - [ ] Create DTOs for categories and locations
-- [ ] Write unit tests for job controllers and services
-- [ ] Write integration (e2e) tests for job endpoints
+- [x] Implement job categories management
+  - [x] Create category entity
+  - [x] Implement category controller
+  - [x] Implement category service
+  - [x] Create DTOs for categories
+- [x] Write unit tests for job controllers and services
+- [x] Write integration (e2e) tests for job endpoints
 
 ### 📅 Shifts Module
 
