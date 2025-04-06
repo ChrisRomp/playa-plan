@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
-import * as request from 'supertest';
+import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/common/prisma/prisma.service';
 import { RegistrationStatus, UserRole } from '@prisma/client';
@@ -102,12 +102,25 @@ describe('RegistrationsController (e2e)', () => {
 
   async function cleanDatabase() {
     // Delete in correct order to respect foreign key constraints
-    await prismaService.registration.deleteMany();
-    await prismaService.shift.deleteMany();
-    await prismaService.job.deleteMany();
-    await prismaService.jobCategory.deleteMany();
-    await prismaService.camp.deleteMany();
-    await prismaService.user.deleteMany();
+    try {
+      // First, clear any registrations
+      await prismaService.registration.deleteMany();
+      
+      // Then clear any payments (they have a relation to users)
+      await prismaService.payment.deleteMany();
+      
+      // Now clear shifts and related entities
+      await prismaService.shift.deleteMany();
+      await prismaService.job.deleteMany();
+      await prismaService.jobCategory.deleteMany();
+      await prismaService.camp.deleteMany();
+      
+      // Finally, clear users
+      await prismaService.user.deleteMany();
+    } catch (error) {
+      console.error('Error cleaning database:', error);
+      // Continue with tests even if cleanup fails
+    }
   }
 
   async function createTestData() {
@@ -198,7 +211,7 @@ describe('RegistrationsController (e2e)', () => {
         .get('/registrations')
         .set('Authorization', `Bearer ${adminToken}`)
         .expect(200)
-        .expect((res) => {
+        .expect((res: request.Response) => {
           expect(Array.isArray(res.body)).toBe(true);
           expect(res.body.length).toBeGreaterThan(0);
           expect(res.body[0]).toHaveProperty('id');
@@ -212,7 +225,7 @@ describe('RegistrationsController (e2e)', () => {
         .get(`/registrations?userId=${testUser.id}`)
         .set('Authorization', `Bearer ${adminToken}`)
         .expect(200)
-        .expect((res) => {
+        .expect((res: request.Response) => {
           expect(Array.isArray(res.body)).toBe(true);
           expect(res.body.length).toBeGreaterThan(0);
           expect(res.body[0].userId).toBe(testUser.id);
@@ -224,7 +237,7 @@ describe('RegistrationsController (e2e)', () => {
         .get(`/registrations?shiftId=${testShift.id}`)
         .set('Authorization', `Bearer ${adminToken}`)
         .expect(200)
-        .expect((res) => {
+        .expect((res: request.Response) => {
           expect(Array.isArray(res.body)).toBe(true);
           expect(res.body.length).toBeGreaterThan(0);
           expect(res.body[0].shiftId).toBe(testShift.id);
@@ -244,7 +257,7 @@ describe('RegistrationsController (e2e)', () => {
         .get(`/registrations/${testRegistration.id}`)
         .set('Authorization', `Bearer ${adminToken}`)
         .expect(200)
-        .expect((res) => {
+        .expect((res: request.Response) => {
           expect(res.body).toHaveProperty('id', testRegistration.id);
           expect(res.body).toHaveProperty('userId', testUser.id);
           expect(res.body).toHaveProperty('shiftId', testShift.id);
@@ -284,7 +297,7 @@ describe('RegistrationsController (e2e)', () => {
           shiftId: testShift.id,
         })
         .expect(201)
-        .expect((res) => {
+        .expect((res: request.Response) => {
           expect(res.body).toHaveProperty('id');
           expect(res.body).toHaveProperty('userId', testUser.id);
           expect(res.body).toHaveProperty('shiftId', testShift.id);
@@ -323,7 +336,7 @@ describe('RegistrationsController (e2e)', () => {
           status: RegistrationStatus.CONFIRMED,
         })
         .expect(200)
-        .expect((res) => {
+        .expect((res: request.Response) => {
           expect(res.body).toHaveProperty('id', testRegistration.id);
           expect(res.body).toHaveProperty('status', RegistrationStatus.CONFIRMED);
         });
@@ -359,7 +372,7 @@ describe('RegistrationsController (e2e)', () => {
         .delete(`/registrations/${testRegistration.id}`)
         .set('Authorization', `Bearer ${adminToken}`)
         .expect(200)
-        .expect((res) => {
+        .expect((res: request.Response) => {
           expect(res.body).toHaveProperty('id', testRegistration.id);
         });
     });
@@ -391,7 +404,7 @@ describe('RegistrationsController (e2e)', () => {
         .get('/registrations/test/admin')
         .set('Authorization', `Bearer ${adminToken}`)
         .expect(200)
-        .expect((res) => {
+        .expect((res: request.Response) => {
           expect(res.body).toHaveProperty('message', 'Admin access to registrations module confirmed');
         });
     });
