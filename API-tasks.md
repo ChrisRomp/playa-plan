@@ -153,8 +153,8 @@
 - [x] Write unit tests for payment controllers and services
   - [x] Create unit tests for PaymentsService
   - [x] Create unit tests for PaymentsController
-  - [ ] Create unit tests for StripeService
-  - [ ] Create unit tests for PaypalService
+  - [x] Create unit tests for StripeService
+  - [x] Create unit tests for PaypalService
 - [ ] Write integration (e2e) tests for payment endpoints
 
 ### 📧 Notifications Module
