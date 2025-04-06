@@ -92,10 +92,14 @@
 
 ### 📅 Shifts Module
 
-- [ ] Implement CRUD operations for shifts within camp sessions
-- [ ] Implement DTOs and validation schemas
-- [ ] Write unit tests for shift controllers and services
-- [ ] Write integration (e2e) tests for shift endpoints
+- [x] Implement CRUD operations for shifts within camp sessions
+  - [x] Create shifts module structure
+  - [x] Implement shifts controller with CRUD endpoints
+  - [x] Implement shifts service with Prisma integration
+  - [x] Create DTOs for shift creation and updates
+- [x] Implement DTOs and validation schemas
+- [x] Write unit tests for shift controllers and services
+- [x] Write integration (e2e) tests for shift endpoints
 
 ### 📝 Registrations Module
 
