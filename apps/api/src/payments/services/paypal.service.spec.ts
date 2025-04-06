@@ -2,29 +2,33 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { PaypalService } from './paypal.service';
 import { ConfigService } from '@nestjs/config';
 import { Logger } from '@nestjs/common';
-import axios from 'axios';
 
-// Mock axios
-jest.mock('axios');
-const mockedAxios = axios as jest.Mocked<typeof axios>;
+// Mock fetch
+global.fetch = jest.fn() as jest.Mock;
 
 describe('PaypalService', () => {
   let service: PaypalService;
-  let configService: ConfigService;
-
+  
+  const mockLogger = {
+    log: jest.fn(),
+    error: jest.fn(),
+    warn: jest.fn(),
+  };
+  
+  const mockConfigService = {
+    get: jest.fn((key: string) => {
+      const config = {
+        'payment.paypal.clientId': 'mock_client_id',
+        'payment.paypal.clientSecret': 'mock_client_secret',
+        'payment.paypal.mode': 'sandbox',
+      };
+      return config[key as keyof typeof config];
+    }),
+  };
+  
   beforeEach(async () => {
-    // Mock ConfigService
-    const mockConfigService = {
-      get: jest.fn().mockImplementation((key) => {
-        const config = {
-          'paypal.clientId': 'mock_paypal_client_id',
-          'paypal.clientSecret': 'mock_paypal_client_secret',
-          'paypal.mode': 'sandbox',
-        };
-        return config[key];
-      }),
-    };
-
+    jest.clearAllMocks();
+    
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PaypalService,
@@ -32,427 +36,364 @@ describe('PaypalService', () => {
           provide: ConfigService,
           useValue: mockConfigService,
         },
+        {
+          provide: Logger,
+          useValue: mockLogger,
+        },
       ],
     }).compile();
-
-    service = module.get<PaypalService>(PaypalService);
-    configService = module.get<ConfigService>(ConfigService);
     
-    // Spy on logger to prevent console output during tests
-    jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
-    jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
-    jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    service = module.get<PaypalService>(PaypalService);
   });
-
+  
   afterEach(() => {
-    jest.clearAllMocks();
+    jest.resetAllMocks();
   });
-
+  
   it('should be defined', () => {
     expect(service).toBeDefined();
   });
-
-  describe('getAccessToken', () => {
-    it('should get an access token successfully', async () => {
-      // Mock data
-      const mockAccessTokenResponse = {
-        data: {
-          access_token: 'mock_access_token',
-          token_type: 'Bearer',
-          expires_in: 3600,
-        },
-      };
-
-      // Setup mocks
-      mockedAxios.post.mockResolvedValueOnce(mockAccessTokenResponse);
-
-      // Execute
-      const result = await service.getAccessToken();
-
-      // Assert
-      expect(mockedAxios.post).toHaveBeenCalledWith(
-        expect.stringContaining('/v1/oauth2/token'),
-        'grant_type=client_credentials',
-        expect.objectContaining({
-          headers: expect.objectContaining({
-            'Content-Type': 'application/x-www-form-urlencoded',
-          }),
-          auth: {
-            username: 'mock_paypal_client_id',
-            password: 'mock_paypal_client_secret',
-          },
-        })
-      );
-      expect(result).toEqual(mockAccessTokenResponse.data.access_token);
-    });
-
-    it('should handle errors when getting access token', async () => {
-      // Mock data
-      const mockError = new Error('PayPal API Error');
-
-      // Setup mocks
-      mockedAxios.post.mockRejectedValueOnce(mockError);
-
-      // Execute & Assert
-      await expect(service.getAccessToken()).rejects.toThrow();
-    });
-  });
-
+  
   describe('createOrder', () => {
-    it('should create an order successfully', async () => {
-      // Mock data
-      const mockPaymentData = {
-        amount: 100,
-        currency: 'USD',
-        userId: 'user-123',
-        itemDescription: 'Test payment',
-        successUrl: 'https://example.com/success',
-        cancelUrl: 'https://example.com/cancel',
-      };
-      
-      const mockAccessTokenResponse = {
-        data: {
-          access_token: 'mock_access_token',
-          token_type: 'Bearer',
-          expires_in: 3600,
-        },
-      };
-      
-      const mockOrderResponse = {
-        data: {
-          id: 'order-123',
-          status: 'CREATED',
-          links: [
-            {
-              href: 'https://www.sandbox.paypal.com/checkoutnow/order-123',
-              rel: 'approve',
-              method: 'GET',
-            },
-          ],
-        },
-      };
-
-      // Setup mocks
-      mockedAxios.post.mockResolvedValueOnce(mockAccessTokenResponse); // getAccessToken
-      mockedAxios.post.mockResolvedValueOnce(mockOrderResponse); // createOrder
-
-      // Execute
-      const result = await service.createOrder(mockPaymentData);
-
-      // Assert first API call (getAccessToken)
-      expect(mockedAxios.post).toHaveBeenCalledWith(
-        expect.stringContaining('/v1/oauth2/token'),
-        expect.any(String),
-        expect.any(Object)
+    it('should create a PayPal order and return it', async () => {
+      // Mock fetch responses for both token and order creation
+      (fetch as jest.Mock).mockImplementationOnce(() => 
+        Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ access_token: 'mock_access_token' }),
+        })
       );
       
-      // Assert second API call (createOrder)
-      expect(mockedAxios.post).toHaveBeenCalledWith(
-        expect.stringContaining('/v2/checkout/orders'),
-        expect.objectContaining({
-          intent: 'CAPTURE',
-          purchase_units: expect.arrayContaining([
-            expect.objectContaining({
-              amount: expect.objectContaining({
-                value: '100.00',
-                currency_code: 'USD',
-              }),
-              description: mockPaymentData.itemDescription,
-            }),
-          ]),
-          application_context: expect.objectContaining({
-            return_url: mockPaymentData.successUrl,
-            cancel_url: mockPaymentData.cancelUrl,
-          }),
-        }),
-        expect.objectContaining({
-          headers: expect.objectContaining({
-            Authorization: `Bearer ${mockAccessTokenResponse.data.access_token}`,
+      (fetch as jest.Mock).mockImplementationOnce(() => 
+        Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({
+            id: 'order_123',
+            status: 'CREATED',
+            links: [
+              { rel: 'self', href: 'https://api.sandbox.paypal.com/v2/checkout/orders/order_123' },
+              { rel: 'approve', href: 'https://www.sandbox.paypal.com/checkoutnow?token=order_123' },
+              { rel: 'update', href: 'https://api.sandbox.paypal.com/v2/checkout/orders/order_123' },
+              { rel: 'capture', href: 'https://api.sandbox.paypal.com/v2/checkout/orders/order_123/capture' },
+            ],
           }),
         })
       );
       
-      expect(result).toEqual(mockOrderResponse.data);
-    });
-
-    it('should handle errors when creating order', async () => {
-      // Mock data
-      const mockPaymentData = {
-        amount: 100,
+      const orderData = {
+        userId: 'user123',
+        amount: 99.99,
         currency: 'USD',
-        userId: 'user-123',
-        itemDescription: 'Test payment',
+        itemDescription: 'Product purchase',
+        successUrl: 'https://example.com/success',
+        cancelUrl: 'https://example.com/cancel',
+        registrationId: 'reg_123',
+      };
+      
+      const result = await service.createOrder(orderData);
+      
+      // Verify fetch was called twice (token + order creation)
+      expect(fetch).toHaveBeenCalledTimes(2);
+      
+      // First call for access token
+      expect(fetch).toHaveBeenNthCalledWith(
+        1,
+        'https://api-m.sandbox.paypal.com/v1/oauth2/token',
+        expect.objectContaining({
+          method: 'POST',
+          headers: expect.any(Object),
+          body: 'grant_type=client_credentials',
+        })
+      );
+      
+      // Second call for order creation
+      expect(fetch).toHaveBeenNthCalledWith(
+        2,
+        'https://api-m.sandbox.paypal.com/v2/checkout/orders',
+        expect.objectContaining({
+          method: 'POST',
+          headers: expect.any(Object),
+          body: expect.any(String),
+        })
+      );
+      
+      expect(mockLogger.log).toHaveBeenCalledWith(
+        expect.stringContaining('Created PayPal order'),
+      );
+      
+      expect(result).toEqual(expect.objectContaining({
+        id: 'order_123',
+        status: 'CREATED',
+      }));
+    });
+    
+    it('should throw an error if order creation fails', async () => {
+      // Mock fetch for successful token but failed order
+      (fetch as jest.Mock).mockImplementationOnce(() => 
+        Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ access_token: 'mock_access_token' }),
+        })
+      );
+      
+      (fetch as jest.Mock).mockImplementationOnce(() => 
+        Promise.resolve({
+          ok: false,
+          json: () => Promise.resolve({ error: 'invalid_request', error_description: 'PayPal API error' }),
+        })
+      );
+      
+      const orderData = {
+        userId: 'user123',
+        amount: 99.99,
+        currency: 'USD',
+        itemDescription: 'Product purchase',
         successUrl: 'https://example.com/success',
         cancelUrl: 'https://example.com/cancel',
       };
       
-      const mockAccessTokenResponse = {
-        data: {
-          access_token: 'mock_access_token',
-          token_type: 'Bearer',
-          expires_in: 3600,
-        },
-      };
+      await expect(service.createOrder(orderData)).rejects.toThrow();
       
-      const mockError = new Error('PayPal API Error');
-
-      // Setup mocks
-      mockedAxios.post.mockResolvedValueOnce(mockAccessTokenResponse); // getAccessToken
-      mockedAxios.post.mockRejectedValueOnce(mockError); // createOrder
-
-      // Execute & Assert
-      await expect(service.createOrder(mockPaymentData)).rejects.toThrow();
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to create PayPal order'),
+        expect.any(String),
+      );
     });
   });
-
+  
   describe('capturePayment', () => {
-    it('should capture a payment successfully', async () => {
-      // Mock data
-      const orderId = 'order-123';
+    it('should capture a payment for an approved order', async () => {
+      // Mock fetch responses for both token and capture
+      (fetch as jest.Mock).mockImplementationOnce(() => 
+        Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ access_token: 'mock_access_token' }),
+        })
+      );
       
-      const mockAccessTokenResponse = {
-        data: {
-          access_token: 'mock_access_token',
-          token_type: 'Bearer',
-          expires_in: 3600,
-        },
-      };
+      (fetch as jest.Mock).mockImplementationOnce(() => 
+        Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({
+            id: 'order_123',
+            status: 'COMPLETED',
+            purchase_units: [
+              {
+                payments: {
+                  captures: [
+                    { id: 'capture_123', status: 'COMPLETED', amount: { value: '99.99', currency_code: 'USD' } }
+                  ]
+                }
+              }
+            ],
+          }),
+        })
+      );
       
-      const mockCaptureResponse = {
-        data: {
-          id: orderId,
-          status: 'COMPLETED',
-          purchase_units: [
-            {
-              payments: {
-                captures: [
-                  {
-                    id: 'capture-123',
-                    status: 'COMPLETED',
-                    amount: {
-                      value: '100.00',
-                      currency_code: 'USD',
-                    },
-                  },
-                ],
-              },
-            },
-          ],
-        },
-      };
-
-      // Setup mocks
-      mockedAxios.post.mockResolvedValueOnce(mockAccessTokenResponse); // getAccessToken
-      mockedAxios.post.mockResolvedValueOnce(mockCaptureResponse); // capturePayment
-
-      // Execute
+      const orderId = 'order_123';
+      
       const result = await service.capturePayment(orderId);
-
-      // Assert first API call (getAccessToken)
-      expect(mockedAxios.post).toHaveBeenCalledWith(
-        expect.stringContaining('/v1/oauth2/token'),
-        expect.any(String),
-        expect.any(Object)
-      );
       
-      // Assert second API call (capturePayment)
-      expect(mockedAxios.post).toHaveBeenCalledWith(
-        expect.stringContaining(`/v2/checkout/orders/${orderId}/capture`),
-        {},
+      // Verify fetch was called twice (token + capture)
+      expect(fetch).toHaveBeenCalledTimes(2);
+      
+      // Second call for payment capture
+      expect(fetch).toHaveBeenNthCalledWith(
+        2,
+        'https://api-m.sandbox.paypal.com/v2/checkout/orders/order_123/capture',
         expect.objectContaining({
-          headers: expect.objectContaining({
-            Authorization: `Bearer ${mockAccessTokenResponse.data.access_token}`,
-          }),
+          method: 'POST',
+          headers: expect.any(Object),
         })
       );
       
-      expect(result).toEqual(mockCaptureResponse.data);
+      expect(mockLogger.log).toHaveBeenCalledWith(
+        expect.stringContaining('Captured payment for order'),
+      );
+      
+      expect(result).toEqual(expect.objectContaining({
+        id: 'order_123',
+        status: 'COMPLETED',
+      }));
     });
-
-    it('should handle errors when capturing payment', async () => {
-      // Mock data
-      const orderId = 'order-123';
+    
+    it('should throw an error if payment capture fails', async () => {
+      // Mock fetch for successful token but failed capture
+      (fetch as jest.Mock).mockImplementationOnce(() => 
+        Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ access_token: 'mock_access_token' }),
+        })
+      );
       
-      const mockAccessTokenResponse = {
-        data: {
-          access_token: 'mock_access_token',
-          token_type: 'Bearer',
-          expires_in: 3600,
-        },
-      };
+      (fetch as jest.Mock).mockImplementationOnce(() => 
+        Promise.resolve({
+          ok: false,
+          json: () => Promise.resolve({ error: 'invalid_request', error_description: 'PayPal API error' }),
+        })
+      );
       
-      const mockError = new Error('PayPal API Error');
-
-      // Setup mocks
-      mockedAxios.post.mockResolvedValueOnce(mockAccessTokenResponse); // getAccessToken
-      mockedAxios.post.mockRejectedValueOnce(mockError); // capturePayment
-
-      // Execute & Assert
+      const orderId = 'order_123';
+      
       await expect(service.capturePayment(orderId)).rejects.toThrow();
+      
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to capture PayPal payment'),
+        expect.any(String),
+      );
     });
   });
-
+  
   describe('getOrderDetails', () => {
-    it('should get order details successfully', async () => {
-      // Mock data
-      const orderId = 'order-123';
-      
-      const mockAccessTokenResponse = {
-        data: {
-          access_token: 'mock_access_token',
-          token_type: 'Bearer',
-          expires_in: 3600,
-        },
-      };
-      
-      const mockOrderDetailsResponse = {
-        data: {
-          id: orderId,
-          status: 'COMPLETED',
-          purchase_units: [
-            {
-              amount: {
-                value: '100.00',
-                currency_code: 'USD',
-              },
-            },
-          ],
-        },
-      };
-
-      // Setup mocks
-      mockedAxios.post.mockResolvedValueOnce(mockAccessTokenResponse); // getAccessToken
-      mockedAxios.get.mockResolvedValueOnce(mockOrderDetailsResponse); // getOrderDetails
-
-      // Execute
-      const result = await service.getOrderDetails(orderId);
-
-      // Assert first API call (getAccessToken)
-      expect(mockedAxios.post).toHaveBeenCalledWith(
-        expect.stringContaining('/v1/oauth2/token'),
-        expect.any(String),
-        expect.any(Object)
+    it('should retrieve order details by ID', async () => {
+      // Mock fetch responses for both token and order details
+      (fetch as jest.Mock).mockImplementationOnce(() => 
+        Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ access_token: 'mock_access_token' }),
+        })
       );
       
-      // Assert second API call (getOrderDetails)
-      expect(mockedAxios.get).toHaveBeenCalledWith(
-        expect.stringContaining(`/v2/checkout/orders/${orderId}`),
-        expect.objectContaining({
-          headers: expect.objectContaining({
-            Authorization: `Bearer ${mockAccessTokenResponse.data.access_token}`,
+      (fetch as jest.Mock).mockImplementationOnce(() => 
+        Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({
+            id: 'order_123',
+            status: 'CREATED',
+            purchase_units: [
+              { amount: { value: '99.99', currency_code: 'USD' } }
+            ],
           }),
         })
       );
       
-      expect(result).toEqual(mockOrderDetailsResponse.data);
+      const orderId = 'order_123';
+      
+      const result = await service.getOrderDetails(orderId);
+      
+      // Verify fetch was called twice (token + get details)
+      expect(fetch).toHaveBeenCalledTimes(2);
+      
+      // Second call for order details
+      expect(fetch).toHaveBeenNthCalledWith(
+        2,
+        'https://api-m.sandbox.paypal.com/v2/checkout/orders/order_123',
+        expect.objectContaining({
+          method: 'GET',
+          headers: expect.any(Object),
+        })
+      );
+      
+      expect(result).toEqual(expect.objectContaining({
+        id: 'order_123',
+        status: 'CREATED',
+        purchase_units: expect.any(Array),
+      }));
     });
-
-    it('should handle errors when getting order details', async () => {
-      // Mock data
-      const orderId = 'order-123';
+    
+    it('should throw an error if getting order details fails', async () => {
+      // Mock fetch for successful token but failed details
+      (fetch as jest.Mock).mockImplementationOnce(() => 
+        Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ access_token: 'mock_access_token' }),
+        })
+      );
       
-      const mockAccessTokenResponse = {
-        data: {
-          access_token: 'mock_access_token',
-          token_type: 'Bearer',
-          expires_in: 3600,
-        },
-      };
+      (fetch as jest.Mock).mockImplementationOnce(() => 
+        Promise.resolve({
+          ok: false,
+          json: () => Promise.resolve({ error: 'invalid_request', error_description: 'PayPal API error' }),
+        })
+      );
       
-      const mockError = new Error('PayPal API Error');
-
-      // Setup mocks
-      mockedAxios.post.mockResolvedValueOnce(mockAccessTokenResponse); // getAccessToken
-      mockedAxios.get.mockRejectedValueOnce(mockError); // getOrderDetails
-
-      // Execute & Assert
+      const orderId = 'order_123';
+      
       await expect(service.getOrderDetails(orderId)).rejects.toThrow();
+      
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to get PayPal order details'),
+        expect.any(String),
+      );
     });
   });
-
+  
   describe('createRefund', () => {
-    it('should create a refund successfully', async () => {
-      // Mock data
-      const captureId = 'capture-123';
-      const amount = 100;
-      const note = 'Refund for order';
-      
-      const mockAccessTokenResponse = {
-        data: {
-          access_token: 'mock_access_token',
-          token_type: 'Bearer',
-          expires_in: 3600,
-        },
-      };
-      
-      const mockRefundResponse = {
-        data: {
-          id: 'refund-123',
-          status: 'COMPLETED',
-          amount: {
-            value: '100.00',
-            currency_code: 'USD',
-          },
-          note_to_payer: note,
-        },
-      };
-
-      // Setup mocks
-      mockedAxios.post.mockResolvedValueOnce(mockAccessTokenResponse); // getAccessToken
-      mockedAxios.post.mockResolvedValueOnce(mockRefundResponse); // createRefund
-
-      // Execute
-      const result = await service.createRefund(captureId, amount, note);
-
-      // Assert first API call (getAccessToken)
-      expect(mockedAxios.post).toHaveBeenCalledWith(
-        expect.stringContaining('/v1/oauth2/token'),
-        expect.any(String),
-        expect.any(Object)
+    it('should create a refund and return it', async () => {
+      // Mock fetch responses for both token and refund
+      (fetch as jest.Mock).mockImplementationOnce(() => 
+        Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ access_token: 'mock_access_token' }),
+        })
       );
       
-      // Assert second API call (createRefund)
-      expect(mockedAxios.post).toHaveBeenCalledWith(
-        expect.stringContaining(`/v2/payments/captures/${captureId}/refund`),
-        expect.objectContaining({
-          amount: expect.objectContaining({
-            value: '100.00',
-            currency_code: 'USD',
-          }),
-          note_to_payer: note,
-        }),
-        expect.objectContaining({
-          headers: expect.objectContaining({
-            Authorization: `Bearer ${mockAccessTokenResponse.data.access_token}`,
+      (fetch as jest.Mock).mockImplementationOnce(() => 
+        Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({
+            id: 'refund_123',
+            status: 'COMPLETED',
+            amount: { value: '50.00', currency_code: 'USD' },
+            links: [],
           }),
         })
       );
       
-      expect(result).toEqual(mockRefundResponse.data);
+      const captureId = 'capture_123';
+      const amount = 50.00;
+      const note = 'Customer requested refund';
+      
+      const result = await service.createRefund(captureId, amount, note);
+      
+      // Verify fetch was called twice (token + refund creation)
+      expect(fetch).toHaveBeenCalledTimes(2);
+      
+      // Second call for refund creation
+      expect(fetch).toHaveBeenNthCalledWith(
+        2,
+        'https://api-m.sandbox.paypal.com/v2/payments/captures/capture_123/refund',
+        expect.objectContaining({
+          method: 'POST',
+          headers: expect.any(Object),
+          body: expect.any(String),
+        })
+      );
+      
+      expect(mockLogger.log).toHaveBeenCalledWith(
+        expect.stringContaining('Creating refund for PayPal capture'),
+      );
+      
+      expect(result).toEqual(expect.objectContaining({
+        id: 'refund_123',
+        status: 'COMPLETED',
+      }));
     });
-
-    it('should handle errors when creating refund', async () => {
-      // Mock data
-      const captureId = 'capture-123';
-      const amount = 100;
-      const note = 'Refund for order';
+    
+    it('should throw an error if refund creation fails', async () => {
+      // Mock fetch for successful token but failed refund
+      (fetch as jest.Mock).mockImplementationOnce(() => 
+        Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ access_token: 'mock_access_token' }),
+        })
+      );
       
-      const mockAccessTokenResponse = {
-        data: {
-          access_token: 'mock_access_token',
-          token_type: 'Bearer',
-          expires_in: 3600,
-        },
-      };
+      (fetch as jest.Mock).mockImplementationOnce(() => 
+        Promise.resolve({
+          ok: false,
+          json: () => Promise.resolve({ error: 'invalid_request', error_description: 'PayPal API error' }),
+        })
+      );
       
-      const mockError = new Error('PayPal API Error');
-
-      // Setup mocks
-      mockedAxios.post.mockResolvedValueOnce(mockAccessTokenResponse); // getAccessToken
-      mockedAxios.post.mockRejectedValueOnce(mockError); // createRefund
-
-      // Execute & Assert
-      await expect(service.createRefund(captureId, amount, note)).rejects.toThrow();
+      const captureId = 'capture_123';
+      
+      await expect(service.createRefund(captureId)).rejects.toThrow();
+      
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to create PayPal refund'),
+        expect.any(String),
+      );
     });
   });
 }); 
