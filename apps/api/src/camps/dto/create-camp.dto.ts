@@ -1,63 +1,58 @@
-import { IsString, IsNotEmpty, IsOptional, IsInt, IsBoolean, IsDateString, Min, MaxDate, MinDate } from 'class-validator';
-import { Type } from 'class-transformer';
+import { IsString, IsDateString, IsNumber, IsBoolean, IsOptional, Min } from 'class-validator';
+import { ApiProperty } from '@nestjs/swagger';
 
-/**
- * Data Transfer Object for creating a new camp
- */
 export class CreateCampDto {
-  /**
-   * Name of the camp session
-   * @example "Summer Camp 2025"
-   */
+  @ApiProperty({
+    description: 'Name of the camp',
+    example: 'Summer Camp 2025',
+  })
   @IsString()
-  @IsNotEmpty()
-  name: string;
+  name!: string;
 
-  /**
-   * Optional description of the camp session
-   * @example "Annual summer camp at Black Rock Desert"
-   */
+  @ApiProperty({
+    description: 'Description of the camp',
+    example: 'A fun summer camp with various activities',
+    required: false,
+  })
   @IsString()
   @IsOptional()
   description?: string;
 
-  /**
-   * Start date of the camp session (ISO format)
-   * @example "2025-08-24T00:00:00.000Z"
-   */
+  @ApiProperty({
+    description: 'Start date of the camp in ISO format',
+    example: '2025-06-15T00:00:00.000Z',
+  })
   @IsDateString()
-  @IsNotEmpty()
-  startDate: string;
+  startDate!: string;
 
-  /**
-   * End date of the camp session (ISO format)
-   * @example "2025-09-01T23:59:59.000Z"
-   */
+  @ApiProperty({
+    description: 'End date of the camp in ISO format',
+    example: '2025-06-22T00:00:00.000Z',
+  })
   @IsDateString()
-  @IsNotEmpty()
-  endDate: string;
+  endDate!: string;
 
-  /**
-   * Location where the camp session will be held
-   * @example "Black Rock Desert, Nevada"
-   */
+  @ApiProperty({
+    description: 'Location where the camp will be held',
+    example: 'Mountain View Camp Ground',
+  })
   @IsString()
-  @IsNotEmpty()
-  location: string;
+  location!: string;
 
-  /**
-   * Maximum number of participants allowed for the camp
-   * @example 500
-   */
-  @IsInt()
+  @ApiProperty({
+    description: 'Maximum number of participants',
+    example: 100,
+    minimum: 1,
+  })
+  @IsNumber()
   @Min(1)
-  @Type(() => Number)
-  capacity: number;
+  capacity!: number;
 
-  /**
-   * Indicates whether the camp is active and open for registrations
-   * @example true
-   */
+  @ApiProperty({
+    description: 'Whether the camp is currently active',
+    example: true,
+    default: true,
+  })
   @IsBoolean()
   @IsOptional()
   isActive?: boolean = true;

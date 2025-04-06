@@ -1,5 +1,6 @@
 import { Exclude, Expose, Transform } from 'class-transformer';
 import { Camp } from '../entities/camp.entity';
+import { ApiProperty } from '@nestjs/swagger';
 
 /**
  * Data Transfer Object for camp API responses
@@ -8,52 +9,93 @@ export class CampResponseDto implements Partial<Camp> {
   /**
    * Unique identifier for the camp
    */
-  id: string;
+  @ApiProperty({
+    description: 'Unique identifier of the camp',
+    example: 'c12345-67890',
+  })
+  id!: string;
   
   /**
    * Name of the camp session
    */
-  name: string;
+  @ApiProperty({
+    description: 'Name of the camp',
+    example: 'Summer Camp 2025',
+  })
+  name!: string;
   
   /**
    * Description of the camp session
    */
-  description: string | null;
+  @ApiProperty({
+    description: 'Description of the camp',
+    example: 'A fun summer camp with various activities',
+    nullable: true,
+  })
+  description!: string | null;
   
   /**
    * Start date of the camp session
    */
-  startDate: Date;
+  @ApiProperty({
+    description: 'Start date of the camp',
+    example: '2025-06-15T00:00:00.000Z',
+  })
+  startDate!: Date;
   
   /**
    * End date of the camp session
    */
-  endDate: Date;
+  @ApiProperty({
+    description: 'End date of the camp',
+    example: '2025-06-22T00:00:00.000Z',
+  })
+  endDate!: Date;
   
   /**
    * Location where the camp session will be held
    */
-  location: string;
+  @ApiProperty({
+    description: 'Location where the camp will be held',
+    example: 'Mountain View Camp Ground',
+  })
+  location!: string;
   
   /**
    * Maximum number of participants allowed for the camp
    */
-  capacity: number;
+  @ApiProperty({
+    description: 'Maximum number of participants',
+    example: 100,
+  })
+  capacity!: number;
   
   /**
    * Indicates whether the camp is active and open for registrations
    */
-  isActive: boolean;
+  @ApiProperty({
+    description: 'Whether the camp is currently active',
+    example: true,
+  })
+  isActive!: boolean;
   
   /**
    * Date when the camp was created
    */
-  createdAt: Date;
+  @ApiProperty({
+    description: 'When the camp was created',
+    example: '2025-01-01T00:00:00.000Z',
+  })
+  createdAt!: Date;
   
   /**
    * Date when the camp was last updated
    */
-  updatedAt: Date;
+  @ApiProperty({
+    description: 'When the camp was last updated',
+    example: '2025-01-01T00:00:00.000Z',
+  })
+  updatedAt!: Date;
   
   /**
    * Calculated property showing if the camp is currently in session

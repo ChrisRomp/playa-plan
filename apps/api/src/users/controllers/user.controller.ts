@@ -1,29 +1,34 @@
-import { 
-  Controller, 
-  Get, 
-  Post, 
-  Body, 
-  Param, 
-  Put, 
-  Delete, 
-  HttpStatus, 
-  HttpCode,
-  NotFoundException,
-  ClassSerializerInterceptor,
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  Delete,
+  UseGuards,
+  Put,
+  UnauthorizedException,
   UseInterceptors,
+  ClassSerializerInterceptor,
+  HttpCode,
+  HttpStatus,
+  ParseUUIDPipe,
+  BadRequestException,
+  NotFoundException,
   ForbiddenException,
   Request,
-  UseGuards
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBearerAuth } from '@nestjs/swagger';
 import { UserService } from '../services/user.service';
 import { CreateUserDto } from '../dto/create-user.dto';
 import { UpdateUserDto } from '../dto/update-user.dto';
-import { User } from '../entities/user.entity';
-import { UserRole } from '@prisma/client';
-import { RolesGuard, Roles } from '../guards/roles.guard';
-import { SelfOrAdminGuard } from '../guards/self-or-admin.guard';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../guards/roles.guard';
+import { Roles } from '../../auth/decorators/roles.decorator';
+import { UserRole } from '@prisma/client';
+import { SelfOrAdminGuard } from '../guards/self-or-admin.guard';
+import { UserTransformInterceptor } from '../interceptors/user-transform.interceptor';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
+import { User } from '../entities/user.entity';
 
 /**
  * Type definition for authenticated request

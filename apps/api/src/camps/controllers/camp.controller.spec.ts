@@ -7,20 +7,9 @@ import { Camp } from '@prisma/client';
 import { CreateCampDto } from '../dto/create-camp.dto';
 import { UpdateCampDto } from '../dto/update-camp.dto';
 
-// Mock request objects for testing
-const mockRequest = (role: UserRole = UserRole.PARTICIPANT) => {
-  return {
-    user: {
-      id: 'user-123',
-      email: 'user@example.com',
-      role: role
-    }
-  };
-};
-
 describe('CampController', () => {
   let controller: CampController;
-  let campsServiceMock: jest.Mocked<Partial<CampsService>>;
+  let campsService: jest.Mocked<CampsService>;
 
   const mockCamp: Camp = {
     id: 'camp-uuid-1',
@@ -36,8 +25,8 @@ describe('CampController', () => {
   };
 
   beforeEach(async () => {
-    // Create a mock CampsService
-    campsServiceMock = {
+    // Create a mock CampsService with all methods
+    const mockCampsService = {
       findAll: jest.fn(),
       findCurrent: jest.fn(),
       findUpcoming: jest.fn(),
@@ -53,12 +42,13 @@ describe('CampController', () => {
       providers: [
         {
           provide: CampsService,
-          useValue: campsServiceMock,
+          useValue: mockCampsService,
         },
       ],
     }).compile();
 
     controller = module.get<CampController>(CampController);
+    campsService = module.get<CampsService>(CampsService) as jest.Mocked<CampsService>;
   });
 
   afterEach(() => {
@@ -69,30 +59,27 @@ describe('CampController', () => {
     it('should return an array of camps', async () => {
       // Arrange
       const expectedCamps = [mockCamp];
-      campsServiceMock.findAll.mockResolvedValue(expectedCamps);
+      campsService.findAll.mockResolvedValue(expectedCamps);
 
       // Act
       const result = await controller.findAll();
 
       // Assert
-      expect(result).toMatchObject(expectedCamps.map(camp => ({
-        id: camp.id,
-        name: camp.name,
-      })));
-      expect(campsServiceMock.findAll).toHaveBeenCalledWith(false);
+      expect(result).toMatchObject(expectedCamps);
+      expect(campsService.findAll).toHaveBeenCalledWith(false);
     });
 
     it('should include inactive camps when requested', async () => {
       // Arrange
       const expectedCamps = [mockCamp, { ...mockCamp, id: 'camp-2', isActive: false }];
-      campsServiceMock.findAll.mockResolvedValue(expectedCamps);
+      campsService.findAll.mockResolvedValue(expectedCamps);
 
       // Act
       const result = await controller.findAll(true);
 
       // Assert
       expect(result).toHaveLength(2);
-      expect(campsServiceMock.findAll).toHaveBeenCalledWith(true);
+      expect(campsService.findAll).toHaveBeenCalledWith(true);
     });
   });
 
@@ -100,17 +87,14 @@ describe('CampController', () => {
     it('should return current active camps', async () => {
       // Arrange
       const expectedCamps = [mockCamp];
-      campsServiceMock.findCurrent.mockResolvedValue(expectedCamps);
+      campsService.findCurrent.mockResolvedValue(expectedCamps);
 
       // Act
       const result = await controller.findCurrent();
 
       // Assert
-      expect(result).toMatchObject(expectedCamps.map(camp => ({
-        id: camp.id,
-        name: camp.name,
-      })));
-      expect(campsServiceMock.findCurrent).toHaveBeenCalled();
+      expect(result).toMatchObject(expectedCamps);
+      expect(campsService.findCurrent).toHaveBeenCalled();
     });
   });
 
@@ -118,43 +102,37 @@ describe('CampController', () => {
     it('should return upcoming active camps', async () => {
       // Arrange
       const expectedCamps = [mockCamp];
-      campsServiceMock.findUpcoming.mockResolvedValue(expectedCamps);
+      campsService.findUpcoming.mockResolvedValue(expectedCamps);
 
       // Act
       const result = await controller.findUpcoming();
 
       // Assert
-      expect(result).toMatchObject(expectedCamps.map(camp => ({
-        id: camp.id,
-        name: camp.name,
-      })));
-      expect(campsServiceMock.findUpcoming).toHaveBeenCalled();
+      expect(result).toMatchObject(expectedCamps);
+      expect(campsService.findUpcoming).toHaveBeenCalled();
     });
   });
 
   describe('findOne', () => {
     it('should return a camp by ID', async () => {
       // Arrange
-      campsServiceMock.findById.mockResolvedValue(mockCamp);
+      campsService.findById.mockResolvedValue(mockCamp);
 
       // Act
       const result = await controller.findOne('camp-uuid-1');
 
       // Assert
-      expect(result).toMatchObject({
-        id: mockCamp.id,
-        name: mockCamp.name,
-      });
-      expect(campsServiceMock.findById).toHaveBeenCalledWith('camp-uuid-1');
+      expect(result).toMatchObject(mockCamp);
+      expect(campsService.findById).toHaveBeenCalledWith('camp-uuid-1');
     });
 
     it('should throw NotFoundException when camp not found', async () => {
       // Arrange
-      campsServiceMock.findById.mockRejectedValue(new NotFoundException('Camp not found'));
+      campsService.findById.mockRejectedValue(new NotFoundException('Camp not found'));
 
       // Act & Assert
       await expect(controller.findOne('non-existent-id')).rejects.toThrow(NotFoundException);
-      expect(campsServiceMock.findById).toHaveBeenCalledWith('non-existent-id');
+      expect(campsService.findById).toHaveBeenCalledWith('non-existent-id');
     });
   });
 
@@ -178,46 +156,39 @@ describe('CampController', () => {
         endDate: new Date(createCampDto.endDate),
       };
 
-      campsServiceMock.create.mockResolvedValue(expectedCamp);
+      campsService.create.mockResolvedValue(expectedCamp);
 
       // Act
       const result = await controller.create(createCampDto);
 
       // Assert
-      expect(result).toMatchObject({
-        id: expectedCamp.id,
-        name: expectedCamp.name,
-        description: expectedCamp.description,
-      });
-      expect(campsServiceMock.create).toHaveBeenCalledWith(createCampDto);
+      expect(result).toMatchObject(expectedCamp);
+      expect(campsService.create).toHaveBeenCalledWith(createCampDto);
     });
   });
 
   describe('update', () => {
     it('should update an existing camp', async () => {
       // Arrange
-      const updateCampDto: UpdateCampDto = {
+      const updateCampDto = {
         name: 'Updated Camp',
         description: 'Updated description',
-      };
+      } as const;
 
       const expectedCamp = {
         ...mockCamp,
-        ...updateCampDto,
+        name: updateCampDto.name,
+        description: updateCampDto.description,
       };
 
-      campsServiceMock.update.mockResolvedValue(expectedCamp);
+      campsService.update.mockResolvedValue(expectedCamp);
 
       // Act
       const result = await controller.update('camp-uuid-1', updateCampDto);
 
       // Assert
-      expect(result).toMatchObject({
-        id: expectedCamp.id,
-        name: expectedCamp.name,
-        description: expectedCamp.description,
-      });
-      expect(campsServiceMock.update).toHaveBeenCalledWith('camp-uuid-1', updateCampDto);
+      expect(result).toMatchObject(expectedCamp);
+      expect(campsService.update).toHaveBeenCalledWith('camp-uuid-1', updateCampDto);
     });
 
     it('should throw NotFoundException when camp not found', async () => {
@@ -226,40 +197,40 @@ describe('CampController', () => {
         name: 'Updated Camp',
       };
 
-      campsServiceMock.update.mockRejectedValue(new NotFoundException('Camp not found'));
+      campsService.update.mockRejectedValue(new NotFoundException('Camp not found'));
 
       // Act & Assert
       await expect(controller.update('non-existent-id', updateCampDto)).rejects.toThrow(
         NotFoundException
       );
-      expect(campsServiceMock.update).toHaveBeenCalledWith('non-existent-id', updateCampDto);
+      expect(campsService.update).toHaveBeenCalledWith('non-existent-id', updateCampDto);
     });
   });
 
   describe('delete', () => {
     it('should delete camp when it has no shifts', async () => {
       // Arrange
-      campsServiceMock.hasShifts.mockResolvedValue(false);
-      campsServiceMock.delete.mockResolvedValue(mockCamp);
+      campsService.hasShifts.mockResolvedValue(false);
+      campsService.delete.mockResolvedValue(mockCamp);
 
       // Act
       await controller.delete('camp-uuid-1');
 
       // Assert
-      expect(campsServiceMock.hasShifts).toHaveBeenCalledWith('camp-uuid-1');
-      expect(campsServiceMock.delete).toHaveBeenCalledWith('camp-uuid-1');
+      expect(campsService.hasShifts).toHaveBeenCalledWith('camp-uuid-1');
+      expect(campsService.delete).toHaveBeenCalledWith('camp-uuid-1');
     });
 
     it('should throw ForbiddenException when camp has shifts', async () => {
       // Arrange
-      campsServiceMock.hasShifts.mockResolvedValue(true);
+      campsService.hasShifts.mockResolvedValue(true);
 
       // Act & Assert
       await expect(controller.delete('camp-uuid-1')).rejects.toThrow(
         ForbiddenException
       );
-      expect(campsServiceMock.hasShifts).toHaveBeenCalledWith('camp-uuid-1');
-      expect(campsServiceMock.delete).not.toHaveBeenCalled();
+      expect(campsService.hasShifts).toHaveBeenCalledWith('camp-uuid-1');
+      expect(campsService.delete).not.toHaveBeenCalled();
     });
   });
 
