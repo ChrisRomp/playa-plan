@@ -277,7 +277,7 @@ export class PaymentsService {
       
       return {
         paymentId: payment.id,
-        url: session.url,
+        url: session.url || undefined,
       };
     } catch (error: any) {
       this.logger.error(`Failed to initiate Stripe payment: ${error.message}`, error.stack);
