@@ -155,6 +155,7 @@
   - [x] Create unit tests for PaymentsController
   - [x] Create unit tests for StripeService
   - [x] Create unit tests for PaypalService
+  - [ ] Fix failing tests in StripeService and PaypalService unit tests
 - [ ] Write integration (e2e) tests for payment endpoints
 
 ### 📧 Notifications Module
