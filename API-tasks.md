@@ -160,24 +160,23 @@
 
 ### 📧 Notifications Module
 
-- [ ] Implement transactional email sending (SendGrid, Mailgun, or Postmark)
+- [ ] Implement transactional email sending (SendGrid, SMTP)
 - [ ] Implement notification controller and service
 - [ ] Write unit tests for notification controllers and services
 - [ ] Write integration (e2e) tests for notification endpoints
 
 ### Advanced User Features
 
-- [ ] Implement user profile picture upload functionality
 - [ ] Implement email verification and password reset integration with Notifications module
 
 ## 5. 🔍 Operations & Monitoring
 
 - [ ] Implement structured API logging system
 - [ ] Create health check endpoints for monitoring
-- [ ] Set up metrics collection (optional)
-- [ ] Implement feature flags system (optional)
+- [?] Set up metrics collection (optional)
+- [?] Implement feature flags system (optional)
 - [ ] Add performance monitoring and tracing
-- [ ] Create maintenance mode capability
+- [?] Create maintenance mode capability (deferred)
 - [ ] Set up database indexes for performance optimization
 - [ ] Implement request timeout handling
 
@@ -213,12 +212,11 @@
 
 - [ ] Update Swagger (OpenAPI) documentation for all endpoints
 - [ ] Configure GitHub Actions workflows for continuous integration and deployment
+  - [ ] Implement CI for API on PRs to `main`
 - [ ] Document API setup and usage instructions in README.md
 
 ## 8. 🗃️ Database Management
 
 - [ ] Set up database seeding workflow
 - [ ] Create database test fixtures for e2e tests
-- [ ] Implement soft delete functionality where appropriate
 - [ ] Create database versioning strategy
-
