@@ -8,7 +8,7 @@ export class CreateJobDto {
   })
   @IsString()
   @IsNotEmpty()
-  name: string;
+  name!: string;
 
   @ApiProperty({
     description: 'The description of the job',
@@ -16,7 +16,15 @@ export class CreateJobDto {
   })
   @IsString()
   @IsNotEmpty()
-  description: string;
+  description!: string;
+
+  @ApiProperty({
+    description: 'The location of the job',
+    example: 'Main Kitchen',
+  })
+  @IsString()
+  @IsNotEmpty()
+  location!: string;
 
   @ApiProperty({
     description: 'The ID of the job category',
@@ -24,14 +32,5 @@ export class CreateJobDto {
   })
   @IsUUID()
   @IsNotEmpty()
-  categoryId: string;
-
-  @ApiProperty({
-    description: 'The ID of the job location',
-    example: '123e4567-e89b-12d3-a456-426614174000',
-    required: false,
-  })
-  @IsUUID()
-  @IsOptional()
-  locationId?: string;
+  categoryId!: string;
 } 

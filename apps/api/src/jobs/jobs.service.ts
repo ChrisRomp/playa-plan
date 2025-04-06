@@ -10,6 +10,9 @@ export class JobsService {
   async create(createJobDto: CreateJobDto) {
     return this.prisma.job.create({
       data: createJobDto,
+      include: {
+        category: true,
+      },
     });
   }
 
@@ -17,7 +20,6 @@ export class JobsService {
     return this.prisma.job.findMany({
       include: {
         category: true,
-        location: true,
       },
     });
   }
@@ -27,7 +29,6 @@ export class JobsService {
       where: { id },
       include: {
         category: true,
-        location: true,
       },
     });
 
@@ -45,7 +46,6 @@ export class JobsService {
         data: updateJobDto,
         include: {
           category: true,
-          location: true,
         },
       });
     } catch (error) {
