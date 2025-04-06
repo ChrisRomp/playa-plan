@@ -144,10 +144,12 @@
   - [x] Add RecordManualPaymentDto for manual transactions
   - [x] Create UpdatePaymentDto for payment status updates
   - [x] Implement CreateRefundDto for refund processing
-- [ ] Complete controller implementation with endpoints
-  - [x] Create placeholder controller
-  - [ ] Implement endpoints for payment operations
-  - [ ] Add webhook handlers for payment providers
+- [x] Complete controller implementation with endpoints
+  - [x] Create controller with required endpoints
+  - [x] Implement payment operations endpoints
+  - [x] Add webhook handlers for payment providers
+  - [x] Define appropriate security and roles for each endpoint
+- [x] Update app.module.ts to include PaymentsModule
 - [ ] Write unit tests for payment controllers and services
 - [ ] Write integration (e2e) tests for payment endpoints
 
