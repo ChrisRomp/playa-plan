@@ -1,11 +1,12 @@
 import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ConfigModule } from '@nestjs/config';
 import { PrismaModule } from './common/prisma/prisma.module';
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
 import { CampsModule } from './camps/camps.module';
 import { ShiftsModule } from './shifts/shifts.module';
 import { PaymentsModule } from './payments/payments.module';
+import { RegistrationsModule } from './registrations/registrations.module';
 import { APP_FILTER } from '@nestjs/core';
 import { GlobalExceptionFilter } from './common/filters/http-exception.filter';
 import { ThrottlingModule } from './common/throttling/throttling.module';
@@ -43,6 +44,7 @@ import validationSchema from './config/validation.schema';
     CampsModule,
     ShiftsModule,
     PaymentsModule,
+    RegistrationsModule,
     // Other feature modules will be added here as they are implemented
   ],
   providers: [

@@ -113,10 +113,10 @@
 
 ### 📝 Registrations Module
 
-- [ ] Implement CRUD operations for user registrations to shifts
-- [ ] Implement DTOs and validation schemas
-- [ ] Write unit tests for registration controllers and services
-- [ ] Write integration (e2e) tests for registration endpoints
+- [x] Implement CRUD operations for user registrations to shifts
+- [x] Implement DTOs and validation schemas
+- [x] Write unit tests for registration controllers and services
+- [x] Write integration (e2e) tests for registration endpoints
 
 ## 4. 💪 Supporting Features
 
