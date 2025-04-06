@@ -122,11 +122,32 @@
 
 ### 💳 Payments Module
 
-- [ ] Integrate Stripe payment processing
-- [ ] Integrate PayPal payment processing
-- [ ] Include ability to manually record payments and refunds
-- [ ] Implement payment controller and service
-- [ ] Implement DTOs and validation schemas
+- [x] Integrate Stripe payment processing
+  - [x] Create Stripe service for payment intents
+  - [x] Implement checkout session creation
+  - [x] Add webhook handling for Stripe events
+  - [x] Handle refunds through Stripe
+- [x] Integrate PayPal payment processing
+  - [x] Create PayPal service for order creation
+  - [x] Implement payment capture functionality
+  - [x] Add refund processing through PayPal
+- [x] Include ability to manually record payments and refunds
+  - [x] Implement manual payment recording
+  - [x] Add support for recording refunds
+- [x] Implement payment controller and service
+  - [x] Create main PaymentsService for orchestrating payments
+  - [x] Add methods for working with both payment providers
+  - [x] Implement payment lifecycle management
+- [x] Implement DTOs and validation schemas
+  - [x] Create CreatePaymentDto for general payments
+  - [x] Create specific DTOs for Stripe and PayPal payments
+  - [x] Add RecordManualPaymentDto for manual transactions
+  - [x] Create UpdatePaymentDto for payment status updates
+  - [x] Implement CreateRefundDto for refund processing
+- [ ] Complete controller implementation with endpoints
+  - [x] Create placeholder controller
+  - [ ] Implement endpoints for payment operations
+  - [ ] Add webhook handlers for payment providers
 - [ ] Write unit tests for payment controllers and services
 - [ ] Write integration (e2e) tests for payment endpoints
 
