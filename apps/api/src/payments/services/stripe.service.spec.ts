@@ -29,23 +29,17 @@ jest.mock('stripe', () => {
 
 // Import Stripe after mocking
 import Stripe from 'stripe';
-// Use any to avoid TypeScript errors with the mock
-const mockStripeConstructor = jest.fn().mockImplementation(() => mockStripeInstance);
 
 describe('StripeService', () => {
   let service: StripeService;
-  
-  const mockLogger = {
-    log: jest.fn(),
-    error: jest.fn(),
-    warn: jest.fn(),
-  };
+  let loggerSpy: { log: jest.SpyInstance; error: jest.SpyInstance; warn: jest.SpyInstance };
   
   const mockConfigService = {
     get: jest.fn((key: string) => {
       const config = {
-        'stripe.secretKey': 'mock_secret_key',
-        'stripe.webhookSecret': 'mock_webhook_secret',
+        'payment.stripe.secretKey': 'mock_secret_key',
+        'payment.stripe.webhookSecret': 'mock_webhook_secret',
+        'frontend.url': 'https://example.com',
       };
       return config[key as keyof typeof config];
     }),
@@ -61,14 +55,21 @@ describe('StripeService', () => {
           provide: ConfigService,
           useValue: mockConfigService,
         },
-        {
-          provide: Logger,
-          useValue: mockLogger,
-        },
       ],
     }).compile();
     
     service = module.get<StripeService>(StripeService);
+    
+    // Spy on the logger methods
+    loggerSpy = {
+      log: jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined),
+      error: jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined),
+      warn: jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined),
+    };
+  });
+  
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
   
   it('should be defined', () => {
@@ -77,48 +78,52 @@ describe('StripeService', () => {
   
   describe('createPaymentIntent', () => {
     it('should create a payment intent and return it', async () => {
-      const userId = 'user123';
-      const amount = 1000;
-      const currency = 'usd';
+      const paymentData = {
+        userId: 'user123',
+        amount: 1000,
+        currency: 'usd',
+        description: 'Payment for camp registration',
+        registrationId: '',
+      };
       const mockPaymentIntent = { id: 'pi_123', client_secret: 'secret_123' };
       
       mockStripeInstance.paymentIntents.create.mockResolvedValue(mockPaymentIntent);
       
-      const result = await service.createPaymentIntent({
-        userId, 
-        amount, 
-        currency
-      });
+      const result = await service.createPaymentIntent(paymentData);
       
       expect(mockStripeInstance.paymentIntents.create).toHaveBeenCalledWith({
-        amount,
-        currency,
-        metadata: { userId },
+        amount: paymentData.amount,
+        currency: paymentData.currency,
+        description: paymentData.description,
+        metadata: { 
+          userId: paymentData.userId,
+          registrationId: paymentData.registrationId,
+        },
       });
       
-      expect(mockLogger.log).toHaveBeenCalledWith(
-        expect.stringContaining('Creating Stripe payment intent'),
+      expect(loggerSpy.log).toHaveBeenCalledWith(
+        expect.stringContaining('Creating payment intent'),
       );
       
       expect(result).toEqual(mockPaymentIntent);
     });
     
     it('should throw an error if payment intent creation fails', async () => {
-      const userId = 'user123';
-      const amount = 1000;
-      const currency = 'usd';
+      const paymentData = {
+        userId: 'user123',
+        amount: 1000,
+        currency: 'usd',
+        description: 'Payment for camp registration',
+        registrationId: '',
+      };
       const mockError = new Error('Stripe API error');
       
       mockStripeInstance.paymentIntents.create.mockRejectedValue(mockError);
       
-      await expect(service.createPaymentIntent({
-        userId, 
-        amount, 
-        currency
-      })).rejects.toThrow('Stripe API error');
+      await expect(service.createPaymentIntent(paymentData)).rejects.toThrow('Stripe API error');
       
-      expect(mockLogger.error).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to create Stripe payment intent'),
+      expect(loggerSpy.error).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to create payment intent'),
         expect.any(String),
       );
     });
@@ -128,11 +133,12 @@ describe('StripeService', () => {
     it('should create a checkout session and return it', async () => {
       const mockSessionData = {
         userId: 'user123',
-        items: [{ price: 'price_123', quantity: 1 }],
         amount: 1000,
         currency: 'usd',
+        description: 'Product purchase',
         successUrl: 'https://example.com/success',
         cancelUrl: 'https://example.com/cancel',
+        registrationId: '',
       };
       
       const mockSession = {
@@ -148,11 +154,27 @@ describe('StripeService', () => {
         expect.objectContaining({
           payment_method_types: ['card'],
           mode: 'payment',
-        }),
+          line_items: [
+            {
+              quantity: 1,
+              price_data: {
+                currency: mockSessionData.currency,
+                unit_amount: mockSessionData.amount,
+                product_data: { name: mockSessionData.description },
+              },
+            },
+          ],
+          success_url: mockSessionData.successUrl,
+          cancel_url: mockSessionData.cancelUrl,
+          metadata: {
+            userId: mockSessionData.userId,
+            registrationId: mockSessionData.registrationId,
+          },
+        })
       );
       
-      expect(mockLogger.log).toHaveBeenCalledWith(
-        expect.stringContaining('Created Stripe checkout session'),
+      expect(loggerSpy.log).toHaveBeenCalledWith(
+        expect.stringContaining('Creating checkout session'),
       );
       
       expect(result).toEqual(mockSession);
@@ -161,11 +183,12 @@ describe('StripeService', () => {
     it('should throw an error if checkout session creation fails', async () => {
       const mockSessionData = {
         userId: 'user123',
-        items: [{ price: 'price_123', quantity: 1 }],
         amount: 1000,
         currency: 'usd',
+        description: 'Product purchase',
         successUrl: 'https://example.com/success',
         cancelUrl: 'https://example.com/cancel',
+        registrationId: '',
       };
       
       const mockError = new Error('Stripe API error');
@@ -174,8 +197,8 @@ describe('StripeService', () => {
       
       await expect(service.createCheckoutSession(mockSessionData)).rejects.toThrow('Stripe API error');
       
-      expect(mockLogger.error).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to create Stripe checkout session'),
+      expect(loggerSpy.error).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to create checkout session'),
         expect.any(String),
       );
     });
@@ -199,8 +222,8 @@ describe('StripeService', () => {
         reason,
       });
       
-      expect(mockLogger.log).toHaveBeenCalledWith(
-        expect.stringContaining('Created Stripe refund'),
+      expect(loggerSpy.log).toHaveBeenCalledWith(
+        expect.stringContaining('Creating refund'),
       );
       
       expect(result).toEqual(mockRefund);
@@ -214,8 +237,8 @@ describe('StripeService', () => {
       
       await expect(service.createRefund(paymentIntentId)).rejects.toThrow('Stripe API error');
       
-      expect(mockLogger.error).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to create Stripe refund'),
+      expect(loggerSpy.error).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to process refund'),
         expect.any(String),
       );
     });
@@ -242,8 +265,8 @@ describe('StripeService', () => {
       
       await expect(service.getPaymentIntent(paymentIntentId)).rejects.toThrow('Stripe API error');
       
-      expect(mockLogger.error).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to retrieve Stripe payment intent'),
+      expect(loggerSpy.error).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to retrieve payment intent'),
         expect.any(String),
       );
     });
@@ -279,8 +302,8 @@ describe('StripeService', () => {
       
       await expect(service.constructEventFromWebhook(mockPayload, mockSignature)).rejects.toThrow('Invalid signature');
       
-      expect(mockLogger.error).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to verify Stripe webhook signature'),
+      expect(loggerSpy.error).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to verify webhook'),
         expect.any(String),
       );
     });
