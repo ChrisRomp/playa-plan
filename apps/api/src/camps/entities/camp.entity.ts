@@ -6,50 +6,54 @@ export class Camp {
   /**
    * Unique identifier for the camp
    */
-  id: string;
+  id!: string;
   
   /**
    * Name of the camp session
    */
-  name: string;
+  name!: string;
   
   /**
    * Optional description of the camp session
    */
-  description: string | null;
+  description!: string | null;
   
   /**
    * Start date of the camp session
    */
-  startDate: Date;
+  startDate!: Date;
   
   /**
    * End date of the camp session
    */
-  endDate: Date;
+  endDate!: Date;
   
   /**
    * Location where the camp session will be held
    */
-  location: string;
+  location!: string;
   
   /**
    * Maximum number of participants allowed for the camp
    */
-  capacity: number;
+  capacity!: number;
   
   /**
    * Indicates whether the camp is active and open for registrations
    */
-  isActive: boolean;
+  isActive!: boolean;
   
   /**
    * Date when the camp record was created
    */
-  createdAt: Date;
+  createdAt!: Date;
   
   /**
    * Date when the camp record was last updated
    */
-  updatedAt: Date;
+  updatedAt!: Date;
+  
+  constructor(partial: Partial<Camp>) {
+    Object.assign(this, partial);
+  }
 }

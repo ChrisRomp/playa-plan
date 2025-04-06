@@ -1,9 +1,9 @@
-import { Module, DynamicModule } from '@nestjs/common';
+import { Module, DynamicModule, ExecutionContext } from '@nestjs/common';
 import { 
   ThrottlerModule, 
-  ThrottlerModuleOptions, 
-  ThrottlerStorage, 
-  THROTTLER_OPTIONS
+  ThrottlerModuleOptions,
+  ThrottlerStorage,
+  ThrottlerOptions
 } from '@nestjs/throttler';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlingGuard } from './throttling.guard';
@@ -52,7 +52,7 @@ export class ThrottlingModule {
         ThrottlerModule.forRootAsync({
           imports: [ConfigModule],
           inject: [ConfigService],
-          useFactory: (configService: ConfigService) => {
+          useFactory: (configService: ConfigService): ThrottlerModuleOptions => {
             const ttl = options?.ttl || 
               configService.get<number>('THROTTLE_TTL') || 60; // Default: 60 seconds
             
@@ -65,16 +65,10 @@ export class ThrottlingModule {
             return {
               throttlers: [
                 {
-                  name: 'default',
                   ttl: ttlMs,
-                  limit: limit,
-                },
-                {
-                  name: 'auth',
-                  ttl: 60000, // 60 seconds in milliseconds
-                  limit: 5,   // 5 requests per minute for auth endpoints
-                },
-              ],
+                  limit
+                }
+              ]
             };
           },
         }),
@@ -82,16 +76,23 @@ export class ThrottlingModule {
       providers: [
         {
           provide: APP_GUARD,
-          inject: [Reflector, THROTTLER_OPTIONS, ThrottlerStorage],
+          inject: [Reflector, ThrottlerStorage],
           useFactory: (
-            reflector: Reflector, 
-            options: ThrottlerModuleOptions, 
+            reflector: Reflector,
             storageService: ThrottlerStorage
           ) => {
+            const defaultOptions: ThrottlerModuleOptions = {
+              throttlers: [
+                {
+                  ttl: 60000,
+                  limit: 100
+                }
+              ]
+            };
             return new ThrottlingGuard(
-              options, 
-              storageService, 
-              reflector, 
+              defaultOptions,
+              storageService,
+              reflector,
               ignoreGetRequests
             );
           },
