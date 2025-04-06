@@ -70,9 +70,9 @@
 
 ### 🏕️ Camp Module
 
-- [ ] Implement CRUD operations for camp sessions
-- [ ] Implement DTOs and validation schemas
-- [ ] Write unit tests for camp controllers and services
+- [x] Implement CRUD operations for camp sessions
+- [x] Implement DTOs and validation schemas
+- [x] Write unit tests for camp controllers and services
 - [ ] Write integration (e2e) tests for camp endpoints
 
 ### 🛠️ Jobs Module
