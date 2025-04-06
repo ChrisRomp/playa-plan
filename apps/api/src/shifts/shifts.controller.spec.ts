@@ -17,19 +17,21 @@ describe('ShiftsController', () => {
     createdAt: new Date(),
     updatedAt: new Date(),
   };
-
-  const mockShiftsService = {
-    create: jest.fn().mockResolvedValue(mockShift),
-    findAll: jest.fn().mockResolvedValue([mockShift]),
-    findOne: jest.fn().mockResolvedValue(mockShift),
-    update: jest.fn().mockResolvedValue({
-      ...mockShift,
-      maxRegistrations: 15,
-    }),
-    remove: jest.fn().mockResolvedValue(mockShift),
+  
+  const mockUpdatedShift = {
+    ...mockShift,
+    maxRegistrations: 15,
   };
 
   beforeEach(async () => {
+    const mockShiftsService = {
+      create: jest.fn(() => Promise.resolve(mockShift)),
+      findAll: jest.fn(() => Promise.resolve([mockShift])),
+      findOne: jest.fn(() => Promise.resolve(mockShift)),
+      update: jest.fn(() => Promise.resolve(mockUpdatedShift)),
+      remove: jest.fn(() => Promise.resolve(mockShift)),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       controllers: [ShiftsController],
       providers: [
@@ -95,10 +97,7 @@ describe('ShiftsController', () => {
 
       const result = await controller.update('test-id', updateShiftDto);
 
-      expect(result).toEqual({
-        ...mockShift,
-        maxRegistrations: 15,
-      });
+      expect(result).toEqual(mockUpdatedShift);
       expect(service.update).toHaveBeenCalledWith('test-id', updateShiftDto);
     });
   });

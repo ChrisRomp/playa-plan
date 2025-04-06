@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
-import * as request from 'supertest';
+import supertest from 'supertest';
 import { AppModule } from '../../src/app.module';
 import { PrismaService } from '../../src/common/prisma/prisma.service';
 
@@ -23,7 +23,7 @@ describe('ShiftsController (e2e)', () => {
     await app.init();
 
     // Create test admin user and get token
-    const adminResponse = await request(app.getHttpServer())
+    const adminResponse = await supertest(app.getHttpServer())
       .post('/auth/login')
       .send({
         email: 'admin@example.com',
@@ -33,7 +33,7 @@ describe('ShiftsController (e2e)', () => {
     adminToken = adminResponse.body.accessToken;
 
     // Create test regular user and get token
-    const userResponse = await request(app.getHttpServer())
+    const userResponse = await supertest(app.getHttpServer())
       .post('/auth/login')
       .send({
         email: 'user@example.com',
@@ -43,7 +43,7 @@ describe('ShiftsController (e2e)', () => {
     userToken = userResponse.body.accessToken;
 
     // Create a test camp
-    const createCampResponse = await request(app.getHttpServer())
+    const createCampResponse = await supertest(app.getHttpServer())
       .post('/camps')
       .set('Authorization', `Bearer ${adminToken}`)
       .send({
@@ -59,7 +59,7 @@ describe('ShiftsController (e2e)', () => {
     campId = createCampResponse.body.id;
 
     // Create a test job category first
-    const createCategoryResponse = await request(app.getHttpServer())
+    const createCategoryResponse = await supertest(app.getHttpServer())
       .post('/jobs/categories')
       .set('Authorization', `Bearer ${adminToken}`)
       .send({
@@ -70,7 +70,7 @@ describe('ShiftsController (e2e)', () => {
     const categoryId = createCategoryResponse.body.id;
 
     // Create a test job
-    const createJobResponse = await request(app.getHttpServer())
+    const createJobResponse = await supertest(app.getHttpServer())
       .post('/jobs')
       .set('Authorization', `Bearer ${adminToken}`)
       .send({
@@ -98,7 +98,7 @@ describe('ShiftsController (e2e)', () => {
         jobId: jobId,
       };
 
-      const response = await request(app.getHttpServer())
+      const response = await supertest(app.getHttpServer())
         .post('/shifts')
         .set('Authorization', `Bearer ${adminToken}`)
         .send(createShiftDto)
@@ -125,7 +125,7 @@ describe('ShiftsController (e2e)', () => {
         jobId: jobId,
       };
 
-      await request(app.getHttpServer())
+      await supertest(app.getHttpServer())
         .post('/shifts')
         .set('Authorization', `Bearer ${userToken}`)
         .send(createShiftDto)
@@ -135,7 +135,7 @@ describe('ShiftsController (e2e)', () => {
 
   describe('GET /shifts', () => {
     it('should return all shifts', async () => {
-      const response = await request(app.getHttpServer())
+      const response = await supertest(app.getHttpServer())
         .get('/shifts')
         .set('Authorization', `Bearer ${userToken}`)
         .expect(200);
@@ -155,7 +155,7 @@ describe('ShiftsController (e2e)', () => {
         jobId: jobId,
       };
 
-      const createResponse = await request(app.getHttpServer())
+      const createResponse = await supertest(app.getHttpServer())
         .post('/shifts')
         .set('Authorization', `Bearer ${adminToken}`)
         .send(createShiftDto);
@@ -163,7 +163,7 @@ describe('ShiftsController (e2e)', () => {
       const shiftId = createResponse.body.id;
 
       // Then get it
-      const response = await request(app.getHttpServer())
+      const response = await supertest(app.getHttpServer())
         .get(`/shifts/${shiftId}`)
         .set('Authorization', `Bearer ${userToken}`)
         .expect(200);
@@ -176,7 +176,7 @@ describe('ShiftsController (e2e)', () => {
     });
 
     it('should return 404 for non-existent shift', async () => {
-      await request(app.getHttpServer())
+      await supertest(app.getHttpServer())
         .get('/shifts/non-existent-id')
         .set('Authorization', `Bearer ${userToken}`)
         .expect(404);
@@ -194,7 +194,7 @@ describe('ShiftsController (e2e)', () => {
         jobId: jobId,
       };
 
-      const createResponse = await request(app.getHttpServer())
+      const createResponse = await supertest(app.getHttpServer())
         .post('/shifts')
         .set('Authorization', `Bearer ${adminToken}`)
         .send(createShiftDto);
@@ -208,7 +208,7 @@ describe('ShiftsController (e2e)', () => {
         maxRegistrations: 25,
       };
 
-      const response = await request(app.getHttpServer())
+      const response = await supertest(app.getHttpServer())
         .patch(`/shifts/${shiftId}`)
         .set('Authorization', `Bearer ${adminToken}`)
         .send(updateShiftDto)
@@ -234,7 +234,7 @@ describe('ShiftsController (e2e)', () => {
         jobId: jobId,
       };
 
-      const createResponse = await request(app.getHttpServer())
+      const createResponse = await supertest(app.getHttpServer())
         .post('/shifts')
         .set('Authorization', `Bearer ${adminToken}`)
         .send(createShiftDto);
@@ -246,7 +246,7 @@ describe('ShiftsController (e2e)', () => {
         maxRegistrations: 35,
       };
 
-      await request(app.getHttpServer())
+      await supertest(app.getHttpServer())
         .patch(`/shifts/${shiftId}`)
         .set('Authorization', `Bearer ${userToken}`)
         .send(updateShiftDto)
@@ -265,7 +265,7 @@ describe('ShiftsController (e2e)', () => {
         jobId: jobId,
       };
 
-      const createResponse = await request(app.getHttpServer())
+      const createResponse = await supertest(app.getHttpServer())
         .post('/shifts')
         .set('Authorization', `Bearer ${adminToken}`)
         .send(createShiftDto);
@@ -273,13 +273,13 @@ describe('ShiftsController (e2e)', () => {
       const shiftId = createResponse.body.id;
 
       // Then delete it
-      await request(app.getHttpServer())
+      await supertest(app.getHttpServer())
         .delete(`/shifts/${shiftId}`)
         .set('Authorization', `Bearer ${adminToken}`)
         .expect(200);
 
       // Verify it's deleted
-      await request(app.getHttpServer())
+      await supertest(app.getHttpServer())
         .get(`/shifts/${shiftId}`)
         .set('Authorization', `Bearer ${adminToken}`)
         .expect(404);
@@ -295,7 +295,7 @@ describe('ShiftsController (e2e)', () => {
         jobId: jobId,
       };
 
-      const createResponse = await request(app.getHttpServer())
+      const createResponse = await supertest(app.getHttpServer())
         .post('/shifts')
         .set('Authorization', `Bearer ${adminToken}`)
         .send(createShiftDto);
@@ -303,7 +303,7 @@ describe('ShiftsController (e2e)', () => {
       const shiftId = createResponse.body.id;
 
       // Then try to delete it as non-admin
-      await request(app.getHttpServer())
+      await supertest(app.getHttpServer())
         .delete(`/shifts/${shiftId}`)
         .set('Authorization', `Bearer ${userToken}`)
         .expect(403);

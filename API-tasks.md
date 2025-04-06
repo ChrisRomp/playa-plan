@@ -114,6 +114,7 @@
 
 - [ ] Integrate Stripe payment processing
 - [ ] Integrate PayPal payment processing
+- [ ] Include ability to manually record payments and refunds
 - [ ] Implement payment controller and service
 - [ ] Implement DTOs and validation schemas
 - [ ] Write unit tests for payment controllers and services

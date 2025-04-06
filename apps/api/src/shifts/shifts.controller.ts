@@ -18,21 +18,21 @@ export class ShiftsController {
   @Roles(UserRole.ADMIN, UserRole.STAFF)
   @ApiOperation({ summary: 'Create a new shift' })
   @ApiCreatedResponse({ description: 'The shift has been successfully created.' })
-  create(@Body() createShiftDto: CreateShiftDto) {
+  async create(@Body() createShiftDto: CreateShiftDto) {
     return this.shiftsService.create(createShiftDto);
   }
 
   @Get()
   @ApiOperation({ summary: 'Get all shifts' })
   @ApiOkResponse({ description: 'Returns all shifts.' })
-  findAll() {
+  async findAll() {
     return this.shiftsService.findAll();
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Get a shift by id' })
   @ApiOkResponse({ description: 'Returns the shift with the specified id.' })
-  findOne(@Param('id') id: string) {
+  async findOne(@Param('id') id: string) {
     return this.shiftsService.findOne(id);
   }
 
@@ -40,7 +40,7 @@ export class ShiftsController {
   @Roles(UserRole.ADMIN, UserRole.STAFF)
   @ApiOperation({ summary: 'Update a shift' })
   @ApiOkResponse({ description: 'The shift has been successfully updated.' })
-  update(@Param('id') id: string, @Body() updateShiftDto: UpdateShiftDto) {
+  async update(@Param('id') id: string, @Body() updateShiftDto: UpdateShiftDto) {
     return this.shiftsService.update(id, updateShiftDto);
   }
 
@@ -48,7 +48,7 @@ export class ShiftsController {
   @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'Delete a shift' })
   @ApiOkResponse({ description: 'The shift has been successfully deleted.' })
-  remove(@Param('id') id: string) {
+  async remove(@Param('id') id: string) {
     return this.shiftsService.remove(id);
   }
 } 

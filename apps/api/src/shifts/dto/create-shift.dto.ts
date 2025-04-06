@@ -11,7 +11,7 @@ export class CreateShiftDto {
   })
   @IsNotEmpty()
   @IsDateString()
-  startTime: string;
+  startTime!: string;
 
   @ApiProperty({
     description: 'The end time of the shift',
@@ -19,7 +19,7 @@ export class CreateShiftDto {
   })
   @IsNotEmpty()
   @IsDateString()
-  endTime: string;
+  endTime!: string;
 
   @ApiProperty({
     description: 'Maximum number of registrations allowed for this shift',
@@ -29,7 +29,7 @@ export class CreateShiftDto {
   @IsNotEmpty()
   @IsNumber()
   @Min(1)
-  maxRegistrations: number;
+  maxRegistrations!: number;
 
   @ApiProperty({
     description: 'ID of the camp this shift belongs to',
@@ -38,7 +38,7 @@ export class CreateShiftDto {
   @IsNotEmpty()
   @IsString()
   @IsUUID()
-  campId: string;
+  campId!: string;
 
   @ApiProperty({
     description: 'ID of the job this shift is for',
@@ -47,5 +47,5 @@ export class CreateShiftDto {
   @IsNotEmpty()
   @IsString()
   @IsUUID()
-  jobId: string;
+  jobId!: string;
 } 
