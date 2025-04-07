@@ -12,16 +12,19 @@ async function main() {
   console.log('Starting database seed...');
 
   // Clean up existing data (in reverse order to respect foreign key constraints)
-  await prisma.notification.deleteMany({});
-  await prisma.payment.deleteMany({});
-  await prisma.registration.deleteMany({});
-  await prisma.shift.deleteMany({});
-  await prisma.job.deleteMany({});
-  await prisma.jobCategory.deleteMany({});
-  await prisma.camp.deleteMany({});
-  await prisma.user.deleteMany({});
-  
-  console.log('Cleaned up existing data');
+  // Wrap in a transaction for atomic execution - if one deletion fails, all are rolled back
+  await prisma.$transaction(async (tx) => {
+    console.log('Cleaning up existing data in transaction...');
+    await tx.notification.deleteMany({});
+    await tx.payment.deleteMany({});
+    await tx.registration.deleteMany({});
+    await tx.shift.deleteMany({});
+    await tx.job.deleteMany({});
+    await tx.jobCategory.deleteMany({});
+    await tx.camp.deleteMany({});
+    await tx.user.deleteMany({});
+    console.log('Successfully cleaned up existing data');
+  });
 
   // Create users
   const adminUser = await prisma.user.create({
