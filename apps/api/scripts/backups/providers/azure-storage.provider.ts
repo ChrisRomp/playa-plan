@@ -4,6 +4,7 @@ import { BlobServiceClient, ContainerClient } from '@azure/storage-blob';
 import { BackupConfig } from '../backup-config';
 import { StorageProvider, BackupFileMetadata } from '../storage-provider.interface';
 import { BackupResult } from '../backup-service';
+import { generateObjectKey, getBackupTypeFromFileName } from '../utils/storage-utils';
 
 /**
  * Azure Blob Storage provider for database backups
@@ -96,7 +97,7 @@ export class AzureStorageProvider implements StorageProvider {
         const properties = await blobClient.getProperties();
         
         // Extract backup type from metadata or filename
-        const backupType = properties.metadata?.backupType as 'full' | 'schema' | 'wal' || this.getBackupTypeFromFileName(blob.name);
+        const backupType = properties.metadata?.backupType as 'full' | 'schema' | 'wal' || getBackupTypeFromFileName(blob.name);
         
         files.push({
           fileName: path.basename(blob.name),
@@ -154,13 +155,12 @@ export class AzureStorageProvider implements StorageProvider {
   }
   
   /**
-   * Generate the full blob name/path for a file
+   * Generate the full blob name for a file
    * @param fileName Name of the file
-   * @returns Full blob name/path in Azure Blob Storage
+   * @returns Full Azure blob name
    */
   private getBlobName(fileName: string): string {
-    const prefix = this.config.storage.azure?.prefix || '';
-    return prefix ? `${prefix}${prefix.endsWith('/') ? '' : '/'}${fileName}` : fileName;
+    return generateObjectKey(fileName, this.config.storage.azure?.prefix || '');
   }
   
   /**
@@ -181,16 +181,5 @@ export class AzureStorageProvider implements StorageProvider {
       console.error('Failed to ensure container exists:', error);
       throw error;
     }
-  }
-  
-  /**
-   * Infer backup type from file name
-   * @param fileName Name of the backup file
-   * @returns Type of backup (full, schema, or wal)
-   */
-  private getBackupTypeFromFileName(fileName: string): 'full' | 'schema' | 'wal' {
-    if (fileName.includes('_full_')) return 'full';
-    if (fileName.includes('_schema_')) return 'schema';
-    return 'wal';
   }
 }

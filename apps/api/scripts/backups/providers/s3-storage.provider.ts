@@ -1,198 +1,185 @@
-import * as fs from 'fs';
-import * as path from 'path';
-import { 
-  S3Client, 
-  PutObjectCommand, 
-  ListObjectsV2Command,
-  DeleteObjectCommand,
-  HeadObjectCommand,
-  S3ClientConfig
-} from '@aws-sdk/client-s3';
-import { BackupConfig } from '../backup-config';
-import { StorageProvider, BackupFileMetadata } from '../storage-provider.interface';
-import { BackupResult } from '../backup-service';
+import { S3Client, PutObjectCommand, ListObjectsV2Command, DeleteObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
+import { StorageProvider } from './storage.provider';
+import { BackupConfig } from '../config/backup-config';
+import { BackupResult, BackupFileMetadata } from '../types/backup.types';
+import { generateObjectKey, getBackupTypeFromFileName } from '../utils/storage-utils';
 
 /**
- * AWS S3 Storage provider for database backups
+ * AWS S3 storage provider for database backups
  */
 export class S3StorageProvider implements StorageProvider {
   private s3Client: S3Client;
-  
+
   /**
-   * Creates a new AWS S3 Storage provider
+   * Create a new S3StorageProvider
    * @param config Backup configuration
    */
   constructor(private readonly config: BackupConfig) {
-    if (!config.storage.s3) {
-      throw new Error('S3 storage configuration is required');
-    }
-    
-    const { region, accessKeyId, secretAccessKey, endpoint } = config.storage.s3;
-    
-    const clientConfig: S3ClientConfig = {
-      region,
+    // Initialize S3 client
+    this.s3Client = new S3Client({
+      region: this.config.storage.s3?.region || 'us-east-1',
       credentials: {
-        accessKeyId,
-        secretAccessKey,
+        accessKeyId: this.config.storage.s3?.accessKeyId || '',
+        secretAccessKey: this.config.storage.s3?.secretAccessKey || '',
       },
-    };
-    
-    // Add custom endpoint if specified (for S3-compatible services)
-    if (endpoint) {
-      clientConfig.endpoint = endpoint;
-    }
-    
-    this.s3Client = new S3Client(clientConfig);
+    });
   }
-  
+
   /**
    * Upload a backup file to S3
-   * @param backupResult Result of a backup operation
-   * @returns Promise that resolves with the updated backup result
+   * @param backupResult Backup result containing file info
+   * @returns Updated backup result with storage info
    */
   public async uploadFile(backupResult: BackupResult): Promise<BackupResult> {
+    if (!backupResult.filePath) {
+      throw new Error('Backup file path is missing');
+    }
+
+    const bucketName = this.config.storage.s3?.bucket;
+    if (!bucketName) {
+      throw new Error('S3 bucket name is not configured');
+    }
+
     try {
-      const { fileName, filePath } = backupResult;
-      const key = this.getObjectKey(fileName);
-      
-      // Read file content
-      const fileContent = fs.readFileSync(filePath);
+      // Generate object key
+      const fileName = backupResult.fileName;
+      const key = generateObjectKey(fileName, this.config.storage.s3?.prefix || '');
+
+      // Read file as buffer
+      const fileContent = await Bun.file(backupResult.filePath).arrayBuffer();
       
       // Upload file to S3
-      const putCommand = new PutObjectCommand({
-        Bucket: this.config.storage.s3?.bucket,
-        Key: key,
-        Body: fileContent,
-        ContentType: 'application/octet-stream',
-        Metadata: {
-          'backup-type': backupResult.backupType,
-          'timestamp': backupResult.timestamp.toISOString(),
-        },
-      });
-      
-      await this.s3Client.send(putCommand);
-      
+      await this.s3Client.send(
+        new PutObjectCommand({
+          Bucket: bucketName,
+          Key: key,
+          Body: fileContent,
+          ContentType: 'application/octet-stream',
+          Metadata: {
+            'backup-type': backupResult.type,
+            'database-name': backupResult.databaseName,
+            'backup-date': backupResult.timestamp.toISOString(),
+          },
+        })
+      );
+
+      // Update backup result with remote storage info
       return {
         ...backupResult,
-        success: true,
-        message: `Successfully uploaded ${fileName} to S3: ${this.config.storage.s3?.bucket}/${key}`,
+        storagePath: `s3://${bucketName}/${key}`,
+        storageProvider: 's3',
       };
     } catch (error) {
-      return {
-        ...backupResult,
-        success: false,
-        error: error instanceof Error ? error : new Error(String(error)),
-        message: `Failed to upload ${backupResult.fileName} to S3: ${error instanceof Error ? error.message : String(error)}`,
-      };
+      const err = error as Error;
+      throw new Error(`Failed to upload backup to S3: ${err.message}`);
     }
   }
-  
+
   /**
    * List all backup files in S3
-   * @returns Promise that resolves with a list of backup file metadata
+   * @returns Array of backup file metadata
    */
   public async listFiles(): Promise<BackupFileMetadata[]> {
+    const bucketName = this.config.storage.s3?.bucket;
+    if (!bucketName) {
+      throw new Error('S3 bucket name is not configured');
+    }
+
     try {
-      const files: BackupFileMetadata[] = [];
       const prefix = this.config.storage.s3?.prefix || '';
       
       // List all objects in the bucket with the specified prefix
-      const listCommand = new ListObjectsV2Command({
-        Bucket: this.config.storage.s3?.bucket,
-        Prefix: prefix,
-      });
-      
-      const response = await this.s3Client.send(listCommand);
-      
-      if (response.Contents) {
-        for (const object of response.Contents) {
-          if (!object.Key) continue;
-          
-          // Extract backup type from the filename
-          const backupType = this.getBackupTypeFromFileName(object.Key);
-          
-          files.push({
-            fileName: path.basename(object.Key),
-            filePath: object.Key,
-            fileSize: object.Size || 0,
-            lastModified: object.LastModified || new Date(),
-            backupType,
-          });
-        }
+      const response = await this.s3Client.send(
+        new ListObjectsV2Command({
+          Bucket: bucketName,
+          Prefix: prefix,
+        })
+      );
+
+      if (!response.Contents || response.Contents.length === 0) {
+        return [];
       }
-      
-      return files;
+
+      // Map S3 objects to backup metadata
+      return response.Contents.map((object) => {
+        if (!object.Key) {
+          throw new Error('S3 object key is missing');
+        }
+
+        // Extract file name from key
+        const keyParts = object.Key.split('/');
+        const fileName = keyParts[keyParts.length - 1];
+        
+        // Get backup type from file name
+        const backupType = getBackupTypeFromFileName(fileName);
+        
+        return {
+          fileName,
+          fullPath: `s3://${bucketName}/${object.Key}`,
+          size: object.Size || 0,
+          lastModified: object.LastModified || new Date(),
+          type: backupType,
+          storageProvider: 's3',
+        };
+      });
     } catch (error) {
-      console.error('Failed to list files from S3:', error);
-      throw error;
+      const err = error as Error;
+      throw new Error(`Failed to list backups from S3: ${err.message}`);
     }
   }
-  
+
   /**
    * Delete a backup file from S3
    * @param fileName Name of the file to delete
-   * @returns Promise that resolves when deletion is complete
    */
   public async deleteFile(fileName: string): Promise<void> {
+    const bucketName = this.config.storage.s3?.bucket;
+    if (!bucketName) {
+      throw new Error('S3 bucket name is not configured');
+    }
+
     try {
-      const key = this.getObjectKey(fileName);
+      const key = generateObjectKey(fileName, this.config.storage.s3?.prefix || '');
       
-      // Delete the object
-      const deleteCommand = new DeleteObjectCommand({
-        Bucket: this.config.storage.s3?.bucket,
-        Key: key,
-      });
-      
-      await this.s3Client.send(deleteCommand);
-      
-      console.log(`Successfully deleted ${fileName} from S3`);
+      // Delete object from S3
+      await this.s3Client.send(
+        new DeleteObjectCommand({
+          Bucket: bucketName,
+          Key: key,
+        })
+      );
     } catch (error) {
-      console.error(`Failed to delete ${fileName} from S3:`, error);
-      throw error;
+      const err = error as Error;
+      throw new Error(`Failed to delete backup from S3: ${err.message}`);
     }
   }
-  
+
   /**
-   * Check if a backup file exists in S3
+   * Check if a file exists in S3
    * @param fileName Name of the file to check
-   * @returns Promise that resolves with true if the file exists
+   * @returns True if the file exists, false otherwise
    */
   public async fileExists(fileName: string): Promise<boolean> {
+    const bucketName = this.config.storage.s3?.bucket;
+    if (!bucketName) {
+      throw new Error('S3 bucket name is not configured');
+    }
+
     try {
-      const key = this.getObjectKey(fileName);
+      const key = generateObjectKey(fileName, this.config.storage.s3?.prefix || '');
       
-      // Check if the object exists
-      const headCommand = new HeadObjectCommand({
-        Bucket: this.config.storage.s3?.bucket,
-        Key: key,
-      });
+      // Check if object exists in S3
+      await this.s3Client.send(
+        new HeadObjectCommand({
+          Bucket: bucketName,
+          Key: key,
+        })
+      );
       
-      await this.s3Client.send(headCommand);
       return true;
     } catch (error) {
-      // Object doesn't exist or error occurred
+      // Object doesn't exist or other error
       return false;
     }
-  }
-  
-  /**
-   * Generate the full S3 object key for a file
-   * @param fileName Name of the file
-   * @returns Full S3 object key
-   */
-  private getObjectKey(fileName: string): string {
-    const prefix = this.config.storage.s3?.prefix || '';
-    return prefix ? `${prefix}${prefix.endsWith('/') ? '' : '/'}${fileName}` : fileName;
-  }
-  
-  /**
-   * Infer backup type from file name
-   * @param fileName Name of the backup file
-   * @returns Type of backup (full, schema, or wal)
-   */
-  private getBackupTypeFromFileName(fileName: string): 'full' | 'schema' | 'wal' {
-    if (fileName.includes('_full_')) return 'full';
-    if (fileName.includes('_schema_')) return 'schema';
-    return 'wal';
   }
 }

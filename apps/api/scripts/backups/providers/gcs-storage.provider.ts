@@ -4,6 +4,7 @@ import { Storage, GetFilesOptions } from '@google-cloud/storage';
 import { BackupConfig } from '../backup-config';
 import { StorageProvider, BackupFileMetadata } from '../storage-provider.interface';
 import { BackupResult } from '../backup-service';
+import { generateObjectKey, getBackupTypeFromFileName } from '../utils/storage-utils';
 
 /**
  * Google Cloud Storage provider for database backups
@@ -92,7 +93,7 @@ export class GCSStorageProvider implements StorageProvider {
         // Extract backup type from metadata or filename
         const backupType = 
           (metadata.metadata?.backupType as 'full' | 'schema' | 'wal') || 
-          this.getBackupTypeFromFileName(file.name);
+          getBackupTypeFromFileName(file.name);
         
         files.push({
           fileName: path.basename(file.name),
@@ -154,18 +155,6 @@ export class GCSStorageProvider implements StorageProvider {
    * @returns Full GCS object name
    */
   private getObjectName(fileName: string): string {
-    const prefix = this.config.storage.gcs?.prefix || '';
-    return prefix ? `${prefix}${prefix.endsWith('/') ? '' : '/'}${fileName}` : fileName;
-  }
-  
-  /**
-   * Infer backup type from file name
-   * @param fileName Name of the backup file
-   * @returns Type of backup (full, schema, or wal)
-   */
-  private getBackupTypeFromFileName(fileName: string): 'full' | 'schema' | 'wal' {
-    if (fileName.includes('_full_')) return 'full';
-    if (fileName.includes('_schema_')) return 'schema';
-    return 'wal';
+    return generateObjectKey(fileName, this.config.storage.gcs?.prefix || '');
   }
 }
