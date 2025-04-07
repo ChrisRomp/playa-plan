@@ -6,6 +6,7 @@ import { RegisterDto } from '../dto/register.dto';
 import { User, UserRole } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
+import { NotificationsService } from '../../notifications/services/notifications.service';
 
 /**
  * Authentication service responsible for user registration, login, and token management
@@ -18,6 +19,7 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   /**
@@ -89,6 +91,9 @@ export class AuthService {
           role: UserRole.PARTICIPANT,
         },
       });
+
+      // Send verification email
+      await this.sendVerificationEmail(newUser.email, verificationToken);
 
       // Return user without password
       const { password: _, ...result } = newUser;
@@ -165,6 +170,25 @@ export class AuthService {
   }
 
   /**
+   * Sends verification email to a user
+   * @param email User email
+   * @param token Verification token
+   * @returns True if email was sent successfully
+   */
+  private async sendVerificationEmail(email: string, token: string): Promise<boolean> {
+    try {
+      const result = await this.notificationsService.sendEmailVerificationEmail(email, token);
+      if (!result) {
+        this.logger.warn(`Failed to send verification email to ${email}`);
+      }
+      return result;
+    } catch (error: unknown) {
+      this.logger.error(`Error sending verification email: ${this.getErrorMessage(error)}`);
+      return false;
+    }
+  }
+
+  /**
    * Initiates password reset process
    * @param email User email
    * @returns True if reset token was generated, false otherwise
@@ -195,11 +219,31 @@ export class AuthService {
         },
       });
 
-      // TODO: Send email with reset link (will be implemented in notifications module)
+      // Send password reset email
+      await this.sendPasswordResetEmail(email, resetToken);
 
       return true;
     } catch (error: unknown) {
       this.logger.error(`Error initiating password reset: ${this.getErrorMessage(error)}`);
+      return false;
+    }
+  }
+
+  /**
+   * Sends password reset email to a user
+   * @param email User email
+   * @param token Reset token
+   * @returns True if email was sent successfully
+   */
+  private async sendPasswordResetEmail(email: string, token: string): Promise<boolean> {
+    try {
+      const result = await this.notificationsService.sendPasswordResetEmail(email, token);
+      if (!result) {
+        this.logger.warn(`Failed to send password reset email to ${email}`);
+      }
+      return result;
+    } catch (error: unknown) {
+      this.logger.error(`Error sending password reset email: ${this.getErrorMessage(error)}`);
       return false;
     }
   }
@@ -253,18 +297,17 @@ export class AuthService {
    */
   private async hashPassword(password: string): Promise<string> {
     const saltRounds = 10;
-    return bcrypt.hash(password, saltRounds);
+    const salt = await bcrypt.genSalt(saltRounds);
+    return bcrypt.hash(password, salt);
   }
-  
+
   /**
-   * Helper method to safely extract message from error objects
-   * @param error Unknown error object
+   * Gets error message from unknown error
+   * @param error Unknown error
    * @returns Error message string
    */
   private getErrorMessage(error: unknown): string {
-    if (error instanceof Error) {
-      return error.message;
-    }
+    if (error instanceof Error) return error.message;
     return String(error);
   }
 }

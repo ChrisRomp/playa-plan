@@ -9,6 +9,7 @@ import { LocalStrategy } from './strategies/local.strategy';
 import { APP_GUARD } from '@nestjs/core';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { PrismaModule } from '../common/prisma/prisma.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 /**
  * Authentication module providing JWT and local authentication
@@ -18,6 +19,7 @@ import { PrismaModule } from '../common/prisma/prisma.module';
     PrismaModule,
     PassportModule,
     ConfigModule,
+    NotificationsModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
