@@ -7,6 +7,12 @@ export default () => ({
   port: parseInt(process.env.PORT || '3000', 10) || 3000,
   nodeEnv: process.env.NODE_ENV || 'development',
 
+  // Application general settings
+  app: {
+    baseUrl: process.env.APP_BASE_URL || 'http://localhost:3000',
+    name: process.env.APP_NAME || 'PlayaPlan',
+  },
+
   // Database configuration 
   database: {
     url: process.env.DATABASE_URL,
@@ -42,15 +48,21 @@ export default () => ({
 
   // Email service configuration
   email: {
-    host: process.env.MAIL_HOST,
-    port: parseInt(process.env.MAIL_PORT || '587', 10) || 587,
-    user: process.env.MAIL_USER,
-    password: process.env.MAIL_PASSWORD,
-    from: process.env.MAIL_FROM || 'noreply@example.com',
-    secure: process.env.MAIL_SECURE === 'true',
-    ignoreTLS: process.env.MAIL_IGNORE_TLS === 'true',
-    requireTLS: process.env.MAIL_REQUIRE_TLS === 'true',
-    debug: process.env.MAIL_DEBUG === 'true',
+    provider: process.env.EMAIL_PROVIDER || 'sendgrid', // 'sendgrid' or 'smtp'
+    defaultFrom: process.env.EMAIL_FROM || 'noreply@example.com',
+    sendgrid: {
+      apiKey: process.env.SENDGRID_API_KEY,
+    },
+    smtp: {
+      host: process.env.MAIL_HOST,
+      port: parseInt(process.env.MAIL_PORT || '587', 10) || 587,
+      user: process.env.MAIL_USER,
+      password: process.env.MAIL_PASSWORD,
+      secure: process.env.MAIL_SECURE === 'true',
+      ignoreTLS: process.env.MAIL_IGNORE_TLS === 'true',
+      requireTLS: process.env.MAIL_REQUIRE_TLS === 'true',
+      debug: process.env.MAIL_DEBUG === 'true',
+    },
   },
 
   // Payment providers

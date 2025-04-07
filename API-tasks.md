@@ -160,9 +160,20 @@
 
 ### 📧 Notifications Module
 
-- [ ] Implement transactional email sending (SendGrid, SMTP)
-- [ ] Implement notification controller and service
-- [ ] Write unit tests for notification controllers and services
+- [x] Implement transactional email sending (SendGrid, SMTP)
+  - [x] Create EmailService for sending emails
+  - [x] Set up SendGrid integration
+  - [x] Add SMTP fallback option
+  - [x] Implement error handling and logging
+- [x] Implement notification controller and service
+  - [x] Create NotificationsService
+  - [x] Create email templates for various notifications
+  - [x] Implement NotificationsController with endpoints
+  - [x] Secure endpoints with proper authorization
+- [x] Write unit tests for notification controllers and services
+  - [x] Create unit tests for EmailService
+  - [x] Create unit tests for NotificationsService
+  - [x] Create unit tests for NotificationsController
 - [ ] Write integration (e2e) tests for notification endpoints
 
 ### Advanced User Features
