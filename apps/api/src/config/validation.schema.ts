@@ -15,6 +15,10 @@ const validationSchema = Joi.object({
     .default('development'),
   PORT: Joi.number().default(3000),
   
+  // App general settings
+  APP_BASE_URL: Joi.string().uri().default('http://localhost:3000'),
+  APP_NAME: Joi.string().default('PlayaPlan'),
+  
   // Database connection pool config
   DATABASE_CONNECTION_LIMIT: Joi.number().default(10),
   DATABASE_POOL_MIN: Joi.number().default(2),
@@ -37,11 +41,33 @@ const validationSchema = Joi.object({
   JWT_EXPIRATION_TIME: Joi.string().default('24h'),
   
   // Email configuration
-  MAIL_HOST: Joi.string(),
+  EMAIL_PROVIDER: Joi.string().valid('sendgrid', 'smtp').default('sendgrid'),
+  EMAIL_FROM: Joi.string().email().default('noreply@example.com'),
+  
+  // SendGrid configuration
+  SENDGRID_API_KEY: Joi.string().when('EMAIL_PROVIDER', {
+    is: 'sendgrid',
+    then: Joi.required(),
+    otherwise: Joi.optional(),
+  }),
+  
+  // SMTP configuration
+  MAIL_HOST: Joi.string().when('EMAIL_PROVIDER', {
+    is: 'smtp',
+    then: Joi.required(),
+    otherwise: Joi.optional(),
+  }),
   MAIL_PORT: Joi.number().default(587),
-  MAIL_USER: Joi.string(),
-  MAIL_PASSWORD: Joi.string(),
-  MAIL_FROM: Joi.string().email(),
+  MAIL_USER: Joi.string().when('EMAIL_PROVIDER', {
+    is: 'smtp',
+    then: Joi.required(),
+    otherwise: Joi.optional(),
+  }),
+  MAIL_PASSWORD: Joi.string().when('EMAIL_PROVIDER', {
+    is: 'smtp',
+    then: Joi.required(),
+    otherwise: Joi.optional(),
+  }),
   MAIL_SECURE: Joi.boolean().default(false),
   MAIL_IGNORE_TLS: Joi.boolean().default(false),
   MAIL_REQUIRE_TLS: Joi.boolean().default(false),

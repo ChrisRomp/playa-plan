@@ -27,6 +27,6 @@ This project involves building a full-stack web application for managing annual 
 
 Implementation will proceed incrementally, starting from the backend API, with database schemas defined using Prisma, followed by frontend integration.
 
-Planned project structure is outlined in [Project Structure](./prompts/project-structure.prompt.md).
+Planned project structure is outlined in [Project Structure](.github/prompts/project-structure.prompt.md).
 
 APIs, controllers, modules, etc., should be individually testable.

@@ -7,6 +7,7 @@ import { CampsModule } from './camps/camps.module';
 import { ShiftsModule } from './shifts/shifts.module';
 import { PaymentsModule } from './payments/payments.module';
 import { RegistrationsModule } from './registrations/registrations.module';
+import { NotificationsModule } from './notifications/notifications.module';
 import { APP_FILTER } from '@nestjs/core';
 import { GlobalExceptionFilter } from './common/filters/http-exception.filter';
 import { ThrottlingModule } from './common/throttling/throttling.module';
@@ -45,6 +46,7 @@ import validationSchema from './config/validation.schema';
     ShiftsModule,
     PaymentsModule,
     RegistrationsModule,
+    NotificationsModule,
     // Other feature modules will be added here as they are implemented
   ],
   providers: [
