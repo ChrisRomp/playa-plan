@@ -2,21 +2,21 @@
 
 ## Initial Setup Tasks
 
-1. [ ] Set up base Vite React TypeScript project
-2. [ ] Add Tailwind CSS
-3. [ ] Set up project structure according to the plan
-4. [ ] Configure ESLint and Prettier
-5. [ ] Configure Vitest for unit testing
-6. [ ] Create basic shared components (with typed props):
-   - [ ] Button
-   - [ ] Input
-   - [ ] Form
-   - [ ] Card
-   - [ ] Modal
-7. [ ] Set up basic routing (using React Router)
-8. [ ] Create auth context and login/register pages (include loading/error states)
-9. [ ] Set up basic API client
-10. [ ] Create initial home page
+1. [x] Set up base Vite React TypeScript project
+2. [x] Add Tailwind CSS
+3. [x] Set up project structure according to the plan
+4. [x] Configure ESLint and Prettier
+5. [x] Configure Vitest for unit testing
+6. [x] Create basic shared components (with typed props):
+   - [x] Button
+   - [x] Input
+   - [x] Form
+   - [x] Card
+   - [x] Modal
+7. [x] Set up basic routing (using React Router)
+8. [x] Create auth context and login/register pages (include loading/error states)
+9. [x] Set up basic API client
+10. [x] Create initial home page
 
 ## Feature Roadmap
 
