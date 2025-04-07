@@ -40,10 +40,11 @@ export abstract class BackupService {
       }
 
       // Build pg_dump command
-      const command = this.buildPgDumpCommand(localFilePath);
+      const { command, args } = this.buildPgDumpCommand(localFilePath);
+      const fullCommand = `${command} ${args.join(' ')}`;
       
       // Execute pg_dump
-      execSync(command, { stdio: 'inherit' });
+      execSync(fullCommand, { stdio: 'inherit' });
       
       // Get file size
       const stats = fs.statSync(localFilePath);
