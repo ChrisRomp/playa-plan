@@ -2,11 +2,14 @@
 
 This project involves building a full-stack web application for managing annual camp registrations called PlayaPlan. The application enables user registration, profile management, and authentication using JWT and Passport.js. Users will sign up for camp job shifts scheduled within admin-defined camp sessions. Each job has categories and location attributes, and not all jobs are available on all camp dates.
 
-## Agent work
+## Copilot agent work
 
-- When planning multiple terminal commands, it's ok to `&&` them
-  - Example: if doing a `mkdir -p ...` followed by `touch ...` just do one command `mkdir -p ... && touch ...`.
-- When working from a checklist document, keep the checklist up to date by checking off items as you progress. Commit changes to git after each cheked item.
+- Work from a checklist document when provided
+  - For API work under `apps/api`, use the checklist in [API-Tasks.md](../API-tasks.md)
+  - For frontend work under `apps/web`, use the checklist in [Web-Tasks.md](../Web-tasks.md)
+- Test each completed item.
+- When completing tasks, check them off in the checklist document.
+- Commit changes to git after each checked item.
 
 ## Development instructions
 
