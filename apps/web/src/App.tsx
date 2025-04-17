@@ -7,6 +7,7 @@ import './App.css';
 const Home = lazy(() => import('./pages/Home'));
 const Login = lazy(() => import('./pages/Login'));
 const Register = lazy(() => import('./pages/Register'));
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 
 // Loading component
@@ -25,10 +26,10 @@ function App() {
             <Route path="/" element={<Home />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
             
             {/* Add more routes here as they are developed */}
             {/* <Route path="/profile" element={<Profile />} /> */}
-            {/* <Route path="/forgot-password" element={<ForgotPassword />} /> */}
             
             {/* 404 page */}
             <Route path="*" element={<NotFound />} />

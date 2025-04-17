@@ -20,10 +20,10 @@
 
 ## Feature Roadmap
 
-1. [ ] User authentication pages
-   - [ ] Login
-   - [ ] Register
-   - [ ] Forgot Password
+1. [x] User authentication pages
+   - [x] Login
+   - [x] Register
+   - [x] Forgot Password
 2. [ ] User profile management
 3. [ ] Camp session browsing
 4. [ ] Job shift browsing and registration
