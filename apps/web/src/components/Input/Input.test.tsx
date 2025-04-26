@@ -28,6 +28,7 @@ describe('Input Component', () => {
   it('should render error message when provided', () => {
     render(<Input error="This field is required" placeholder="Required field" />);
     expect(screen.getByText('This field is required')).toBeInTheDocument();
+    expect(screen.getByText('This field is required')).toHaveClass('text-danger-600');
     
     const input = screen.getByPlaceholderText('Required field');
     expect(input).toHaveAttribute('aria-invalid', 'true');
@@ -76,5 +77,41 @@ describe('Input Component', () => {
       />
     );
     expect(screen.getByTestId('right-icon')).toBeInTheDocument();
+  });
+
+  it('should render with different sizes', () => {
+    const { rerender } = render(<Input inputSize="sm" placeholder="Small input" />);
+    let input = screen.getByPlaceholderText('Small input');
+    expect(input).toHaveClass('text-sm');
+    expect(input).toHaveClass('py-1.5');
+
+    rerender(<Input inputSize="md" placeholder="Medium input" />);
+    input = screen.getByPlaceholderText('Medium input');
+    expect(input).toHaveClass('text-base');
+    
+    rerender(<Input inputSize="lg" placeholder="Large input" />);
+    input = screen.getByPlaceholderText('Large input');
+    expect(input).toHaveClass('text-lg');
+  });
+
+  it('should render with different variants', () => {
+    const { rerender } = render(<Input variant="outline" placeholder="Outline variant" />);
+    let input = screen.getByPlaceholderText('Outline variant');
+    expect(input).toHaveClass('shadow-sm');
+    
+    rerender(<Input variant="filled" placeholder="Filled variant" />);
+    input = screen.getByPlaceholderText('Filled variant');
+    expect(input).toHaveClass('bg-secondary-100');
+    
+    rerender(<Input variant="unstyled" placeholder="Unstyled variant" />);
+    input = screen.getByPlaceholderText('Unstyled variant');
+    expect(input).toHaveClass('bg-transparent');
+    expect(input).toHaveClass('border-transparent');
+  });
+
+  it('should apply fullWidth class when specified', () => {
+    render(<Input fullWidth placeholder="Full width input" />);
+    const container = screen.getByPlaceholderText('Full width input').parentElement?.parentElement;
+    expect(container).toHaveClass('w-full');
   });
 }); 

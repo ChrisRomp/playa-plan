@@ -5,8 +5,8 @@ This project involves building a full-stack web application for managing annual 
 ## Copilot agent work
 
 - Work from a checklist document when provided
-  - For API work under `apps/api`, use the checklist in [API-Tasks.md](../API-tasks.md)
-  - For frontend work under `apps/web`, use the checklist in [Web-Tasks.md](../Web-tasks.md)
+  - For API work under `apps/api`, use the checklist in [API-Tasks.md](../API-tasks.md) and prompts from [API Development](./prompts/nestjs-development.prompt.md)
+  - For frontend work under `apps/web`, use the checklist in [Web-Tasks.md](../Web-tasks.md) and prompts from [Frontend Development](./prompts/frontend-development.prompt.md)
 - Test each completed item.
 - When completing tasks, check them off in the checklist document.
 - Commit changes to git after each checked item.
