@@ -31,7 +31,7 @@ const LoadingFallback = () => (
 // Layout component for authenticated pages
 const MainLayout = ({ children }: { children: React.ReactNode }) => {
   return (
-    <div className="min-h-screen bg-secondary-50 flex flex-col">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
       <Header 
         navItems={navItems} 
         rightSection={
@@ -50,9 +50,9 @@ const MainLayout = ({ children }: { children: React.ReactNode }) => {
           {children}
         </Container>
       </main>
-      <footer className="bg-white border-t border-secondary-200 py-6">
+      <footer className="bg-white border-t border-gray-200 py-6">
         <Container>
-          <div className="text-center text-secondary-600 text-sm">
+          <div className="text-center text-gray-600 text-sm">
             &copy; {new Date().getFullYear()} PlayaPlan. All rights reserved.
           </div>
         </Container>
@@ -64,7 +64,7 @@ const MainLayout = ({ children }: { children: React.ReactNode }) => {
 // Auth layout without navigation
 const AuthLayout = ({ children }: { children: React.ReactNode }) => {
   return (
-    <div className="min-h-screen bg-secondary-50 flex flex-col items-center justify-center">
+    <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center">
       <Container size="xs">
         {children}
       </Container>

@@ -10,7 +10,9 @@ This project involves building a full-stack web application for managing annual 
 ## The application stack includes:
 
 - Frontend: React with TypeScript and Tailwind CSS
+  - Frontend tasks: [Web-tasks.md](mdc:../Web-tasks.md)
 - Backend API: NestJS with TypeScript
+  - Backend/API tasks: [API-tasks.md](mdc:../API-tasks.md)
 - Database: PostgreSQL managed via Prisma ORM
 - Authentication: Passport.js (Local and JWT strategies), with email magic link login to be added later
 - Payments: Stripe and PayPal integrations

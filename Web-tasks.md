@@ -13,6 +13,7 @@
    - [x] Form
    - [x] Card
    - [x] Modal
+   - [x] Todo
 7. [x] Set up basic routing (using React Router)
 8. [x] Create auth context and login/register pages (include loading/error states)
 9. [x] Set up basic API client
@@ -42,6 +43,9 @@
    - [x] Create loading and error state components
      - [x] Design loading spinners/skeletons
      - [x] Create error message components with recovery actions
+   - [x] Create task management component
+     - [x] Implement Todo component with checkboxes
+     - [x] Add to home page with sample tasks
 3. [ ] User profile management
 4. [ ] Camp session browsing
 5. [ ] Job shift browsing and registration

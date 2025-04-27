@@ -6,6 +6,7 @@
         "libs/*"
     ],
     "scripts": {
+        "start": "bash ./start.sh",
         "dev:api": "npm run dev --workspace=api",
         "dev:web": "npm run dev --workspace=web",
         "build": "tsc -b apps/*",
@@ -24,5 +25,8 @@
         "prettier-eslint": "^16.3.0",
         "rimraf": "^6.0.1",
         "typescript": "^5.8.2"
+    },
+    "dependencies": {
+        "react-icons": "^5.5.0"
     }
 }
