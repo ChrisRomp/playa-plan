@@ -57,6 +57,16 @@
 - [x] Add admin/test method to controller as a smoke test
 - [ ] Update Swagger documentation for all user endpoints
 - [ ] Document user module usage and endpoints in README.md
+- [ ] Update User model for additional profile fields from spec
+  - [ ] Add emergency contact info field
+  - [ ] Add phone field
+  - [ ] Add city, state/province fields
+  - [ ] Add country field
+  - [ ] Add allow registration boolean
+  - [ ] Add allow early registration boolean
+  - [ ] Add allow deferred dues payment boolean
+  - [ ] Add allow no job boolean
+  - [ ] Add internal notes field
 
 ### 🛡️ Security Foundations
 
@@ -65,6 +75,10 @@
 - [x] Add request validation pipes and sanitization
 - [x] Implement API security headers (CSRF protection, etc.)
 - [x] Set up input sanitization to prevent injection attacks
+- [ ] Implement Cloudflare Turnstile for bot protection on public endpoints
+  - [ ] Integrate Turnstile API with authentication endpoints
+  - [ ] Add server-side validation of Turnstile tokens
+  - [ ] Implement fallback mechanisms for accessibility
 
 ## 3. 📚 Core Domain Modules
 
@@ -92,6 +106,9 @@
   - [x] Create DTOs for categories
 - [x] Write unit tests for job controllers and services
 - [x] Write integration (e2e) tests for job endpoints
+- [ ] Update Job model for additional fields from spec
+  - [ ] Add staff only boolean field
+  - [ ] Add always required boolean field
 
 ### 📅 Shifts Module
 
@@ -110,6 +127,7 @@
     - [ ] Update test setup to handle authentication properly
   - [ ] Update tests to handle proper test data creation and teardown
   - [ ] Ensure all shift e2e tests pass
+- [ ] Update Shift model to support day-of-week selection rather than specific dates
 
 ### 📝 Registrations Module
 
@@ -117,6 +135,29 @@
 - [x] Implement DTOs and validation schemas
 - [x] Write unit tests for registration controllers and services
 - [x] Write integration (e2e) tests for registration endpoints
+
+### 🏕️ Camping Options Module (Missing)
+
+- [ ] Create CampingOptions module with CRUD operations
+  - [ ] Create entity, controller, and service for camping options
+  - [ ] Implement relationships between users, camps, and camping options
+  - [ ] Create DTOs for camping option creation and updates
+  - [ ] Implement validation for camping options
+- [ ] Implement camping option model with following fields
+  - [ ] Name
+  - [ ] Enabled boolean
+  - [ ] Work shifts required count
+  - [ ] Job categories relationship
+  - [ ] Participant dues
+  - [ ] Staff dues
+  - [ ] Maximum signups
+  - [ ] Additional fields configuration system
+- [ ] Implement camping option fields configuration
+  - [ ] Create field type enum (string, number, boolean, date)
+  - [ ] Support for field validation options
+  - [ ] Create controller endpoints for field management
+- [ ] Write unit tests for camping options
+- [ ] Write integration tests for camping options
 
 ## 4. 💪 Supporting Features
 
@@ -180,6 +221,34 @@
 
 - [x] Implement email verification and password reset integration with Notifications module
 
+### ⚙️ Core Configuration Module (Missing)
+
+- [ ] Create CoreConfig module with CRUD operations
+  - [ ] Create CoreConfig entity with all site configuration options
+  - [ ] Implement controller and service for managing site config
+  - [ ] Create DTOs for configuration updates
+- [ ] Implement camp info configuration section
+  - [ ] Camp name
+  - [ ] Camp description
+  - [ ] Home page blurb
+  - [ ] Camp banner URL
+  - [ ] Camp icon URL
+- [ ] Implement registration configuration section
+  - [ ] Registration year
+  - [ ] Early registration open flag
+  - [ ] Registration open flag
+  - [ ] Registration terms
+  - [ ] Allow deferred dues payment flag
+- [ ] Implement payment processing configuration
+  - [ ] Stripe enabled flag and settings
+  - [ ] PayPal enabled flag and settings
+- [ ] Implement email configuration section
+  - [ ] SMTP configuration management
+- [ ] Implement site configuration
+  - [ ] Time zone setting
+- [ ] Write unit tests for CoreConfig module
+- [ ] Write integration tests for CoreConfig endpoints
+
 ## 5. 🔍 Operations & Monitoring
 
 - [ ] Implement structured API logging system
@@ -209,7 +278,26 @@
   - [ ] Implement seed/cleanup utilities for test data
   - [ ] Ensure test isolation between test suites
 
-## 7. 📚 Shared Libraries and Documentation
+## 7. 📊 Reporting & Dashboards (Missing)
+
+- [ ] Create ReportingModule for staff/admin dashboards
+  - [ ] Create reporting controller and service
+  - [ ] Implement authorization for reports access
+- [ ] Implement Work Schedule report
+  - [ ] Group work schedule by day then category
+  - [ ] Include staff-only jobs visibility
+  - [ ] Support filtering and sorting options
+- [ ] Implement Registration Dashboard report
+  - [ ] Show registrations with grouped/filtered capability
+  - [ ] Support for drilling into user profile details
+  - [ ] Access to payment/refund information for admins
+- [ ] Create data export functionality for reports
+  - [ ] CSV export capability
+  - [ ] Excel export capability
+- [ ] Write unit tests for reporting module
+- [ ] Write integration tests for reporting endpoints
+
+## 8. 📚 Shared Libraries and Documentation
 
 ### 📚 Shared Libraries (`libs`)
 
@@ -226,7 +314,7 @@
   - [ ] Implement CI for API on PRs to `main`
 - [ ] Document API setup and usage instructions in README.md
 
-## 8. 🗃️ Database Management
+## 9. 🗃️ Database Management
 
 - [ ] Set up database seeding workflow
 - [ ] Create database test fixtures for e2e tests
