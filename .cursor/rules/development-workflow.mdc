@@ -1,0 +1,73 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Development Workflow
+
+This guide outlines the development workflow used in the PlayaPlan project.
+
+## Task Management
+
+- Frontend tasks are tracked in [Web-tasks.md](mdc:../../Web-tasks.md)
+- Backend tasks are tracked in [API-tasks.md](mdc:../../API-tasks.md)
+- Tests should pass before items are checked off
+- Tasks should be checked off as they are completed
+- Commit changes to git after each completed task
+
+## Test-Driven Development (TDD)
+
+1. Write tests first before implementing functionality
+2. Run tests to verify they fail for the expected reasons
+3. Implement the minimum code needed to pass the tests
+4. Refactor while ensuring tests continue to pass
+5. Commit working code with passing tests
+
+## Code Style and Quality
+
+- Follow [SOLID principles](mdc:https:/en.wikipedia.org/wiki/SOLID)
+- Methods should follow single responsibility principle
+- Maximum method length: 20 lines where practical
+- Keep nesting level <= 2 where practical
+- No abbreviations unless universally known
+
+## Naming Conventions
+
+- **Methods**: verb + noun (e.g., validateCredentials)
+- **Classes**: noun (e.g., CredentialValidator)
+- **Tests**: should + behavior (e.g., shouldValidateCredentials)
+- Use descriptive naming that clearly communicates purpose
+
+## Git Workflow
+
+- Work on feature branches
+- Keep commits focused on single tasks/changes
+- Write clear commit messages
+- Open pull requests for code review
+
+## Running the Application
+
+### Backend (NestJS)
+
+```bash
+cd apps/api
+npm run start:dev  # Start in development mode
+npm run test       # Run unit tests
+npm run test:e2e   # Run e2e tests
+npm run prisma:dev # Apply Prisma schema changes
+```
+
+### Frontend (React)
+
+```bash
+cd apps/web
+npm run dev        # Start development server
+npm run test       # Run unit tests
+npm run build      # Build for production
+```
+
+## Database Management
+
+- Use Prisma Studio to view/edit database contents: `npx prisma studio`
+- Apply migrations with `npx prisma migrate dev`
+- Reset test database with `npx prisma migrate reset --force`

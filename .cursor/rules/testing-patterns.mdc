@@ -1,0 +1,109 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Testing Patterns
+
+This guide covers testing patterns used in the PlayaPlan project.
+
+## Backend Testing (NestJS)
+
+### Unit Testing
+- Test files named with `.spec.ts` suffix
+- Use Jest testing framework
+- Follow Arrange-Act-Assert pattern
+- Mock external dependencies
+
+```typescript
+// Example pattern for controller tests
+describe('UsersController', () => {
+  let controller: UsersController;
+  let service: UsersService;
+
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      controllers: [UsersController],
+      providers: [
+        {
+          provide: UsersService,
+          useValue: mockUsersService,
+        },
+      ],
+    }).compile();
+
+    controller = module.get<UsersController>(UsersController);
+    service = module.get<UsersService>(UsersService);
+  });
+
+  it('should return a user by id', async () => {
+    // Arrange
+    const userId = 'test-id';
+    const expectedResult = {...mockUser, id: userId};
+    jest.spyOn(service, 'findById').mockResolvedValue(expectedResult);
+    
+    // Act
+    const result = await controller.findById(userId);
+    
+    // Assert
+    expect(result).toEqual(expectedResult);
+    expect(service.findById).toHaveBeenCalledWith(userId);
+  });
+});
+```
+
+### E2E Testing
+- Tests located in `apps/api/test` directory
+- Use supertest for HTTP requests
+- Isolate database for testing
+- Use factory functions for test data
+
+## Frontend Testing (React)
+
+### Component Testing
+- Use Vitest for component testing
+- Files named with `.test.tsx` suffix
+- Use React Testing Library patterns
+- Test components in isolation
+
+```typescript
+// Example pattern for component tests
+describe('Button', () => {
+  it('renders with primary variant by default', () => {
+    // Arrange
+    render(<Button>Click me</Button>);
+    
+    // Act & Assert
+    const button = screen.getByRole('button', { name: /click me/i });
+    expect(button).toHaveClass('bg-primary');
+  });
+
+  it('calls onClick handler when clicked', () => {
+    // Arrange
+    const handleClick = vi.fn();
+    render(<Button onClick={handleClick}>Click me</Button>);
+    
+    // Act
+    const button = screen.getByRole('button', { name: /click me/i });
+    userEvent.click(button);
+    
+    // Assert
+    expect(handleClick).toHaveBeenCalledTimes(1);
+  });
+});
+```
+
+### Integration Testing
+- Test component interactions
+- Focus on user flows and behavior
+- Simulate real user interactions
+
+## Shared Testing Utilities
+
+### Backend Test Utilities
+- Mock factories in `apps/api/src/common/testing/mocks`
+- Test fixtures in `apps/api/src/common/testing/fixtures`
+
+### Frontend Test Utilities
+- Test setup in `apps/web/src/test/setup.ts`
+- Custom test renderers in `apps/web/src/test/utils.tsx`

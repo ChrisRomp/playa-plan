@@ -1,0 +1,67 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# API Endpoints Structure
+
+The PlayaPlan API is built using NestJS following RESTful principles. The endpoints are organized by domain modules.
+
+## Authentication API
+
+- **POST /auth/register**: Register a new user
+- **POST /auth/login**: Authenticate and get JWT token
+- **POST /auth/verify-email**: Verify user email with token
+- **POST /auth/forgot-password**: Request password reset
+- **POST /auth/reset-password**: Reset password with token
+
+## Users API
+
+- **GET /users**: List users (admin only)
+- **GET /users/:id**: Get user details
+- **PATCH /users/:id**: Update user
+- **DELETE /users/:id**: Delete user (admin only)
+- **GET /users/profile**: Get current user profile
+
+## Camps API
+
+- **GET /camps**: List all camps
+- **GET /camps/:id**: Get camp details
+- **POST /camps**: Create camp (admin only)
+- **PATCH /camps/:id**: Update camp (admin only)
+- **DELETE /camps/:id**: Delete camp (admin only)
+
+## Jobs API
+
+- **GET /jobs**: List all jobs
+- **GET /jobs/:id**: Get job details
+- **POST /jobs**: Create job (admin only)
+- **PATCH /jobs/:id**: Update job (admin only)
+- **DELETE /jobs/:id**: Delete job (admin only)
+- **GET /job-categories**: List job categories
+- **POST /job-categories**: Create job category (admin only)
+
+## Shifts API
+
+- **GET /shifts**: List all shifts
+- **GET /shifts/:id**: Get shift details
+- **POST /shifts**: Create shift (admin only)
+- **PATCH /shifts/:id**: Update shift (admin only)
+- **DELETE /shifts/:id**: Delete shift (admin only)
+- **GET /camps/:campId/shifts**: Get shifts for a specific camp
+
+## Registrations API
+
+- **GET /registrations**: List registrations
+- **GET /registrations/:id**: Get registration details
+- **POST /registrations**: Create registration
+- **PATCH /registrations/:id**: Update registration
+- **DELETE /registrations/:id**: Cancel registration
+- **GET /users/:userId/registrations**: Get user registrations
+
+## Payments API
+
+- **POST /payments**: Create payment
+- **GET /payments/:id**: Get payment details
+- **POST /payments/webhook**: Payment provider webhook
+- **POST /payments/refund**: Process refund

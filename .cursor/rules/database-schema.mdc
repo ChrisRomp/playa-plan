@@ -1,0 +1,41 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Database Schema
+
+The PlayaPlan application uses PostgreSQL managed through Prisma ORM. The schema is defined in [apps/api/prisma/schema.prisma](mdc:apps/api/prisma/schema.prisma).
+
+## Core Models
+
+### Users and Authentication
+- **User**: Core user entity with authentication fields
+  - Roles: ADMIN, STAFF, PARTICIPANT
+  - Relations: registrations, payments
+  - Authentication: password, verification tokens, reset tokens
+
+### Camp Management
+- **Camp**: Represents a camp session with dates and location
+  - Relations: shifts
+- **JobCategory**: Categories for organizing job types
+  - Relations: jobs
+- **Job**: Job definitions with descriptions and locations
+  - Relations: category, shifts
+- **Shift**: Time slots for specific jobs during camps
+  - Relations: camp, job, registrations
+  - Tracking: maxRegistrations
+
+### Participant Management
+- **Registration**: Connects users to shifts they've signed up for
+  - Status: PENDING, CONFIRMED, CANCELLED, WAITLISTED
+  - Relations: user, shift, payment
+- **Payment**: Tracks payments for registrations
+  - Status: PENDING, COMPLETED, FAILED, REFUNDED
+  - Providers: STRIPE, PAYPAL
+  - Relations: user, registration
+
+### Notifications
+- **Notification**: Manages system notifications to users
+  - Types: EMAIL_VERIFICATION, PASSWORD_RESET, REGISTRATION_CONFIRMATION, PAYMENT_CONFIRMATION, SHIFT_REMINDER
+  - Status: PENDING, SENT, FAILED

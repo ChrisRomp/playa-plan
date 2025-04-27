@@ -1,0 +1,50 @@
+---
+description: 
+globs: apps/web/**
+alwaysApply: false
+---
+# Frontend Components Guide
+
+The PlayaPlan frontend is built with React, TypeScript, and Tailwind CSS. This guide provides an overview of the key components and their usage patterns.
+
+## Core UI Components
+
+### Layout Components
+- **Container**: Responsive container with max-width settings
+- **Card**: Styled card component for content sections
+- **Header**: Main application header with navigation
+- **Navbar**: Navigation component with responsive mobile menu
+
+### Form Components
+- **Button**: Multi-variant button component (primary, secondary, danger)
+- **Input**: Form input component with validation states
+- **Form**: Form wrapper with built-in validation handling
+
+### Feedback Components
+- **AlertBox**: For displaying success, error, info, or warning messages
+- **Modal**: Dialog component for confirmations and forms
+- **Spinner**: Loading indicator
+- **Badge**: Status indicator badges
+
+### Data Display
+- **Text**: Typography components with consistent styling
+- **Todo**: Checkbox component for task lists
+
+## Pages Structure
+
+The application pages are organized in the `src/pages/` directory:
+- **Auth**: Login, Register, ForgotPassword pages
+- **Home**: Landing page with dashboard functionality
+- **Profile**: User profile management
+
+## Context and State Management
+
+- **AuthContext**: Manages user authentication state and tokens
+- **API Hooks**: Custom hooks for API data fetching
+
+## Styling Guidelines
+
+- Use Tailwind CSS for styling components
+- Follow the color palette defined in `tailwind.config.js`
+- Use responsive design patterns for all components
+- Maintain consistent spacing using Tailwind spacing classes
