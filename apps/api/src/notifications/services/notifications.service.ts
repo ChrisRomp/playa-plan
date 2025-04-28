@@ -8,6 +8,7 @@ export enum NotificationType {
   EMAIL_VERIFICATION = 'email_verification',
   PAYMENT_CONFIRMATION = 'payment_confirmation',
   SHIFT_CONFIRMATION = 'shift_confirmation',
+  LOGIN_CODE = 'login_code',
 }
 
 export interface NotificationTemplate {
@@ -20,6 +21,7 @@ export interface TemplateData {
   name?: string;
   resetUrl?: string;
   verificationUrl?: string;
+  loginCode?: string;
   paymentDetails?: {
     id: string;
     amount: number;
@@ -154,6 +156,16 @@ export class NotificationsService {
   }
 
   /**
+   * Send login verification code email
+   * @param email User email address
+   * @param code Verification code
+   * @returns Promise resolving to true if email was sent successfully
+   */
+  async sendLoginCodeEmail(email: string, code: string): Promise<boolean> {
+    return this.sendNotification(email, NotificationType.LOGIN_CODE, { loginCode: code });
+  }
+
+  /**
    * Get template for specific notification type
    * @param type Notification type
    * @param data Template data
@@ -167,6 +179,8 @@ export class NotificationsService {
         return this.getPasswordResetTemplate(data.resetUrl || '');
       case NotificationType.EMAIL_VERIFICATION:
         return this.getEmailVerificationTemplate(data.verificationUrl || '');
+      case NotificationType.LOGIN_CODE:
+        return this.getLoginCodeTemplate(data.loginCode || '');
       case NotificationType.PAYMENT_CONFIRMATION:
         if (!data.paymentDetails) {
           throw new Error('Payment details are required for payment confirmation template');
@@ -277,6 +291,37 @@ export class NotificationsService {
       </div>
     `;
     
+    return { subject, text, html };
+  }
+
+  /**
+   * Get login code email template
+   */
+  private getLoginCodeTemplate(code: string): NotificationTemplate {
+    const subject = 'Your PlayaPlan Login Code';
+    const text = `
+      Hello,
+      
+      Your verification code to log in to PlayaPlan is: ${code}
+      
+      This code will expire in 15 minutes. If you did not request this code, please ignore this email.
+      
+      Best regards,
+      The PlayaPlan Team
+    `;
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2>Your Login Verification Code</h2>
+        <p>Hello,</p>
+        <p>Your verification code to log in to PlayaPlan is:</p>
+        <div style="background-color: #f5f5f5; padding: 15px; font-size: 24px; text-align: center; letter-spacing: 5px; font-weight: bold; margin: 20px 0;">
+          ${code}
+        </div>
+        <p>This code will expire in 15 minutes.</p>
+        <p>If you did not request this code, please ignore this email.</p>
+        <p>Best regards,<br>The PlayaPlan Team</p>
+      </div>
+    `;
     return { subject, text, html };
   }
 

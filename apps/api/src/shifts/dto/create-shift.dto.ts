@@ -1,51 +1,48 @@
-import { IsDateString, IsNotEmpty, IsNumber, IsString, IsUUID, Min } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
+import { IsDate, IsEnum, IsInt, IsNotEmpty, IsString } from 'class-validator';
+import { DayOfWeek } from '@playa-plan/types';
 
 /**
  * Data Transfer Object for creating a new shift
  */
 export class CreateShiftDto {
-  @ApiProperty({
-    description: 'The start time of the shift',
-    example: '2023-06-01T09:00:00Z',
-  })
-  @IsNotEmpty()
-  @IsDateString()
-  startTime!: string;
-
-  @ApiProperty({
-    description: 'The end time of the shift',
-    example: '2023-06-01T17:00:00Z',
-  })
-  @IsNotEmpty()
-  @IsDateString()
-  endTime!: string;
-
-  @ApiProperty({
-    description: 'Maximum number of registrations allowed for this shift',
-    example: 10,
-    minimum: 1,
-  })
-  @IsNotEmpty()
-  @IsNumber()
-  @Min(1)
-  maxRegistrations!: number;
-
-  @ApiProperty({
-    description: 'ID of the camp this shift belongs to',
-    example: '5f8d0d55-e0a3-4cf0-a620-2412acd4361c',
-  })
+  @ApiProperty({ description: 'The title of the shift' })
   @IsNotEmpty()
   @IsString()
-  @IsUUID()
-  campId!: string;
+  name!: string;
 
-  @ApiProperty({
-    description: 'ID of the job this shift is for',
-    example: '7c8d0d55-e0a3-4cf0-a620-2412acd4361d',
-  })
+  @ApiProperty({ description: 'The description of the shift' })
   @IsNotEmpty()
   @IsString()
-  @IsUUID()
-  jobId!: string;
-} 
+  description!: string;
+
+  @ApiProperty({ description: 'The maximum number of registrations allowed for this shift' })
+  @IsNotEmpty()
+  @IsInt()
+  maxParticipants!: number;
+
+  @ApiProperty({ description: 'The start time of the shift' })
+  @IsNotEmpty()
+  @IsDate()
+  startTime!: Date;
+
+  @ApiProperty({ description: 'The end time of the shift' })
+  @IsNotEmpty()
+  @IsDate()
+  endTime!: Date;
+
+  @ApiProperty({ enum: DayOfWeek, description: 'The day of the week for this shift' })
+  @IsNotEmpty()
+  @IsEnum(DayOfWeek)
+  dayOfWeek!: DayOfWeek;
+
+  @ApiProperty({ description: 'The ID of the camp this shift belongs to' })
+  @IsNotEmpty()
+  @IsString()
+  location!: string;
+
+  @ApiProperty({ description: 'The ID of the job this shift is for' })
+  @IsNotEmpty()
+  @IsInt()
+  jobId!: number;
+}

@@ -206,7 +206,8 @@ async function main() {
       endTime: new Date('2025-08-26T12:00:00Z'),
       maxRegistrations: 5,
       campId: camp.id,
-      jobId: kitchenJob.id
+      jobId: kitchenJob.id,
+      dayOfWeek: 'MONDAY'
     }
   });
 
@@ -216,7 +217,8 @@ async function main() {
       endTime: new Date('2025-08-26T17:00:00Z'),
       maxRegistrations: 5,
       campId: camp.id,
-      jobId: kitchenJob.id
+      jobId: kitchenJob.id,
+      dayOfWeek: 'MONDAY'
     }
   });
 
@@ -226,7 +228,8 @@ async function main() {
       endTime: new Date('2025-08-26T13:00:00Z'),
       maxRegistrations: 3,
       campId: camp.id,
-      jobId: greeterJob.id
+      jobId: greeterJob.id,
+      dayOfWeek: 'MONDAY'
     }
   });
 
@@ -236,7 +239,8 @@ async function main() {
       endTime: new Date('2025-08-27T02:00:00Z'),
       maxRegistrations: 4,
       campId: camp.id,
-      jobId: rangerJob.id
+      jobId: rangerJob.id,
+      dayOfWeek: 'MONDAY'
     }
   });
 

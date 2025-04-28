@@ -1,7 +1,13 @@
 {
     "extends": "../../tsconfig.base.json",
     "compilerOptions": {
-      "outDir": "../../dist/api"
+      "outDir": "../../dist/api",
+      "types": ["node", "jest"],
+      "paths": {
+        "@libs/types/*": ["../../libs/types/src/*"]
+      },
+      "sourceMap": false,
+      "inlineSourceMap": true
     },
     "include": ["src"]
   }

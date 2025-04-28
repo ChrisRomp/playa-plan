@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ShiftsController } from './shifts.controller';
 import { ShiftsService } from './shifts.service';
 import { CreateShiftDto, UpdateShiftDto } from './dto';
+import { DayOfWeek } from '@libs/types/enums/day-of-week.enum';
 
 describe('ShiftsController', () => {
   let controller: ShiftsController;
@@ -13,7 +14,7 @@ describe('ShiftsController', () => {
     endTime: new Date('2023-06-01T17:00:00Z'),
     maxRegistrations: 10,
     campId: 'camp-id',
-    jobId: 'job-id',
+    jobId: 1,
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -56,18 +57,21 @@ describe('ShiftsController', () => {
 
   describe('create', () => {
     it('should create a shift', async () => {
-      const createShiftDto: CreateShiftDto = {
-        startTime: '2023-06-01T09:00:00Z',
-        endTime: '2023-06-01T17:00:00Z',
-        maxRegistrations: 10,
-        campId: 'camp-id',
-        jobId: 'job-id',
+      const mockCreateShiftDto = {
+        title: 'Test Shift',
+        description: 'Test Description',
+        maxWorkers: 5,
+        startTime: new Date('2023-06-01T09:00:00Z'),
+        endTime: new Date('2023-06-01T17:00:00Z'),
+        dayOfWeek: DayOfWeek.MONDAY,
+        campId: 'test-camp-id',
+        jobId: 1
       };
 
-      const result = await controller.create(createShiftDto);
+      const result = await controller.create(mockCreateShiftDto);
 
       expect(result).toEqual(mockShift);
-      expect(service.create).toHaveBeenCalledWith(createShiftDto);
+      expect(service.create).toHaveBeenCalledWith(mockCreateShiftDto);
     });
   });
 

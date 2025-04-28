@@ -1,7 +1,8 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { CreateShiftDto, UpdateShiftDto } from './dto';
-import { Shift } from '@prisma/client';
+import { Prisma, Shift } from '@prisma/client';
+import { DayOfWeek } from '@libs/types/enums/day-of-week.enum';
 
 @Injectable()
 export class ShiftsService {
@@ -21,7 +22,8 @@ export class ShiftsService {
       data: {
         startTime,
         endTime,
-        maxRegistrations: createShiftDto.maxRegistrations,
+        maxRegistrations: createShiftDto.maxWorkers,
+        dayOfWeek: createShiftDto.dayOfWeek,
         camp: { connect: { id: createShiftDto.campId } },
         job: { connect: { id: createShiftDto.jobId } },
       },
@@ -75,31 +77,16 @@ export class ShiftsService {
     // Check if shift exists
     await this.findOne(id);
 
-    // Parse date strings to Date objects if provided
-    const data: any = { ...updateShiftDto };
-    
-    if (updateShiftDto.startTime) {
-      data.startTime = new Date(updateShiftDto.startTime);
-    }
-    
-    if (updateShiftDto.endTime) {
-      data.endTime = new Date(updateShiftDto.endTime);
-    }
-    
-    // Handle relations
-    if (updateShiftDto.campId) {
-      data.camp = { connect: { id: updateShiftDto.campId } };
-      delete data.campId;
-    }
-    
-    if (updateShiftDto.jobId) {
-      data.job = { connect: { id: updateShiftDto.jobId } };
-      delete data.jobId;
-    }
-
     return this.prisma.shift.update({
       where: { id },
-      data,
+      data: {
+        startTime: updateShiftDto.startTime ? new Date(updateShiftDto.startTime) : undefined,
+        endTime: updateShiftDto.endTime ? new Date(updateShiftDto.endTime) : undefined,
+        maxRegistrations: updateShiftDto.maxRegistrations,
+        dayOfWeek: updateShiftDto.dayOfWeek,
+        ...(updateShiftDto.campId ? { camp: { connect: { id: updateShiftDto.campId } } } : {}),
+        ...(updateShiftDto.jobId ? { job: { connect: { id: updateShiftDto.jobId } } } : {}),
+      },
       include: {
         camp: true,
         job: true,
