@@ -79,7 +79,7 @@ describe('ShiftsController', () => {
 
   describe('create', () => {
     it('should create a shift', async () => {
-      const mockCreateShiftDto = {
+      const mockCreateShiftDto: CreateShiftDto = {
         name: 'Test Shift',
         description: 'Test Description',
         maxParticipants: 5,
