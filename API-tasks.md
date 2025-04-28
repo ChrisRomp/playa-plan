@@ -54,6 +54,9 @@
 - [x] Write unit tests for User controllers, services, and guards
 - [x] Write unit tests for UserTransformInterceptor
 - [ ] Complete integration (e2e) tests for all user endpoints
+  - [ ] Create e2e test files following project patterns
+  - [ ] Implement proper test data creation and cleanup
+  - [ ] Test permissions (admin vs. regular users)
 - [x] Add admin/test method to controller as a smoke test
 - [x] Update Swagger documentation for all user endpoints
 - [ ] Document user module usage and endpoints in README.md
