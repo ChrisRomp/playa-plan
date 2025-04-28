@@ -312,10 +312,11 @@
   - [x] Create payment-status enum in shared types
   - [x] Create payment-method enum in shared types
 - [ ] Fix TypeScript path mapping for the shared types library
-  - [ ] Configure TypeScript properly to resolve `@playa-plan/types` imports
-  - [ ] Fix dependency declaration in package.json (replace `workspace:*`)
-  - [ ] Update all imports to use the shared types across the codebase
-  - [ ] Remove duplicate enum files in the API project once imports are working
+  - [x] Configure TypeScript path mappings in tsconfig.base.json
+  - [x] Fix dependency declaration in package.json (replace `workspace:*` with `file:../../libs/types`)
+  - [ ] Update all imports to use the shared types across the codebase (blocked by TypeScript resolution issues)
+  - [ ] Remove duplicate enum files in the API project (deferred until import issues are resolved)
+  - [ ] Fix e2e tests failing on Prisma and SendGrid issues (unrelated to enum changes)
 - [ ] Define shared constants (e.g., role enums)
 - [ ] Implement shared validation schemas (Zod or class-validator)
 - [ ] Implement shared utility functions (e.g., date formatting)
