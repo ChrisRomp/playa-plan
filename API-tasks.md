@@ -37,8 +37,8 @@
 - [x] Implement DTOs for login and registration
 - [x] Implement email verification flow
 - [x] Implement password reset flow
-- [ ] Implement email code verification login
-- [x] Write unit tests for authentication controller and service
+- [x] Implement email code verification login
+- [ ] Write unit tests for authentication controller and service
 - [ ] Write integration (e2e) tests for authentication endpoints
 
 ### 🛠️ Users Module
