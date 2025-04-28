@@ -47,12 +47,15 @@ export interface TemplateData {
 export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
   private readonly baseUrl: string;
+  private readonly isDebugMode: boolean;
   
   constructor(
     private readonly emailService: EmailService,
     private readonly configService: ConfigService,
   ) {
     this.baseUrl = this.configService.get<string>('app.baseUrl', 'http://localhost:3000');
+    this.isDebugMode = this.configService.get<string>('nodeEnv') === 'development' || 
+                        process.argv.includes('--debug');
   }
 
   /**
@@ -77,12 +80,44 @@ export class NotificationsService {
         html: template.html,
       };
       
+      // Log notification to console in debug mode
+      if (this.isDebugMode) {
+        this.logNotificationToConsole(type, emailOptions);
+      }
+      
+      // If no email provider is configured but we're in debug mode, return success
+      // as the notification has been logged to console
+      const emailProviderConfigured = this.configService.get<string>('email.provider') !== undefined;
+      
+      if (!emailProviderConfigured && this.isDebugMode) {
+        return true;
+      }
+      
       return await this.emailService.sendEmail(emailOptions);
     } catch (error: unknown) {
       const err = error as Error;
       this.logger.error(`Failed to send ${type} notification: ${err.message}`, err.stack);
       return false;
     }
+  }
+  
+  /**
+   * Log notification to console when in debug mode
+   * @param type Type of notification being sent
+   * @param options Email options including recipient and content
+   */
+  private logNotificationToConsole(type: NotificationType, options: EmailOptions): void {
+    const recipient = Array.isArray(options.to) ? options.to.join(', ') : options.to;
+    
+    console.log('\n=============== DEBUG MODE: EMAIL NOTIFICATION ===============');
+    console.log(`Type: ${type}`);
+    console.log(`To: ${recipient}`);
+    console.log(`Subject: ${options.subject}`);
+    console.log('\n--- PLAIN TEXT CONTENT ---');
+    console.log(options.text);
+    console.log('\n--- HTML CONTENT ---');
+    console.log(options.html);
+    console.log('===============================================================\n');
   }
 
   /**

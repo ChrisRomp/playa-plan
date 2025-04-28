@@ -219,7 +219,7 @@
   - [x] Create unit tests for NotificationsService
   - [x] Create unit tests for NotificationsController
 - [ ] Write integration (e2e) tests for notification endpoints
-- [ ] When the backend server is running in debug mode, emit notifications to the console as well as any configured email services (or just console if no email service is configured)
+- [x] When the backend server is running in debug mode, emit notifications to the console as well as any configured email services (or just console if no email service is configured)
 
 ### Advanced User Features
 
