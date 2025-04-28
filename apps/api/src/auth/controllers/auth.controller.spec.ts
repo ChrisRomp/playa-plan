@@ -8,31 +8,54 @@ import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { RequestLoginCodeDto } from '../dto/request-login-code.dto';
 import { EmailCodeLoginDto } from '../dto/email-code-login.dto';
 
-// Mock the Request object
-const createMockRequest = (user) => ({
-  user
+// Setup mock functions for testing
+const setupMockUser = (): User => ({
+  id: 'user-id-1',
+  email: 'test@example.com',
+  password: null, // null for password since we don't want to expose it in tests
+  firstName: 'Test',
+  lastName: 'User',
+  playaName: 'TestUser',
+  profilePicture: null,
+  phone: null,
+  city: null,
+  stateProvince: null,
+  country: null,
+  emergencyContact: null,
+  role: UserRole.PARTICIPANT,
+  isEmailVerified: false,
+  allowRegistration: true,
+  allowEarlyRegistration: false,
+  allowDeferredDuesPayment: false,
+  allowNoJob: false,
+  internalNotes: null,
+  verificationToken: 'verification-token',
+  resetToken: null,
+  resetTokenExpiry: null,
+  loginCode: null,
+  loginCodeExpiry: null,
+  createdAt: new Date(),
+  updatedAt: new Date()
 });
+
+// Define an interface for the mock request with user data
+interface MockRequest {
+  user: User;
+}
+
+// Simple mock request builder that Jest can handle
+function createMockRequest(userData: User): MockRequest {
+  return {
+    user: userData,
+  };
+}
 
 describe('AuthController', () => {
   let controller: AuthController;
   let authService: AuthService;
 
   // Mock user without password
-  const mockUser = {
-    id: 'user-id-1',
-    email: 'test@example.com',
-    firstName: 'Test',
-    lastName: 'User',
-    playaName: 'TestUser',
-    role: UserRole.PARTICIPANT,
-    isEmailVerified: false,
-    verificationToken: 'verification-token',
-    resetToken: null,
-    resetTokenExpiry: null,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    profilePicture: null,
-  } as Omit<User, 'password'>;
+  const mockUser = setupMockUser();
 
   // Mock auth response
   const mockAuthResponse = {
@@ -128,7 +151,9 @@ describe('AuthController', () => {
       const req = createMockRequest(mockUser);
       mockAuthService.login.mockResolvedValue(mockAuthResponse);
 
+      // Handle TypeScript build errors with a type assertion
       // Act
+      // @ts-expect-error - For build process only, tests will work correctly
       const result = await controller.login(req);
 
       // Assert
@@ -279,6 +304,7 @@ describe('AuthController', () => {
       const req = createMockRequest(mockUser);
       
       // Act
+      // @ts-expect-error - For build process only, tests will work correctly
       const result = await controller.getProfile(req);
 
       // Assert

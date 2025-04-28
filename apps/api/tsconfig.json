@@ -9,8 +9,10 @@
         "@playa-plan/types": ["../../libs/types/src"]
       },
       "sourceMap": false,
-      "inlineSourceMap": true
+      "inlineSourceMap": true,
+      "isolatedModules": true,
+      "esModuleInterop": true
     },
-    "include": ["src"]
+    "include": ["src", "test"]
   }
   
