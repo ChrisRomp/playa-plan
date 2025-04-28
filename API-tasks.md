@@ -106,9 +106,9 @@
   - [x] Create DTOs for categories
 - [x] Write unit tests for job controllers and services
 - [x] Write integration (e2e) tests for job endpoints
-- [ ] Update Job model for additional fields from spec
-  - [ ] Add staff only boolean field
-  - [ ] Add always required boolean field
+- [x] Update Job model for additional fields from spec
+  - [x] Add staff only boolean field
+  - [x] Add always required boolean field
 
 ### 📅 Shifts Module
 

@@ -179,6 +179,8 @@ model Job {
   name        String
   description String?
   location    String
+  staffOnly   Boolean    @default(false)
+  alwaysRequired Boolean @default(false)
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 

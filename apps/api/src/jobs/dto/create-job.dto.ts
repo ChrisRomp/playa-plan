@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsOptional, IsUUID } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsUUID, IsBoolean } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateJobDto {
@@ -25,6 +25,24 @@ export class CreateJobDto {
   @IsString()
   @IsNotEmpty()
   location!: string;
+
+  @ApiProperty({
+    description: 'Whether the job is only available to staff members',
+    example: false,
+    default: false,
+  })
+  @IsBoolean()
+  @IsOptional()
+  staffOnly?: boolean;
+
+  @ApiProperty({
+    description: 'Whether the job is always required regardless of camp settings',
+    example: false,
+    default: false,
+  })
+  @IsBoolean()
+  @IsOptional()
+  alwaysRequired?: boolean;
 
   @ApiProperty({
     description: 'The ID of the job category',

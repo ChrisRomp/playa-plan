@@ -53,6 +53,8 @@ describe('JobsController (e2e)', () => {
         description: 'Test Description',
         location: 'Test Location',
         categoryId: 'test-category-id',
+        staffOnly: false,
+        alwaysRequired: true,
       };
 
       const response = await request(app.getHttpServer())
@@ -73,6 +75,8 @@ describe('JobsController (e2e)', () => {
         description: 'Test Description',
         location: 'Test Location',
         categoryId: 'test-category-id',
+        staffOnly: true,
+        alwaysRequired: false,
       };
 
       await request(app.getHttpServer())
@@ -102,6 +106,8 @@ describe('JobsController (e2e)', () => {
         description: 'Test Description',
         location: 'Test Location',
         categoryId: 'test-category-id',
+        staffOnly: false,
+        alwaysRequired: false,
       };
 
       const createResponse = await request(app.getHttpServer())
@@ -137,6 +143,8 @@ describe('JobsController (e2e)', () => {
         description: 'Test Description',
         location: 'Test Location',
         categoryId: 'test-category-id',
+        staffOnly: false,
+        alwaysRequired: false,
       };
 
       const createResponse = await request(app.getHttpServer())
@@ -151,6 +159,8 @@ describe('JobsController (e2e)', () => {
         name: 'Updated Job',
         description: 'Updated Description',
         location: 'Updated Location',
+        staffOnly: true,
+        alwaysRequired: true,
       };
 
       const response = await request(app.getHttpServer())
@@ -172,6 +182,8 @@ describe('JobsController (e2e)', () => {
         description: 'Test Description',
         location: 'Test Location',
         categoryId: 'test-category-id',
+        staffOnly: false,
+        alwaysRequired: false,
       };
 
       const createResponse = await request(app.getHttpServer())
@@ -202,6 +214,8 @@ describe('JobsController (e2e)', () => {
         description: 'Test Description',
         location: 'Test Location',
         categoryId: 'test-category-id',
+        staffOnly: false,
+        alwaysRequired: false,
       };
 
       const createResponse = await request(app.getHttpServer())
@@ -231,6 +245,8 @@ describe('JobsController (e2e)', () => {
         description: 'Test Description',
         location: 'Test Location',
         categoryId: 'test-category-id',
+        staffOnly: false,
+        alwaysRequired: false,
       };
 
       const createResponse = await request(app.getHttpServer())
