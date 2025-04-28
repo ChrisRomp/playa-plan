@@ -5,6 +5,22 @@ import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/common/prisma/prisma.service';
 import { UserRole } from '@prisma/client';
 
+// Interface for raw camping option results
+interface RawCampingOption {
+  id: string;
+  name: string;
+  description: string | null;
+  enabled: boolean;
+  workShiftsRequired: number;
+  participantDues: number;
+  staffDues: number;
+  maxSignups: number;
+  campId: string;
+  jobCategoryIds: string[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 // Mock SendGrid
 jest.mock('@sendgrid/mail', () => ({
   setApiKey: jest.fn(),
@@ -37,6 +53,8 @@ describe('CampingOptionsController (e2e)', () => {
         startDate: new Date('2023-08-01'),
         endDate: new Date('2023-08-07'),
         description: 'Test Camp Description',
+        location: 'Test Location',
+        capacity: 100,
       },
     });
     testCampId = camp.id;
@@ -227,7 +245,7 @@ describe('CampingOptionsController (e2e)', () => {
           now()
         )
         RETURNING *
-      `);
+      `) as RawCampingOption[];
 
       campingOptionId = campingOption[0].id;
     });
@@ -274,7 +292,7 @@ describe('CampingOptionsController (e2e)', () => {
           now()
         )
         RETURNING *
-      `);
+      `) as RawCampingOption[];
 
       campingOptionId = campingOption[0].id;
     });
@@ -343,7 +361,7 @@ describe('CampingOptionsController (e2e)', () => {
           now()
         )
         RETURNING *
-      `);
+      `) as RawCampingOption[];
 
       campingOptionId = campingOption[0].id;
     });

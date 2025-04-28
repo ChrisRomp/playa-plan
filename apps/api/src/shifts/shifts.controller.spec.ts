@@ -3,6 +3,8 @@ import { ShiftsController } from './shifts.controller';
 import { ShiftsService } from './shifts.service';
 import { CreateShiftDto, UpdateShiftDto } from './dto';
 import { DayOfWeek } from '../common/enums/day-of-week.enum';
+import { PrismaService } from '../common/prisma/prisma.service';
+import { RegistrationsService } from '../registrations/registrations.service';
 
 describe('ShiftsController', () => {
   let controller: ShiftsController;
@@ -33,12 +35,32 @@ describe('ShiftsController', () => {
       remove: jest.fn(() => Promise.resolve(mockShift)),
     };
 
+    const mockRegistrationsService = {
+      create: jest.fn(() => Promise.resolve({ id: 'reg-id', userId: 'user-id', shiftId: 'test-id' })),
+      findByUser: jest.fn(() => Promise.resolve([])),
+      findByShift: jest.fn(() => Promise.resolve([])),
+      findOne: jest.fn(() => Promise.resolve({ id: 'reg-id', userId: 'user-id', shiftId: 'test-id' })),
+      update: jest.fn(() => Promise.resolve({ id: 'reg-id', userId: 'user-id', shiftId: 'test-id', status: 'CANCELLED' })),
+    };
+
+    const mockPrismaService = {
+      // Add any necessary mock methods here
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       controllers: [ShiftsController],
       providers: [
         {
           provide: ShiftsService,
           useValue: mockShiftsService,
+        },
+        {
+          provide: RegistrationsService,
+          useValue: mockRegistrationsService,
+        },
+        {
+          provide: PrismaService,
+          useValue: mockPrismaService,
         },
       ],
     }).compile();

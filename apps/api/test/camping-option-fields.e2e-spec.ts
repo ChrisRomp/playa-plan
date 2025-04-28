@@ -5,6 +5,37 @@ import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/common/prisma/prisma.service';
 import { UserRole, FieldType } from '@prisma/client';
 
+// Interface for raw camping option results
+interface RawCampingOption {
+  id: string;
+  name: string;
+  description: string | null;
+  enabled: boolean;
+  workShiftsRequired: number;
+  participantDues: number;
+  staffDues: number;
+  maxSignups: number;
+  campId: string;
+  jobCategoryIds: string[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// Interface for raw camping option field results
+interface RawCampingOptionField {
+  id: string;
+  displayName: string;
+  description: string | null;
+  dataType: FieldType;
+  required: boolean;
+  maxLength: number | null;
+  minValue: number | null;
+  maxValue: number | null;
+  campingOptionId: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 // Mock SendGrid
 jest.mock('@sendgrid/mail', () => ({
   setApiKey: jest.fn(),
@@ -63,7 +94,7 @@ describe('CampingOptionFieldsController (e2e)', () => {
         now()
       )
       RETURNING *
-    `);
+    `) as RawCampingOption[];
 
     testCampingOptionId = campingOption[0].id;
 
@@ -220,7 +251,7 @@ describe('CampingOptionFieldsController (e2e)', () => {
           now()
         )
         RETURNING *
-      `);
+      `) as RawCampingOptionField[];
 
       fieldId = field[0].id;
     });
@@ -266,7 +297,7 @@ describe('CampingOptionFieldsController (e2e)', () => {
           now()
         )
         RETURNING *
-      `);
+      `) as RawCampingOptionField[];
 
       fieldId = field[0].id;
     });
@@ -328,7 +359,7 @@ describe('CampingOptionFieldsController (e2e)', () => {
           now()
         )
         RETURNING *
-      `);
+      `) as RawCampingOptionField[];
 
       fieldId = field[0].id;
     });
