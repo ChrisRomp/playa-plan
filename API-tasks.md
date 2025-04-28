@@ -225,33 +225,33 @@
 
 - [x] Implement email verification and password reset integration with Notifications module
 
-### ⚙️ Core Configuration Module (Missing)
+### ⚙️ Core Configuration Module
 
-- [ ] Create CoreConfig module with CRUD operations
-  - [ ] Create CoreConfig entity with all site configuration options
-  - [ ] Implement controller and service for managing site config
-  - [ ] Create DTOs for configuration updates
-- [ ] Implement camp info configuration section
-  - [ ] Camp name
-  - [ ] Camp description
-  - [ ] Home page blurb
-  - [ ] Camp banner URL
-  - [ ] Camp icon URL
-- [ ] Implement registration configuration section
-  - [ ] Registration year
-  - [ ] Early registration open flag
-  - [ ] Registration open flag
-  - [ ] Registration terms
-  - [ ] Allow deferred dues payment flag
-- [ ] Implement payment processing configuration
-  - [ ] Stripe enabled flag and settings
-  - [ ] PayPal enabled flag and settings
-- [ ] Implement email configuration section
-  - [ ] SMTP configuration management
-- [ ] Implement site configuration
-  - [ ] Time zone setting
-- [ ] Write unit tests for CoreConfig module
-- [ ] Write integration tests for CoreConfig endpoints
+- [x] Create CoreConfig module with CRUD operations
+  - [x] Create CoreConfig entity with all site configuration options
+  - [x] Implement controller and service for managing site config
+  - [x] Create DTOs for configuration updates
+- [x] Implement camp info configuration section
+  - [x] Camp name
+  - [x] Camp description
+  - [x] Home page blurb
+  - [x] Camp banner URL
+  - [x] Camp icon URL
+- [x] Implement registration configuration section
+  - [x] Registration year
+  - [x] Early registration open flag
+  - [x] Registration open flag
+  - [x] Registration terms
+  - [x] Allow deferred dues payment flag
+- [x] Implement payment processing configuration
+  - [x] Stripe enabled flag and settings
+  - [x] PayPal enabled flag and settings
+- [x] Implement email configuration section
+  - [x] SMTP configuration management
+- [x] Implement site configuration
+  - [x] Time zone setting
+- [x] Write unit tests for CoreConfig module
+- [x] Write integration tests for CoreConfig endpoints
 
 ## 5. 🔍 Operations & Monitoring
 
