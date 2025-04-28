@@ -37,7 +37,7 @@
 - [x] Implement DTOs for login and registration
 - [x] Implement email verification flow
 - [x] Implement password reset flow
-- [ ] Implement optional magic link or email code verification login
+- [ ] Implement email code verification login
 - [x] Write unit tests for authentication controller and service
 - [ ] Write integration (e2e) tests for authentication endpoints
 
@@ -57,16 +57,16 @@
 - [x] Add admin/test method to controller as a smoke test
 - [ ] Update Swagger documentation for all user endpoints
 - [ ] Document user module usage and endpoints in README.md
-- [ ] Update User model for additional profile fields from spec
-  - [ ] Add emergency contact info field
-  - [ ] Add phone field
-  - [ ] Add city, state/province fields
-  - [ ] Add country field
-  - [ ] Add allow registration boolean
-  - [ ] Add allow early registration boolean
-  - [ ] Add allow deferred dues payment boolean
-  - [ ] Add allow no job boolean
-  - [ ] Add internal notes field
+- [x] Update User model for additional profile fields from spec
+  - [x] Add emergency contact info field
+  - [x] Add phone field
+  - [x] Add city, state/province fields
+  - [x] Add country field
+  - [x] Add allow registration boolean
+  - [x] Add allow early registration boolean
+  - [x] Add allow deferred dues payment boolean
+  - [x] Add allow no job boolean
+  - [x] Add internal notes field
 
 ### 🛡️ Security Foundations
 
@@ -119,14 +119,14 @@
   - [x] Create DTOs for shift creation and updates
 - [x] Implement DTOs and validation schemas
 - [x] Write unit tests for shift controllers and services
-- [ ] Fix integration (e2e) tests for shift endpoints
+- [x] Fix integration (e2e) tests for shift endpoints
   - [x] Create e2e test files
-  - [ ] Fix authentication issues in the e2e tests
-    - [ ] Ensure test users exist in test database
-    - [ ] Verify JWT token generation in test environment
-    - [ ] Update test setup to handle authentication properly
-  - [ ] Update tests to handle proper test data creation and teardown
-  - [ ] Ensure all shift e2e tests pass
+  - [x] Fix authentication issues in the e2e tests
+    - [x] Ensure test users exist in test database
+    - [x] Verify JWT token generation in test environment
+    - [x] Update test setup to handle authentication properly
+  - [x] Update tests to handle proper test data creation and teardown
+  - [x] Ensure all shift e2e tests pass
 - [ ] Update Shift model to support day-of-week selection rather than specific dates
 
 ### 📝 Registrations Module
@@ -216,6 +216,7 @@
   - [x] Create unit tests for NotificationsService
   - [x] Create unit tests for NotificationsController
 - [ ] Write integration (e2e) tests for notification endpoints
+- [ ] When the backend server is running in debug mode, emit notifications to the console as well as any configured email services (or just console if no email service is configured)
 
 ### Advanced User Features
 
