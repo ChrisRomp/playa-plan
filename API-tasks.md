@@ -38,7 +38,7 @@
 - [x] Implement email verification flow
 - [x] Implement password reset flow
 - [x] Implement email code verification login
-- [ ] Write unit tests for authentication controller and service
+- [x] Write unit tests for authentication controller and service
 - [ ] Write integration (e2e) tests for authentication endpoints
 
 ### 🛠️ Users Module
