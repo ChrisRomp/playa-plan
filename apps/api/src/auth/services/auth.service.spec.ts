@@ -27,14 +27,24 @@ describe('AuthService', () => {
     firstName: 'Test',
     lastName: 'User',
     playaName: 'TestUser',
+    profilePicture: null,
+    phone: null,
+    city: null,
+    stateProvince: null,
+    country: null,
+    emergencyContact: null,
     role: UserRole.PARTICIPANT,
     isEmailVerified: false,
+    allowRegistration: true,
+    allowEarlyRegistration: false,
+    allowDeferredDuesPayment: false,
+    allowNoJob: false,
+    internalNotes: null,
     verificationToken: 'verification-token',
     resetToken: null,
     resetTokenExpiry: null,
     createdAt: new Date(),
     updatedAt: new Date(),
-    profilePicture: null,
   } as User;
 
   // Mock prisma service
@@ -197,25 +207,16 @@ describe('AuthService', () => {
   });
 
   describe('login', () => {
-    // Create a type-safe user without password property
-    const userWithoutPassword: Omit<User, 'password'> = {
-      id: mockUser.id,
-      email: mockUser.email,
-      firstName: mockUser.firstName,
-      lastName: mockUser.lastName,
-      playaName: mockUser.playaName,
-      role: mockUser.role,
-      isEmailVerified: mockUser.isEmailVerified,
-      verificationToken: mockUser.verificationToken,
-      resetToken: mockUser.resetToken,
-      resetTokenExpiry: mockUser.resetTokenExpiry,
-      createdAt: mockUser.createdAt,
-      updatedAt: mockUser.updatedAt,
-      profilePicture: mockUser.profilePicture,
-    };
-
     it('should return user data with JWT token', async () => {
-      const result = await service.login(userWithoutPassword);
+      // Create minimal user for login - no need for all fields
+      const userForLogin = {
+        id: mockUser.id,
+        email: mockUser.email,
+        role: mockUser.role,
+      };
+      
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const result = await service.login(userForLogin as any);
       
       expect(result).toHaveProperty('accessToken', 'mocked-jwt-token');
       expect(result).toHaveProperty('userId', 'user-id-1');
