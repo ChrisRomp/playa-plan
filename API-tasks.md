@@ -305,7 +305,17 @@
 
 ### 📚 Shared Libraries (`libs`)
 
-- [ ] Define shared TypeScript types/interfaces (DTOs, entities)
+- [x] Define shared TypeScript types/interfaces (DTOs, entities)
+  - [x] Create day-of-week enum in shared types
+  - [x] Create user-role enum in shared types
+  - [x] Create registration-status enum in shared types
+  - [x] Create payment-status enum in shared types
+  - [x] Create payment-method enum in shared types
+- [ ] Fix TypeScript path mapping for the shared types library
+  - [ ] Configure TypeScript properly to resolve `@playa-plan/types` imports
+  - [ ] Fix dependency declaration in package.json (replace `workspace:*`)
+  - [ ] Update all imports to use the shared types across the codebase
+  - [ ] Remove duplicate enum files in the API project once imports are working
 - [ ] Define shared constants (e.g., role enums)
 - [ ] Implement shared validation schemas (Zod or class-validator)
 - [ ] Implement shared utility functions (e.g., date formatting)
