@@ -3,13 +3,15 @@ import { AuthController } from './auth.controller';
 import { AuthService } from '../services/auth.service';
 import { RegisterDto } from '../dto/register.dto';
 import { User, UserRole } from '@prisma/client';
-import { UnauthorizedException } from '@nestjs/common';
-import { Request } from 'express';
+import { UnauthorizedException, BadRequestException, ConflictException } from '@nestjs/common';
+import { JwtAuthGuard } from '../guards/jwt-auth.guard';
+import { RequestLoginCodeDto } from '../dto/request-login-code.dto';
+import { EmailCodeLoginDto } from '../dto/email-code-login.dto';
 
-// Define the request with user interface to match controller type
-interface RequestWithUser extends Request {
-  user: Omit<User, 'password'>;
-}
+// Mock the Request object
+const createMockRequest = (user) => ({
+  user
+});
 
 describe('AuthController', () => {
   let controller: AuthController;
@@ -46,9 +48,12 @@ describe('AuthController', () => {
   const mockAuthService = {
     register: jest.fn(),
     login: jest.fn(),
+    validateCredentials: jest.fn(),
     verifyEmail: jest.fn(),
     initiatePasswordReset: jest.fn(),
     resetPassword: jest.fn(),
+    generateLoginCode: jest.fn(),
+    validateLoginCode: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -62,7 +67,10 @@ describe('AuthController', () => {
           useValue: mockAuthService,
         },
       ],
-    }).compile();
+    })
+      .overrideGuard(JwtAuthGuard)
+      .useValue({ canActivate: () => true })
+      .compile();
 
     controller = module.get<AuthController>(AuthController);
     authService = module.get<AuthService>(AuthService);
@@ -73,93 +81,207 @@ describe('AuthController', () => {
   });
 
   describe('register', () => {
-    it('should register a new user and return auth response', async () => {
+    it('should create a new user', async () => {
+      // Arrange
       const registerDto: RegisterDto = {
-        email: 'new@example.com',
+        email: 'test@example.com',
         password: 'Password123!',
-        firstName: 'New',
+        firstName: 'Test',
         lastName: 'User',
-        playaName: 'NewUser',
+        playaName: 'TestUser',
       };
-
+      
       mockAuthService.register.mockResolvedValue(mockUser);
       mockAuthService.login.mockResolvedValue(mockAuthResponse);
 
+      // Act
       const result = await controller.register(registerDto);
-      
+
+      // Assert
       expect(result).toEqual(mockAuthResponse);
-      expect(authService.register).toHaveBeenCalledWith(registerDto);
-      expect(authService.login).toHaveBeenCalledWith(mockUser);
+      expect(mockAuthService.register).toHaveBeenCalledWith(registerDto);
+      expect(mockAuthService.login).toHaveBeenCalledWith(mockUser);
+    });
+
+    it('should throw if user registration fails', async () => {
+      // Arrange
+      const registerDto: RegisterDto = {
+        email: 'test@example.com',
+        password: 'Password123!',
+        firstName: 'Test',
+        lastName: 'User',
+        playaName: 'TestUser',
+      };
+      
+      mockAuthService.register.mockRejectedValue(
+        new ConflictException('User with this email already exists')
+      );
+
+      // Act & Assert
+      await expect(controller.register(registerDto)).rejects.toThrow(ConflictException);
     });
   });
 
   describe('login', () => {
-    it('should return auth response for authenticated user', async () => {
+    it('should authenticate and return a JWT token with user info', async () => {
+      // Arrange
+      const req = createMockRequest(mockUser);
       mockAuthService.login.mockResolvedValue(mockAuthResponse);
 
-      const req = { user: mockUser } as RequestWithUser;
+      // Act
       const result = await controller.login(req);
-      
+
+      // Assert
       expect(result).toEqual(mockAuthResponse);
-      expect(authService.login).toHaveBeenCalledWith(mockUser);
+      expect(mockAuthService.login).toHaveBeenCalledWith(mockUser);
     });
   });
 
   describe('verifyEmail', () => {
-    it('should verify email successfully with valid token', async () => {
+    it('should verify email with valid token', async () => {
+      // Arrange
       mockAuthService.verifyEmail.mockResolvedValue(true);
 
+      // Act
       const result = await controller.verifyEmail('valid-token');
-      
+
+      // Assert
       expect(result).toEqual({ message: 'Email verified successfully' });
-      expect(authService.verifyEmail).toHaveBeenCalledWith('valid-token');
+      expect(mockAuthService.verifyEmail).toHaveBeenCalledWith('valid-token');
     });
 
-    it('should throw UnauthorizedException with invalid token', async () => {
+    it('should throw UnauthorizedException for invalid token', async () => {
+      // Arrange
       mockAuthService.verifyEmail.mockResolvedValue(false);
 
+      // Act & Assert
       await expect(controller.verifyEmail('invalid-token')).rejects.toThrow(UnauthorizedException);
-      expect(authService.verifyEmail).toHaveBeenCalledWith('invalid-token');
+      await expect(controller.verifyEmail('invalid-token')).rejects.toThrow('Invalid or expired verification token');
     });
   });
 
   describe('forgotPassword', () => {
-    it('should initiate password reset', async () => {
+    it('should initiate password reset successfully', async () => {
+      // Arrange
       mockAuthService.initiatePasswordReset.mockResolvedValue(true);
 
+      // Act
       const result = await controller.forgotPassword('test@example.com');
-      
+
+      // Assert
       expect(result).toEqual({ 
         message: 'If your email exists in our system, you will receive a password reset link' 
       });
-      expect(authService.initiatePasswordReset).toHaveBeenCalledWith('test@example.com');
+      expect(mockAuthService.initiatePasswordReset).toHaveBeenCalledWith('test@example.com');
+    });
+
+    it('should return the same message even if password reset initiation fails', async () => {
+      // Arrange
+      mockAuthService.initiatePasswordReset.mockResolvedValue(false);
+
+      // Act
+      const result = await controller.forgotPassword('test@example.com');
+
+      // Assert
+      expect(result).toEqual({ 
+        message: 'If your email exists in our system, you will receive a password reset link' 
+      });
+      expect(mockAuthService.initiatePasswordReset).toHaveBeenCalledWith('test@example.com');
     });
   });
 
   describe('resetPassword', () => {
     it('should reset password with valid token', async () => {
+      // Arrange
       mockAuthService.resetPassword.mockResolvedValue(true);
 
+      // Act
       const result = await controller.resetPassword('valid-token', 'NewPassword123!');
-      
+
+      // Assert
       expect(result).toEqual({ message: 'Password reset successfully' });
-      expect(authService.resetPassword).toHaveBeenCalledWith('valid-token', 'NewPassword123!');
+      expect(mockAuthService.resetPassword).toHaveBeenCalledWith('valid-token', 'NewPassword123!');
     });
 
-    it('should throw UnauthorizedException with invalid token', async () => {
+    it('should throw UnauthorizedException for invalid token', async () => {
+      // Arrange
       mockAuthService.resetPassword.mockResolvedValue(false);
 
+      // Act & Assert
       await expect(controller.resetPassword('invalid-token', 'NewPassword123!')).rejects.toThrow(UnauthorizedException);
-      expect(authService.resetPassword).toHaveBeenCalledWith('invalid-token', 'NewPassword123!');
+      await expect(controller.resetPassword('invalid-token', 'NewPassword123!')).rejects.toThrow('Invalid or expired reset token');
+    });
+  });
+
+  describe('requestLoginCode', () => {
+    it('should request a login code successfully', async () => {
+      // Arrange
+      const loginEmailDto: RequestLoginCodeDto = { email: 'test@example.com' };
+      mockAuthService.generateLoginCode.mockResolvedValue(true);
+
+      // Act
+      const result = await controller.requestLoginCode(loginEmailDto);
+
+      // Assert
+      expect(result).toEqual({ 
+        message: 'If your email exists in our system, you will receive a login code' 
+      });
+      expect(mockAuthService.generateLoginCode).toHaveBeenCalledWith('test@example.com');
+    });
+
+    it('should throw BadRequestException if login code generation fails', async () => {
+      // Arrange
+      const loginEmailDto: RequestLoginCodeDto = { email: 'test@example.com' };
+      mockAuthService.generateLoginCode.mockResolvedValue(false);
+
+      // Act & Assert
+      await expect(controller.requestLoginCode(loginEmailDto)).rejects.toThrow(BadRequestException);
+      await expect(controller.requestLoginCode(loginEmailDto)).rejects.toThrow('Failed to send login code');
+    });
+  });
+
+  describe('loginWithCode', () => {
+    it('should verify login code and return JWT token with user info', async () => {
+      // Arrange
+      const emailCodeLoginDto: EmailCodeLoginDto = {
+        email: 'test@example.com',
+        code: '123456',
+      };
+      mockAuthService.validateLoginCode.mockResolvedValue(mockUser);
+      mockAuthService.login.mockResolvedValue(mockAuthResponse);
+
+      // Act
+      const result = await controller.loginWithCode(emailCodeLoginDto);
+
+      // Assert
+      expect(result).toEqual(mockAuthResponse);
+      expect(mockAuthService.validateLoginCode).toHaveBeenCalledWith('test@example.com', '123456');
+      expect(mockAuthService.login).toHaveBeenCalledWith(mockUser);
+    });
+
+    it('should throw UnauthorizedException for invalid login code', async () => {
+      // Arrange
+      const emailCodeLoginDto: EmailCodeLoginDto = {
+        email: 'test@example.com',
+        code: 'invalid',
+      };
+      mockAuthService.validateLoginCode.mockResolvedValue(null);
+
+      // Act & Assert
+      await expect(controller.loginWithCode(emailCodeLoginDto)).rejects.toThrow(UnauthorizedException);
+      await expect(controller.loginWithCode(emailCodeLoginDto)).rejects.toThrow('Invalid or expired verification code');
     });
   });
 
   describe('getProfile', () => {
     it('should return user profile', async () => {
-      const req = { user: mockUser } as RequestWithUser;
+      // Arrange
+      const req = createMockRequest(mockUser);
       
+      // Act
       const result = await controller.getProfile(req);
-      
+
+      // Assert
       expect(result).toEqual(mockUser);
     });
   });
