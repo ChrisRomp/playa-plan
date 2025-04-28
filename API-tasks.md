@@ -141,26 +141,26 @@
 
 ### 🏕️ Camping Options Module (Missing)
 
-- [ ] Create CampingOptions module with CRUD operations
-  - [ ] Create entity, controller, and service for camping options
-  - [ ] Implement relationships between users, camps, and camping options
-  - [ ] Create DTOs for camping option creation and updates
-  - [ ] Implement validation for camping options
-- [ ] Implement camping option model with following fields
-  - [ ] Name
-  - [ ] Enabled boolean
-  - [ ] Work shifts required count
-  - [ ] Job categories relationship
-  - [ ] Participant dues
-  - [ ] Staff dues
-  - [ ] Maximum signups
-  - [ ] Additional fields configuration system
-- [ ] Implement camping option fields configuration
-  - [ ] Create field type enum (string, number, boolean, date)
-  - [ ] Support for field validation options
-  - [ ] Create controller endpoints for field management
-- [ ] Write unit tests for camping options
-- [ ] Write integration tests for camping options
+- [x] Create CampingOptions module with CRUD operations
+  - [x] Create entity, controller, and service for camping options
+  - [x] Implement relationships between users, camps, and camping options
+  - [x] Create DTOs for camping option creation and updates
+  - [x] Implement validation for camping options
+- [x] Implement camping option model with following fields
+  - [x] Name
+  - [x] Enabled boolean
+  - [x] Work shifts required count
+  - [x] Job categories relationship
+  - [x] Participant dues
+  - [x] Staff dues
+  - [x] Maximum signups
+  - [x] Additional fields configuration system
+- [x] Implement camping option fields configuration
+  - [x] Create field type enum (string, number, boolean, date)
+  - [x] Support for field validation options
+  - [x] Create controller endpoints for field management
+- [x] Write unit tests for camping options
+- [x] Write integration tests for camping options
 
 ## 4. 💪 Supporting Features
 
