@@ -115,8 +115,6 @@ export class NotificationsService {
     console.log(`Subject: ${options.subject}`);
     console.log('\n--- PLAIN TEXT CONTENT ---');
     console.log(options.text);
-    console.log('\n--- HTML CONTENT ---');
-    console.log(options.html);
     console.log('===============================================================\n');
   }
 
