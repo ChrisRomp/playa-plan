@@ -55,7 +55,7 @@
 - [x] Write unit tests for UserTransformInterceptor
 - [ ] Complete integration (e2e) tests for all user endpoints
 - [x] Add admin/test method to controller as a smoke test
-- [ ] Update Swagger documentation for all user endpoints
+- [x] Update Swagger documentation for all user endpoints
 - [ ] Document user module usage and endpoints in README.md
 - [x] Update User model for additional profile fields from spec
   - [x] Add emergency contact info field
