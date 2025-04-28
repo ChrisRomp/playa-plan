@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ShiftsController } from './shifts.controller';
 import { ShiftsService } from './shifts.service';
 import { CreateShiftDto, UpdateShiftDto } from './dto';
-import { DayOfWeek } from '@libs/types/enums/day-of-week.enum';
+import { DayOfWeek } from '../common/enums/day-of-week.enum';
 
 describe('ShiftsController', () => {
   let controller: ShiftsController;
@@ -58,13 +58,13 @@ describe('ShiftsController', () => {
   describe('create', () => {
     it('should create a shift', async () => {
       const mockCreateShiftDto = {
-        title: 'Test Shift',
+        name: 'Test Shift',
         description: 'Test Description',
-        maxWorkers: 5,
+        maxParticipants: 5,
         startTime: new Date('2023-06-01T09:00:00Z'),
         endTime: new Date('2023-06-01T17:00:00Z'),
         dayOfWeek: DayOfWeek.MONDAY,
-        campId: 'test-camp-id',
+        location: 'test-camp-id',
         jobId: 1
       };
 
@@ -96,7 +96,7 @@ describe('ShiftsController', () => {
   describe('update', () => {
     it('should update a shift', async () => {
       const updateShiftDto: UpdateShiftDto = {
-        maxRegistrations: 15,
+        maxParticipants: 15,
       };
 
       const result = await controller.update('test-id', updateShiftDto);

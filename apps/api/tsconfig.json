@@ -4,7 +4,9 @@
       "outDir": "../../dist/api",
       "types": ["node", "jest"],
       "paths": {
-        "@libs/types/*": ["../../libs/types/src/*"]
+        "@libs/types/*": ["../../libs/types/src/*"],
+        "@libs/types": ["../../libs/types/src"],
+        "@playa-plan/types": ["../../libs/types/src"]
       },
       "sourceMap": false,
       "inlineSourceMap": true

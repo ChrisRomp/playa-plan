@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsDate, IsEnum, IsInt, IsNotEmpty, IsString } from 'class-validator';
-import { DayOfWeek } from '@playa-plan/types';
+import { DayOfWeek } from '../../common/enums/day-of-week.enum';
 
 /**
  * Data Transfer Object for creating a new shift

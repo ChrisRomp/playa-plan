@@ -1,8 +1,18 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsDate, IsEnum, IsInt, IsOptional, IsString, IsUUID, Min } from 'class-validator';
-import { DayOfWeek } from '@libs/types/enums/day-of-week.enum';
+import { IsDate, IsEnum, IsInt, IsOptional, IsString, Min } from 'class-validator';
+import { DayOfWeek } from '../../common/enums/day-of-week.enum';
 
 export class UpdateShiftDto {
+  @ApiProperty({ description: 'The title of the shift', required: false })
+  @IsString()
+  @IsOptional()
+  name?: string;
+
+  @ApiProperty({ description: 'The description of the shift', required: false })
+  @IsString()
+  @IsOptional()
+  description?: string;
+
   @ApiProperty({ description: 'The start time of the shift', required: false })
   @IsDate()
   @IsOptional()
@@ -17,7 +27,7 @@ export class UpdateShiftDto {
   @IsInt()
   @Min(1)
   @IsOptional()
-  maxRegistrations?: number;
+  maxParticipants?: number;
 
   @ApiProperty({ enum: DayOfWeek, description: 'The day of the week for this shift', required: false })
   @IsEnum(DayOfWeek)
@@ -27,12 +37,10 @@ export class UpdateShiftDto {
   @ApiProperty({ description: 'The ID of the camp this shift belongs to', required: false })
   @IsString()
   @IsOptional()
-  @IsUUID()
-  campId?: string;
+  location?: string;
 
   @ApiProperty({ description: 'The ID of the job this shift is for', required: false })
-  @IsString()
+  @IsInt()
   @IsOptional()
-  @IsUUID()
-  jobId?: string;
+  jobId?: number;
 } 

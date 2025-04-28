@@ -130,7 +130,7 @@
     - [x] Update test setup to handle authentication properly
   - [x] Update tests to handle proper test data creation and teardown
   - [x] Ensure all shift e2e tests pass
-- [ ] Update Shift model to support day-of-week selection rather than specific dates
+- [x] Update Shift model to support day-of-week selection rather than specific dates
 
 ### 📝 Registrations Module
 

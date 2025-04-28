@@ -3,7 +3,7 @@ import { ShiftsService } from './shifts.service';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { NotFoundException } from '@nestjs/common';
 import { CreateShiftDto } from './dto';
-import { DayOfWeek } from '@libs/types/enums/day-of-week.enum';
+import { DayOfWeek } from '../common/enums/day-of-week.enum';
 
 describe('ShiftsService', () => {
   let service: ShiftsService;
@@ -22,23 +22,23 @@ describe('ShiftsService', () => {
   };
 
   const mockCreateShiftDto = {
-    title: 'Test Shift',
+    name: 'Test Shift',
     description: 'Test Description',
-    maxWorkers: 5,
+    maxParticipants: 5,
     startTime: new Date('2023-06-01T09:00:00Z'),
     endTime: new Date('2023-06-01T17:00:00Z'),
     dayOfWeek: DayOfWeek.MONDAY,
-    campId: 'test-camp-id',
+    location: 'test-camp-id',
     jobId: 1
   };
 
   const mockUpdateShiftDto = {
     startTime: new Date('2023-07-01T10:00:00Z'),
     endTime: new Date('2023-07-01T18:00:00Z'),
-    maxWorkers: 15,
+    maxParticipants: 15,
     dayOfWeek: DayOfWeek.TUESDAY,
-    campId: 'updated-camp-id',
-    jobId: 'updated-job-id'
+    location: 'updated-camp-id',
+    jobId: 2
   };
 
   beforeEach(async () => {
@@ -76,10 +76,10 @@ describe('ShiftsService', () => {
         data: {
           startTime: mockCreateShiftDto.startTime,
           endTime: mockCreateShiftDto.endTime,
-          maxRegistrations: mockCreateShiftDto.maxWorkers,
+          maxRegistrations: mockCreateShiftDto.maxParticipants,
           dayOfWeek: mockCreateShiftDto.dayOfWeek,
-          camp: { connect: { id: mockCreateShiftDto.campId } },
-          job: { connect: { id: mockCreateShiftDto.jobId } },
+          camp: { connect: { id: mockCreateShiftDto.location } },
+          job: { connect: { id: String(mockCreateShiftDto.jobId) } },
         },
       });
     });
@@ -122,10 +122,10 @@ describe('ShiftsService', () => {
         data: {
           startTime: mockUpdateShiftDto.startTime,
           endTime: mockUpdateShiftDto.endTime,
-          maxRegistrations: mockUpdateShiftDto.maxWorkers,
+          maxRegistrations: mockUpdateShiftDto.maxParticipants,
           dayOfWeek: mockUpdateShiftDto.dayOfWeek,
-          ...(mockUpdateShiftDto.campId ? { camp: { connect: { id: mockUpdateShiftDto.campId } } } : {}),
-          ...(mockUpdateShiftDto.jobId ? { job: { connect: { id: mockUpdateShiftDto.jobId } } } : {}),
+          camp: { connect: { id: mockUpdateShiftDto.location } },
+          job: { connect: { id: String(mockUpdateShiftDto.jobId) } },
         },
         include: {
           camp: true,
