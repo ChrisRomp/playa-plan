@@ -45,51 +45,22 @@ export class CampingOptionsService {
         }
       }
 
-      // Convert job category IDs to string array representation for PostgreSQL
-      const jobCategoryIdsArray = JSON.stringify(createCampingOptionDto.jobCategoryIds || [])
-        .replace(/\[/g, '{')
-        .replace(/\]/g, '}');
+      // For create operation
+      const campingOption = await this.prisma.campingOption.create({
+        data: {
+          name: createCampingOptionDto.name,
+          description: createCampingOptionDto.description,
+          enabled: createCampingOptionDto.enabled ?? true,
+          workShiftsRequired: createCampingOptionDto.workShiftsRequired ?? 0,
+          participantDues: createCampingOptionDto.participantDues,
+          staffDues: createCampingOptionDto.staffDues,
+          maxSignups: createCampingOptionDto.maxSignups ?? 0,
+          camp: { connect: { id: createCampingOptionDto.campId } },
+          jobCategoryIds: createCampingOptionDto.jobCategoryIds || [],
+        },
+      });
 
-      const query = `
-        INSERT INTO "camping_options"
-        (id, name, description, enabled, "workShiftsRequired", "participantDues", "staffDues", "maxSignups", "campId", "jobCategoryIds", "createdAt", "updatedAt")
-        VALUES
-        (
-          gen_random_uuid(),
-          $1,
-          $2,
-          $3,
-          $4,
-          $5,
-          $6,
-          $7,
-          $8,
-          $9::text[],
-          now(),
-          now()
-        )
-        RETURNING *
-      `;
-
-      const values = [
-        createCampingOptionDto.name,
-        createCampingOptionDto.description || null,
-        createCampingOptionDto.enabled !== undefined ? createCampingOptionDto.enabled : true,
-        createCampingOptionDto.workShiftsRequired !== undefined ? createCampingOptionDto.workShiftsRequired : 0,
-        createCampingOptionDto.participantDues,
-        createCampingOptionDto.staffDues,
-        createCampingOptionDto.maxSignups !== undefined ? createCampingOptionDto.maxSignups : 0,
-        createCampingOptionDto.campId,
-        jobCategoryIdsArray
-      ];
-
-      const result = await this.prisma.$queryRawUnsafe(query, ...values);
-      
-      if (!result || !Array.isArray(result) || result.length === 0) {
-        throw new BadRequestException('Failed to create camping option');
-      }
-
-      return new CampingOption(result[0]);
+      return new CampingOption(campingOption);
     } catch (error) {
       if (error instanceof NotFoundException || error instanceof BadRequestException) {
         throw error;
@@ -309,4 +280,4 @@ export class CampingOptionsService {
       throw new BadRequestException('Failed to delete camping option');
     }
   }
-} 
+}

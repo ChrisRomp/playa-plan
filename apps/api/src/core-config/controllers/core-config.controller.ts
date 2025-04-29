@@ -203,7 +203,9 @@ export class CoreConfigController {
   @ApiResponse({ status: 403, description: 'Forbidden - requires admin role' })
   @Get('admin/test')
   @Roles(UserRole.ADMIN)
-  adminTest(): string {
-    return this.coreConfigService.adminTest();
+  @UseInterceptors() // Override the controller-level interceptors
+  adminTest(): { message: string } {
+    // Return an object instead of a string to avoid problems with UserTransformInterceptor
+    return { message: this.coreConfigService.adminTest() };
   }
 } 

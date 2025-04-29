@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -10,111 +7,247 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// User models
 model User {
-  id                String    @id @default(uuid())
-  email             String    @unique
-  password          String?
-  firstName         String
-  lastName          String
-  playaName         String?
-  profilePicture    String?
-  phone             String?
-  city              String?
-  stateProvince     String?
-  country           String?
-  emergencyContact  String?
-  role              UserRole  @default(PARTICIPANT)
-  isEmailVerified   Boolean   @default(false)
-  allowRegistration Boolean   @default(true)
-  allowEarlyRegistration Boolean @default(false)
-  allowDeferredDuesPayment Boolean @default(false)
-  allowNoJob        Boolean   @default(false)
-  internalNotes     String?
-  verificationToken String?
-  resetToken        String?
-  resetTokenExpiry  DateTime?
-  loginCode         String?
-  loginCodeExpiry   DateTime?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-
-  // Relations
-  registrations     Registration[]
-  payments          Payment[]
+  id                         String                      @id @default(uuid())
+  email                      String                      @unique
+  password                   String?
+  firstName                  String
+  lastName                   String
+  playaName                  String?
+  profilePicture             String?
+  role                       UserRole                    @default(PARTICIPANT)
+  isEmailVerified            Boolean                     @default(false)
+  verificationToken          String?
+  resetToken                 String?
+  resetTokenExpiry           DateTime?
+  createdAt                  DateTime                    @default(now())
+  updatedAt                  DateTime                    @updatedAt
+  allowDeferredDuesPayment   Boolean                     @default(false)
+  allowEarlyRegistration     Boolean                     @default(false)
+  allowNoJob                 Boolean                     @default(false)
+  allowRegistration          Boolean                     @default(true)
+  city                       String?
+  country                    String?
+  emergencyContact           String?
+  internalNotes              String?
+  phone                      String?
+  stateProvince              String?
+  loginCode                  String?
+  loginCodeExpiry            DateTime?
   campingOptionRegistrations CampingOptionRegistration[]
+  payments                   Payment[]
+  registrations              Registration[]
 
   @@map("users")
+}
+
+model Camp {
+  id             String          @id @default(uuid())
+  name           String
+  description    String?
+  startDate      DateTime
+  endDate        DateTime
+  location       String
+  capacity       Int
+  isActive       Boolean         @default(true)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  campingOptions CampingOption[]
+  shifts         Shift[]
+
+  @@map("camps")
+}
+
+model CampingOption {
+  id                 String                      @id @default(uuid())
+  name               String
+  description        String?
+  enabled            Boolean                     @default(true)
+  workShiftsRequired Int                         @default(0)
+  participantDues    Float
+  staffDues          Float
+  maxSignups         Int                         @default(0)
+  createdAt          DateTime                    @default(now())
+  updatedAt          DateTime                    @updatedAt
+  campId             String
+  jobCategoryIds     String[]
+  fields             CampingOptionField[]
+  registrations      CampingOptionRegistration[]
+  camp               Camp                        @relation(fields: [campId], references: [id])
+
+  @@map("camping_options")
+}
+
+model CampingOptionField {
+  id              String                    @id @default(uuid())
+  displayName     String
+  description     String?
+  dataType        FieldType
+  required        Boolean                   @default(false)
+  maxLength       Int?
+  minValue        Float?
+  maxValue        Float?
+  createdAt       DateTime                  @default(now())
+  updatedAt       DateTime                  @updatedAt
+  campingOptionId String
+  fieldValues     CampingOptionFieldValue[]
+  campingOption   CampingOption             @relation(fields: [campingOptionId], references: [id], onDelete: Cascade)
+
+  @@map("camping_option_fields")
+}
+
+model CampingOptionFieldValue {
+  id             String                    @id @default(uuid())
+  value          String
+  createdAt      DateTime                  @default(now())
+  updatedAt      DateTime                  @updatedAt
+  fieldId        String
+  registrationId String
+  field          CampingOptionField        @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+  registration   CampingOptionRegistration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+
+  @@map("camping_option_field_values")
+}
+
+model CampingOptionRegistration {
+  id              String                    @id @default(uuid())
+  createdAt       DateTime                  @default(now())
+  updatedAt       DateTime                  @updatedAt
+  userId          String
+  campingOptionId String
+  fieldValues     CampingOptionFieldValue[]
+  campingOption   CampingOption             @relation(fields: [campingOptionId], references: [id])
+  user            User                      @relation(fields: [userId], references: [id])
+
+  @@map("camping_option_registrations")
+}
+
+model JobCategory {
+  id             String   @id @default(uuid())
+  name           String   @unique
+  description    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  alwaysRequired Boolean  @default(false)
+  location       String?
+  staffOnly      Boolean  @default(false)
+  jobs           Job[]
+
+  @@map("job_categories")
+}
+
+model Job {
+  id             String      @id @default(uuid())
+  name           String
+  description    String?
+  location       String
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  categoryId     String
+  alwaysRequired Boolean     @default(false)
+  staffOnly      Boolean     @default(false)
+  category       JobCategory @relation(fields: [categoryId], references: [id])
+  shifts         Shift[]
+
+  @@map("jobs")
+}
+
+model Shift {
+  id               String         @id @default(uuid())
+  startTime        DateTime
+  endTime          DateTime
+  maxRegistrations Int
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  campId           String
+  jobId            String
+  dayOfWeek        DayOfWeek
+  registrations    Registration[]
+  camp             Camp           @relation(fields: [campId], references: [id])
+  job              Job            @relation(fields: [jobId], references: [id])
+
+  @@map("shifts")
+}
+
+model Registration {
+  id        String             @id @default(uuid())
+  status    RegistrationStatus @default(PENDING)
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+  userId    String
+  shiftId   String
+  paymentId String?            @unique
+  payment   Payment?           @relation(fields: [paymentId], references: [id])
+  shift     Shift              @relation(fields: [shiftId], references: [id])
+  user      User               @relation(fields: [userId], references: [id])
+
+  @@map("registrations")
+}
+
+model Payment {
+  id            String          @id @default(uuid())
+  amount        Float
+  currency      String          @default("USD")
+  status        PaymentStatus   @default(PENDING)
+  provider      PaymentProvider
+  providerRefId String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  userId        String
+  user          User            @relation(fields: [userId], references: [id])
+  registration  Registration?
+
+  @@map("payments")
+}
+
+model Notification {
+  id        String             @id @default(uuid())
+  type      NotificationType
+  content   String
+  recipient String
+  status    NotificationStatus @default(PENDING)
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+
+  @@map("notifications")
+}
+
+model CoreConfig {
+  id                       String     @id @default(uuid())
+  campName                 String
+  campDescription          String?
+  homePageBlurb            String?
+  campBannerUrl            String?
+  campIconUrl              String?
+  registrationYear         Int
+  earlyRegistrationOpen    Boolean    @default(false)
+  registrationOpen         Boolean    @default(false)
+  registrationTerms        String?
+  allowDeferredDuesPayment Boolean    @default(false)
+  stripeEnabled            Boolean    @default(false)
+  stripePublicKey          String?
+  stripeApiKey             String?
+  stripeWebhookSecret      String?
+  paypalEnabled            Boolean    @default(false)
+  paypalClientId           String?
+  paypalClientSecret       String?
+  paypalMode               PaypalMode @default(SANDBOX)
+  smtpHost                 String?
+  smtpPort                 Int?
+  smtpUser                 String?
+  smtpPassword             String?
+  smtpSecure               Boolean    @default(false)
+  timeZone                 String     @default("UTC")
+  createdAt                DateTime   @default(now())
+  updatedAt                DateTime   @updatedAt
+
+  @@map("core_config")
 }
 
 enum UserRole {
   ADMIN
   STAFF
   PARTICIPANT
-}
-
-// Camp models
-model Camp {
-  id          String   @id @default(uuid())
-  name        String
-  description String?
-  startDate   DateTime
-  endDate     DateTime
-  location    String
-  capacity    Int
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  // Relations
-  shifts      Shift[]
-  campingOptions CampingOption[]
-
-  @@map("camps")
-}
-
-// Camping Option models
-model CampingOption {
-  id                String   @id @default(uuid())
-  name              String
-  description       String?
-  enabled           Boolean  @default(true)
-  workShiftsRequired Int     @default(0)
-  participantDues   Float
-  staffDues         Float
-  maxSignups        Int      @default(0) // 0 = unlimited
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-
-  // Relations
-  campId            String
-  camp              Camp     @relation(fields: [campId], references: [id])
-  jobCategoryIds    String[] // Array of category IDs
-  fields            CampingOptionField[]
-  registrations     CampingOptionRegistration[]
-
-  @@map("camping_options")
-}
-
-// Camping Option Field models
-model CampingOptionField {
-  id              String   @id @default(uuid())
-  displayName     String
-  description     String?
-  dataType        FieldType
-  required        Boolean  @default(false)
-  maxLength       Int?
-  minValue        Float?
-  maxValue        Float?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  // Relations
-  campingOptionId String
-  campingOption   CampingOption @relation(fields: [campingOptionId], references: [id], onDelete: Cascade)
-  fieldValues     CampingOptionFieldValue[]
-
-  @@map("camping_option_fields")
 }
 
 enum FieldType {
@@ -124,74 +257,6 @@ enum FieldType {
   NUMBER
   BOOLEAN
   DATE
-}
-
-// Camping Option Field Value models - stores user responses to custom fields
-model CampingOptionFieldValue {
-  id              String   @id @default(uuid())
-  value           String
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  // Relations
-  fieldId         String
-  field           CampingOptionField @relation(fields: [fieldId], references: [id], onDelete: Cascade)
-  registrationId  String
-  registration    CampingOptionRegistration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
-
-  @@map("camping_option_field_values")
-}
-
-// Camping Option Registration models - connects users to camping options
-model CampingOptionRegistration {
-  id              String   @id @default(uuid())
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  // Relations
-  userId          String
-  user            User     @relation(fields: [userId], references: [id])
-  campingOptionId String
-  campingOption   CampingOption @relation(fields: [campingOptionId], references: [id])
-  fieldValues     CampingOptionFieldValue[]
-
-  @@map("camping_option_registrations")
-}
-
-// Job Category model
-model JobCategory {
-  id          String   @id @default(uuid())
-  name        String   @unique
-  description String?
-  location    String?
-  staffOnly   Boolean  @default(false)
-  alwaysRequired Boolean @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  // Relations
-  jobs        Job[]
-
-  @@map("job_categories")
-}
-
-// Job models
-model Job {
-  id          String     @id @default(uuid())
-  name        String
-  description String?
-  location    String
-  staffOnly   Boolean    @default(false)
-  alwaysRequired Boolean @default(false)
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
-
-  // Relations
-  categoryId  String
-  category    JobCategory @relation(fields: [categoryId], references: [id])
-  shifts      Shift[]
-
-  @@map("jobs")
 }
 
 enum DayOfWeek {
@@ -207,68 +272,11 @@ enum DayOfWeek {
   POST_EVENT
 }
 
-// Shift models
-model Shift {
-  id          String   @id @default(uuid())
-  startTime   DateTime
-  endTime     DateTime
-  maxRegistrations  Int
-  dayOfWeek   DayOfWeek
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  // Relations
-  campId      String
-  camp        Camp     @relation(fields: [campId], references: [id])
-  jobId       String
-  job         Job      @relation(fields: [jobId], references: [id])
-  registrations Registration[]
-
-  @@map("shifts")
-}
-
-// Registration models
-model Registration {
-  id        String   @id @default(uuid())
-  status    RegistrationStatus @default(PENDING)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  userId    String
-  user      User     @relation(fields: [userId], references: [id])
-  shiftId   String
-  shift     Shift    @relation(fields: [shiftId], references: [id])
-  payment   Payment? @relation(fields: [paymentId], references: [id])
-  paymentId String?  @unique
-
-  @@map("registrations")
-}
-
 enum RegistrationStatus {
   PENDING
   CONFIRMED
   CANCELLED
   WAITLISTED
-}
-
-// Payment models
-model Payment {
-  id            String        @id @default(uuid())
-  amount        Float
-  currency      String        @default("USD")
-  status        PaymentStatus @default(PENDING)
-  provider      PaymentProvider
-  providerRefId String?
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
-
-  // Relations
-  userId        String
-  user          User          @relation(fields: [userId], references: [id])
-  registration  Registration?
-
-  @@map("payments")
 }
 
 enum PaymentStatus {
@@ -283,19 +291,6 @@ enum PaymentProvider {
   PAYPAL
 }
 
-// Notification models
-model Notification {
-  id        String            @id @default(uuid())
-  type      NotificationType
-  content   String
-  recipient String
-  status    NotificationStatus @default(PENDING)
-  createdAt DateTime          @default(now())
-  updatedAt DateTime          @updatedAt
-
-  @@map("notifications")
-}
-
 enum NotificationType {
   EMAIL_VERIFICATION
   PASSWORD_RESET
@@ -308,50 +303,6 @@ enum NotificationStatus {
   PENDING
   SENT
   FAILED
-}
-
-// Core Configuration model
-model CoreConfig {
-  id              String    @id @default(uuid())
-  
-  // Camp Info
-  campName        String
-  campDescription String?
-  homePageBlurb   String?
-  campBannerUrl   String?
-  campIconUrl     String?
-  
-  // Registration
-  registrationYear Int
-  earlyRegistrationOpen Boolean @default(false)
-  registrationOpen Boolean @default(false)
-  registrationTerms String?
-  allowDeferredDuesPayment Boolean @default(false)
-  
-  // Payment Processing
-  stripeEnabled   Boolean @default(false)
-  stripePublicKey String?
-  stripeApiKey    String?
-  stripeWebhookSecret String?
-  paypalEnabled   Boolean @default(false)
-  paypalClientId  String?
-  paypalClientSecret String?
-  paypalMode      PaypalMode @default(SANDBOX)
-  
-  // Email Configuration
-  smtpHost        String?
-  smtpPort        Int?
-  smtpUser        String?
-  smtpPassword    String?
-  smtpSecure      Boolean @default(false)
-  
-  // Site Configuration
-  timeZone        String @default("UTC")
-  
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  @@map("core_config")
 }
 
 enum PaypalMode {

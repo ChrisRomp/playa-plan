@@ -50,8 +50,13 @@ describe('CoreConfigService', () => {
 
   // Create a more complete mock
   const mockPrismaService = {
-    $queryRaw: jest.fn(),
-    $queryRawUnsafe: jest.fn(),
+    coreConfig: {
+      findMany: jest.fn(),
+      findUnique: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+      delete: jest.fn(),
+    },
   };
 
   beforeEach(async () => {
@@ -97,85 +102,87 @@ describe('CoreConfigService', () => {
     };
 
     it('should create a new core configuration when none exists', async () => {
-      mockPrismaService.$queryRaw.mockResolvedValueOnce([]);
-      mockPrismaService.$queryRaw.mockResolvedValueOnce([mockCoreConfig]);
+      mockPrismaService.coreConfig.findMany.mockResolvedValueOnce([]);
+      mockPrismaService.coreConfig.create.mockResolvedValueOnce(mockCoreConfig);
       
       const result = await service.create(createDto);
       
-      expect(mockPrismaService.$queryRaw).toHaveBeenCalled();
+      expect(mockPrismaService.coreConfig.findMany).toHaveBeenCalled();
+      expect(mockPrismaService.coreConfig.create).toHaveBeenCalled();
       expect(result).toBeInstanceOf(CoreConfig);
     });
 
     it('should throw BadRequestException if configs already exist', async () => {
-      mockPrismaService.$queryRaw.mockResolvedValueOnce([mockCoreConfig]);
+      mockPrismaService.coreConfig.findMany.mockResolvedValueOnce([mockCoreConfig]);
       
       await expect(service.create(createDto)).rejects.toThrow(BadRequestException);
-      expect(mockPrismaService.$queryRaw).toHaveBeenCalled();
+      expect(mockPrismaService.coreConfig.findMany).toHaveBeenCalled();
     });
 
     it('should throw BadRequestException if creation fails', async () => {
-      mockPrismaService.$queryRaw.mockResolvedValueOnce([]);
-      mockPrismaService.$queryRaw.mockRejectedValueOnce(new Error('Database error'));
+      mockPrismaService.coreConfig.findMany.mockResolvedValueOnce([]);
+      mockPrismaService.coreConfig.create.mockRejectedValueOnce(new Error('Database error'));
       
       await expect(service.create(createDto)).rejects.toThrow(BadRequestException);
-      expect(mockPrismaService.$queryRaw).toHaveBeenCalled();
+      expect(mockPrismaService.coreConfig.findMany).toHaveBeenCalled();
+      expect(mockPrismaService.coreConfig.create).toHaveBeenCalled();
     });
   });
 
   describe('findAll', () => {
     it('should return all configurations', async () => {
-      mockPrismaService.$queryRaw.mockResolvedValueOnce([mockCoreConfig]);
+      mockPrismaService.coreConfig.findMany.mockResolvedValueOnce([mockCoreConfig]);
       
       const result = await service.findAll();
       
-      expect(mockPrismaService.$queryRaw).toHaveBeenCalled();
+      expect(mockPrismaService.coreConfig.findMany).toHaveBeenCalled();
       expect(result).toHaveLength(1);
       expect(result[0]).toBeInstanceOf(CoreConfig);
     });
 
     it('should return empty array if no configs found', async () => {
-      mockPrismaService.$queryRaw.mockRejectedValueOnce(new Error('Database error'));
+      mockPrismaService.coreConfig.findMany.mockRejectedValueOnce(new Error('Database error'));
       
       const result = await service.findAll();
       
-      expect(mockPrismaService.$queryRaw).toHaveBeenCalled();
+      expect(mockPrismaService.coreConfig.findMany).toHaveBeenCalled();
       expect(result).toEqual([]);
     });
   });
 
   describe('findCurrent', () => {
     it('should return the current configuration', async () => {
-      mockPrismaService.$queryRaw.mockResolvedValueOnce([mockCoreConfig]);
+      mockPrismaService.coreConfig.findMany.mockResolvedValueOnce([mockCoreConfig]);
       
       const result = await service.findCurrent();
       
-      expect(mockPrismaService.$queryRaw).toHaveBeenCalled();
+      expect(mockPrismaService.coreConfig.findMany).toHaveBeenCalled();
       expect(result).toBeInstanceOf(CoreConfig);
     });
 
     it('should throw NotFoundException if no configs found', async () => {
-      mockPrismaService.$queryRaw.mockResolvedValueOnce([]);
+      mockPrismaService.coreConfig.findMany.mockResolvedValueOnce([]);
       
       await expect(service.findCurrent()).rejects.toThrow(NotFoundException);
-      expect(mockPrismaService.$queryRaw).toHaveBeenCalled();
+      expect(mockPrismaService.coreConfig.findMany).toHaveBeenCalled();
     });
   });
 
   describe('findOne', () => {
     it('should return a specific configuration by ID', async () => {
-      mockPrismaService.$queryRaw.mockResolvedValueOnce([mockCoreConfig]);
+      mockPrismaService.coreConfig.findUnique.mockResolvedValueOnce(mockCoreConfig);
       
       const result = await service.findOne(mockCoreConfig.id as string);
       
-      expect(mockPrismaService.$queryRaw).toHaveBeenCalled();
+      expect(mockPrismaService.coreConfig.findUnique).toHaveBeenCalled();
       expect(result).toBeInstanceOf(CoreConfig);
     });
 
     it('should throw NotFoundException if config not found', async () => {
-      mockPrismaService.$queryRaw.mockResolvedValueOnce([]);
+      mockPrismaService.coreConfig.findUnique.mockResolvedValueOnce(null);
       
       await expect(service.findOne('not-found-id')).rejects.toThrow(NotFoundException);
-      expect(mockPrismaService.$queryRaw).toHaveBeenCalled();
+      expect(mockPrismaService.coreConfig.findUnique).toHaveBeenCalled();
     });
   });
 
@@ -186,58 +193,60 @@ describe('CoreConfigService', () => {
     };
 
     it('should update a configuration', async () => {
-      mockPrismaService.$queryRaw.mockResolvedValueOnce([mockCoreConfig]);
-      mockPrismaService.$queryRawUnsafe.mockResolvedValueOnce([updatedCoreConfig]);
+      mockPrismaService.coreConfig.findUnique.mockResolvedValueOnce(mockCoreConfig);
+      mockPrismaService.coreConfig.update.mockResolvedValueOnce(updatedCoreConfig);
       
       const result = await service.update(mockCoreConfig.id as string, updateDto);
       
-      expect(mockPrismaService.$queryRaw).toHaveBeenCalled();
-      expect(mockPrismaService.$queryRawUnsafe).toHaveBeenCalled();
+      expect(mockPrismaService.coreConfig.findUnique).toHaveBeenCalled();
+      expect(mockPrismaService.coreConfig.update).toHaveBeenCalled();
       expect(result).toBeInstanceOf(CoreConfig);
       expect(result.campName).toEqual('Updated Camp');
     });
 
     it('should throw NotFoundException if config not found', async () => {
-      mockPrismaService.$queryRaw.mockResolvedValueOnce([]);
+      mockPrismaService.coreConfig.findUnique.mockResolvedValueOnce(null);
       
       await expect(service.update('not-found-id', updateDto)).rejects.toThrow(NotFoundException);
-      expect(mockPrismaService.$queryRaw).toHaveBeenCalled();
+      expect(mockPrismaService.coreConfig.findUnique).toHaveBeenCalled();
     });
 
     it('should throw BadRequestException if update fails', async () => {
-      mockPrismaService.$queryRaw.mockResolvedValueOnce([mockCoreConfig]);
-      mockPrismaService.$queryRawUnsafe.mockRejectedValueOnce(new Error('Database error'));
+      mockPrismaService.coreConfig.findUnique.mockResolvedValueOnce(mockCoreConfig);
+      mockPrismaService.coreConfig.update.mockRejectedValueOnce(new Error('Database error'));
       
       await expect(service.update(mockCoreConfig.id as string, updateDto)).rejects.toThrow(BadRequestException);
-      expect(mockPrismaService.$queryRaw).toHaveBeenCalled();
-      expect(mockPrismaService.$queryRawUnsafe).toHaveBeenCalled();
+      expect(mockPrismaService.coreConfig.findUnique).toHaveBeenCalled();
+      expect(mockPrismaService.coreConfig.update).toHaveBeenCalled();
     });
   });
 
   describe('remove', () => {
     it('should delete a configuration', async () => {
-      mockPrismaService.$queryRaw.mockResolvedValueOnce([mockCoreConfig])
-                               .mockResolvedValueOnce([mockCoreConfig]);
+      mockPrismaService.coreConfig.findUnique.mockResolvedValueOnce(mockCoreConfig);
+      mockPrismaService.coreConfig.delete.mockResolvedValueOnce(mockCoreConfig);
       
       const result = await service.remove(mockCoreConfig.id as string);
       
-      expect(mockPrismaService.$queryRaw).toHaveBeenCalledTimes(2);
+      expect(mockPrismaService.coreConfig.findUnique).toHaveBeenCalled();
+      expect(mockPrismaService.coreConfig.delete).toHaveBeenCalled();
       expect(result).toBeInstanceOf(CoreConfig);
     });
 
     it('should throw NotFoundException if config not found', async () => {
-      mockPrismaService.$queryRaw.mockResolvedValueOnce([]);
+      mockPrismaService.coreConfig.findUnique.mockResolvedValueOnce(null);
       
       await expect(service.remove('not-found-id')).rejects.toThrow(NotFoundException);
-      expect(mockPrismaService.$queryRaw).toHaveBeenCalled();
+      expect(mockPrismaService.coreConfig.findUnique).toHaveBeenCalled();
     });
 
-    it('should throw NotFoundException if deletion fails', async () => {
-      mockPrismaService.$queryRaw.mockResolvedValueOnce([mockCoreConfig])
-                               .mockResolvedValueOnce([]);
+    it('should throw BadRequestException if deletion fails', async () => {
+      mockPrismaService.coreConfig.findUnique.mockResolvedValueOnce(mockCoreConfig);
+      mockPrismaService.coreConfig.delete.mockRejectedValueOnce(new Error('Database error'));
       
-      await expect(service.remove(mockCoreConfig.id as string)).rejects.toThrow(NotFoundException);
-      expect(mockPrismaService.$queryRaw).toHaveBeenCalledTimes(2);
+      await expect(service.remove(mockCoreConfig.id as string)).rejects.toThrow(BadRequestException);
+      expect(mockPrismaService.coreConfig.findUnique).toHaveBeenCalled();
+      expect(mockPrismaService.coreConfig.delete).toHaveBeenCalled();
     });
   });
 
@@ -248,4 +257,4 @@ describe('CoreConfigService', () => {
       expect(result).toEqual('Core Config module is working!');
     });
   });
-}); 
+});

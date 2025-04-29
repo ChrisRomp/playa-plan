@@ -13,6 +13,45 @@ export class CoreConfigService {
    * @param prisma - The PrismaService for database access
    */
   constructor(private readonly prisma: PrismaService) {}
+  
+  /**
+   * Helper to map Prisma CoreConfig to entity
+   */
+  private mapToEntity(config: any): CoreConfig {
+    return new CoreConfig({
+      id: config.id,
+      campName: config.campName,
+      campDescription: config.campDescription,
+      homePageBlurb: config.homePageBlurb,
+      campBannerUrl: config.campBannerUrl,
+      campIconUrl: config.campIconUrl,
+      registrationYear: config.registrationYear,
+      earlyRegistrationOpen: config.earlyRegistrationOpen,
+      registrationOpen: config.registrationOpen,
+      registrationTerms: config.registrationTerms,
+      allowDeferredDuesPayment: config.allowDeferredDuesPayment,
+      stripeEnabled: config.stripeEnabled,
+      stripePublicKey: config.stripePublicKey,
+      stripeApiKey: config.stripeApiKey,
+      stripeWebhookSecret: config.stripeWebhookSecret,
+      paypalEnabled: config.paypalEnabled,
+      paypalClientId: config.paypalClientId,
+      paypalClientSecret: config.paypalClientSecret,
+      paypalMode: config.paypalMode === 'LIVE' ? 'live' : 'sandbox',
+      smtpHost: config.smtpHost,
+      smtpPort: config.smtpPort,
+      // Map the DB fields to entity fields (the entity uses different names)
+      smtpUsername: config.smtpUser,
+      smtpPassword: config.smtpPassword,
+      smtpUseSsl: config.smtpSecure,
+      // These fields don't exist in the database schema
+      senderEmail: null,
+      senderName: null,
+      timeZone: config.timeZone,
+      createdAt: config.createdAt,
+      updatedAt: config.updatedAt,
+    });
+  }
 
   /**
    * Create initial core configuration
@@ -22,81 +61,42 @@ export class CoreConfigService {
   async create(createCoreConfigDto: CreateCoreConfigDto): Promise<CoreConfig> {
     try {
       // Check if configuration already exists
-      const existingConfig = await this.findAll();
+      const existingConfig = await this.prisma.coreConfig.findMany();
       if (existingConfig.length > 0) {
         throw new BadRequestException('Core configuration already exists. Use update instead.');
       }
 
-      const result = await this.prisma.$queryRaw`
-        INSERT INTO "core_config" (
-          id,
-          "campName",
-          "campDescription",
-          "homePageBlurb",
-          "campBannerUrl",
-          "campIconUrl",
-          "registrationYear",
-          "earlyRegistrationOpen",
-          "registrationOpen",
-          "registrationTerms",
-          "allowDeferredDuesPayment",
-          "stripeEnabled",
-          "stripePublicKey",
-          "stripeApiKey",
-          "stripeWebhookSecret",
-          "paypalEnabled",
-          "paypalClientId",
-          "paypalClientSecret",
-          "paypalMode",
-          "smtpHost",
-          "smtpPort",
-          "smtpUsername",
-          "smtpPassword",
-          "smtpUseSsl",
-          "senderEmail",
-          "senderName",
-          "timeZone",
-          "createdAt",
-          "updatedAt"
-        ) VALUES (
-          gen_random_uuid(),
-          ${createCoreConfigDto.campName},
-          ${createCoreConfigDto.campDescription || null},
-          ${createCoreConfigDto.homePageBlurb || null},
-          ${createCoreConfigDto.campBannerUrl || null},
-          ${createCoreConfigDto.campIconUrl || null},
-          ${createCoreConfigDto.registrationYear},
-          ${createCoreConfigDto.earlyRegistrationOpen !== undefined ? createCoreConfigDto.earlyRegistrationOpen : false},
-          ${createCoreConfigDto.registrationOpen !== undefined ? createCoreConfigDto.registrationOpen : false},
-          ${createCoreConfigDto.registrationTerms || null},
-          ${createCoreConfigDto.allowDeferredDuesPayment !== undefined ? createCoreConfigDto.allowDeferredDuesPayment : false},
-          ${createCoreConfigDto.stripeEnabled !== undefined ? createCoreConfigDto.stripeEnabled : false},
-          ${createCoreConfigDto.stripePublicKey || null},
-          ${createCoreConfigDto.stripeApiKey || null},
-          ${createCoreConfigDto.stripeWebhookSecret || null},
-          ${createCoreConfigDto.paypalEnabled !== undefined ? createCoreConfigDto.paypalEnabled : false},
-          ${createCoreConfigDto.paypalClientId || null},
-          ${createCoreConfigDto.paypalClientSecret || null},
-          ${createCoreConfigDto.paypalMode || 'sandbox'},
-          ${createCoreConfigDto.smtpHost || null},
-          ${createCoreConfigDto.smtpPort || null},
-          ${createCoreConfigDto.smtpUsername || null},
-          ${createCoreConfigDto.smtpPassword || null},
-          ${createCoreConfigDto.smtpUseSsl !== undefined ? createCoreConfigDto.smtpUseSsl : false},
-          ${createCoreConfigDto.senderEmail || null},
-          ${createCoreConfigDto.senderName || null},
-          ${createCoreConfigDto.timeZone || 'UTC'},
-          now(),
-          now()
-        )
-        RETURNING *
-      `;
-
-      if (!result || !Array.isArray(result) || result.length === 0) {
-        throw new BadRequestException('Failed to create core configuration');
-      }
-
-      return new CoreConfig(result[0]);
+      const created = await this.prisma.coreConfig.create({
+        data: {
+          campName: createCoreConfigDto.campName,
+          campDescription: createCoreConfigDto.campDescription ?? null,
+          homePageBlurb: createCoreConfigDto.homePageBlurb ?? null,
+          campBannerUrl: createCoreConfigDto.campBannerUrl ?? null,
+          campIconUrl: createCoreConfigDto.campIconUrl ?? null,
+          registrationYear: createCoreConfigDto.registrationYear,
+          earlyRegistrationOpen: createCoreConfigDto.earlyRegistrationOpen ?? false,
+          registrationOpen: createCoreConfigDto.registrationOpen ?? false,
+          registrationTerms: createCoreConfigDto.registrationTerms ?? null,
+          allowDeferredDuesPayment: createCoreConfigDto.allowDeferredDuesPayment ?? false,
+          stripeEnabled: createCoreConfigDto.stripeEnabled ?? false,
+          stripePublicKey: createCoreConfigDto.stripePublicKey ?? null,
+          stripeApiKey: createCoreConfigDto.stripeApiKey ?? null,
+          stripeWebhookSecret: createCoreConfigDto.stripeWebhookSecret ?? null,
+          paypalEnabled: createCoreConfigDto.paypalEnabled ?? false,
+          paypalClientId: createCoreConfigDto.paypalClientId ?? null,
+          paypalClientSecret: createCoreConfigDto.paypalClientSecret ?? null,
+          paypalMode: (createCoreConfigDto.paypalMode === 'live' ? 'LIVE' : 'SANDBOX'),
+          smtpHost: createCoreConfigDto.smtpHost ?? null,
+          smtpPort: createCoreConfigDto.smtpPort ?? null,
+          // Map entity field names to DB column names
+          smtpUser: createCoreConfigDto.smtpUsername ?? null,
+          smtpPassword: createCoreConfigDto.smtpPassword ?? null,
+          smtpSecure: createCoreConfigDto.smtpUseSsl ?? false,
+          timeZone: createCoreConfigDto.timeZone ?? 'UTC',
+        },
+      });
+      
+      return this.mapToEntity(created);
     } catch (error: unknown) {
       if (error instanceof BadRequestException) {
         throw error;
@@ -112,15 +112,11 @@ export class CoreConfigService {
    */
   async findAll(): Promise<CoreConfig[]> {
     try {
-      const result = await this.prisma.$queryRaw`
-        SELECT * FROM "core_config" ORDER BY "createdAt" DESC
-      `;
-
-      if (!result || !Array.isArray(result)) {
-        return [];
-      }
-
-      return result.map(config => new CoreConfig(config));
+      const result = await this.prisma.coreConfig.findMany({ 
+        orderBy: { createdAt: 'desc' } 
+      });
+      
+      return result.map(config => this.mapToEntity(config));
     } catch (error: unknown) {
       return [];
     }
@@ -147,15 +143,15 @@ export class CoreConfigService {
    */
   async findOne(id: string): Promise<CoreConfig> {
     try {
-      const result = await this.prisma.$queryRaw`
-        SELECT * FROM "core_config" WHERE id = ${id}::uuid
-      `;
+      const config = await this.prisma.coreConfig.findUnique({ 
+        where: { id } 
+      });
 
-      if (!result || !Array.isArray(result) || result.length === 0) {
+      if (!config) {
         throw new NotFoundException(`Core configuration with ID ${id} not found`);
       }
 
-      return new CoreConfig(result[0]);
+      return this.mapToEntity(config);
     } catch (error: unknown) {
       if (error instanceof NotFoundException) {
         throw error;
@@ -174,73 +170,49 @@ export class CoreConfigService {
     try {
       // Make sure the config exists
       await this.findOne(id);
-
-      // Build the SET clause dynamically
-      const setClauses: string[] = [];
-      const values: Array<string | number | boolean | Date | null> = [];
-      let paramIndex = 1;
-
-      // Helper function to add a clause if the field is defined
-      const addClause = (field: string, value: unknown) => {
-        if (value !== undefined) {
-          setClauses.push(`"${field}" = $${paramIndex++}`);
-          values.push(value === null ? null : value as string | number | boolean | null);
-        }
-      };
-
-      // Add clauses for all fields
-      addClause('campName', updateCoreConfigDto.campName);
-      addClause('campDescription', updateCoreConfigDto.campDescription);
-      addClause('homePageBlurb', updateCoreConfigDto.homePageBlurb);
-      addClause('campBannerUrl', updateCoreConfigDto.campBannerUrl);
-      addClause('campIconUrl', updateCoreConfigDto.campIconUrl);
-      addClause('registrationYear', updateCoreConfigDto.registrationYear);
-      addClause('earlyRegistrationOpen', updateCoreConfigDto.earlyRegistrationOpen);
-      addClause('registrationOpen', updateCoreConfigDto.registrationOpen);
-      addClause('registrationTerms', updateCoreConfigDto.registrationTerms);
-      addClause('allowDeferredDuesPayment', updateCoreConfigDto.allowDeferredDuesPayment);
-      addClause('stripeEnabled', updateCoreConfigDto.stripeEnabled);
-      addClause('stripePublicKey', updateCoreConfigDto.stripePublicKey);
-      addClause('stripeApiKey', updateCoreConfigDto.stripeApiKey);
-      addClause('stripeWebhookSecret', updateCoreConfigDto.stripeWebhookSecret);
-      addClause('paypalEnabled', updateCoreConfigDto.paypalEnabled);
-      addClause('paypalClientId', updateCoreConfigDto.paypalClientId);
-      addClause('paypalClientSecret', updateCoreConfigDto.paypalClientSecret);
-      addClause('paypalMode', updateCoreConfigDto.paypalMode);
-      addClause('smtpHost', updateCoreConfigDto.smtpHost);
-      addClause('smtpPort', updateCoreConfigDto.smtpPort);
-      addClause('smtpUsername', updateCoreConfigDto.smtpUsername);
-      addClause('smtpPassword', updateCoreConfigDto.smtpPassword);
-      addClause('smtpUseSsl', updateCoreConfigDto.smtpUseSsl);
-      addClause('senderEmail', updateCoreConfigDto.senderEmail);
-      addClause('senderName', updateCoreConfigDto.senderName);
-      addClause('timeZone', updateCoreConfigDto.timeZone);
+      
+      // Map DTO fields to Prisma model fields
+      const data: any = {};
+      if (updateCoreConfigDto.campName !== undefined) data.campName = updateCoreConfigDto.campName;
+      if (updateCoreConfigDto.campDescription !== undefined) data.campDescription = updateCoreConfigDto.campDescription;
+      if (updateCoreConfigDto.homePageBlurb !== undefined) data.homePageBlurb = updateCoreConfigDto.homePageBlurb;
+      if (updateCoreConfigDto.campBannerUrl !== undefined) data.campBannerUrl = updateCoreConfigDto.campBannerUrl;
+      if (updateCoreConfigDto.campIconUrl !== undefined) data.campIconUrl = updateCoreConfigDto.campIconUrl;
+      if (updateCoreConfigDto.registrationYear !== undefined) data.registrationYear = updateCoreConfigDto.registrationYear;
+      if (updateCoreConfigDto.earlyRegistrationOpen !== undefined) data.earlyRegistrationOpen = updateCoreConfigDto.earlyRegistrationOpen;
+      if (updateCoreConfigDto.registrationOpen !== undefined) data.registrationOpen = updateCoreConfigDto.registrationOpen;
+      if (updateCoreConfigDto.registrationTerms !== undefined) data.registrationTerms = updateCoreConfigDto.registrationTerms;
+      if (updateCoreConfigDto.allowDeferredDuesPayment !== undefined) data.allowDeferredDuesPayment = updateCoreConfigDto.allowDeferredDuesPayment;
+      if (updateCoreConfigDto.stripeEnabled !== undefined) data.stripeEnabled = updateCoreConfigDto.stripeEnabled;
+      if (updateCoreConfigDto.stripePublicKey !== undefined) data.stripePublicKey = updateCoreConfigDto.stripePublicKey;
+      if (updateCoreConfigDto.stripeApiKey !== undefined) data.stripeApiKey = updateCoreConfigDto.stripeApiKey;
+      if (updateCoreConfigDto.stripeWebhookSecret !== undefined) data.stripeWebhookSecret = updateCoreConfigDto.stripeWebhookSecret;
+      if (updateCoreConfigDto.paypalEnabled !== undefined) data.paypalEnabled = updateCoreConfigDto.paypalEnabled;
+      if (updateCoreConfigDto.paypalClientId !== undefined) data.paypalClientId = updateCoreConfigDto.paypalClientId;
+      if (updateCoreConfigDto.paypalClientSecret !== undefined) data.paypalClientSecret = updateCoreConfigDto.paypalClientSecret;
+      if (updateCoreConfigDto.paypalMode !== undefined) data.paypalMode = (updateCoreConfigDto.paypalMode === 'live' ? 'LIVE' : 'SANDBOX');
+      if (updateCoreConfigDto.smtpHost !== undefined) data.smtpHost = updateCoreConfigDto.smtpHost;
+      if (updateCoreConfigDto.smtpPort !== undefined) data.smtpPort = updateCoreConfigDto.smtpPort;
+      if (updateCoreConfigDto.smtpUsername !== undefined) data.smtpUser = updateCoreConfigDto.smtpUsername;
+      if (updateCoreConfigDto.smtpPassword !== undefined) data.smtpPassword = updateCoreConfigDto.smtpPassword;
+      if (updateCoreConfigDto.smtpUseSsl !== undefined) data.smtpSecure = updateCoreConfigDto.smtpUseSsl;
+      // These fields aren't in the Prisma schema
+      if (updateCoreConfigDto.timeZone !== undefined) data.timeZone = updateCoreConfigDto.timeZone;
 
       // Always update the updatedAt field
-      setClauses.push(`"updatedAt" = $${paramIndex++}`);
-      values.push(new Date());
-
-      if (setClauses.length === 1 && setClauses[0].includes('updatedAt')) {
-        // Only updatedAt was set, no actual updates
+      data.updatedAt = new Date();
+      
+      // If no fields to update, just return the existing record
+      if (Object.keys(data).length === 1 && data.updatedAt) {
         return this.findOne(id);
       }
 
-      const query = `
-        UPDATE "core_config"
-        SET ${setClauses.join(', ')}
-        WHERE id = $${paramIndex++}::uuid
-        RETURNING *
-      `;
-
-      values.push(id);
-
-      const result = await this.prisma.$queryRawUnsafe(query, ...values);
-
-      if (!result || !Array.isArray(result) || result.length === 0) {
-        throw new NotFoundException(`Core configuration with ID ${id} not found`);
-      }
-
-      return new CoreConfig(result[0]);
+      const updated = await this.prisma.coreConfig.update({ 
+        where: { id }, 
+        data 
+      });
+      
+      return this.mapToEntity(updated);
     } catch (error: unknown) {
       if (error instanceof NotFoundException) {
         throw error;
@@ -259,15 +231,11 @@ export class CoreConfigService {
     try {
       // Make sure the config exists
       const config = await this.findOne(id);
-
-      const result = await this.prisma.$queryRaw`
-        DELETE FROM "core_config" WHERE id = ${id}::uuid
-        RETURNING *
-      `;
-
-      if (!result || !Array.isArray(result) || result.length === 0) {
-        throw new NotFoundException(`Core configuration with ID ${id} not found`);
-      }
+      
+      // Delete the configuration
+      await this.prisma.coreConfig.delete({
+        where: { id }
+      });
 
       return config;
     } catch (error: unknown) {

@@ -214,9 +214,8 @@ describe('CoreConfigController', () => {
   describe('adminTest', () => {
     it('should return a test message', () => {
       const result = controller.adminTest();
-      
       expect(service.adminTest).toHaveBeenCalled();
-      expect(result).toEqual('Core Config module is working!');
+      expect(result).toEqual({ message: 'Core Config module is working!' });
     });
   });
-}); 
+});

@@ -47,8 +47,12 @@ export class UserTransformInterceptor implements NestInterceptor {
       return instanceToPlain(user); // Apply class-transformer exclusions
     }
 
-    // Skip if not a user object
-    if (!user || !('email' in user)) {
+    // Handle non-user objects more reliably
+    // First check if it's actually a user-like object (has email and other key user fields)
+    if (!user || typeof user !== 'object' || 
+        !('email' in user) || 
+        !('firstName' in user) || 
+        !('lastName' in user)) {
       return user;
     }
 
