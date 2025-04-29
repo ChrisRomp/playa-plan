@@ -24,7 +24,7 @@ libs/*/.env
 Thumbs.db
 
 # VSCode settings (optional, if personal)
-.vscode/
+#.vscode/
 
 # Prisma
 **/prisma/dev.db

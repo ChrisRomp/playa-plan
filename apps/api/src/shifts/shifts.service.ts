@@ -1,7 +1,8 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
-import { CreateShiftDto, UpdateShiftDto } from './dto';
-import { Shift } from '@prisma/client';
+import { CreateShiftDto } from './dto/create-shift.dto';
+import { UpdateShiftDto } from './dto/update-shift.dto';
+import { Prisma, Shift } from '@prisma/client';
 
 @Injectable()
 export class ShiftsService {
@@ -9,43 +10,35 @@ export class ShiftsService {
 
   /**
    * Create a new shift
-   * @param createShiftDto - The data to create the shift
+   * @param createShiftDto - The data to create the shift with
    * @returns The created shift
    */
   async create(createShiftDto: CreateShiftDto): Promise<Shift> {
-    // Parse date strings to Date objects
-    const startTime = new Date(createShiftDto.startTime);
-    const endTime = new Date(createShiftDto.endTime);
-
     return this.prisma.shift.create({
       data: {
-        startTime,
-        endTime,
-        maxRegistrations: createShiftDto.maxRegistrations,
-        camp: { connect: { id: createShiftDto.campId } },
-        job: { connect: { id: createShiftDto.jobId } },
+        startTime: createShiftDto.startTime,
+        endTime: createShiftDto.endTime,
+        maxRegistrations: createShiftDto.maxParticipants,
+        dayOfWeek: createShiftDto.dayOfWeek,
+        camp: { connect: { id: createShiftDto.location } },
+        job: { connect: { id: String(createShiftDto.jobId) } },
       },
     });
   }
 
   /**
-   * Get all shifts
-   * @returns All shifts
+   * Find all shifts
+   * @returns An array of shifts
    */
   async findAll(): Promise<Shift[]> {
-    return this.prisma.shift.findMany({
-      include: {
-        camp: true,
-        job: true,
-      },
-    });
+    return this.prisma.shift.findMany();
   }
 
   /**
-   * Get a shift by ID
-   * @param id - The ID of the shift to find
-   * @returns The shift, if found
-   * @throws NotFoundException if not found
+   * Find a shift by id
+   * @param id - The id of the shift to find
+   * @returns The found shift
+   * @throws NotFoundException if the shift is not found
    */
   async findOne(id: string): Promise<Shift> {
     const shift = await this.prisma.shift.findUnique({
@@ -66,35 +59,36 @@ export class ShiftsService {
 
   /**
    * Update a shift
-   * @param id - The ID of the shift to update
+   * @param id - The id of the shift to update
    * @param updateShiftDto - The data to update the shift with
    * @returns The updated shift
-   * @throws NotFoundException if not found
    */
   async update(id: string, updateShiftDto: UpdateShiftDto): Promise<Shift> {
-    // Check if shift exists
-    await this.findOne(id);
+    // Create data object for Prisma update
+    const data: Prisma.ShiftUpdateInput = {};
 
-    // Parse date strings to Date objects if provided
-    const data: any = { ...updateShiftDto };
-    
     if (updateShiftDto.startTime) {
-      data.startTime = new Date(updateShiftDto.startTime);
+      data.startTime = updateShiftDto.startTime;
     }
-    
+
     if (updateShiftDto.endTime) {
-      data.endTime = new Date(updateShiftDto.endTime);
+      data.endTime = updateShiftDto.endTime;
     }
-    
-    // Handle relations
-    if (updateShiftDto.campId) {
-      data.camp = { connect: { id: updateShiftDto.campId } };
-      delete data.campId;
+
+    if (updateShiftDto.maxParticipants) {
+      data.maxRegistrations = updateShiftDto.maxParticipants;
     }
-    
+
+    if (updateShiftDto.dayOfWeek) {
+      data.dayOfWeek = updateShiftDto.dayOfWeek;
+    }
+
+    if (updateShiftDto.location) {
+      data.camp = { connect: { id: updateShiftDto.location } };
+    }
+
     if (updateShiftDto.jobId) {
-      data.job = { connect: { id: updateShiftDto.jobId } };
-      delete data.jobId;
+      data.job = { connect: { id: String(updateShiftDto.jobId) } };
     }
 
     return this.prisma.shift.update({
@@ -108,15 +102,11 @@ export class ShiftsService {
   }
 
   /**
-   * Delete a shift
-   * @param id - The ID of the shift to delete
-   * @returns The deleted shift
-   * @throws NotFoundException if not found
+   * Remove a shift
+   * @param id - The id of the shift to remove
+   * @returns The removed shift
    */
   async remove(id: string): Promise<Shift> {
-    // Check if shift exists
-    await this.findOne(id);
-
     return this.prisma.shift.delete({
       where: { id },
     });

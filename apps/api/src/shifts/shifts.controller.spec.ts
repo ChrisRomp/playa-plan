@@ -2,6 +2,9 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ShiftsController } from './shifts.controller';
 import { ShiftsService } from './shifts.service';
 import { CreateShiftDto, UpdateShiftDto } from './dto';
+import { DayOfWeek } from '../common/enums/day-of-week.enum';
+import { PrismaService } from '../common/prisma/prisma.service';
+import { RegistrationsService } from '../registrations/registrations.service';
 
 describe('ShiftsController', () => {
   let controller: ShiftsController;
@@ -13,7 +16,7 @@ describe('ShiftsController', () => {
     endTime: new Date('2023-06-01T17:00:00Z'),
     maxRegistrations: 10,
     campId: 'camp-id',
-    jobId: 'job-id',
+    jobId: 1,
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -32,12 +35,32 @@ describe('ShiftsController', () => {
       remove: jest.fn(() => Promise.resolve(mockShift)),
     };
 
+    const mockRegistrationsService = {
+      create: jest.fn(() => Promise.resolve({ id: 'reg-id', userId: 'user-id', shiftId: 'test-id' })),
+      findByUser: jest.fn(() => Promise.resolve([])),
+      findByShift: jest.fn(() => Promise.resolve([])),
+      findOne: jest.fn(() => Promise.resolve({ id: 'reg-id', userId: 'user-id', shiftId: 'test-id' })),
+      update: jest.fn(() => Promise.resolve({ id: 'reg-id', userId: 'user-id', shiftId: 'test-id', status: 'CANCELLED' })),
+    };
+
+    const mockPrismaService = {
+      // Add any necessary mock methods here
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       controllers: [ShiftsController],
       providers: [
         {
           provide: ShiftsService,
           useValue: mockShiftsService,
+        },
+        {
+          provide: RegistrationsService,
+          useValue: mockRegistrationsService,
+        },
+        {
+          provide: PrismaService,
+          useValue: mockPrismaService,
         },
       ],
     }).compile();
@@ -56,18 +79,21 @@ describe('ShiftsController', () => {
 
   describe('create', () => {
     it('should create a shift', async () => {
-      const createShiftDto: CreateShiftDto = {
-        startTime: '2023-06-01T09:00:00Z',
-        endTime: '2023-06-01T17:00:00Z',
-        maxRegistrations: 10,
-        campId: 'camp-id',
-        jobId: 'job-id',
+      const mockCreateShiftDto: CreateShiftDto = {
+        name: 'Test Shift',
+        description: 'Test Description',
+        maxParticipants: 5,
+        startTime: new Date('2023-06-01T09:00:00Z'),
+        endTime: new Date('2023-06-01T17:00:00Z'),
+        dayOfWeek: DayOfWeek.MONDAY,
+        location: 'test-camp-id',
+        jobId: 1
       };
 
-      const result = await controller.create(createShiftDto);
+      const result = await controller.create(mockCreateShiftDto);
 
       expect(result).toEqual(mockShift);
-      expect(service.create).toHaveBeenCalledWith(createShiftDto);
+      expect(service.create).toHaveBeenCalledWith(mockCreateShiftDto);
     });
   });
 
@@ -92,7 +118,7 @@ describe('ShiftsController', () => {
   describe('update', () => {
     it('should update a shift', async () => {
       const updateShiftDto: UpdateShiftDto = {
-        maxRegistrations: 15,
+        maxParticipants: 15,
       };
 
       const result = await controller.update('test-id', updateShiftDto);

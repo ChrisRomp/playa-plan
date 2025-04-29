@@ -37,7 +37,7 @@
 - [x] Implement DTOs for login and registration
 - [x] Implement email verification flow
 - [x] Implement password reset flow
-- [ ] Implement optional magic link or email code verification login
+- [x] Implement email code verification login
 - [x] Write unit tests for authentication controller and service
 - [ ] Write integration (e2e) tests for authentication endpoints
 
@@ -54,9 +54,22 @@
 - [x] Write unit tests for User controllers, services, and guards
 - [x] Write unit tests for UserTransformInterceptor
 - [ ] Complete integration (e2e) tests for all user endpoints
+  - [ ] Create e2e test files following project patterns
+  - [ ] Implement proper test data creation and cleanup
+  - [ ] Test permissions (admin vs. regular users)
 - [x] Add admin/test method to controller as a smoke test
-- [ ] Update Swagger documentation for all user endpoints
+- [x] Update Swagger documentation for all user endpoints
 - [ ] Document user module usage and endpoints in README.md
+- [x] Update User model for additional profile fields from spec
+  - [x] Add emergency contact info field
+  - [x] Add phone field
+  - [x] Add city, state/province fields
+  - [x] Add country field
+  - [x] Add allow registration boolean
+  - [x] Add allow early registration boolean
+  - [x] Add allow deferred dues payment boolean
+  - [x] Add allow no job boolean
+  - [x] Add internal notes field
 
 ### 🛡️ Security Foundations
 
@@ -65,6 +78,10 @@
 - [x] Add request validation pipes and sanitization
 - [x] Implement API security headers (CSRF protection, etc.)
 - [x] Set up input sanitization to prevent injection attacks
+- [ ] Implement Cloudflare Turnstile for bot protection on public endpoints
+  - [ ] Integrate Turnstile API with authentication endpoints
+  - [ ] Add server-side validation of Turnstile tokens
+  - [ ] Implement fallback mechanisms for accessibility
 
 ## 3. 📚 Core Domain Modules
 
@@ -92,6 +109,9 @@
   - [x] Create DTOs for categories
 - [x] Write unit tests for job controllers and services
 - [x] Write integration (e2e) tests for job endpoints
+- [x] Update Job model for additional fields from spec
+  - [x] Add staff only boolean field
+  - [x] Add always required boolean field
 
 ### 📅 Shifts Module
 
@@ -102,14 +122,15 @@
   - [x] Create DTOs for shift creation and updates
 - [x] Implement DTOs and validation schemas
 - [x] Write unit tests for shift controllers and services
-- [ ] Fix integration (e2e) tests for shift endpoints
+- [x] Fix integration (e2e) tests for shift endpoints
   - [x] Create e2e test files
-  - [ ] Fix authentication issues in the e2e tests
-    - [ ] Ensure test users exist in test database
-    - [ ] Verify JWT token generation in test environment
-    - [ ] Update test setup to handle authentication properly
-  - [ ] Update tests to handle proper test data creation and teardown
-  - [ ] Ensure all shift e2e tests pass
+  - [x] Fix authentication issues in the e2e tests
+    - [x] Ensure test users exist in test database
+    - [x] Verify JWT token generation in test environment
+    - [x] Update test setup to handle authentication properly
+  - [x] Update tests to handle proper test data creation and teardown
+  - [x] Ensure all shift e2e tests pass
+- [x] Update Shift model to support day-of-week selection rather than specific dates
 
 ### 📝 Registrations Module
 
@@ -117,6 +138,29 @@
 - [x] Implement DTOs and validation schemas
 - [x] Write unit tests for registration controllers and services
 - [x] Write integration (e2e) tests for registration endpoints
+
+### 🏕️ Camping Options Module (Missing)
+
+- [x] Create CampingOptions module with CRUD operations
+  - [x] Create entity, controller, and service for camping options
+  - [x] Implement relationships between users, camps, and camping options
+  - [x] Create DTOs for camping option creation and updates
+  - [x] Implement validation for camping options
+- [x] Implement camping option model with following fields
+  - [x] Name
+  - [x] Enabled boolean
+  - [x] Work shifts required count
+  - [x] Job categories relationship
+  - [x] Participant dues
+  - [x] Staff dues
+  - [x] Maximum signups
+  - [x] Additional fields configuration system
+- [x] Implement camping option fields configuration
+  - [x] Create field type enum (string, number, boolean, date)
+  - [x] Support for field validation options
+  - [x] Create controller endpoints for field management
+- [x] Write unit tests for camping options
+- [x] Write integration tests for camping options
 
 ## 4. 💪 Supporting Features
 
@@ -175,10 +219,39 @@
   - [x] Create unit tests for NotificationsService
   - [x] Create unit tests for NotificationsController
 - [ ] Write integration (e2e) tests for notification endpoints
+- [x] When the backend server is running in debug mode, emit notifications to the console as well as any configured email services (or just console if no email service is configured)
 
 ### Advanced User Features
 
 - [x] Implement email verification and password reset integration with Notifications module
+
+### ⚙️ Core Configuration Module
+
+- [x] Create CoreConfig module with CRUD operations
+  - [x] Create CoreConfig entity with all site configuration options
+  - [x] Implement controller and service for managing site config
+  - [x] Create DTOs for configuration updates
+- [x] Implement camp info configuration section
+  - [x] Camp name
+  - [x] Camp description
+  - [x] Home page blurb
+  - [x] Camp banner URL
+  - [x] Camp icon URL
+- [x] Implement registration configuration section
+  - [x] Registration year
+  - [x] Early registration open flag
+  - [x] Registration open flag
+  - [x] Registration terms
+  - [x] Allow deferred dues payment flag
+- [x] Implement payment processing configuration
+  - [x] Stripe enabled flag and settings
+  - [x] PayPal enabled flag and settings
+- [x] Implement email configuration section
+  - [x] SMTP configuration management
+- [x] Implement site configuration
+  - [x] Time zone setting
+- [x] Write unit tests for CoreConfig module
+- [x] Write integration tests for CoreConfig endpoints
 
 ## 5. 🔍 Operations & Monitoring
 
@@ -209,11 +282,41 @@
   - [ ] Implement seed/cleanup utilities for test data
   - [ ] Ensure test isolation between test suites
 
-## 7. 📚 Shared Libraries and Documentation
+## 7. 📊 Reporting & Dashboards (Missing)
+
+- [ ] Create ReportingModule for staff/admin dashboards
+  - [ ] Create reporting controller and service
+  - [ ] Implement authorization for reports access
+- [ ] Implement Work Schedule report
+  - [ ] Group work schedule by day then category
+  - [ ] Include staff-only jobs visibility
+  - [ ] Support filtering and sorting options
+- [ ] Implement Registration Dashboard report
+  - [ ] Show registrations with grouped/filtered capability
+  - [ ] Support for drilling into user profile details
+  - [ ] Access to payment/refund information for admins
+- [ ] Create data export functionality for reports
+  - [ ] CSV export capability
+  - [ ] Excel export capability
+- [ ] Write unit tests for reporting module
+- [ ] Write integration tests for reporting endpoints
+
+## 8. 📚 Shared Libraries and Documentation
 
 ### 📚 Shared Libraries (`libs`)
 
-- [ ] Define shared TypeScript types/interfaces (DTOs, entities)
+- [x] Define shared TypeScript types/interfaces (DTOs, entities)
+  - [x] Create day-of-week enum in shared types
+  - [x] Create user-role enum in shared types
+  - [x] Create registration-status enum in shared types
+  - [x] Create payment-status enum in shared types
+  - [x] Create payment-method enum in shared types
+- [ ] Fix TypeScript path mapping for the shared types library
+  - [x] Configure TypeScript path mappings in tsconfig.base.json
+  - [x] Fix dependency declaration in package.json (replace `workspace:*` with `file:../../libs/types`)
+  - [ ] Update all imports to use the shared types across the codebase (blocked by TypeScript resolution issues)
+  - [ ] Remove duplicate enum files in the API project (deferred until import issues are resolved)
+  - [ ] Fix e2e tests failing on Prisma and SendGrid issues (unrelated to enum changes)
 - [ ] Define shared constants (e.g., role enums)
 - [ ] Implement shared validation schemas (Zod or class-validator)
 - [ ] Implement shared utility functions (e.g., date formatting)
@@ -226,7 +329,7 @@
   - [ ] Implement CI for API on PRs to `main`
 - [ ] Document API setup and usage instructions in README.md
 
-## 8. 🗃️ Database Management
+## 9. 🗃️ Database Management
 
 - [ ] Set up database seeding workflow
 - [ ] Create database test fixtures for e2e tests

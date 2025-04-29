@@ -54,6 +54,7 @@ describe('RegistrationsController (e2e)', () => {
     maxRegistrations: number;
     campId: string;
     jobId: string;
+    dayOfWeek: string;
   };
   let testRegistration: {
     id: string;
@@ -186,6 +187,7 @@ describe('RegistrationsController (e2e)', () => {
         maxRegistrations: 10,
         campId: testCamp.id,
         jobId: testJob.id,
+        dayOfWeek: 'MONDAY',
       },
     });
 

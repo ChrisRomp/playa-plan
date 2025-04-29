@@ -1,0 +1,89 @@
+---
+description: Test driven development; unit testing; integration testing; all test-related work
+globs: 
+alwaysApply: false
+---
+# Testing Strategy
+
+## Test-Driven Development
+
+- Write tests before implementing features
+- Follow the Red-Green-Refactor cycle:
+  1. Write a failing test
+  2. Write minimal code to make it pass
+  3. Refactor while keeping tests green
+- Use descriptive test names: `should + expected behavior`
+
+## Testing Structure
+
+### Unit Tests
+
+- Test individual functions, components, and services in isolation
+- Mock external dependencies
+- Cover normal cases, edge cases, and error handling
+- Follow AAA pattern (Arrange-Act-Assert)
+- Name variables clearly: `inputX`, `mockX`, `actualX`, `expectedX`
+- Keep tests fast and deterministic
+
+### Integration Tests
+
+- Test interactions between components
+- Use test databases or in-memory databases
+- Ensure components work together correctly
+- Test API contracts and data flow
+
+### End-to-End Tests
+
+- Test complete user flows
+- Focus on critical paths
+- Use headless browsers (Playwright recommended)
+- Include accessibility checks
+
+## Test Coverage
+
+- Aim for high code coverage (>80%)
+- Focus on critical business logic
+- Make uncovered code explicit and justified
+- Review coverage reports regularly
+
+## Backend Testing
+
+- Unit test services in isolation
+- Unit test controllers with mocked services
+- Integration test modules with real dependencies
+- E2E test API endpoints with an isolated test database
+- Test validation pipes and guards independently
+- Test error handling and exception filters
+
+## Frontend Testing
+
+- Unit test components using testing library
+- Test hooks separately
+- Mock API requests
+- Test form validation
+- Test UI interactions
+- Include visual regression tests for critical components
+
+## Testing Tools
+
+- Backend: Jest
+- Frontend: Vitest + Testing Library
+- E2E: Playwright
+- API Testing: Supertest
+- Coverage: c8 or Jest coverage
+
+## Test Environment
+
+- Use environment variables for configuration
+- Have separate test databases
+- Reset test state between test runs
+- Use Docker for consistent environments
+
+## Continuous Integration
+
+- Run tests on every commit
+- Split test suites for faster feedback
+- Fail the build on test failures
+- Generate test reports and metrics
+
+See [app-spec.md](mdc:docs/app-spec.md) for detailed testing requirements for specific application features.

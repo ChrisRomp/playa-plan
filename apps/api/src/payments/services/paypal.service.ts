@@ -3,6 +3,37 @@ import { ConfigService } from '@nestjs/config';
 import { CreatePaypalPaymentDto } from '../dto';
 
 /**
+ * PayPal API response types
+ */
+interface PayPalErrorResponse {
+  error: string;
+  error_description: string;
+}
+
+interface PayPalTokenResponse {
+  access_token: string;
+  expires_in: number;
+  token_type: string;
+}
+
+interface PayPalOrderResponse {
+  id: string;
+  status: string;
+  links: Array<{
+    href: string;
+    rel: string;
+    method: string;
+  }>;
+}
+
+interface PayPalCaptureResponse {
+  id: string;
+  status: string;
+  payment_source: Record<string, any>;
+  purchase_units: Array<Record<string, any>>;
+}
+
+/**
  * Service for handling PayPal payment processing
  */
 @Injectable()
@@ -44,11 +75,11 @@ export class PaypalService {
       });
       
       if (!response.ok) {
-        const errorData = await response.json();
+        const errorData = await response.json() as PayPalErrorResponse;
         throw new Error(`PayPal access token error: ${errorData.error_description}`);
       }
       
-      const data = await response.json();
+      const data = await response.json() as PayPalTokenResponse;
       return data.access_token;
     } catch (error: any) {
       this.logger.error(`Failed to get PayPal access token: ${error.message}`, error.stack);
@@ -102,7 +133,7 @@ export class PaypalService {
         throw new Error(`PayPal order creation error: ${JSON.stringify(errorData)}`);
       }
       
-      const order = await response.json();
+      const order = await response.json() as PayPalOrderResponse;
       this.logger.log(`Created PayPal order ${order.id}`);
       
       return order;
@@ -136,7 +167,7 @@ export class PaypalService {
         throw new Error(`PayPal payment capture error: ${JSON.stringify(errorData)}`);
       }
       
-      const captureData = await response.json();
+      const captureData = await response.json() as PayPalCaptureResponse;
       this.logger.log(`Captured payment for order ${orderId}, status: ${captureData.status}`);
       
       return captureData;
@@ -215,7 +246,7 @@ export class PaypalService {
         throw new Error(`PayPal refund error: ${JSON.stringify(errorData)}`);
       }
       
-      const refundDetails = await response.json();
+      const refundDetails = await response.json() as { id: string; status: string };
       this.logger.log(`Created refund for capture ${captureId}, status: ${refundDetails.status}`);
       
       return refundDetails;

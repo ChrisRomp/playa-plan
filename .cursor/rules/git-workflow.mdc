@@ -1,0 +1,70 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Git Workflow Guidelines
+
+## Branch Strategy
+
+- `main`: Production-ready code
+- `develop`: Integration branch for feature work
+- `feature/*`: Feature branches
+- `bugfix/*`: Bug fix branches
+- `hotfix/*`: Emergency production fixes
+
+## Commits
+
+- Make atomic commits (one logical change per commit)
+- Use descriptive commit messages following this format:
+  ```
+  <type>(<scope>): <short summary>
+  
+  <optional body>
+  
+  <optional footer>
+  ```
+- Types: feat, fix, docs, style, refactor, test, chore
+- Example: `feat(auth): implement magic link authentication`
+
+## Pull Requests
+
+- Reference task/issue numbers in PR title or description
+- Include a summary of changes and testing performed
+- Keep PRs reasonably sized (prefer smaller PRs)
+- Ensure CI tests pass before requesting review
+- Squash merge after approval
+
+## Continuous Integration
+
+- Commits to all branches trigger unit tests
+- PRs to develop/main trigger integration tests
+- Code coverage reports generated for each PR
+- Automated linting enforced
+- Build artifacts generated for deployment
+
+## Development Workflow
+
+1. Update local develop branch
+2. Create feature branch
+3. Make changes with frequent, atomic commits
+4. Write or update tests
+5. Open PR against develop
+6. Address review feedback
+7. Merge PR after approval
+
+## When Working From Checklist 
+
+- Check off items as you progress
+- Commit changes to git after each checked item
+- Use meaningful commit messages
+
+## Release Process
+
+1. Create release branch from develop
+2. Verify all tests pass
+3. Bump version numbers
+4. Tag release
+5. Merge to main
+
+Reference [app-spec.md](mdc:docs/app-spec.md) for detailed application requirements.

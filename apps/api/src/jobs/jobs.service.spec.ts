@@ -45,6 +45,8 @@ describe('JobsService', () => {
         description: 'Test Description',
         location: 'Test Location',
         categoryId: 'test-category-id',
+        staffOnly: false,
+        alwaysRequired: true,
       };
 
       const expectedJob = {
@@ -173,6 +175,8 @@ describe('JobsService', () => {
         name: 'Updated Job',
         description: 'Updated Description',
         location: 'Updated Location',
+        staffOnly: true,
+        alwaysRequired: false,
       };
 
       const expectedJob = {

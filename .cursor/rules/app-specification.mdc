@@ -1,0 +1,43 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# PlayaPlan App Specification
+
+This Cursor rule links to the detailed app specification document which outlines the full requirements for the PlayaPlan application.
+
+## Core Features
+
+- User registration with role-based permissions (Admin, Staff, Participant)
+- Authentication via email code (magic links planned for future)
+- User profiles with configurable fields
+- Camp registration with configurable camping options
+- Work shift scheduling and management
+- Payment processing via Stripe and PayPal
+- Reporting and administrative dashboards
+- Notifications system
+
+## User Roles
+
+- **Participant**: Default role, can register for camp and shifts
+- **Staff**: Can view camp reports and additional user information
+- **Admin**: Full access to all system features and configuration
+
+## Registration Process
+
+1. Users create an account and complete their profile
+2. Users select available camping options
+3. Users sign up for required work shifts
+4. Users pay camp dues (or defer payment if allowed)
+5. Registration is confirmed
+
+## Technical Requirements
+
+- Mobile responsive design
+- WCAG 2.2 compliant for accessibility
+- Security best practices (CSRF protection, CORS, input validation)
+- API-driven architecture
+- Comprehensive testing
+
+For complete detailed specifications, refer to the full [app-spec.md](mdc:docs/app-spec.md) document.

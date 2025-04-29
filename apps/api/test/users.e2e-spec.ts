@@ -1,10 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
-import * as request from 'supertest';
+import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/common/prisma/prisma.service';
 import { UserRole } from '@prisma/client';
 import { JwtService } from '@nestjs/jwt';
+import { Prisma } from '@prisma/client';
 
 describe('UsersController (e2e)', () => {
   let app: INestApplication;
@@ -101,8 +102,7 @@ describe('UsersController (e2e)', () => {
         return request(app.getHttpServer())
           .get('/users')
           .set('Authorization', `Bearer ${adminToken}`)
-          .expect(200)
-          .expect(res => {
+          .expect((res: request.Response) => {
             expect(Array.isArray(res.body)).toBeTruthy();
             expect(res.body.length).toBe(2);
           });
@@ -117,7 +117,9 @@ describe('UsersController (e2e)', () => {
         return request(app.getHttpServer())
           .get('/users')
           .set('Authorization', `Bearer ${staffToken}`)
-          .expect(200);
+          .expect((res: request.Response) => {
+            expect(Array.isArray(res.body)).toBeTruthy();
+          });
       });
 
       it('should deny participants access to all users list', () => {
@@ -128,14 +130,18 @@ describe('UsersController (e2e)', () => {
         return request(app.getHttpServer())
           .get('/users')
           .set('Authorization', `Bearer ${userToken}`)
-          .expect(403); // Forbidden
+          .expect((res: request.Response) => {
+            expect(res.status).toBe(403); // Forbidden
+          });
       });
 
       it('should deny access to users without authentication', () => {
         // Act & Assert
         return request(app.getHttpServer())
           .get('/users')
-          .expect(401); // Unauthorized
+          .expect((res: request.Response) => {
+            expect(res.status).toBe(401); // Unauthorized
+          });
       });
     });
 
@@ -149,8 +155,7 @@ describe('UsersController (e2e)', () => {
         return request(app.getHttpServer())
           .get(`/users/${mockUser.id}`)
           .set('Authorization', `Bearer ${userToken}`)
-          .expect(200)
-          .expect(res => {
+          .expect((res: request.Response) => {
             expect(res.body.id).toBe(mockUser.id);
           });
       });
@@ -164,7 +169,9 @@ describe('UsersController (e2e)', () => {
         return request(app.getHttpServer())
           .get(`/users/${mockAdmin.id}`)
           .set('Authorization', `Bearer ${userToken}`)
-          .expect(403); // Forbidden
+          .expect((res: request.Response) => {
+            expect(res.status).toBe(403); // Forbidden
+          });
       });
 
       it('should allow admins to access any profile', () => {
@@ -176,7 +183,9 @@ describe('UsersController (e2e)', () => {
         return request(app.getHttpServer())
           .get(`/users/${mockUser.id}`)
           .set('Authorization', `Bearer ${adminToken}`)
-          .expect(200);
+          .expect((res: request.Response) => {
+            expect(res.status).toBe(200);
+          });
       });
 
       it('should allow staff to access participant profiles', () => {
@@ -188,7 +197,9 @@ describe('UsersController (e2e)', () => {
         return request(app.getHttpServer())
           .get(`/users/${mockUser.id}`)
           .set('Authorization', `Bearer ${staffToken}`)
-          .expect(200);
+          .expect((res: request.Response) => {
+            expect(res.status).toBe(200);
+          });
       });
 
       it('should deny staff access to admin profiles', () => {
@@ -199,8 +210,8 @@ describe('UsersController (e2e)', () => {
           role: UserRole.ADMIN
         };
         
-        prismaMock.user.findUnique.mockImplementation(async (args) => {
-          if (args.where.id === mockAdmin.id) {
+        prismaMock.user.findUnique.mockImplementation(async (args: Prisma.UserFindUniqueArgs) => {
+          if (args.where?.id === mockAdmin.id) {
             return mockAdmin;
           }
           return null;
@@ -210,7 +221,9 @@ describe('UsersController (e2e)', () => {
         return request(app.getHttpServer())
           .get(`/users/${mockAdmin.id}`)
           .set('Authorization', `Bearer ${staffToken}`)
-          .expect(403); // Forbidden
+          .expect((res: request.Response) => {
+            expect(res.status).toBe(403); // Forbidden
+          });
       });
     });
 
@@ -224,8 +237,7 @@ describe('UsersController (e2e)', () => {
         return request(app.getHttpServer())
           .get('/users/me/profile')
           .set('Authorization', `Bearer ${userToken}`)
-          .expect(200)
-          .expect(res => {
+          .expect((res: request.Response) => {
             expect(res.body.id).toBe(mockUser.id);
             expect(res.body.email).toBe(mockUser.email);
           });
@@ -235,7 +247,9 @@ describe('UsersController (e2e)', () => {
         // Act & Assert
         return request(app.getHttpServer())
           .get('/users/me/profile')
-          .expect(401); // Unauthorized
+          .expect((res: request.Response) => {
+            expect(res.status).toBe(401); // Unauthorized
+          });
       });
     });
 
@@ -258,8 +272,7 @@ describe('UsersController (e2e)', () => {
           .put(`/users/${mockUser.id}`)
           .set('Authorization', `Bearer ${adminToken}`)
           .send(updateData)
-          .expect(200)
-          .expect(res => {
+          .expect((res: request.Response) => {
             expect(res.body.role).toBe(UserRole.STAFF);
           });
       });
@@ -276,7 +289,9 @@ describe('UsersController (e2e)', () => {
           .put(`/users/${mockUser.id}`)
           .set('Authorization', `Bearer ${userToken}`)
           .send(updateData)
-          .expect(403); // Forbidden
+          .expect((res: request.Response) => {
+            expect(res.status).toBe(403); // Forbidden
+          });
       });
     });
 
@@ -289,8 +304,7 @@ describe('UsersController (e2e)', () => {
         return request(app.getHttpServer())
           .get('/users/admin/test')
           .set('Authorization', `Bearer ${adminToken}`)
-          .expect(200)
-          .expect(res => {
+          .expect((res: request.Response) => {
             expect(res.body.message).toBe('Admin test successful');
           });
       });
@@ -303,7 +317,9 @@ describe('UsersController (e2e)', () => {
         return request(app.getHttpServer())
           .get('/users/admin/test')
           .set('Authorization', `Bearer ${userToken}`)
-          .expect(403); // Forbidden
+          .expect((res: request.Response) => {
+            expect(res.status).toBe(403); // Forbidden
+          });
       });
     });
   });
@@ -318,8 +334,7 @@ describe('UsersController (e2e)', () => {
       return request(app.getHttpServer())
         .get('/users')
         .set('Authorization', `Bearer ${adminToken}`)
-        .expect(200)
-        .expect(res => {
+        .expect((res: request.Response) => {
           expect(Array.isArray(res.body)).toBeTruthy();
           expect(res.body.length).toBe(1);
           expect(res.body[0].email).toBe(mockUser.email);
@@ -337,8 +352,7 @@ describe('UsersController (e2e)', () => {
       return request(app.getHttpServer())
         .get(`/users/${mockUser.id}`)
         .set('Authorization', `Bearer ${adminToken}`)
-        .expect(200)
-        .expect(res => {
+        .expect((res: request.Response) => {
           expect(res.body.id).toBe(mockUser.id);
           expect(res.body.email).toBe(mockUser.email);
         });
@@ -353,7 +367,9 @@ describe('UsersController (e2e)', () => {
       return request(app.getHttpServer())
         .get('/users/non-existent-id')
         .set('Authorization', `Bearer ${adminToken}`)
-        .expect(404);
+        .expect((res: request.Response) => {
+          expect(res.status).toBe(404);
+        });
     });
   });
 
@@ -384,8 +400,8 @@ describe('UsersController (e2e)', () => {
         .post('/users')
         .set('Authorization', `Bearer ${adminToken}`)
         .send(createUserDto)
-        .expect(201)
-        .expect(res => {
+        .expect((res: request.Response) => {
+          expect(res.status).toBe(201);
           expect(res.body.email).toBe(createUserDto.email);
           expect(res.body.firstName).toBe(createUserDto.firstName);
           expect(res.body.lastName).toBe(createUserDto.lastName);
@@ -404,7 +420,9 @@ describe('UsersController (e2e)', () => {
           // Missing required fields
           email: 'invalid-email',
         })
-        .expect(400);
+        .expect((res: request.Response) => {
+          expect(res.status).toBe(400);
+        });
     });
 
     it('should return 409 if email already exists', () => {
@@ -424,7 +442,9 @@ describe('UsersController (e2e)', () => {
         .post('/users')
         .set('Authorization', `Bearer ${adminToken}`)
         .send(createUserDto)
-        .expect(409);
+        .expect((res: request.Response) => {
+          expect(res.status).toBe(409);
+        });
     });
   });
 
@@ -443,8 +463,7 @@ describe('UsersController (e2e)', () => {
         .put(`/users/${mockUser.id}`)
         .set('Authorization', `Bearer ${adminToken}`)
         .send(updateData)
-        .expect(200)
-        .expect(res => {
+        .expect((res: request.Response) => {
           expect(res.body.firstName).toBe(updateData.firstName);
           expect(res.body.lastName).toBe(updateData.lastName);
         });
@@ -460,7 +479,9 @@ describe('UsersController (e2e)', () => {
         .put('/users/non-existent-id')
         .set('Authorization', `Bearer ${adminToken}`)
         .send({ firstName: 'Updated' })
-        .expect(404);
+        .expect((res: request.Response) => {
+          expect(res.status).toBe(404);
+        });
     });
   });
 
@@ -475,7 +496,9 @@ describe('UsersController (e2e)', () => {
       return request(app.getHttpServer())
         .delete(`/users/${mockUser.id}`)
         .set('Authorization', `Bearer ${adminToken}`)
-        .expect(204);
+        .expect((res: request.Response) => {
+          expect(res.status).toBe(204);
+        });
     });
 
     it('should return 404 if user not found', () => {
@@ -487,7 +510,9 @@ describe('UsersController (e2e)', () => {
       return request(app.getHttpServer())
         .delete('/users/non-existent-id')
         .set('Authorization', `Bearer ${adminToken}`)
-        .expect(404);
+        .expect((res: request.Response) => {
+          expect(res.status).toBe(404);
+        });
     });
   });
 });

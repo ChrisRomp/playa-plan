@@ -1,14 +1,15 @@
-import { Controller, Post, Body, UseGuards, Get, Request, Query, HttpStatus, HttpCode, UnauthorizedException } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, Get, Request, Query, HttpStatus, HttpCode, UnauthorizedException, BadRequestException } from '@nestjs/common';
 import { AuthService } from '../services/auth.service';
 import { RegisterDto } from '../dto/register.dto';
 import { LoginDto } from '../dto/login.dto';
 import { AuthResponseDto } from '../dto/auth-response.dto';
 import { LocalAuthGuard } from '../guards/local-auth.guard';
-import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { Public } from '../decorators/public.decorator';
 import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiBearerAuth } from '@nestjs/swagger';
 import { Request as ExpressRequest } from 'express';
-import { User, UserRole } from '@prisma/client';
+import { User } from '@prisma/client';
+import { RequestLoginCodeDto } from '../dto/request-login-code.dto';
+import { EmailCodeLoginDto } from '../dto/email-code-login.dto';
 
 // Define the user type for request objects
 interface RequestWithUser extends ExpressRequest {
@@ -73,6 +74,64 @@ export class AuthController {
   })
   async login(@Request() req: RequestWithUser): Promise<AuthResponseDto> {
     return this.authService.login(req.user);
+  }
+  
+  /**
+   * Request a login code for email verification-based login
+   * @param requestLoginCodeDto Email address
+   * @returns Success message
+   */
+  @Public()
+  @Post('request-login-code')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Request a login code for email verification-based login' })
+  @ApiBody({ type: RequestLoginCodeDto })
+  @ApiResponse({ 
+    status: HttpStatus.OK,
+    description: 'Login code sent if email exists'
+  })
+  async requestLoginCode(@Body() requestLoginCodeDto: RequestLoginCodeDto): Promise<{ message: string }> {
+    const { email } = requestLoginCodeDto;
+    
+    const result = await this.authService.generateLoginCode(email);
+    
+    if (!result) {
+      throw new BadRequestException('Failed to send login code');
+    }
+    
+    // Always return success to prevent user enumeration
+    return { message: 'If your email exists in our system, you will receive a login code' };
+  }
+  
+  /**
+   * Login with email verification code
+   * @param emailCodeLoginDto Email and verification code
+   * @returns Authentication response with token
+   */
+  @Public()
+  @Post('login-with-code')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Login with email verification code' })
+  @ApiBody({ type: EmailCodeLoginDto })
+  @ApiResponse({ 
+    status: HttpStatus.OK,
+    description: 'User successfully logged in',
+    type: AuthResponseDto
+  })
+  @ApiResponse({ 
+    status: HttpStatus.UNAUTHORIZED, 
+    description: 'Invalid or expired verification code'
+  })
+  async loginWithCode(@Body() emailCodeLoginDto: EmailCodeLoginDto): Promise<AuthResponseDto> {
+    const { email, code } = emailCodeLoginDto;
+    
+    const user = await this.authService.validateLoginCode(email, code);
+    
+    if (!user) {
+      throw new UnauthorizedException('Invalid or expired verification code');
+    }
+    
+    return this.authService.login(user);
   }
 
   /**
@@ -147,7 +206,7 @@ export class AuthController {
   @ApiOperation({ summary: 'Get current user profile' })
   @ApiResponse({ status: HttpStatus.OK, description: 'User profile retrieved successfully' })
   @ApiResponse({ status: HttpStatus.UNAUTHORIZED, description: 'Unauthorized' })
-  async getProfile(@Request() req: RequestWithUser): Promise<any> {
+  async getProfile(@Request() req: RequestWithUser): Promise<Omit<User, 'password'>> {
     // User is already injected in request by JWT strategy
     return req.user;
   }

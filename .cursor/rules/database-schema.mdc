@@ -1,0 +1,126 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Database Schema Guidelines
+
+## Prisma Schema Organization
+
+- Model names should be singular, PascalCase (e.g., `User`, `CampingOption`)
+- Field names should be camelCase
+- Group related models together with comments
+- Include clear, descriptive comments for complex relationships or business rules
+- Use appropriate data types matching application requirements
+
+## Relationships
+
+- Define relationships explicitly with clear field names
+- Use appropriate relationship types:
+  - `@relation` for defining relationships
+  - Use `fields` and `references` to specify foreign keys
+  - Define `onDelete` and `onUpdate` behaviors explicitly
+- Name junction tables clearly to represent the relationship
+
+## Field Guidelines
+
+- Use required fields (`String`, `Int`) rather than optional (`String?`, `Int?`) where possible
+- Include field comments for business logic rules
+- Use enums for fields with fixed sets of values (e.g., `UserRole`, `RegistrationStatus`)
+- Include sensible defaults where appropriate
+- Use appropriate indexes for query performance
+
+## Primary Keys
+
+- Use UUIDs (`String @id @default(uuid())`) for primary keys
+- Consider natural keys where appropriate
+- Always include `id` fields for consistent API usage
+
+## Indexes and Performance
+
+- Create indexes on frequently queried fields
+- Create composite indexes for queries with multiple conditions
+- Consider unique constraints where appropriate
+- Be mindful of index size and maintenance overhead
+
+## Validation and Constraints
+
+- Use `@unique` for fields requiring uniqueness
+- Apply appropriate length constraints via `@db.VarChar(length)`
+- Use `@default` for setting default values
+- Implement check constraints where necessary
+
+## Migrations
+
+- Keep migrations small and focused
+- Include descriptive migration names
+- Test migrations thoroughly on development data
+- Create seed data for development and testing
+- Include up/down migration capabilities where possible
+
+## Key Models Based on [App Spec](mdc:docs/app-spec.md)
+
+### User Model
+
+```prisma
+model User {
+  id               String          @id @default(uuid())
+  email            String          @unique
+  emailConfirmed   Boolean         @default(false)
+  firstName        String
+  lastName         String
+  playaName        String?
+  phone            String?
+  city             String?
+  state            String?
+  country          String?
+  emergencyContact String?
+  allowRegistration Boolean         @default(true)
+  allowEarlyRegistration Boolean    @default(false)
+  allowDeferredDuesPayment Boolean  @default(false)
+  allowNoJob       Boolean         @default(false)
+  internalNotes    String?
+  role             UserRole        @default(PARTICIPANT)
+  registrations    Registration[]
+  workShifts       JobSignup[]
+  payments         Payment[]
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+}
+
+enum UserRole {
+  PARTICIPANT
+  STAFF
+  ADMIN
+}
+```
+
+### Registration and Camping Models
+
+```prisma
+model Registration {
+  id              String             @id @default(uuid())
+  userId          String
+  user            User               @relation(fields: [userId], references: [id])
+  year            Int
+  status          RegistrationStatus @default(PENDING)
+  campingOptions  CampingOptionRegistration[]
+  jobSignups      JobSignup[]
+  customFields    Json?
+  termsAccepted   Boolean            @default(false)
+  payments        Payment[]
+  dueAmount       Float              @default(0)
+  paidAmount      Float              @default(0)
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+}
+
+enum RegistrationStatus {
+  PENDING
+  COMPLETE
+  CANCELLED
+  ERROR
+}
+```
+
+See full model specifications and relationships in the [app-spec.md](mdc:docs/app-spec.md) document.

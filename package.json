@@ -11,7 +11,7 @@
         "build": "tsc -b apps/*",
         "format": "prettier --write .",
         "lint": "eslint . --ext .ts,.tsx,.js,.jsx",
-        "test": "turbo run test",
+        "test": "jest",
         "clean": "rimraf dist node_modules **/dist **/node_modules"
     },
     "devDependencies": {

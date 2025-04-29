@@ -47,6 +47,8 @@ describe('JobsController', () => {
         description: 'Test Description',
         location: 'Test Location',
         categoryId: 'test-category-id',
+        staffOnly: false,
+        alwaysRequired: false,
       };
 
       const expectedJob = {
@@ -154,6 +156,8 @@ describe('JobsController', () => {
         name: 'Updated Job',
         description: 'Updated Description',
         location: 'Updated Location',
+        staffOnly: true,
+        alwaysRequired: true,
       };
 
       const expectedJob = {

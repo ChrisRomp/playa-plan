@@ -7,11 +7,13 @@ playaplan/
 ├── apps/
 │   ├── api/                    # NestJS backend (PlayaPlan API)
 │   │   ├── src/
+│   │   ├── dist/               # API-specific build output
 │   │   ├── prisma/
 │   │   ├── test/
 │   │   └── ...
 │   └── web/                    # React frontend (PlayaPlan UI)
 │       ├── src/
+│       ├── dist/               # Web-specific build output
 │       └── public/
 ├── libs/                       # Shared libraries between frontend and backend
 │   ├── types/                  # Shared TypeScript types/interfaces (e.g., DTOs)
