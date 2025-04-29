@@ -47,8 +47,8 @@ export class CampingOptionsService {
 
       // Convert job category IDs to string array representation for PostgreSQL
       const jobCategoryIdsArray = JSON.stringify(createCampingOptionDto.jobCategoryIds || [])
-        .replace('[', '{')
-        .replace(']', '}');
+        .replace(/\[/g, '{')
+        .replace(/\]/g, '}');
 
       const query = `
         INSERT INTO "camping_options"
@@ -228,8 +228,8 @@ export class CampingOptionsService {
 
       if (updateCampingOptionDto.jobCategoryIds !== undefined) {
         const jobCategoryIdsArray = JSON.stringify(updateCampingOptionDto.jobCategoryIds)
-          .replace('[', '{')
-          .replace(']', '}');
+          .replace(/\[/g, '{')
+          .replace(/\]/g, '}');
         setClauses.push(`"jobCategoryIds" = $${paramIndex++}::text[]`);
         values.push(jobCategoryIdsArray);
       }
