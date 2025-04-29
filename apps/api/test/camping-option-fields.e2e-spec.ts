@@ -75,28 +75,21 @@ describe('CampingOptionFieldsController (e2e)', () => {
     testCampId = camp.id;
 
     // Create a test camping option
-    const campingOption = await prisma.$queryRawUnsafe(`
-      INSERT INTO "camping_options"
-      (id, name, description, enabled, "workShiftsRequired", "participantDues", "staffDues", "maxSignups", "campId", "jobCategoryIds", "createdAt", "updatedAt")
-      VALUES
-      (
-        gen_random_uuid(),
-        'Test Camping Option for Fields',
-        'Test Description',
-        true,
-        1,
-        200.00,
-        100.00,
-        30,
-        '${testCampId}',
-        '{}',
-        now(),
-        now()
-      )
-      RETURNING *
-    `) as RawCampingOption[];
+    const campingOption = await prisma.campingOption.create({
+      data: {
+        name: 'Test Camping Option for Fields',
+        description: 'Test Description',
+        enabled: true,
+        workShiftsRequired: 1,
+        participantDues: 200.00,
+        staffDues: 100.00,
+        maxSignups: 30,
+        campId: testCampId,
+        jobCategoryIds: [],
+      }
+    });
 
-    testCampingOptionId = campingOption[0].id;
+    testCampingOptionId = campingOption.id;
 
     // Ensure test users exist
     let admin = await prisma.user.findUnique({
@@ -155,10 +148,10 @@ describe('CampingOptionFieldsController (e2e)', () => {
 
   afterAll(async () => {
     // Clean up test data
-    // First delete camping option
-    await prisma.$queryRawUnsafe(`
-      DELETE FROM "camping_options" WHERE id = '${testCampingOptionId}'
-    `).catch(() => {
+    // First delete camping option fields (will cascade to camping option fields)
+    await prisma.campingOption.delete({
+      where: { id: testCampingOptionId },
+    }).catch(() => {
       // Ignore errors if already deleted
     });
 
@@ -233,27 +226,18 @@ describe('CampingOptionFieldsController (e2e)', () => {
 
     beforeAll(async () => {
       // Create a field to test with
-      const field = await prisma.$queryRawUnsafe(`
-        INSERT INTO "camping_option_fields"
-        (id, "displayName", description, "dataType", required, "maxLength", "minValue", "maxValue", "campingOptionId", "createdAt", "updatedAt")
-        VALUES
-        (
-          gen_random_uuid(),
-          'Test Field for GET',
-          'Field for testing GET',
-          'STRING',
-          true,
-          100,
-          NULL,
-          NULL,
-          '${testCampingOptionId}',
-          now(),
-          now()
-        )
-        RETURNING *
-      `) as RawCampingOptionField[];
+      const field = await prisma.campingOptionField.create({
+        data: {
+          displayName: 'Test Field for GET',
+          description: 'Field for testing GET',
+          dataType: 'STRING',
+          required: true,
+          maxLength: 100,
+          campingOptionId: testCampingOptionId,
+        }
+      });
 
-      fieldId = field[0].id;
+      fieldId = field.id;
     });
 
     it('should return a field by id', async () => {
@@ -279,27 +263,18 @@ describe('CampingOptionFieldsController (e2e)', () => {
 
     beforeAll(async () => {
       // Create a field to test with
-      const field = await prisma.$queryRawUnsafe(`
-        INSERT INTO "camping_option_fields"
-        (id, "displayName", description, "dataType", required, "maxLength", "minValue", "maxValue", "campingOptionId", "createdAt", "updatedAt")
-        VALUES
-        (
-          gen_random_uuid(),
-          'Test Field for PATCH',
-          'Field for testing PATCH',
-          'STRING',
-          false,
-          100,
-          NULL,
-          NULL,
-          '${testCampingOptionId}',
-          now(),
-          now()
-        )
-        RETURNING *
-      `) as RawCampingOptionField[];
+      const field = await prisma.campingOptionField.create({
+        data: {
+          displayName: 'Test Field for PATCH',
+          description: 'Field for testing PATCH',
+          dataType: 'STRING',
+          required: true,
+          maxLength: 100,
+          campingOptionId: testCampingOptionId,
+        }
+      });
 
-      fieldId = field[0].id;
+      fieldId = field.id;
     });
 
     it('should update a field (admin)', async () => {
@@ -341,27 +316,18 @@ describe('CampingOptionFieldsController (e2e)', () => {
 
     beforeEach(async () => {
       // Create a field to test with
-      const field = await prisma.$queryRawUnsafe(`
-        INSERT INTO "camping_option_fields"
-        (id, "displayName", description, "dataType", required, "maxLength", "minValue", "maxValue", "campingOptionId", "createdAt", "updatedAt")
-        VALUES
-        (
-          gen_random_uuid(),
-          'Test Field for DELETE',
-          'Field for testing DELETE',
-          'STRING',
-          false,
-          100,
-          NULL,
-          NULL,
-          '${testCampingOptionId}',
-          now(),
-          now()
-        )
-        RETURNING *
-      `) as RawCampingOptionField[];
+      const field = await prisma.campingOptionField.create({
+        data: {
+          displayName: 'Test Field for DELETE',
+          description: 'Field for testing DELETE',
+          dataType: 'STRING',
+          required: true,
+          maxLength: 100,
+          campingOptionId: testCampingOptionId,
+        }
+      });
 
-      fieldId = field[0].id;
+      fieldId = field.id;
     });
 
     it('should delete a field (admin)', async () => {

@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { CreateCampingOptionDto, UpdateCampingOptionDto } from '../dto';
 import { CampingOption } from '../entities/camping-option.entity';
+import { Prisma } from '@prisma/client';
 
 /**
  * Service for managing camping options
@@ -76,25 +77,24 @@ export class CampingOptionsService {
    * @returns Array of camping options
    */
   async findAll(includeDisabled = false, campId?: string): Promise<CampingOption[]> {
-    let query = `SELECT * FROM "camping_options" WHERE 1=1`;
+    const whereClause: Prisma.CampingOptionWhereInput = {};
     
     if (!includeDisabled) {
-      query += ` AND enabled = true`;
+      whereClause.enabled = true;
     }
     
     if (campId) {
-      query += ` AND "campId" = '${campId}'`;
+      whereClause.campId = campId;
     }
     
-    query += ` ORDER BY name ASC`;
+    const campingOptions = await this.prisma.campingOption.findMany({
+      where: whereClause,
+      orderBy: {
+        name: 'asc',
+      },
+    });
     
-    const results = await this.prisma.$queryRawUnsafe(query);
-    
-    if (!results || !Array.isArray(results)) {
-      return [];
-    }
-    
-    return results.map(option => new CampingOption(option));
+    return campingOptions.map(option => new CampingOption(option));
   }
 
   /**
@@ -103,15 +103,15 @@ export class CampingOptionsService {
    * @returns The camping option if found
    */
   async findOne(id: string): Promise<CampingOption> {
-    const results = await this.prisma.$queryRaw`
-      SELECT * FROM "camping_options" WHERE id = ${id}::uuid
-    `;
+    const campingOption = await this.prisma.campingOption.findUnique({
+      where: { id },
+    });
 
-    if (!results || !Array.isArray(results) || results.length === 0) {
+    if (!campingOption) {
       throw new NotFoundException(`Camping option with ID ${id} not found`);
     }
 
-    return new CampingOption(results[0]);
+    return new CampingOption(campingOption);
   }
 
   /**
@@ -120,15 +120,11 @@ export class CampingOptionsService {
    * @returns The number of registrations
    */
   async getRegistrationCount(id: string): Promise<number> {
-    const result = await this.prisma.$queryRaw`
-      SELECT COUNT(*) AS count FROM "camping_option_registrations" WHERE "campingOptionId" = ${id}::uuid
-    `;
-
-    if (!result || !Array.isArray(result) || result.length === 0) {
-      return 0;
-    }
+    const count = await this.prisma.campingOptionRegistration.count({
+      where: { campingOptionId: id },
+    });
     
-    return parseInt(result[0].count, 10) || 0;
+    return count;
   }
 
   /**
@@ -157,77 +153,52 @@ export class CampingOptionsService {
         }
       }
 
-      // Build the SET clause dynamically
-      const setClauses = [];
-      const values = [];
-      let paramIndex = 1;
-
+      // Prepare update data
+      const updateData: Prisma.CampingOptionUpdateInput = {};
+      
       if (updateCampingOptionDto.name !== undefined) {
-        setClauses.push(`name = $${paramIndex++}`);
-        values.push(updateCampingOptionDto.name);
+        updateData.name = updateCampingOptionDto.name;
       }
 
       if (updateCampingOptionDto.description !== undefined) {
-        setClauses.push(`description = $${paramIndex++}`);
-        values.push(updateCampingOptionDto.description);
+        updateData.description = updateCampingOptionDto.description;
       }
 
       if (updateCampingOptionDto.enabled !== undefined) {
-        setClauses.push(`enabled = $${paramIndex++}`);
-        values.push(updateCampingOptionDto.enabled);
+        updateData.enabled = updateCampingOptionDto.enabled;
       }
 
       if (updateCampingOptionDto.workShiftsRequired !== undefined) {
-        setClauses.push(`"workShiftsRequired" = $${paramIndex++}`);
-        values.push(updateCampingOptionDto.workShiftsRequired);
+        updateData.workShiftsRequired = updateCampingOptionDto.workShiftsRequired;
       }
 
       if (updateCampingOptionDto.participantDues !== undefined) {
-        setClauses.push(`"participantDues" = $${paramIndex++}`);
-        values.push(updateCampingOptionDto.participantDues);
+        updateData.participantDues = updateCampingOptionDto.participantDues;
       }
 
       if (updateCampingOptionDto.staffDues !== undefined) {
-        setClauses.push(`"staffDues" = $${paramIndex++}`);
-        values.push(updateCampingOptionDto.staffDues);
+        updateData.staffDues = updateCampingOptionDto.staffDues;
       }
 
       if (updateCampingOptionDto.maxSignups !== undefined) {
-        setClauses.push(`"maxSignups" = $${paramIndex++}`);
-        values.push(updateCampingOptionDto.maxSignups);
+        updateData.maxSignups = updateCampingOptionDto.maxSignups;
       }
 
       if (updateCampingOptionDto.jobCategoryIds !== undefined) {
-        const jobCategoryIdsArray = JSON.stringify(updateCampingOptionDto.jobCategoryIds)
-          .replace(/\[/g, '{')
-          .replace(/\]/g, '}');
-        setClauses.push(`"jobCategoryIds" = $${paramIndex++}::text[]`);
-        values.push(jobCategoryIdsArray);
+        updateData.jobCategoryIds = updateCampingOptionDto.jobCategoryIds;
       }
 
-      if (setClauses.length === 0) {
-        // No fields to update
+      // If no fields to update, return current entity
+      if (Object.keys(updateData).length === 0) {
         return this.findOne(id);
       }
 
-      setClauses.push(`"updatedAt" = now()`);
+      const updated = await this.prisma.campingOption.update({
+        where: { id },
+        data: updateData,
+      });
 
-      const query = `
-        UPDATE "camping_options"
-        SET ${setClauses.join(', ')}
-        WHERE id = $${paramIndex}
-        RETURNING *
-      `;
-
-      values.push(id);
-
-      const result = await this.prisma.$queryRawUnsafe(query, ...values);
-
-      if (!result || !Array.isArray(result) || result.length === 0) {
-        throw new NotFoundException(`Camping option with ID ${id} not found`);
-      }
-
-      return new CampingOption(result[0]);
+      return new CampingOption(updated);
     } catch (error) {
       if (error instanceof NotFoundException || error instanceof BadRequestException) {
         throw error;
@@ -254,23 +225,20 @@ export class CampingOptionsService {
         );
       }
 
-      // Also check if there are any fields defined for this option
-      const fieldResult = await this.prisma.$queryRaw`
-        SELECT COUNT(*) AS count FROM "camping_option_fields" WHERE "campingOptionId" = ${id}::uuid
-      `;
-
-      if (fieldResult && Array.isArray(fieldResult) && fieldResult.length > 0) {
-        const fieldCount = parseInt(fieldResult[0].count, 10) || 0;
-        if (fieldCount > 0) {
-          throw new BadRequestException(
-            `Cannot delete camping option with ID ${id} because it has ${fieldCount} custom fields. Delete the fields first.`
-          );
-        }
+      // Check if there are any fields defined for this option
+      const fieldCount = await this.prisma.campingOptionField.count({
+        where: { campingOptionId: id },
+      });
+      
+      if (fieldCount > 0) {
+        throw new BadRequestException(
+          `Cannot delete camping option with ID ${id} because it has ${fieldCount} custom fields. Delete the fields first.`
+        );
       }
 
-      await this.prisma.$queryRaw`
-        DELETE FROM "camping_options" WHERE id = ${id}::uuid
-      `;
+      await this.prisma.campingOption.delete({
+        where: { id },
+      });
 
       return campingOption;
     } catch (error) {

@@ -225,29 +225,22 @@ describe('CampingOptionsController (e2e)', () => {
     let campingOptionId: string;
 
     beforeAll(async () => {
-      // Create a camping option to test with
-      const campingOption = await prisma.$queryRawUnsafe(`
-        INSERT INTO "camping_options"
-        (id, name, description, enabled, "workShiftsRequired", "participantDues", "staffDues", "maxSignups", "campId", "jobCategoryIds", "createdAt", "updatedAt")
-        VALUES
-        (
-          gen_random_uuid(),
-          'Test Camping Option for GET',
-          'Test Description',
-          true,
-          1,
-          200.00,
-          100.00,
-          30,
-          '${testCampId}',
-          '{"${testJobCategoryId}"}',
-          now(),
-          now()
-        )
-        RETURNING *
-      `) as RawCampingOption[];
+      // Create a camping option to test with using Prisma ORM
+      const campingOption = await prisma.campingOption.create({
+        data: {
+          name: 'Test Camping Option for GET',
+          description: 'Test Description',
+          enabled: true,
+          workShiftsRequired: 1,
+          participantDues: 200.00,
+          staffDues: 100.00,
+          maxSignups: 30,
+          campId: testCampId,
+          jobCategoryIds: [testJobCategoryId],
+        },
+      });
 
-      campingOptionId = campingOption[0].id;
+      campingOptionId = campingOption.id;
     });
 
     it('should return a camping option by id', async () => {
@@ -272,29 +265,22 @@ describe('CampingOptionsController (e2e)', () => {
     let campingOptionId: string;
 
     beforeAll(async () => {
-      // Create a camping option to test with
-      const campingOption = await prisma.$queryRawUnsafe(`
-        INSERT INTO "camping_options"
-        (id, name, description, enabled, "workShiftsRequired", "participantDues", "staffDues", "maxSignups", "campId", "jobCategoryIds", "createdAt", "updatedAt")
-        VALUES
-        (
-          gen_random_uuid(),
-          'Test Camping Option for PATCH',
-          'Test Description',
-          true,
-          1,
-          200.00,
-          100.00,
-          30,
-          '${testCampId}',
-          '{"${testJobCategoryId}"}',
-          now(),
-          now()
-        )
-        RETURNING *
-      `) as RawCampingOption[];
+      // Create a camping option to test with using Prisma ORM
+      const campingOption = await prisma.campingOption.create({
+        data: {
+          name: 'Test Camping Option for PATCH',
+          description: 'Test Description',
+          enabled: true,
+          workShiftsRequired: 1,
+          participantDues: 200.00,
+          staffDues: 100.00,
+          maxSignups: 30,
+          campId: testCampId,
+          jobCategoryIds: [testJobCategoryId],
+        },
+      });
 
-      campingOptionId = campingOption[0].id;
+      campingOptionId = campingOption.id;
     });
 
     it('should update a camping option (admin)', async () => {
@@ -341,29 +327,22 @@ describe('CampingOptionsController (e2e)', () => {
     let campingOptionId: string;
 
     beforeEach(async () => {
-      // Create a camping option to test with
-      const campingOption = await prisma.$queryRawUnsafe(`
-        INSERT INTO "camping_options"
-        (id, name, description, enabled, "workShiftsRequired", "participantDues", "staffDues", "maxSignups", "campId", "jobCategoryIds", "createdAt", "updatedAt")
-        VALUES
-        (
-          gen_random_uuid(),
-          'Test Camping Option for DELETE',
-          'Test Description',
-          true,
-          1,
-          200.00,
-          100.00,
-          30,
-          '${testCampId}',
-          '{"${testJobCategoryId}"}',
-          now(),
-          now()
-        )
-        RETURNING *
-      `) as RawCampingOption[];
+      // Create a camping option to test with using Prisma ORM
+      const campingOption = await prisma.campingOption.create({
+        data: {
+          name: 'Test Camping Option for DELETE',
+          description: 'Test Description',
+          enabled: true,
+          workShiftsRequired: 1,
+          participantDues: 200.00,
+          staffDues: 100.00,
+          maxSignups: 30,
+          campId: testCampId,
+          jobCategoryIds: [testJobCategoryId],
+        },
+      });
 
-      campingOptionId = campingOption[0].id;
+      campingOptionId = campingOption.id;
     });
 
     it('should delete a camping option (admin)', async () => {
