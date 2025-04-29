@@ -52,7 +52,6 @@ function createMockRequest(userData: User): MockRequest {
 
 describe('AuthController', () => {
   let controller: AuthController;
-  let authService: AuthService;
 
   // Mock user without password
   const mockUser = setupMockUser();
@@ -96,7 +95,6 @@ describe('AuthController', () => {
       .compile();
 
     controller = module.get<AuthController>(AuthController);
-    authService = module.get<AuthService>(AuthService);
   });
 
   it('should be defined', () => {
