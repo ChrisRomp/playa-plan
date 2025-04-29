@@ -8,23 +8,63 @@ async function hashPassword(password: string): Promise<string> {
   return bcrypt.hash(password, salt);
 }
 
+async function tableExists(tableName: string): Promise<boolean> {
+  try {
+    // Try to get a count from the table - if it doesn't exist, it will throw an error
+    await prisma.$queryRawUnsafe(`SELECT COUNT(*) FROM "${tableName}"`);
+    return true;
+  } catch (error) {
+    return false;
+  }
+}
+
 async function main() {
   console.log('Starting database seed...');
 
   // Clean up existing data (in reverse order to respect foreign key constraints)
-  // Wrap in a transaction for atomic execution - if one deletion fails, all are rolled back
-  await prisma.$transaction(async (tx) => {
-    console.log('Cleaning up existing data in transaction...');
-    await tx.notification.deleteMany({});
-    await tx.payment.deleteMany({});
-    await tx.registration.deleteMany({});
-    await tx.shift.deleteMany({});
-    await tx.job.deleteMany({});
-    await tx.jobCategory.deleteMany({});
-    await tx.camp.deleteMany({});
-    await tx.user.deleteMany({});
-    console.log('Successfully cleaned up existing data');
-  });
+  console.log('Checking and cleaning up existing data...');
+  
+  if (await tableExists('notifications')) {
+    await prisma.notification.deleteMany({});
+    console.log('Cleaned notifications table');
+  }
+  
+  if (await tableExists('payments')) {
+    await prisma.payment.deleteMany({});
+    console.log('Cleaned payments table');
+  }
+  
+  if (await tableExists('registrations')) {
+    await prisma.registration.deleteMany({});
+    console.log('Cleaned registrations table');
+  }
+  
+  if (await tableExists('shifts')) {
+    await prisma.shift.deleteMany({});
+    console.log('Cleaned shifts table');
+  }
+  
+  if (await tableExists('jobs')) {
+    await prisma.job.deleteMany({});
+    console.log('Cleaned jobs table');
+  }
+  
+  if (await tableExists('job_categories')) {
+    await prisma.jobCategory.deleteMany({});
+    console.log('Cleaned job_categories table');
+  }
+  
+  if (await tableExists('camps')) {
+    await prisma.camp.deleteMany({});
+    console.log('Cleaned camps table');
+  }
+  
+  if (await tableExists('users')) {
+    await prisma.user.deleteMany({});
+    console.log('Cleaned users table');
+  }
+  
+  console.log('Successfully completed data cleanup');
 
   // Create users
   const adminUser = await prisma.user.create({
