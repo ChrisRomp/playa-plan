@@ -4,11 +4,10 @@ import { RegisterDto } from '../dto/register.dto';
 import { LoginDto } from '../dto/login.dto';
 import { AuthResponseDto } from '../dto/auth-response.dto';
 import { LocalAuthGuard } from '../guards/local-auth.guard';
-import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { Public } from '../decorators/public.decorator';
 import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiBearerAuth } from '@nestjs/swagger';
 import { Request as ExpressRequest } from 'express';
-import { User, UserRole } from '@prisma/client';
+import { User } from '@prisma/client';
 import { RequestLoginCodeDto } from '../dto/request-login-code.dto';
 import { EmailCodeLoginDto } from '../dto/email-code-login.dto';
 
