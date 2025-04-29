@@ -12,6 +12,7 @@
         "outDir": "dist"
       }
     ],
-    "watchAssets": true
+    "watchAssets": true,
+    "preserveWatchOutput": true
   }
 }
