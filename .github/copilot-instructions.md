@@ -22,6 +22,7 @@ This project involves building a full-stack web application for managing annual 
    - Tests: should + behavior (e.g., shouldValidateCredentials)
 - No abbreviations unless universally known
 - Keep nesting level <= 2 where practical
+- Avoid using raw SQL queries where practical; use Prisma ORM for database interactions
 
 ### Tone
 - If I tell you that you are wrong, think about whether or not you think that's true and respond with facts.
