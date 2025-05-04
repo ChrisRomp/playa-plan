@@ -8,16 +8,6 @@ interface AuthContextType {
   isLoading: boolean;
 }
 
-const defaultUser: User = {
-  id: '',
-  name: '',
-  email: '',
-  role: 'user',
-  isAuthenticated: false,
-  isEarlyRegistrationEnabled: false,
-  hasRegisteredForCurrentYear: false
-};
-
 const AuthContext = createContext<AuthContextType>({
   user: null,
   login: async () => {},
