@@ -15,6 +15,10 @@ Keeping simplicity in mind, we'll use:
   - Unit Tests: Vitest (integrates seamlessly with Vite)
   - E2E Tests: Playwright (cross-browser, modern API, accessibility checks recommended)
 
+## Work tracking
+
+Track work progress in [frontend-tasks.md](frontend-tasks.md).
+
 ## Visual Elements
 
 ### Header
