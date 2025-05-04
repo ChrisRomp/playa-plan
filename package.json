@@ -10,13 +10,13 @@
         "dev:api": "npm run dev --workspace=api",
         "dev:web": "npm run dev --workspace=web",
         "build": "tsc && vite build",
-        "format": "prettier --write \"src/**/*.{ts,tsx}\"",
+        "format": "prettier --write \"apps/**/*.{ts,tsx}\" \"libs/**/*.{ts,tsx}\"",
         "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
         "preview": "vite preview",
-        "test": "vitest run",
-        "test:watch": "vitest",
-        "test:coverage": "vitest run --coverage",
-        "clean": "rimraf dist node_modules **/dist **/node_modules"
+        "test": "npm run test --workspaces --if-present",
+        "test:watch": "npm run test:watch --workspaces --if-present",
+        "test:coverage": "npm run test:coverage --workspaces --if-present",
+        "clean": "rimraf node_modules **/dist **/node_modules"
     },
     "devDependencies": {
         "@typescript-eslint/eslint-plugin": "^8.31.1",
