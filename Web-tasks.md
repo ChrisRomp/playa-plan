@@ -2,41 +2,41 @@
 
 ## Initial Setup Tasks
 
-1. [ ] Set up base Vite React TypeScript project
-2. [ ] Add Tailwind CSS
-3. [ ] Set up project structure according to the plan
-4. [ ] Configure ESLint and Prettier
-5. [ ] Configure Vitest for unit testing
+1. ✅ Set up base Vite React TypeScript project
+2. ✅ Add Tailwind CSS
+3. ✅ Set up project structure according to the plan
+4. ✅ Configure ESLint and Prettier
+5. ✅ Configure Vitest for unit testing
 6. [ ] Create basic shared components (with typed props):
-   - [ ] Button
-   - [ ] Input
+   - ✅ Button
+   - ✅ Input
    - [ ] Form
-   - [ ] Card
-   - [ ] Modal
+   - ✅ Card
+   - ✅ Modal
    - [ ] DataTable (with sorting/filtering/grouping)
-   - [ ] Notification
-   - [ ] AccessibleImage (with alt text handling)
-   - [ ] RichTextContent (with sanitization and accessibility)
-7. [ ] Set up basic routing (using React Router)
-8. [ ] Create auth context and login/register pages (include loading/error states)
-9. [ ] Set up basic API client
-10. [ ] Create initial home page with responsive layout
+   - ✅ Notification
+   - ✅ AccessibleImage (with alt text handling)
+   - ✅ RichTextContent (with sanitization and accessibility)
+7. ✅ Set up basic routing (using React Router)
+8. ✅ Create auth context and login/register pages (include loading/error states)
+9. ✅ Set up basic API client
+10. ✅ Create initial home page with responsive layout
 11. [ ] Implement WCAG 2.2 accessibility standards
-    - [ ] Implement proper focus management
-    - [ ] Add keyboard navigation support
+    - ✅ Implement proper focus management
+    - ✅ Add keyboard navigation support
     - [ ] Ensure screen reader compatibility
-    - [ ] Configure proper ARIA attributes
+    - ✅ Configure proper ARIA attributes
 
 ## Feature Roadmap
 
 1. [ ] User authentication system
-   - [ ] Email authorization code login process (handled by API?)
+   - ✅ Email authorization code login process (handled by API?)
    - [ ] JWT persistence using HTTP-only cookies
      - [ ] Set up cookie service utility
      - [ ] Configure secure but practical cookie settings (Secure, SameSite Lax)
      - [ ] Implement automatic token refresh mechanism
      - [ ] Handle session expiration gracefully
-   - [ ] User registration
+   - ✅ User registration
    - [ ] CAPTCHA integration for security
 
 2. [ ] User profile management
@@ -70,6 +70,7 @@
    - [ ] Schedule viewing by day/category
 
 7. [ ] Notification system
+   - ✅ UI notifications component
    - [ ] Email notifications for registration events
    - [ ] UI for notification history/preferences
 
