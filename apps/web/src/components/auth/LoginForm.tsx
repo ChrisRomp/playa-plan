@@ -1,14 +1,61 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../store/AuthContext';
 
 const LoginForm: React.FC = () => {
+  // Form state
   const [email, setEmail] = useState('');
   const [verificationCode, setVerificationCode] = useState('');
-  const [isRegister, setIsRegister] = useState(false);
-  const [codeSent, setCodeSent] = useState(false);
-  const { login, isLoading } = useAuth();
+  
+  // Track whether verification code has been sent
+  // Initialize from localStorage to maintain state across page refreshes
+  const [codeSent, setCodeSent] = useState(() => {
+    const savedEmail = localStorage.getItem('pendingLoginEmail');
+    return savedEmail ? true : false;
+  });
+  
+  // Use local loading state instead of the one from AuthContext
+  const [localLoading, setLocalLoading] = useState(false);
+  
+  // Get authentication context values
+  const { requestVerificationCode, verifyCode, error: authError, isAuthenticated } = useAuth();
   const [error, setError] = useState('');
+  
+  // Initialize email from localStorage if available (for page refreshes)
+  useEffect(() => {
+    // Always reset loading state on component mount
+    setLocalLoading(false);
+    
+    const savedEmail = localStorage.getItem('pendingRegistrationEmail');
+    if (savedEmail) {
+      setEmail(savedEmail);
+      setCodeSent(true);
+    }
+    
+    // Clear any stuck loading state on page load
+    localStorage.removeItem('auth_loading_state');
+  }, []);
 
+  // Update local error state when auth context error changes
+  useEffect(() => {
+    if (authError) {
+      setError(authError);
+      // Reset loading state when there's an error
+      setLocalLoading(false);
+    }
+  }, [authError]);
+
+  // Redirect logic if user is already authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      // Redirect to home page or dashboard
+      // In a real app with routing, we would use react-router's useNavigate here
+      window.location.href = '/';
+    }
+  }, [isAuthenticated]);
+
+  /**
+   * Handle sending verification code to the provided email
+   */
   const handleSendCode = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -18,19 +65,32 @@ const LoginForm: React.FC = () => {
       return;
     }
     
+    // Set local loading state
+    setLocalLoading(true);
+    
     try {
-      // Replace with actual API call to send verification code
-      console.log(`Sending verification code to ${email}`);
-      // Simulate API call
-      setTimeout(() => {
-        setCodeSent(true);
-      }, 1000);
+      // Call the API to send verification code
+      await requestVerificationCode(email);
+      
+      // Save email to localStorage to maintain state across page refreshes
+      localStorage.setItem('pendingLoginEmail', email);
+      
+      // For debugging
+      console.log(`Login process started for email: ${email}`);
+      
+      setCodeSent(true);
     } catch (error) {
+      // Error is already set in the auth context and will update via useEffect
       console.error('Failed to send verification code:', error);
-      setError('Failed to send verification code');
+    } finally {
+      // Always reset loading state
+      setLocalLoading(false);
     }
   };
 
+  /**
+   * Handle verification of the code for login/signup
+   */
   const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -40,19 +100,26 @@ const LoginForm: React.FC = () => {
       return;
     }
     
+    // Set local loading state
+    setLocalLoading(true);
+    
     try {
-      // Replace this with the actual verification logic
-      await login(email, verificationCode);
+      // Call the API to verify the code
+      await verifyCode(email, verificationCode);
+      // Successful verification will trigger a redirect via the isAuthenticated useEffect
     } catch (error) {
+      // Error is already set in the auth context and will update via useEffect
       console.error('Verification failed:', error);
-      setError('Invalid verification code');
+    } finally {
+      // Always reset loading state
+      setLocalLoading(false);
     }
   };
 
   return (
     <div className="bg-white p-8 rounded-lg shadow-md max-w-md w-full mx-auto">
       <h2 className="text-2xl font-bold text-center mb-6">
-        {isRegister ? 'Create Account' : 'Sign In'}
+        Log In or Sign Up
       </h2>
       
       {error && (
@@ -80,10 +147,10 @@ const LoginForm: React.FC = () => {
           
           <button
             type="submit"
-            disabled={isLoading}
+            disabled={localLoading}
             className="w-full bg-amber-600 text-white font-medium py-2 px-4 rounded-md hover:bg-amber-700 transition-colors duration-300 disabled:bg-amber-400"
           >
-            {isLoading ? (
+            {localLoading ? (
               <span className="flex items-center justify-center">
                 <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -101,7 +168,10 @@ const LoginForm: React.FC = () => {
               A verification code has been sent to <span className="font-medium">{email}</span>.
               <button 
                 type="button"
-                onClick={() => setCodeSent(false)}
+                onClick={() => {
+                  setCodeSent(false);
+                  localStorage.removeItem('pendingLoginEmail');
+                }}
                 className="text-amber-600 hover:text-amber-800 ml-2 text-sm font-medium transition-colors"
               >
                 Change
@@ -123,10 +193,10 @@ const LoginForm: React.FC = () => {
           
           <button
             type="submit"
-            disabled={isLoading}
+            disabled={localLoading}
             className="w-full bg-amber-600 text-white font-medium py-2 px-4 rounded-md hover:bg-amber-700 transition-colors duration-300 disabled:bg-amber-400 mt-4"
           >
-            {isLoading ? (
+            {localLoading ? (
               <span className="flex items-center justify-center">
                 <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -134,21 +204,15 @@ const LoginForm: React.FC = () => {
                 </svg>
                 Verifying...
               </span>
-            ) : isRegister ? 'Create Account' : 'Sign In'}
+            ) : 'Log In'}
           </button>
         </form>
       )}
       
       <div className="mt-6 text-center">
-        <button
-          onClick={() => {
-            setIsRegister(!isRegister);
-            setCodeSent(false);
-          }}
-          className="text-amber-600 hover:text-amber-800 text-sm font-medium transition-colors"
-        >
-          {isRegister ? 'Already have an account? Sign In' : 'Need an account? Register'}
-        </button>
+        <p className="text-gray-600 text-sm">
+          Enter your email to sign in or create an account
+        </p>
       </div>
     </div>
   );

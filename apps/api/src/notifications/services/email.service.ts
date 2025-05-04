@@ -79,11 +79,36 @@ export class EmailService {
   async sendEmail(options: EmailOptions): Promise<boolean> {
     try {
       const { to, subject, text, html, from, replyTo, attachments } = options;
+      const isDebugMode = this.configService.get('NODE_ENV') === 'development';
+      const isSendgridConfigured = !!this.configService.get('email.sendgrid.apiKey');
+      const isSmtpConfigured = !!this.transporter;
+      
+      // In debug mode, always log the email content to console
+      if (isDebugMode) {
+        // Only output the text content in debug mode
+        console.log('\n====== EMAIL CONTENT (DEBUG MODE) ======');
+        console.log(`To: ${Array.isArray(to) ? to.join(', ') : to}`);
+        console.log(`Subject: ${subject}`);
+        console.log('\n----- Text Content -----');
+        console.log(text || 'No text content provided');
+        console.log('================================\n');
+        
+        // If email isn't configured, pretend it was sent successfully
+        if (!isSendgridConfigured && !isSmtpConfigured) {
+          return true;
+        }
+      }
+      
+      // If not in debug mode and email isn't configured, silently return without sending
+      if (!isSendgridConfigured && !isSmtpConfigured) {
+        this.logger.debug('Email not configured, skipping send');
+        return false;
+      }
       
       // Set default from if not provided
       const emailFrom = from || this.defaultFrom;
       
-      if (this.emailProvider === 'sendgrid') {
+      if (this.emailProvider === 'sendgrid' && isSendgridConfigured) {
         return this.sendViaSendGrid({
           to,
           from: emailFrom,
@@ -98,7 +123,7 @@ export class EmailService {
             disposition: 'attachment',
           })),
         });
-      } else if (this.emailProvider === 'smtp' && this.transporter) {
+      } else if (this.emailProvider === 'smtp' && isSmtpConfigured) {
         return this.sendViaSmtp({
           to,
           from: emailFrom,

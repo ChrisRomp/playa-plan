@@ -1,10 +1,9 @@
-import { Injectable, ConflictException, UnauthorizedException, Logger, BadRequestException } from '@nestjs/common';
+import { Injectable, ConflictException, Logger, BadRequestException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { RegisterDto } from '../dto/register.dto';
 import { User, UserRole } from '@prisma/client';
-import * as bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
 import { NotificationsService } from '../../notifications/services/notifications.service';
 
@@ -23,79 +22,57 @@ export class AuthService {
   ) {}
 
   /**
-   * Validates user credentials for login
+   * This method is kept for compatibility with Passport.js local strategy 
+   * but is not used in email verification flow
+   * 
    * @param email User email
-   * @param password User password
-   * @returns User object without password if credentials are valid, null otherwise
+   * @returns null - we use email verification instead
    */
-  async validateCredentials(email: string, password: string): Promise<Omit<User, 'password'> | null> {
-    try {
-      // Find user by email
-      const user = await this.prisma.user.findUnique({
-        where: { email },
-      });
-
-      // Return null if user not found or password doesn't match
-      if (!user || !user.password) {
-        return null;
-      }
-
-      // Compare provided password with stored hash
-      const isPasswordValid = await bcrypt.compare(password, user.password);
-      if (!isPasswordValid) {
-        return null;
-      }
-
-      // Return user without password
-      const { password: _, ...result } = user;
-      return result;
-    } catch (error: unknown) {
-      this.logger.error(`Error validating user credentials: ${this.getErrorMessage(error)}`);
-      return null;
-    }
+  async validateCredentials(_email: string): Promise<null> {
+    this.logger.warn(`validateCredentials called but we use email verification flow instead`);
+    return null;
   }
 
   /**
    * Registers a new user
    * @param registerDto Data for user registration
-   * @returns Newly created user without password
+   * @returns Newly created user
    */
   async register(registerDto: RegisterDto): Promise<Omit<User, 'password'>> {
-    const { email, password, firstName, lastName, playaName } = registerDto;
-
-    // Check if user with the same email already exists
-    const existingUser = await this.prisma.user.findUnique({
-      where: { email },
-    });
-
-    if (existingUser) {
-      throw new ConflictException('User with this email already exists');
-    }
+    const { email, firstName, lastName, playaName } = registerDto;
 
     try {
-      // Generate password hash
-      const hashedPassword = await this.hashPassword(password);
+      // Check if user with this email already exists
+      const existingUser = await this.prisma.user.findUnique({
+        where: { email },
+      });
 
-      // Generate verification token
+      if (existingUser) {
+        this.logger.warn(`Registration failed: User with email ${email} already exists`);
+        throw new ConflictException('User with this email already exists');
+      }
+
+      // Generate email verification token
       const verificationToken = uuidv4();
 
       // Create new user
       const newUser = await this.prisma.user.create({
         data: {
           email,
-          password: hashedPassword,
           firstName,
           lastName,
           playaName,
-          verificationToken,
           role: UserRole.PARTICIPANT,
+          verificationToken: verificationToken,
         },
       });
+
+      this.logger.log(`User registered: ${newUser.id}`);
 
       // Send verification email
       await this.sendVerificationEmail(newUser.email, verificationToken);
 
-      // Return user without password
+      // Return user data without password
       const { password: _, ...result } = newUser;
       return result;
     } catch (error: unknown) {
@@ -189,111 +166,8 @@ export class AuthService {
   }
 
   /**
-   * Initiates password reset process
-   * @param email User email
-   * @returns True if reset token was generated, false otherwise
-   */
-  async initiatePasswordReset(email: string): Promise<boolean> {
-    try {
-      // Find user by email
-      const user = await this.prisma.user.findUnique({
-        where: { email },
-      });
-
-      if (!user) {
-        // Return true even if user doesn't exist to prevent user enumeration
-        return true;
-      }
-
-      // Generate reset token
-      const resetToken = uuidv4();
-      const resetTokenExpiry = new Date();
-      resetTokenExpiry.setHours(resetTokenExpiry.getHours() + 24); // Token valid for 24 hours
-
-      // Update user with reset token
-      await this.prisma.user.update({
-        where: { id: user.id },
-        data: {
-          resetToken,
-          resetTokenExpiry,
-        },
-      });
-
-      // Send password reset email
-      await this.sendPasswordResetEmail(email, resetToken);
-
-      return true;
-    } catch (error: unknown) {
-      this.logger.error(`Error initiating password reset: ${this.getErrorMessage(error)}`);
-      return false;
-    }
-  }
-
-  /**
-   * Sends password reset email to a user
-   * @param email User email
-   * @param token Reset token
-   * @returns True if email was sent successfully
-   */
-  private async sendPasswordResetEmail(email: string, token: string): Promise<boolean> {
-    try {
-      const result = await this.notificationsService.sendPasswordResetEmail(email, token);
-      if (!result) {
-        this.logger.warn(`Failed to send password reset email to ${email}`);
-      }
-      return result;
-    } catch (error: unknown) {
-      this.logger.error(`Error sending password reset email: ${this.getErrorMessage(error)}`);
-      return false;
-    }
-  }
-
-  /**
-   * Resets a user's password using the reset token
-   * @param token Reset token
-   * @param newPassword New password
-   * @returns True if password was reset successfully, false otherwise
-   */
-  async resetPassword(token: string, newPassword: string): Promise<boolean> {
-    try {
-      const now = new Date();
-
-      // Find user with the reset token that hasn't expired
-      const user = await this.prisma.user.findFirst({
-        where: {
-          resetToken: token,
-          resetTokenExpiry: {
-            gt: now,
-          },
-        },
-      });
-
-      if (!user) {
-        return false;
-      }
-
-      // Hash the new password
-      const hashedPassword = await this.hashPassword(newPassword);
-
-      // Update user with new password
-      await this.prisma.user.update({
-        where: { id: user.id },
-        data: {
-          password: hashedPassword,
-          resetToken: null,
-          resetTokenExpiry: null,
-        },
-      });
-
-      return true;
-    } catch (error: unknown) {
-      this.logger.error(`Error during password reset: ${this.getErrorMessage(error)}`);
-      return false;
-    }
-  }
-
-  /**
    * Generates a 6-digit login code for email verification login
+   * Combined login/registration flow - will work for new or existing users
    * @param email User email
    * @returns True if login code was sent successfully, false otherwise
    */
@@ -304,10 +178,8 @@ export class AuthService {
         where: { email },
       });
 
-      if (!user) {
-        // Return true even if user doesn't exist to prevent user enumeration
-        return true;
-      }
+      // We'll generate and send a code regardless of whether the user exists
+      // This will handle both login and registration via the same flow
 
       // Generate a random 6-digit code
       const loginCode = Math.floor(100000 + Math.random() * 900000).toString();
@@ -316,14 +188,32 @@ export class AuthService {
       const loginCodeExpiry = new Date();
       loginCodeExpiry.setMinutes(loginCodeExpiry.getMinutes() + 15);
 
-      // Update user with login code
-      await this.prisma.user.update({
-        where: { id: user.id },
-        data: {
-          loginCode,
-          loginCodeExpiry,
-        },
-      });
+      // If user exists, update with login code
+      if (user) {
+        await this.prisma.user.update({
+          where: { id: user.id },
+          data: {
+            loginCode,
+            loginCodeExpiry,
+          },
+        });
+      } else {
+        // If user doesn't exist, create a new user with the login code
+        // This creates a minimal user record that will be completed after verification
+        await this.prisma.user.create({
+          data: {
+            email,
+            loginCode,
+            loginCodeExpiry,
+            role: UserRole.PARTICIPANT,
+            firstName: '', // These will be updated after verification
+            lastName: '', // These will be updated after verification
+            isEmailVerified: false,
+          },
+        });
+        
+        this.logger.log(`Created new user with email: ${email} (pending verification)`);  
+      }
 
       // Send login code email
       await this.sendLoginCodeEmail(email, loginCode);
@@ -356,6 +246,7 @@ export class AuthService {
 
   /**
    * Validates login code for email verification login
+   * Combined login/registration flow - creates a new user if one doesn't exist
    * @param email User email
    * @param code Login code
    * @returns User object if code is valid, null otherwise
@@ -364,8 +255,8 @@ export class AuthService {
     try {
       const now = new Date();
 
-      // Find user with the provided email and valid login code
-      const user = await this.prisma.user.findFirst({
+      // Step 1: Find user with matching email and authorization code
+      let user = await this.prisma.user.findFirst({
         where: {
           email,
           loginCode: code,
@@ -376,20 +267,23 @@ export class AuthService {
       });
 
       if (!user) {
+        // Invalid or expired code
         return null;
       }
 
-      // Clear the login code after successful validation
-      await this.prisma.user.update({
+      // Step 2: Clear the login code after successful validation
+      const updatedUser = await this.prisma.user.update({
         where: { id: user.id },
         data: {
           loginCode: null,
           loginCodeExpiry: null,
+          // If this is the first time they're verifying their email, mark it as verified
+          isEmailVerified: true,
         },
       });
 
-      // Return user without password
-      const { password, ...result } = user;
+      // Return user without password field
+      const { password: _, ...result } = updatedUser;
       return result;
     } catch (error: unknown) {
       this.logger.error(`Error validating login code: ${this.getErrorMessage(error)}`);
@@ -398,20 +292,11 @@ export class AuthService {
   }
 
   /**
-   * Hash a password
-   * @param password Plain text password
-   * @returns Hashed password
-   */
-  private async hashPassword(password: string): Promise<string> {
-    const saltRounds = 10;
-    const salt = await bcrypt.genSalt(saltRounds);
-    return bcrypt.hash(password, salt);
-  }
-
-  /**
-   * Safely get error message
+   * Safely get error message from any error type
+   * @param error The error to extract a message from
+   * @returns A string representation of the error
    */
   private getErrorMessage(error: unknown): string {
-    return error instanceof Error ? error.message : 'Unknown error';
+    return error instanceof Error ? error.message : String(error);
   }
 }

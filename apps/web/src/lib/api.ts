@@ -11,14 +11,87 @@ export const api = axios.create({
   },
 });
 
-// Add auth token to requests
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+/**
+ * API Interceptors
+ * 
+ * With HTTP-only cookies, we don't need to manually attach tokens to requests
+ * The browser will automatically send cookies with the request
+ * 
+ * We still have interceptors for:
+ * 1. Response error handling for 401 Unauthorized (token expired)
+ * 2. Automatic token refresh when needed
+ */
+let isRefreshing = false;
+let failedQueue: { resolve: (value: unknown) => void; reject: (reason?: unknown) => void }[] = [];
+
+// Process failed requests queue after token refresh
+const processQueue = (error: Error | null, token: string | null = null) => {
+  failedQueue.forEach(promise => {
+    if (error) {
+      promise.reject(error);
+    } else {
+      promise.resolve(token);
+    }
+  });
+  
+  failedQueue = [];
+};
+
+// Response interceptor for handling 401 errors and token refresh
+api.interceptors.response.use(
+  response => response,
+  async error => {
+    const originalRequest = error.config;
+    
+    // If error response is 401 and we haven't already tried to refresh
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      if (isRefreshing) {
+        // If we're already refreshing, add this request to the queue
+        return new Promise((resolve, reject) => {
+          failedQueue.push({ resolve, reject });
+        })
+          .then(() => {
+            return api(originalRequest);
+          })
+          .catch(err => {
+            return Promise.reject(err);
+          });
+      }
+
+      originalRequest._retry = true;
+      isRefreshing = true;
+
+      try {
+        // Attempt to refresh the token
+        const refreshed = await auth.refreshToken();
+        
+        if (refreshed) {
+          // If refresh successful, process the queue and retry the original request
+          processQueue(null);
+          return api(originalRequest);
+        } else {
+          // If refresh failed, reject all queued requests
+          processQueue(new Error('Refresh token failed'));
+          
+          // Redirect to login page
+          window.location.href = '/login';
+          return Promise.reject(error);
+        }
+      } catch (refreshError) {
+        // Handle refresh error
+        processQueue(refreshError instanceof Error ? refreshError : new Error('Unknown refresh error'));
+        
+        // Redirect to login page
+        window.location.href = '/login';
+        return Promise.reject(refreshError);
+      } finally {
+        isRefreshing = false;
+      }
+    }
+    
+    return Promise.reject(error);
   }
-  return config;
-});
+);
 
 // Response schemas
 export const UserSchema = z.object({
@@ -74,26 +147,102 @@ export type CoreConfig = z.infer<typeof CoreConfigSchema>;
 
 // API Functions
 export const auth = {
-  login: async (email: string, password: string) => {
-    const response = await api.post<AuthResponse>('/auth/login', { email, password });
+  /**
+   * Request an email verification code to be sent for login/registration
+   */
+  requestVerificationCode: async (email: string) => {
+    return await api.post('/auth/request-login-code', { email });
+  },
+  
+  /**
+   * Verify email code and login or register the user
+   */
+  verifyCode: async (email: string, code: string) => {
+    const response = await api.post<AuthResponse>('/auth/login-with-code', { email, code });
     return AuthResponseSchema.parse(response.data);
   },
   
-  register: async (data: {
-    email: string;
-    password: string;
+  /**
+   * Complete registration with additional user details
+   * Only required for new users after verifying email
+   * 
+   * Note: This endpoint is not yet implemented in the backend.
+   * For now, we'll use the regular register endpoint as a fallback.
+   */
+  completeRegistration: async (data: {
     firstName: string;
     lastName: string;
     playaName?: string;
   }) => {
-    const response = await api.post<AuthResponse>('/auth/register', data);
+    // Since the complete-registration endpoint doesn't exist yet,
+    // we'll use the register endpoint as a fallback
+    // This will need to be updated once the backend implements the endpoint
+    const response = await api.post<AuthResponse>('/auth/register', {
+      ...data,
+      email: localStorage.getItem('pendingRegistrationEmail') || '',
+      password: 'temporary-password', // This will be replaced with a proper flow later
+    });
     return AuthResponseSchema.parse(response.data);
   },
   
+  /**
+   * Get the current user profile
+   */
   getProfile: async () => {
     const response = await api.get<User>('/auth/profile');
     return UserSchema.parse(response.data);
   },
+  
+  /**
+   * Refresh the authentication token
+   * 
+   * Note: This endpoint is not yet implemented in the backend.
+   * For now, we'll use a mock implementation that always returns true.
+   */
+  refreshToken: async () => {
+    // Since the refresh endpoint doesn't exist yet, we'll mock it
+    // This will need to be updated once the backend implements the endpoint
+    try {
+      // Try to access a protected endpoint to see if our token is still valid
+      await api.get('/auth/profile');
+      return true;
+    } catch {
+      // If we get any error, our token is likely invalid
+      return false;
+    }
+  },
+  
+  /**
+   * Logout the user and clear cookies
+   * 
+   * Note: This endpoint is not yet implemented in the backend.
+   * For now, we'll just clear local state and cookies on the client side.
+   */
+  logout: async () => {
+    // Since the logout endpoint doesn't exist yet, we'll just clear local state
+    // This will need to be updated once the backend implements the endpoint
+    localStorage.clear();
+    // Clear all cookies by setting them to expire in the past
+    document.cookie.split(';').forEach(cookie => {
+      document.cookie = cookie.replace(/^ +/, '').replace(/=.*/, '=;expires=' + new Date().toUTCString() + ';path=/');
+    });
+    return { data: { success: true } };
+  },
+  
+  /**
+   * Check if the user is currently authenticated
+   * This makes a lightweight API call to validate the current session
+   */
+  checkAuth: async () => {
+    try {
+      // Use the test auth endpoint to check authentication
+      const response = await api.get<{ message: string }>('/auth/test');
+      return response.data.message === 'Authentication is working';
+    } catch {
+      // Intentionally ignoring error and returning false for failed auth check
+      return false;
+    }
+  }
 };
 
 export const config = {
