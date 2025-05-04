@@ -3,7 +3,7 @@ import { User } from '../types';
 
 interface AuthContextType {
   user: User | null;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string) => Promise<void>;
   logout: () => void;
   isLoading: boolean;
 }
@@ -31,7 +31,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  const login = async (email: string, password: string) => {
+  const login = async (email: string) => {
     setIsLoading(true);
     try {
       // Mock login - in a real application, this would call an API
