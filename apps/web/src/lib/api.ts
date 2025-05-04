@@ -179,7 +179,7 @@ export const auth = {
     // This will need to be updated once the backend implements the endpoint
     const response = await api.post<AuthResponse>('/auth/register', {
       ...data,
-      email: localStorage.getItem('pendingRegistrationEmail') || '',
+      email: localStorage.getItem('pendingLoginEmail') || '',
       password: 'temporary-password', // This will be replaced with a proper flow later
     });
     return AuthResponseSchema.parse(response.data);
