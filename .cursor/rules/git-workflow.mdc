@@ -16,6 +16,7 @@ alwaysApply: false
 ## Commits
 
 - Make atomic commits (one logical change per commit)
+- Do not bypass signing commits
 - Use descriptive commit messages following this format:
   ```
   <type>(<scope>): <short summary>
@@ -47,7 +48,7 @@ alwaysApply: false
 
 1. Update local develop branch
 2. Create feature branch
-3. Make changes with frequent, atomic commits
+3. Make changes with frequent, atomic commits (signed)
 4. Write or update tests
 5. Open PR against develop
 6. Address review feedback
@@ -58,6 +59,7 @@ alwaysApply: false
 - Check off items as you progress
 - Commit changes to git after each checked item
 - Use meaningful commit messages
+- Do not bypass signing commits
 
 ## Release Process
 

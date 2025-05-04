@@ -6,7 +6,7 @@ This project involves building a full-stack web application for managing annual 
 
 - When planning multiple terminal commands, it's ok to `&&` them
   - Example: if doing a `mkdir -p ...` followed by `touch ...` just do one command `mkdir -p ... && touch ...`.
-- When working from a checklist document, keep the checklist up to date by checking off items as you progress. Commit changes to git after each cheked item.
+- When working from a checklist document, keep the checklist up to date by checking off items as you progress. Commit changes to git after each cheked item. Do not bypass signing commits.
 
 ## Development instructions
 
