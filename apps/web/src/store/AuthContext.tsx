@@ -105,9 +105,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     
     try {
       await auth.requestVerificationCode(email);
-      // Store email for registration flow if needed
+      // Store email for login/registration flow if needed
       if (email) {
-        localStorage.setItem('pendingRegistrationEmail', email);
+        localStorage.setItem('pendingLoginEmail', email);
       }
     } catch (err) {
       setError('Failed to send verification code. Please try again.');
@@ -147,7 +147,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       });
       
       // Clear any stored email after successful verification
-      localStorage.removeItem('pendingRegistrationEmail');
+      localStorage.removeItem('pendingLoginEmail');
     } catch (err) {
       setError('Invalid verification code. Please try again.');
       console.error('Verification failed:', err);

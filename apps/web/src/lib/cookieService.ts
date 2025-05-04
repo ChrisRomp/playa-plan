@@ -11,8 +11,8 @@ export const AUTH_STATUS_COOKIE = 'auth_state';
 
 // Default cookie settings
 const DEFAULT_COOKIE_OPTIONS = {
-  // Prevents JavaScript access (protects against XSS)
-  httpOnly: true,
+  // Note: httpOnly cannot be set via client-side JavaScript
+  // It can only be set by the server in HTTP responses
   // Only sent over HTTPS (except in development)
   secure: process.env.NODE_ENV === 'production',
   // Reasonable CSRF protection while allowing redirects
@@ -38,17 +38,20 @@ export interface CookieOptions {
 
 /**
  * Sets a cookie with the specified name, value, and options
- * Note: This function is only used for client-side cookies, not HTTP-only cookies
- * HTTP-only cookies can only be set by the server in HTTP responses
+ * Note: This function is only used for client-side cookies
+ * 
+ * IMPORTANT: The httpOnly flag in options is ignored when set client-side.
+ * HttpOnly cookies can ONLY be set by the server in HTTP responses.
+ * This attribute is included in the interface for documentation purposes only.
  */
 export function setCookie(name: string, value: string, options: CookieOptions = {}): void {
   const cookieOptions = { ...DEFAULT_COOKIE_OPTIONS, ...options };
   
   let cookieString = `${encodeURIComponent(name)}=${encodeURIComponent(value)}`;
   
-  if (cookieOptions.httpOnly) {
-    cookieString += '; HttpOnly';
-  }
+  // Note: Setting httpOnly via client-side JavaScript has no effect
+  // This property is ignored by browsers when set via document.cookie
+  // It's included in the options for documentation consistency only
   
   if (cookieOptions.secure) {
     cookieString += '; Secure';
@@ -122,9 +125,9 @@ export function deleteCookie(name: string, options: CookieOptions = {}): void {
  * The actual tokens are managed by the server via HTTP-only cookies
  */
 export const setAuthenticatedState = async (): Promise<void> => {
-  // We use a non-HTTP-only cookie to track auth state on the client
+  // We use a regular cookie to track auth state on the client
   // This is safe because it contains no sensitive information
-  setCookie(AUTH_STATUS_COOKIE, 'authenticated', { httpOnly: false });
+  setCookie(AUTH_STATUS_COOKIE, 'authenticated');
 };
 
 /**

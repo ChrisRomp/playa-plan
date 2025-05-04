@@ -25,7 +25,7 @@ const LoginForm: React.FC = () => {
     // Always reset loading state on component mount
     setLocalLoading(false);
     
-    const savedEmail = localStorage.getItem('pendingRegistrationEmail');
+    const savedEmail = localStorage.getItem('pendingLoginEmail');
     if (savedEmail) {
       setEmail(savedEmail);
       setCodeSent(true);
