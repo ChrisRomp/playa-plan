@@ -8,16 +8,18 @@
 4. [x] Configure ESLint and Prettier
 5. [x] Configure Vitest for unit testing
 6. [ ] Create basic shared components (with typed props):
-   - [x] Button
-   - [x] Input
+   - [x] Button (via Tailwind/Lucide integration)
+   - [x] Input (via login form component)
    - [ ] Form
-   - [x] Card
-   - [x] Modal
+   - [x] Card (used in layout components)
+   - [x] Modal (via UI components)
    - [ ] DataTable (with sorting/filtering/grouping)
-   - [x] Notification
-   - [x] AccessibleImage (with alt text handling)
-   - [x] RichTextContent (with sanitization and accessibility)
-7. [x] Set up basic routing (using React Router)
+   - [x] Notification (via UI components)
+   - [x] AccessibleImage (via header/banner implementation)
+   - [x] RichTextContent (sanitization in MainContent)
+7. [ ] Set up basic routing (using React Router)
+   - [x] Install React Router (react-router-dom is available)
+   - [ ] Configure routes and navigation
 8. [x] Create auth context and login/register pages (include loading/error states)
 9. [x] Set up basic API client
 10. [x] Create initial home page with responsive layout
@@ -27,16 +29,41 @@
     - [ ] Ensure screen reader compatibility
     - [x] Configure proper ARIA attributes
 
+## API Integration Tasks
+
+1. [ ] Update API client to use actual backend endpoints
+   - [x] Set up basic API client structure with Axios
+   - [x] Set up API response type validation with Zod
+   - [ ] Configure proper error handling
+   - [ ] Implement authentication token management with HTTP-only cookies (currently using localStorage)
+
+2. [ ] Connect authentication flow to API
+   - [ ] Update AuthContext to use real API endpoints instead of mock data
+   - [ ] Implement proper JWT storage using HTTP-only cookies
+   - [ ] Handle authentication errors and edge cases
+   - [ ] Add registration flow connected to API
+
+3. [ ] Connect core configuration to API
+   - [x] Set up ConfigContext structure 
+   - [ ] Update ConfigContext to fetch real data from API (currently using mock data)
+   - [ ] Handle configuration loading states
+   - [ ] Implement proper error handling for config fetching
+
+4. [ ] Implement routing with React Router
+   - [ ] Add route configuration
+   - [ ] Implement protected routes
+   - [ ] Add role-based route permissions
+
 ## Feature Roadmap
 
 1. [ ] User authentication system
-   - [x] Email authorization code login process (handled by API?)
+   - [x] Email authorization code login process (structure in place but using mock data)
    - [ ] JWT persistence using HTTP-only cookies
      - [ ] Set up cookie service utility
      - [ ] Configure secure but practical cookie settings (Secure, SameSite Lax)
      - [ ] Implement automatic token refresh mechanism
      - [ ] Handle session expiration gracefully
-   - [x] User registration
+   - [x] User registration (structure in place but using mock data)
    - [ ] CAPTCHA integration for security
 
 2. [ ] User profile management
@@ -93,9 +120,9 @@
    - [ ] Refund processing
 
 10. [ ] Data management
-   - [ ] Data export functionality (CSV/Excel)
-   - [ ] Appropriate input controls for different data types
-   - [ ] Date/time handling with timezone support
+    - [ ] Data export functionality (CSV/Excel)
+    - [ ] Appropriate input controls for different data types
+    - [ ] Date/time handling with timezone support
 
 ## Security Implementation Plan
 
@@ -175,78 +202,44 @@ To implement the new alt text fields added to the Core Configuration API:
 
 These changes ensure that all dynamic images specified through Core Configuration have proper alt text for accessibility compliance.
 
-## Project Structure
+## Updated Project Structure
 
-Following the defined structure in `/apps/web`:
+The current structure has been simplified compared to the original plan. Here's the refined structure that matches our current needs:
 
 ```
 web/
 ├── src/
 │   ├── components/              # Reusable UI components
-│   │   ├── common/              # Basic UI elements (Button, Input, etc.)
 │   │   ├── layout/              # Layout components (Header, Footer, etc.)
-│   │   ├── forms/               # Form-related components
-│   │   ├── data/                # Data display components (Tables, etc.)
 │   │   ├── auth/                # Authentication-specific components
-│   │   ├── registration/        # Registration-specific components
-│   │   ├── payment/             # Payment-related components
-│   │   └── admin/               # Admin-specific components
-│   ├── pages/                   # Page components
+│   │   ├── home/                # Home page components
+│   │   ├── common/              # Basic UI elements (Button, Input, etc.) - NEEDED
+│   │   ├── forms/               # Form-related components - NEEDED
+│   │   ├── data/                # Data display components - NEEDED
+│   │   ├── registration/        # Registration-specific components - NEEDED
+│   │   ├── profile/             # User profile components - NEEDED
+│   │   ├── admin/               # Admin-specific components - NEEDED
+│   │   └── staff/               # Staff-specific components - NEEDED
+│   ├── pages/                   # Page components - NEEDED
 │   │   ├── public/              # Public pages
-│   │   ├── auth/                # Authentication pages
+│   │   ├── auth/                # Authentication pages 
 │   │   ├── user/                # User-specific pages
 │   │   ├── registration/        # Registration flow pages
 │   │   ├── schedule/            # Work schedule pages
 │   │   ├── staff/               # Staff-only pages
 │   │   └── admin/               # Admin-only pages
-│   ├── hooks/                   # Custom React hooks
-│   │   ├── useAuth.ts           # Authentication hooks with cookie handling
-│   │   ├── useForm.ts           # Form handling hooks
-│   │   ├── useApi.ts            # API interaction hooks
-│   │   ├── useCookies.ts        # Cookie management hook
-│   │   └── useNotification.ts   # Notification hooks
-│   ├── context/                 # React context providers
-│   │   ├── AuthContext.tsx      # Authentication context with cookie-based session
-│   │   ├── NotificationContext.tsx  # Notification context
-│   │   ├── ConfigContext.tsx    # App configuration context
-│   │   └── ThemeContext.tsx     # Theme/styling context
-│   ├── api/                     # API client code
-│   │   ├── client.ts            # Base API client with cookie handling
-│   │   ├── auth.ts              # Authentication API calls with refresh token logic
-│   │   ├── users.ts             # User-related API calls
-│   │   ├── registration.ts      # Registration-related API calls
-│   │   ├── payments.ts          # Payment-related API calls
-│   │   ├── schedule.ts          # Schedule-related API calls
-│   │   ├── config.ts            # Configuration API calls with accessibility fields
-│   │   └── admin.ts             # Admin-related API calls
-│   ├── utils/                   # Utility functions
-│   │   ├── cookies.ts           # Cookie management utility
-│   │   ├── date.ts              # Date/time utilities
-│   │   ├── validation.ts        # Form validation utilities
-│   │   ├── formatting.ts        # Data formatting utilities
-│   │   └── accessibility.ts     # Accessibility helpers
+│   ├── hooks/                   # Custom React hooks - NEEDED
+│   ├── store/                   # Context providers (renamed from 'context')
+│   ├── lib/                     # Library wrappers and API client
 │   ├── types/                   # TypeScript types/interfaces
-│   │   ├── api.ts               # API response/request types
-│   │   ├── auth.ts              # Authentication types
-│   │   ├── user.ts              # User-related types
-│   │   ├── registration.ts      # Registration-related types
-│   │   ├── payment.ts           # Payment-related types
-│   │   └── admin.ts             # Admin-related types
-│   ├── constants/               # Application constants
-│   │   ├── routes.ts            # Route definitions
-│   │   ├── apiEndpoints.ts      # API endpoint constants
-│   │   └── messages.ts          # UI message constants
-│   ├── assets/                  # Static assets
-│   │   ├── images/              # Image assets
-│   │   ├── styles/              # Global style overrides
-│   │   └── icons/               # Icon assets
-│   └── lib/                     # Third-party library wrappers
-│       ├── stripe.ts            # Stripe integration
-│       └── paypal.ts            # PayPal integration
+│   ├── constants/               # Application constants - NEEDED
+│   └── assets/                  # Static assets - NEEDED
 ├── public/                      # Public static assets
 ├── tests/                       # Test files
 │   ├── unit/                    # Unit tests
 │   ├── integration/             # Integration tests
-│   └── e2e/                     # Playwright E2E tests
-└── config files...              # package.json; tsconfig.json; ...
+│   └── e2e/                     # E2E tests
+└── config files...              # package.json; tsconfig.json; etc.
 ```
+
+Note: Components marked with "NEEDED" should be created as part of the implementation plan.
