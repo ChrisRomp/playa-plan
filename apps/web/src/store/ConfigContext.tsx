@@ -19,13 +19,13 @@ export const useConfig = () => useContext(ConfigContext);
 
 // Mock data - in a real application, this would come from an API
 const mockConfig: CampConfig = {
-  name: "Camp Dusty Dreams",
-  description: "A place for dreamers in the dust",
+  name: "PlayaPlan",
+  description: "A Burning Man camp registration and planning tool",
   bannerUrl: "/images/playa-plan-banner.png",
   bannerAltText: "Desert landscape at sunset with art installations",
   iconUrl: "/icons/playa-plan-icon.png",
-  iconAltText: "Camp Dusty Dreams camp icon",
-  homePageBlurb: "<h2>Welcome to Camp Dusty Dreams!</h2><p>Join us for an unforgettable experience in the desert. Our camp provides a supportive community for creativity, self-expression, and radical inclusion.</p><p>Register now to secure your spot and sign up for shifts to help keep our camp running smoothly.</p>",
+  iconAltText: "PlayaPlan camp icon",
+  homePageBlurb: "<h2>Welcome to PlayaPlan.</h2><p>Please log in as an admin and configure your site.</p>",
   registrationOpen: true,
   earlyRegistrationOpen: true,
   currentYear: 2025
