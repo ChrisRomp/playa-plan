@@ -50,6 +50,15 @@ export class CoreConfig {
   campBannerUrl!: string | null;
 
   /**
+   * Alt text for the camp banner image (for accessibility)
+   */
+  @ApiProperty({
+    description: 'Alt text for the camp banner image (for accessibility)',
+    example: 'Beautiful sunset view of Camp Awesome with mountains in the background'
+  })
+  campBannerAltText!: string | null;
+
+  /**
    * Camp icon URL
    */
   @ApiProperty({
@@ -57,6 +66,15 @@ export class CoreConfig {
     example: 'https://example.com/icon.png'
   })
   campIconUrl!: string | null;
+
+  /**
+   * Alt text for the camp icon image (for accessibility)
+   */
+  @ApiProperty({
+    description: 'Alt text for the camp icon image (for accessibility)',
+    example: 'Camp Awesome logo with a stylized tent icon'
+  })
+  campIconAltText!: string | null;
 
   /**
    * Registration year

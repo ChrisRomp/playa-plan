@@ -218,7 +218,9 @@ model CoreConfig {
   campDescription          String?
   homePageBlurb            String?
   campBannerUrl            String?
+  campBannerAltText        String?
   campIconUrl              String?
+  campIconAltText          String?
   registrationYear         Int
   earlyRegistrationOpen    Boolean    @default(false)
   registrationOpen         Boolean    @default(false)

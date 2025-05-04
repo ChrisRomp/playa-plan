@@ -1,6 +1,6 @@
 ---
-description: 
-globs: apps/web/**
+description:
+globs:
 alwaysApply: false
 ---
 ## Technology Choices (Simple Stack)
@@ -20,6 +20,8 @@ Keeping simplicity in mind, we'll use:
 
 ## Development
 
-- Use [Web-tasks.md](mdc:../../Web-tasks.md) to track work, checking off items as we progress.
+- Use [frontend-tasks.md](../../docs/frontend-tasks.md) to track work, checking off items as we progress.
+- Reference [frontend-spec.md](../../docs/frontend-spec.md)
 - Unit test modules before completing the tasks
 - Create git commits after each task; local only, do not push
+- Do not bypass signing commits

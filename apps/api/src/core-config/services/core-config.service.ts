@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { CreateCoreConfigDto, UpdateCoreConfigDto } from '../dto';
 import { CoreConfig } from '../entities/core-config.entity';
+import { CoreConfig as PrismaCoreConfig, Prisma } from '@prisma/client';
 
 /**
  * Service for managing core site configuration
@@ -17,14 +18,16 @@ export class CoreConfigService {
   /**
    * Helper to map Prisma CoreConfig to entity
    */
-  private mapToEntity(config: any): CoreConfig {
+  private mapToEntity(config: PrismaCoreConfig): CoreConfig {
     return new CoreConfig({
       id: config.id,
       campName: config.campName,
       campDescription: config.campDescription,
       homePageBlurb: config.homePageBlurb,
       campBannerUrl: config.campBannerUrl,
+      campBannerAltText: config.campBannerAltText,
       campIconUrl: config.campIconUrl,
+      campIconAltText: config.campIconAltText,
       registrationYear: config.registrationYear,
       earlyRegistrationOpen: config.earlyRegistrationOpen,
       registrationOpen: config.registrationOpen,
@@ -72,7 +75,9 @@ export class CoreConfigService {
           campDescription: createCoreConfigDto.campDescription ?? null,
           homePageBlurb: createCoreConfigDto.homePageBlurb ?? null,
           campBannerUrl: createCoreConfigDto.campBannerUrl ?? null,
+          campBannerAltText: createCoreConfigDto.campBannerAltText ?? null,
           campIconUrl: createCoreConfigDto.campIconUrl ?? null,
+          campIconAltText: createCoreConfigDto.campIconAltText ?? null,
           registrationYear: createCoreConfigDto.registrationYear,
           earlyRegistrationOpen: createCoreConfigDto.earlyRegistrationOpen ?? false,
           registrationOpen: createCoreConfigDto.registrationOpen ?? false,
@@ -172,12 +177,14 @@ export class CoreConfigService {
       await this.findOne(id);
       
       // Map DTO fields to Prisma model fields
-      const data: any = {};
+      const data: Prisma.CoreConfigUpdateInput = {};
       if (updateCoreConfigDto.campName !== undefined) data.campName = updateCoreConfigDto.campName;
       if (updateCoreConfigDto.campDescription !== undefined) data.campDescription = updateCoreConfigDto.campDescription;
       if (updateCoreConfigDto.homePageBlurb !== undefined) data.homePageBlurb = updateCoreConfigDto.homePageBlurb;
       if (updateCoreConfigDto.campBannerUrl !== undefined) data.campBannerUrl = updateCoreConfigDto.campBannerUrl;
+      if (updateCoreConfigDto.campBannerAltText !== undefined) data.campBannerAltText = updateCoreConfigDto.campBannerAltText;
       if (updateCoreConfigDto.campIconUrl !== undefined) data.campIconUrl = updateCoreConfigDto.campIconUrl;
+      if (updateCoreConfigDto.campIconAltText !== undefined) data.campIconAltText = updateCoreConfigDto.campIconAltText;
       if (updateCoreConfigDto.registrationYear !== undefined) data.registrationYear = updateCoreConfigDto.registrationYear;
       if (updateCoreConfigDto.earlyRegistrationOpen !== undefined) data.earlyRegistrationOpen = updateCoreConfigDto.earlyRegistrationOpen;
       if (updateCoreConfigDto.registrationOpen !== undefined) data.registrationOpen = updateCoreConfigDto.registrationOpen;

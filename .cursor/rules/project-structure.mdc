@@ -146,57 +146,5 @@ common/testing/
 
 ## Web frontend detail `/apps/web`
 
-```text
-web/
-├── src/
-│   ├── components/
-│   │   ├── Button/
-│   │   │   ├── Button.tsx
-│   │   │   ├── Button.test.tsx          # Component unit tests
-│   │   │   └── Button.stories.tsx       # Component stories (if using Storybook)
-│   │   └── Form/
-│   │       ├── Form.tsx
-│   │       └── Form.test.tsx
-│   ├── pages/
-│   │   ├── Home/
-│   │   │   ├── Home.tsx
-│   │   │   └── Home.test.tsx            # Page component tests
-│   │   └── Profile/
-│   │       ├── Profile.tsx
-│   │       └── Profile.test.tsx
-│   ├── hooks/
-│   │   ├── useAuth.ts
-│   │   └── useAuth.test.ts              # Custom hook tests
-│   ├── auth/
-│   ├── api/                             # API utilities or React Query configs
-│   │   ├── users.api.ts
-│   │   └── users.api.test.ts            # API call tests
-│   ├── types/                           # Local or imported shared types
-│   └── styles/
-│   └── __tests__/
-│       └── integration/                 # Integration tests with component interactions
-│           └── auth-flow.test.tsx
-├── public/
-├── package.json
-└── tailwind.config.js
-```
+Reference [frontend-spec.md](../../docs/frontend-spec.md)
 
-## Shared libraries `/libs`
-
-```text
-libs/
-├── types/
-│   └── index.ts                # Shared interfaces (User, Job, etc.)
-├── constants/
-│   └── roles.ts                # e.g., export enum UserRole { ADMIN, STAFF, PARTICIPANT }
-├── validation/
-│   ├── signup.schema.ts        # Zod or class-validator shared schemas
-│   └── signup.schema.spec.ts   # Tests for validation schemas
-├── utils/
-│   ├── dateHelpers.ts          # Time/formatting helpers shared across apps
-│   └── dateHelpers.spec.ts     # Tests for utility functions
-└── testing/                    # Shared testing utilities
-    ├── test-setup.ts           # Common test setup for libs
-    └── mocks/                  # Shared mocks
-        └── api-response.mock.ts
-```

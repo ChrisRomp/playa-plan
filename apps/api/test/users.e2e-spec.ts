@@ -7,12 +7,45 @@ import { UserRole } from '@prisma/client';
 import { JwtService } from '@nestjs/jwt';
 import { Prisma } from '@prisma/client';
 
+// Define types for the mocks
+type MockPrismaService = {
+  user: {
+    findMany: jest.Mock;
+    findUnique: jest.Mock;
+    findFirst: jest.Mock;
+    create: jest.Mock;
+    update: jest.Mock;
+    delete: jest.Mock;
+    count: jest.Mock;
+  };
+  $connect: jest.Mock;
+  $disconnect: jest.Mock;
+  $transaction: jest.Mock;
+};
+
+type UserType = {
+  id: string;
+  email: string;
+  password: string;
+  firstName: string;
+  lastName: string;
+  playaName: string | null;
+  profilePicture: string | null;
+  role: UserRole;
+  isEmailVerified: boolean;
+  verificationToken: string | null;
+  resetToken: string | null;
+  resetTokenExpiry: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
 describe('UsersController (e2e)', () => {
   let app: INestApplication;
-  let prismaMock: any;
+  let prismaMock: MockPrismaService;
   let jwtService: JwtService;
 
-  const mockUser = {
+  const mockUser: UserType = {
     id: 'test-uuid-e2e',
     email: 'test-e2e@example.com',
     password: 'hashed_password',
@@ -29,14 +62,14 @@ describe('UsersController (e2e)', () => {
     updatedAt: new Date(),
   };
 
-  const mockAdmin = {
+  const mockAdmin: UserType = {
     ...mockUser,
     id: 'admin-uuid-e2e',
     email: 'admin-e2e@example.com',
     role: UserRole.ADMIN,
   };
 
-  const mockStaff = {
+  const mockStaff: UserType = {
     ...mockUser,
     id: 'staff-uuid-e2e',
     email: 'staff-e2e@example.com',
@@ -44,7 +77,7 @@ describe('UsersController (e2e)', () => {
   };
 
   // Helper to create authentication tokens for testing
-  const getAuthToken = (user: any) => {
+  const getAuthToken = (user: UserType) => {
     return jwtService.sign({ sub: user.id, email: user.email, role: user.role });
   };
 

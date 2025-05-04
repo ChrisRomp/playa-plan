@@ -68,6 +68,19 @@ export class UpdateCoreConfigDto {
   campBannerUrl?: string;
 
   /**
+   * Alt text for the camp banner image (for accessibility)
+   */
+  @ApiProperty({
+    description: 'Alt text for the camp banner image (for accessibility)',
+    example: 'Beautiful sunset view of Camp Awesome with mountains in the background',
+    required: false
+  })
+  @IsString()
+  @IsOptional()
+  @Length(1, 250)
+  campBannerAltText?: string;
+
+  /**
    * Camp icon URL
    */
   @ApiProperty({
@@ -78,6 +91,19 @@ export class UpdateCoreConfigDto {
   @IsUrl()
   @IsOptional()
   campIconUrl?: string;
+
+  /**
+   * Alt text for the camp icon image (for accessibility)
+   */
+  @ApiProperty({
+    description: 'Alt text for the camp icon image (for accessibility)',
+    example: 'Camp Awesome logo with a stylized tent icon',
+    required: false
+  })
+  @IsString()
+  @IsOptional()
+  @Length(1, 250)
+  campIconAltText?: string;
 
   /**
    * Registration year
