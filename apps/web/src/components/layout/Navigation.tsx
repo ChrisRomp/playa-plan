@@ -19,8 +19,8 @@ const Navigation: React.FC<NavigationProps> = ({
     if (closeMenu) closeMenu();
   };
   
-  const textColorClass = isScrolled || isMobile ? 'text-gray-800' : 'text-white';
-  const hoverClass = isScrolled || isMobile ? 'hover:text-blue-600' : 'hover:text-blue-300';
+  const textColorClass = isScrolled || isMobile ? 'text-amber-900' : 'text-white';
+  const hoverClass = isScrolled || isMobile ? 'hover:text-amber-600' : 'hover:text-amber-200';
   
   const linkClass = `flex items-center gap-2 px-4 py-2 ${textColorClass} ${hoverClass} transition-colors duration-200`;
   
