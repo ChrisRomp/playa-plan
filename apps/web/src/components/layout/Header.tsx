@@ -37,8 +37,10 @@ const Header: React.FC = () => {
     );
   }
 
-  const defaultBanner = 'https://images.pexels.com/photos/587976/pexels-photo-587976.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2';
+  const defaultBanner = '/images/playa-plan-banner.png';
+  const defaultIcon = '/icons/playa-plan-icon.png';
   const bannerUrl = config.bannerUrl || defaultBanner;
+  const iconUrl = config.iconUrl || defaultIcon;
 
   return (
     <>
@@ -56,20 +58,19 @@ const Header: React.FC = () => {
             opacity: isScrolled ? 0 : 1,
             filter: 'brightness(0.7)'
           }}
+          aria-hidden="true"
         />
         
         <div className="absolute inset-0 flex flex-col justify-between p-4 md:p-8">
           <div className="flex justify-between items-center relative z-20">
             <div className="flex items-center space-x-4">
-              {config.iconUrl && (
-                <img 
-                  src={config.iconUrl} 
-                  alt={`${config.name} icon`} 
-                  className={`rounded-full object-cover border-2 border-white transition-all duration-300 ${
-                    isScrolled ? 'w-8 h-8' : 'w-12 h-12'
-                  }`}
-                />
-              )}
+              <img 
+                src={iconUrl} 
+                alt={config.iconAltText || `${config.name} camp icon`}
+                className={`rounded-full object-cover border-2 border-white transition-all duration-300 ${
+                  isScrolled ? 'w-8 h-8' : 'w-12 h-12'
+                }`}
+              />
               <h1 className={`font-bold transition-all duration-300 ${
                 isScrolled ? 'text-gray-800 text-xl' : 'text-white text-2xl'
               }`}>

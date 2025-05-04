@@ -14,7 +14,9 @@ export interface CampConfig {
   name: string;
   description: string;
   bannerUrl?: string;
+  bannerAltText?: string;
   iconUrl?: string;
+  iconAltText?: string;
   homePageBlurb: string;
   registrationOpen: boolean;
   earlyRegistrationOpen: boolean;
