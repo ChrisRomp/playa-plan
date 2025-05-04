@@ -99,6 +99,10 @@ describe('CoreConfigController (e2e)', () => {
         campName: 'Test Camp',
         registrationYear: 2023,
         timeZone: 'America/Los_Angeles',
+        campBannerUrl: 'https://example.com/banner.jpg',
+        campBannerAltText: 'Beautiful test camp banner',
+        campIconUrl: 'https://example.com/icon.png',
+        campIconAltText: 'Test camp logo',
       };
 
       const response = await request(app.getHttpServer())
@@ -112,6 +116,10 @@ describe('CoreConfigController (e2e)', () => {
       expect(response.body.campName).toBe(createDto.campName);
       expect(response.body.registrationYear).toBe(createDto.registrationYear);
       expect(response.body.timeZone).toBe(createDto.timeZone);
+      expect(response.body.campBannerUrl).toBe(createDto.campBannerUrl);
+      expect(response.body.campBannerAltText).toBe(createDto.campBannerAltText);
+      expect(response.body.campIconUrl).toBe(createDto.campIconUrl);
+      expect(response.body.campIconAltText).toBe(createDto.campIconAltText);
 
       // Save the ID for later tests
       testConfigId = response.body.id;
@@ -169,7 +177,9 @@ describe('CoreConfigController (e2e)', () => {
     it('should update a configuration (admin only)', async () => {
       const updateDto = {
         campName: 'Updated Camp Name',
-        registrationOpen: true
+        registrationOpen: true,
+        campBannerAltText: 'Updated banner alt text for accessibility',
+        campIconAltText: 'Updated icon alt text for accessibility',
       };
 
       const response = await request(app.getHttpServer())
@@ -182,6 +192,8 @@ describe('CoreConfigController (e2e)', () => {
       expect(response.body.id).toBe(testConfigId);
       expect(response.body.campName).toBe(updateDto.campName);
       expect(response.body.registrationOpen).toBe(updateDto.registrationOpen);
+      expect(response.body.campBannerAltText).toBe(updateDto.campBannerAltText);
+      expect(response.body.campIconAltText).toBe(updateDto.campIconAltText);
     });
 
     it('should not allow regular users to update a configuration', async () => {
@@ -245,6 +257,10 @@ describe('CoreConfigController (e2e)', () => {
 
       expect(response.body).toBeDefined();
       expect(response.body.id).toBe(testConfigId);
+      
+      // Alt text fields should be included
+      expect(response.body.campBannerAltText).toBeDefined();
+      expect(response.body.campIconAltText).toBeDefined();
       
       // Sensitive fields should be excluded
       expect(response.body.stripeApiKey).toBeUndefined();

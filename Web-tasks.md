@@ -15,11 +15,17 @@
    - [ ] Modal
    - [ ] DataTable (with sorting/filtering/grouping)
    - [ ] Notification
+   - [ ] AccessibleImage (with alt text handling)
+   - [ ] RichTextContent (with sanitization and accessibility)
 7. [ ] Set up basic routing (using React Router)
 8. [ ] Create auth context and login/register pages (include loading/error states)
 9. [ ] Set up basic API client
 10. [ ] Create initial home page with responsive layout
 11. [ ] Implement WCAG 2.2 accessibility standards
+    - [ ] Implement proper focus management
+    - [ ] Add keyboard navigation support
+    - [ ] Ensure screen reader compatibility
+    - [ ] Configure proper ARIA attributes
 
 ## Feature Roadmap
 
@@ -75,6 +81,10 @@
 9. [ ] Admin pages
    - [ ] User management
    - [ ] Core configuration management
+     - [ ] Basic camp information settings
+     - [ ] Banner and icon configuration with alt text fields
+     - [ ] Registration settings management
+     - [ ] Payment processor configuration
    - [ ] Camping options configuration
    - [ ] Job/category management
    - [ ] Shift management
@@ -109,6 +119,60 @@ The application will use HTTP-only cookies for JWT storage with the following ap
    - Token structure will follow JWT best practices with minimal claims
 
 This approach balances security and usability for the camp registration system, which is not a high-security application but requires reasonable protection.
+
+## Accessibility Implementation Plan
+
+To ensure WCAG 2.2 compliance for dynamic content from Core Configuration:
+
+1. **Banner and Image Accessibility**
+   - Add `bannerAltText` field to Core Configuration to store descriptive alt text for banner images
+   - Add `iconAltText` field to Core Configuration for camp icon alt text
+   - Implement proper image loading patterns with fallbacks and loading states
+
+2. **Rich Text Content Accessibility**
+   - Sanitize HTML from campDescription and homePageBlurb
+   - Ensure proper heading structure in rendered HTML content
+   - Validate that dynamically-rendered HTML maintains semantic structure
+   - Check color contrast for dynamic content against backgrounds
+
+3. **Dynamic UI Components**
+   - Ensure all dynamic form fields have proper labels and ARIA attributes
+   - Implement keyboard navigation for dynamically-generated content
+   - Add focus management for dynamically-changing content
+   - Ensure all interactive elements have visible focus states
+
+4. **Responsive Design for Accessibility**
+   - Test dynamic content at various zoom levels (up to 400%)
+   - Ensure text reflow at higher zoom levels
+   - Test with screen readers to verify announcements of dynamic content changes
+
+These requirements will be integrated throughout the component development process to ensure all dynamically-specified visual elements are fully accessible.
+
+## API Accessibility Implementation Guide
+
+To implement the new alt text fields added to the Core Configuration API:
+
+1. **API Changes Already Made:**
+   - Added `campBannerAltText` and `campIconAltText` fields to the database schema
+   - Updated all relevant DTOs and service implementations
+   - Created database migrations
+
+2. **Web Implementation Requirements:**
+   - Update API client types to include new alt text fields
+   - Modify the `AccessibleImage` component to handle alt text from API
+   - Add alt text input fields to Core Configuration admin forms
+   - Implement fallback alt text logic when none is provided:
+     ```typescript
+     const altText = image.altText || `${campName} ${imageName}`; // Fallback
+     ```
+   - Add validation to ensure alt text is provided when images are uploaded/configured
+
+3. **Testing Considerations:**
+   - Test screen reader compatibility with dynamic images
+   - Verify alt text is properly associated with images
+   - Test fallback behavior when alt text is missing
+
+These changes ensure that all dynamic images specified through Core Configuration have proper alt text for accessibility compliance.
 
 ## Project Structure
 
@@ -152,6 +216,7 @@ web/
 │   │   ├── registration.ts      # Registration-related API calls
 │   │   ├── payments.ts          # Payment-related API calls
 │   │   ├── schedule.ts          # Schedule-related API calls
+│   │   ├── config.ts            # Configuration API calls with accessibility fields
 │   │   └── admin.ts             # Admin-related API calls
 │   ├── utils/                   # Utility functions
 │   │   ├── cookies.ts           # Cookie management utility
