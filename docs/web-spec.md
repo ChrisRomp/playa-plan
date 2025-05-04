@@ -7,14 +7,14 @@
 The header of the website should contain:
 
 - Hero Banner Image
-    - If no URL is specified, use src/assets/images/playa-plan-banner.png
+    - If no URL is specified, use public/images/playa-plan-banner.png
 - Overlay of Camp name
 - Subtext of Camp description
 - A collabsible "hamburger" menu if the menu is collapsed
 
 Camp name, camp description, and camp banner URL come from the Core Configuration data API.
 
-If the camp icon URL is not specified in configuration, use src/assets/images/playa-plan-icon.png.
+If the camp icon URL is not specified in configuration, use public/icons/playa-plan-icon.png.
 
 ### Menu
 

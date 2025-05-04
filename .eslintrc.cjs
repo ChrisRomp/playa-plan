@@ -1,27 +1,26 @@
 // .eslintrc.cjs
 module.exports = {
     root: true,
-    parser: '@typescript-eslint/parser',
-    plugins: ['@typescript-eslint'],
+    env: { browser: true, es2020: true },
     extends: [
       'eslint:recommended',
       'plugin:@typescript-eslint/recommended',
+      'plugin:react-hooks/recommended',
+      'plugin:jsx-a11y/recommended',
       'prettier'
     ],
-    env: {
-      node: true,
-      browser: true,
-      es2022: true
-    },
-    ignorePatterns: ['dist/', 'node_modules/', '*.config.js', '*.config.cjs'],
-    parserOptions: {
-      ecmaVersion: 'latest',
-      sourceType: 'module'
-    },
+    ignorePatterns: ['dist', '.eslintrc.cjs'],
+    parser: '@typescript-eslint/parser',
+    plugins: ['react-refresh', 'jsx-a11y'],
     rules: {
-      // Example: Customize here
-      '@typescript-eslint/no-unused-vars': ['warn'],
-      '@typescript-eslint/explicit-module-boundary-types': 'off'
+      'react-refresh/only-export-components': [
+        'warn',
+        { allowConstantExport: true },
+      ],
+      'jsx-a11y/alt-text': 'error',
+      'jsx-a11y/aria-props': 'error',
+      'jsx-a11y/aria-role': 'error',
+      'jsx-a11y/role-has-required-aria-props': 'error',
     }
   };
   

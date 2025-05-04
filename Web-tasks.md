@@ -30,7 +30,7 @@
 ## Feature Roadmap
 
 1. [ ] User authentication system
-   - [ ] Email authorization code login process
+   - [ ] Email authorization code login process (handled by API?)
    - [ ] JWT persistence using HTTP-only cookies
      - [ ] Set up cookie service utility
      - [ ] Configure secure but practical cookie settings (Secure, SameSite Lax)

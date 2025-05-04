@@ -6,12 +6,16 @@
         "libs/*"
     ],
     "scripts": {
+        "dev": "vite",
         "dev:api": "npm run dev --workspace=api",
         "dev:web": "npm run dev --workspace=web",
-        "build": "tsc -b apps/*",
-        "format": "prettier --write .",
-        "lint": "eslint . --ext .ts,.tsx,.js,.jsx",
-        "test": "jest",
+        "build": "tsc && vite build",
+        "format": "prettier --write \"src/**/*.{ts,tsx}\"",
+        "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+        "preview": "vite preview",
+        "test": "vitest run",
+        "test:watch": "vitest",
+        "test:coverage": "vitest run --coverage",
         "clean": "rimraf dist node_modules **/dist **/node_modules"
     },
     "devDependencies": {
