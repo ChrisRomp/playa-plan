@@ -92,24 +92,6 @@ const LoginForm: React.FC = () => {
           {isRegister ? 'Already have an account? Sign In' : 'Need an account? Register'}
         </button>
       </div>
-      
-      <div className="mt-6 text-center text-sm text-gray-500">
-        <p>
-          For demo purposes:
-        </p>
-        <p className="mt-1">
-          Use "admin@example.com" for admin access
-        </p>
-        <p>
-          Use "staff@example.com" for staff access
-        </p>
-        <p>
-          Use any other email for regular user access
-        </p>
-        <p className="mt-1">
-          (Any password will work)
-        </p>
-      </div>
     </div>
   );
 };
