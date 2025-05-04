@@ -28,7 +28,9 @@ export class AuthService {
    * @param email User email
    * @returns null - we use email verification instead
    */
-  async validateCredentials(_email: string): Promise<null> {
+  // We use this signature to maintain compatibility with Passport local strategy
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async validateCredentials(email: string): Promise<null> {
     this.logger.warn(`validateCredentials called but we use email verification flow instead`);
     return null;
   }
@@ -73,7 +75,8 @@ export class AuthService {
       await this.sendVerificationEmail(newUser.email, verificationToken);
 
       // Return user data without password
-      const { password: _, ...result } = newUser;
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { password, ...result } = newUser;
       return result;
     } catch (error: unknown) {
       this.logger.error(`Error during user registration: ${this.getErrorMessage(error)}`);
@@ -283,7 +286,8 @@ export class AuthService {
       });
 
       // Return user without password field
-      const { password: _, ...result } = updatedUser;
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { password, ...result } = updatedUser;
       return result;
     } catch (error: unknown) {
       this.logger.error(`Error validating login code: ${this.getErrorMessage(error)}`);
