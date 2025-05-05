@@ -8,7 +8,7 @@ declare module 'axios' {
   }
 }
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 // API client instance
 export const api = axios.create({
@@ -16,7 +16,23 @@ export const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  withCredentials: true, // Important: this ensures cookies are sent with requests
 });
+
+// Log API configuration for debugging
+console.log(`API client configured with baseURL: ${API_URL}`);
+
+// Add request interceptor for debugging
+api.interceptors.request.use(
+  (config) => {
+    console.log(`API Request: ${config.method?.toUpperCase()} ${config.url}`, config.data || '');
+    return config;
+  },
+  (error) => {
+    console.error('API Request Error:', error);
+    return Promise.reject(error);
+  }
+);
 
 /**
  * API Interceptors
@@ -30,6 +46,19 @@ export const api = axios.create({
  */
 let isRefreshing = false;
 let failedQueue: { resolve: (value: unknown) => void; reject: (reason?: unknown) => void }[] = [];
+
+// Function to set the JWT token in the Authorization header
+export const setJwtToken = (token: string) => {
+  // Add token to default headers for all future requests
+  api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+  console.log('JWT token set in Authorization header');
+};
+
+// Function to clear the JWT token from the Authorization header
+export const clearJwtToken = () => {
+  delete api.defaults.headers.common['Authorization'];
+  console.log('JWT token cleared from Authorization header');
+};
 
 // Process failed requests queue after token refresh
 const processQueue = (error: Error | null, token: string | null = null) => {
@@ -106,12 +135,18 @@ export const UserSchema = z.object({
   email: z.string().email(),
   firstName: z.string(),
   lastName: z.string(),
-  playaName: z.string().optional(),
-  profilePicture: z.string().optional(),
+  playaName: z.string().nullable().optional(),
+  profilePicture: z.string().nullable().optional(),
   role: z.enum(['ADMIN', 'STAFF', 'PARTICIPANT']),
   isEmailVerified: z.boolean(),
   createdAt: z.string(),
   updatedAt: z.string(),
+  // Include additional fields that may be needed for profile validation
+  phone: z.string().nullable().optional(),
+  city: z.string().nullable().optional(),
+  stateProvince: z.string().nullable().optional(),
+  country: z.string().nullable().optional(),
+  emergencyContact: z.string().nullable().optional(),
 });
 
 export const AuthResponseSchema = z.object({
@@ -156,9 +191,39 @@ export type CoreConfig = z.infer<typeof CoreConfigSchema>;
 export const auth = {
   /**
    * Request an email verification code to be sent for login/registration
+   * @param email The email address to send the verification code to
+   * @returns A promise that resolves to true if the code was successfully sent
    */
-  requestVerificationCode: async (email: string) => {
-    return await api.post('/auth/request-login-code', { email });
+  requestVerificationCode: async (email: string): Promise<boolean> => {
+    try {
+      // Use a more explicit API call with debugging
+      console.log(`API: Requesting verification code for ${email}`);
+      const response = await api.post('/auth/request-login-code', { email }, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        }
+      });
+      
+      // Log response for debugging
+      console.log('API response:', response.status, response.statusText);
+      
+      // Check for a success response
+      return response.status >= 200 && response.status < 300;
+    } catch (error) {
+      // Properly type the error for safer access
+      const axiosError = error as {
+        message?: string;
+        response?: { status?: number; statusText?: string };
+      };
+      console.error(
+        'Error requesting verification code:',
+        axiosError.message, 
+        axiosError.response?.status,
+        axiosError.response?.statusText
+      );
+      return false;
+    }
   },
   
   /**
@@ -166,7 +231,14 @@ export const auth = {
    */
   verifyCode: async (email: string, code: string) => {
     const response = await api.post<AuthResponse>('/auth/login-with-code', { email, code });
-    return AuthResponseSchema.parse(response.data);
+    const parsedResponse = AuthResponseSchema.parse(response.data);
+    
+    // Store the JWT token and add it to future request headers
+    if (parsedResponse.accessToken) {
+      setJwtToken(parsedResponse.accessToken);
+    }
+    
+    return parsedResponse;
   },
   
   /**
@@ -229,6 +301,8 @@ export const auth = {
     // Since the logout endpoint doesn't exist yet, we'll just clear local state
     // This will need to be updated once the backend implements the endpoint
     localStorage.clear();
+    // Clear JWT token from memory and request headers
+    clearJwtToken();
     // Clear all cookies by setting them to expire in the past
     document.cookie.split(';').forEach(cookie => {
       document.cookie = cookie.replace(/^ +/, '').replace(/=.*/, '=;expires=' + new Date().toUTCString() + ';path=/');

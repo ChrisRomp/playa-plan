@@ -1,0 +1,41 @@
+@email = testuser@playaplan.example.com
+
+###
+# @name request_login_code
+POST http://localhost:3001/auth/request-login-code HTTP/1.1
+Content-Type: application/json
+
+{
+    "email": "{{email}}"
+}
+
+###
+# @name login_with_code
+# @prompt code Auth code from email
+POST http://localhost:3001/auth/login-with-code HTTP/1.1
+Content-Type: application/json
+
+{
+    "email": "{{email}}",
+    "code": "{{code}}"
+}
+
+###
+# @name get_profile
+@accessToken = {{login_with_code.response.body.accessToken}}
+GET http://localhost:3001/auth/profile HTTP/1.1
+Authorization: Bearer {{accessToken}}
+
+###
+# @name update_profile
+PUT http://localhost:3001/users/{{get_profile.response.body.id}} HTTP/1.1
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+    "internalNotes": "Internal notes test",
+    "allowEarlyRegistration": true,
+    "allowRegistration": true,
+    "allowNoJob": true,
+    "allowDeferredDuesPayment": true
+}
