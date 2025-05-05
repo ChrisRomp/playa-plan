@@ -32,7 +32,10 @@ const LoginForm: React.FC = () => {
     }
     
     // Clear any stuck loading state on page load
-    localStorage.removeItem('auth_loading_state');
+    // If the user manually refreshes during login, we may want to start fresh
+    if (!savedEmail) {
+      localStorage.removeItem('pendingLoginEmail');
+    }
   }, []);
 
   // Update local error state when auth context error changes

@@ -1,6 +1,13 @@
 import axios from 'axios';
 import { z } from 'zod';
 
+// Extend AxiosRequestConfig to include the _retry property
+declare module 'axios' {
+  export interface AxiosRequestConfig {
+    _retry?: boolean;
+  }
+}
+
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 // API client instance
