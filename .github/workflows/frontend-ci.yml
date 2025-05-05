@@ -1,0 +1,48 @@
+name: Frontend CI
+permissions:
+  contents: read
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'apps/web/**'
+      - '.github/workflows/frontend-ci.yml'
+      - 'package.json'
+      - 'package-lock.json'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'apps/web/**'
+      - '.github/workflows/frontend-ci.yml'
+      - 'package.json'
+      - 'package-lock.json'
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [22.x]
+
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v3
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+    
+    - name: Install dependencies
+      working-directory: apps/web
+      run: npm ci
+    
+    - name: Build frontend
+      working-directory: apps/web
+      run: npm run build
+    
+    - name: Test frontend
+      working-directory: apps/web
+      run: npm run test
