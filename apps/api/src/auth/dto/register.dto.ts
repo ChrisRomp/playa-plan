@@ -4,9 +4,7 @@ import {
   IsNotEmpty, 
   IsOptional, 
   IsString, 
-  Matches,
-  MaxLength, 
-  MinLength 
+  MaxLength 
 } from 'class-validator';
 
 /**
@@ -21,20 +19,7 @@ export class RegisterDto {
   @IsNotEmpty({ message: 'Email is required' })
   readonly email: string = '';
 
-  @ApiProperty({
-    example: 'Password123!',
-    description: 'The password for the account',
-  })
-  @IsString()
-  @IsNotEmpty({ message: 'Password is required' })
-  @MinLength(8, { message: 'Password must be at least 8 characters long' })
-  @Matches(
-    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[a-zA-Z\d\W]{8,}$/,
-    {
-      message: 'Password must contain at least 1 uppercase letter, 1 lowercase letter, and 1 number',
-    },
-  )
-  readonly password: string = '';
+  // Password is not required as we use email verification
 
   @ApiProperty({
     example: 'John',

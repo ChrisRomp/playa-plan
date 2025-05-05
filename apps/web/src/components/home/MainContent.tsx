@@ -1,7 +1,7 @@
 import React from 'react';
 import { useAuth } from '../../store/AuthContext';
 import { useConfig } from '../../store/ConfigContext';
-import LoginForm from '../auth/LoginForm';
+import LoginFormReset from '../auth/LoginFormReset';
 import UserDashboard from './UserDashboard';
 
 const MainContent: React.FC = () => {
@@ -34,7 +34,7 @@ const MainContent: React.FC = () => {
           <p className="text-lg font-medium mb-4">
             Sign in or create an account to register for {config.name}
           </p>
-          <LoginForm />
+          <LoginFormReset />
         </div>
       </div>
     );

@@ -31,17 +31,17 @@
 
 ## API Integration Tasks
 
-1. [ ] Update API client to use actual backend endpoints
+1. [x] Update API client to use actual backend endpoints
    - [x] Set up basic API client structure with Axios
    - [x] Set up API response type validation with Zod
-   - [ ] Configure proper error handling
-   - [ ] Implement authentication token management with HTTP-only cookies (currently using localStorage)
+   - [x] Configure proper error handling
+   - [x] Implement authentication token management with HTTP-only cookies
 
-2. [ ] Connect authentication flow to API
-   - [ ] Update AuthContext to use real API endpoints instead of mock data
-   - [ ] Implement proper JWT storage using HTTP-only cookies
-   - [ ] Handle authentication errors and edge cases
-   - [ ] Add registration flow connected to API
+2. [x] Connect authentication flow to API
+   - [x] Update AuthContext to use real API endpoints instead of mock data
+   - [x] Implement proper JWT storage using HTTP-only cookies
+   - [x] Handle authentication errors and edge cases
+   - [ ] Complete registration flow with profile data collection
 
 3. [ ] Connect core configuration to API
    - [x] Set up ConfigContext structure 
@@ -51,19 +51,21 @@
 
 4. [ ] Implement routing with React Router
    - [ ] Add route configuration
-   - [ ] Implement protected routes
+   - [ ] Implement protected routes using authentication state
    - [ ] Add role-based route permissions
+   - [ ] Replace window.location redirects with React Router navigation
 
 ## Feature Roadmap
 
-1. [ ] User authentication system
-   - [x] Email authorization code login process (structure in place but using mock data)
-   - [ ] JWT persistence using HTTP-only cookies
-     - [ ] Set up cookie service utility
-     - [ ] Configure secure but practical cookie settings (Secure, SameSite Lax)
-     - [ ] Implement automatic token refresh mechanism
-     - [ ] Handle session expiration gracefully
-   - [x] User registration (structure in place but using mock data)
+1. [x] User authentication system
+   - [x] Email authorization code login process connected to API
+   - [x] JWT persistence using HTTP-only cookies
+     - [x] Set up cookie service utility
+     - [x] Configure secure but practical cookie settings (Secure, SameSite Lax)
+     - [x] Implement automatic token refresh mechanism
+     - [x] Handle session expiration gracefully
+   - [x] Basic user registration via email verification
+   - [ ] Complete registration flow with profile data collection
    - [ ] CAPTCHA integration for security
 
 2. [ ] User profile management

@@ -155,48 +155,6 @@ export class AuthController {
   }
 
   /**
-   * Request password reset
-   * @param email User email
-   * @returns Success message
-   */
-  @Public()
-  @Post('forgot-password')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Request password reset' })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Password reset email sent if email exists' })
-  async forgotPassword(@Body('email') email: string): Promise<{ message: string }> {
-    await this.authService.initiatePasswordReset(email);
-    
-    // Always return success to prevent user enumeration
-    return { message: 'If your email exists in our system, you will receive a password reset link' };
-  }
-
-  /**
-   * Reset password with token
-   * @param token Reset token
-   * @param newPassword New password
-   * @returns Success message
-   */
-  @Public()
-  @Post('reset-password')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Reset password with token' })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Password reset successfully' })
-  @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Invalid or expired reset token' })
-  async resetPassword(
-    @Body('token') token: string,
-    @Body('newPassword') newPassword: string,
-  ): Promise<{ message: string }> {
-    const isReset = await this.authService.resetPassword(token, newPassword);
-    
-    if (!isReset) {
-      throw new UnauthorizedException('Invalid or expired reset token');
-    }
-
-    return { message: 'Password reset successfully' };
-  }
-
-  /**
    * Get current user profile (protected route)
    * @param req Request object with authenticated user
    * @returns User profile data

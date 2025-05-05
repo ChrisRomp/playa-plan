@@ -72,8 +72,6 @@ describe('AuthController', () => {
     login: jest.fn(),
     validateCredentials: jest.fn(),
     verifyEmail: jest.fn(),
-    initiatePasswordReset: jest.fn(),
-    resetPassword: jest.fn(),
     generateLoginCode: jest.fn(),
     validateLoginCode: jest.fn(),
   };
@@ -105,11 +103,10 @@ describe('AuthController', () => {
     it('should create a new user', async () => {
       // Arrange
       const registerDto: RegisterDto = {
-        email: 'test@example.com',
-        password: 'Password123!',
-        firstName: 'Test',
+        email: 'new@example.com',
+        firstName: 'New',
         lastName: 'User',
-        playaName: 'TestUser',
+        playaName: 'NewUser',
       };
       
       mockAuthService.register.mockResolvedValue(mockUser);
@@ -127,11 +124,10 @@ describe('AuthController', () => {
     it('should throw if user registration fails', async () => {
       // Arrange
       const registerDto: RegisterDto = {
-        email: 'test@example.com',
-        password: 'Password123!',
-        firstName: 'Test',
+        email: 'new@example.com',
+        firstName: 'New',
         lastName: 'User',
-        playaName: 'TestUser',
+        playaName: 'NewUser',
       };
       
       mockAuthService.register.mockRejectedValue(
@@ -183,58 +179,9 @@ describe('AuthController', () => {
     });
   });
 
-  describe('forgotPassword', () => {
-    it('should initiate password reset successfully', async () => {
-      // Arrange
-      mockAuthService.initiatePasswordReset.mockResolvedValue(true);
+  // Password reset functionality removed in favor of email verification
 
-      // Act
-      const result = await controller.forgotPassword('test@example.com');
-
-      // Assert
-      expect(result).toEqual({ 
-        message: 'If your email exists in our system, you will receive a password reset link' 
-      });
-      expect(mockAuthService.initiatePasswordReset).toHaveBeenCalledWith('test@example.com');
-    });
-
-    it('should return the same message even if password reset initiation fails', async () => {
-      // Arrange
-      mockAuthService.initiatePasswordReset.mockResolvedValue(false);
-
-      // Act
-      const result = await controller.forgotPassword('test@example.com');
-
-      // Assert
-      expect(result).toEqual({ 
-        message: 'If your email exists in our system, you will receive a password reset link' 
-      });
-      expect(mockAuthService.initiatePasswordReset).toHaveBeenCalledWith('test@example.com');
-    });
-  });
-
-  describe('resetPassword', () => {
-    it('should reset password with valid token', async () => {
-      // Arrange
-      mockAuthService.resetPassword.mockResolvedValue(true);
-
-      // Act
-      const result = await controller.resetPassword('valid-token', 'NewPassword123!');
-
-      // Assert
-      expect(result).toEqual({ message: 'Password reset successfully' });
-      expect(mockAuthService.resetPassword).toHaveBeenCalledWith('valid-token', 'NewPassword123!');
-    });
-
-    it('should throw UnauthorizedException for invalid token', async () => {
-      // Arrange
-      mockAuthService.resetPassword.mockResolvedValue(false);
-
-      // Act & Assert
-      await expect(controller.resetPassword('invalid-token', 'NewPassword123!')).rejects.toThrow(UnauthorizedException);
-      await expect(controller.resetPassword('invalid-token', 'NewPassword123!')).rejects.toThrow('Invalid or expired reset token');
-    });
-  });
+  // Password reset functionality removed in favor of email verification
 
   describe('requestLoginCode', () => {
     it('should request a login code successfully', async () => {

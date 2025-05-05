@@ -16,17 +16,22 @@ export class LocalStrategy extends PassportStrategy(Strategy) {
   }
 
   /**
-   * Validates user credentials
+   * This method is needed by the Passport local strategy, but in our email verification flow,
+   * users authenticate via email verification codes instead of passwords.
+   * 
    * @param email User email
-   * @param password User password
-   * @returns Authenticated user
-   * @throws UnauthorizedException if credentials are invalid
+   * @param password Password parameter is required by Passport but not used
+   * @returns Null - this method always throws as we use email verification instead
+   * @throws UnauthorizedException indicating we use email verification flow
    */
-  async validate(email: string, password: string): Promise<any> {
-    const user = await this.authService.validateCredentials(email, password);
-    if (!user) {
-      throw new UnauthorizedException('Invalid credentials');
-    }
-    return user;
+  async validate(email: string, 
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    password: string
+  ): Promise<never> {
+    // Call validateCredentials with only email parameter
+    await this.authService.validateCredentials(email);
+    
+    // Our validateCredentials always returns null as we use email verification flow
+    throw new UnauthorizedException('Please use email verification flow to authenticate');
   }
 }
