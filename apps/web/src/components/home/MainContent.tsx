@@ -45,7 +45,7 @@ const MainContent: React.FC = () => {
   }
   
   // User is authenticated but profile is incomplete, redirect to profile page
-  if (!isProfileComplete) {
+  if (user && !isProfileComplete) {
     return <ProfilePage />;
   }
   
