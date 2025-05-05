@@ -8,9 +8,15 @@ vi.mock('axios', () => {
       create: () => ({
         post: vi.fn(),
         get: vi.fn(),
+        put: vi.fn(), // Add PUT method for profile updates
+        patch: vi.fn(),
+        defaults: { headers: { common: {} } },
         interceptors: {
           response: {
             use: vi.fn()
+          },
+          request: {
+            use: vi.fn() // Add request interceptor mock
           }
         }
       })
