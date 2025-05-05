@@ -72,18 +72,24 @@ const LoginForm: React.FC = () => {
     setLocalLoading(true);
     
     try {
+      console.log(`Attempting to send verification code to: ${email}`);
+      
       // Call the API to send verification code
-      await requestVerificationCode(email);
+      const success = await requestVerificationCode(email);
+      console.log(`Verification code request result: ${success ? 'success' : 'failed'}`);
       
-      // Save email to localStorage to maintain state across page refreshes
-      localStorage.setItem('pendingLoginEmail', email);
-      
-      // For debugging
-      console.log(`Login process started for email: ${email}`);
-      
-      setCodeSent(true);
+      // Only proceed to verification code screen if code was sent successfully
+      if (success) {
+        // Save email to localStorage to maintain state across page refreshes
+        localStorage.setItem('pendingLoginEmail', email);
+        setCodeSent(true);
+      } else {
+        // Explicitly set error if the API call failed
+        setError('Failed to send verification code. Please try again later.');
+      }
     } catch (error) {
-      // Error is already set in the auth context and will update via useEffect
+      // Set a specific error message
+      setError('Network error when requesting verification code. Please check your connection and try again.');
       console.error('Failed to send verification code:', error);
     } finally {
       // Always reset loading state

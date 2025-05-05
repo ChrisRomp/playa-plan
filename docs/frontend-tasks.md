@@ -65,13 +65,13 @@
      - [x] Implement automatic token refresh mechanism
      - [x] Handle session expiration gracefully
    - [x] Basic user registration via email verification
-   - [ ] Complete registration flow with profile data collection
+   - [x] Complete registration flow with profile data collection
    - [ ] CAPTCHA integration for security
 
-2. [ ] User profile management
-   - [ ] Complete profile form with all required fields
+2. [x] User profile management
+   - [x] Complete profile form with all required fields
    - [ ] Email change process with verification
-   - [ ] Profile editing
+   - [x] Profile editing
 
 3. [ ] Camp registration system
    - [ ] Registration flow with profile confirmation

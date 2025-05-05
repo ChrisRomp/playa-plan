@@ -13,8 +13,15 @@ async function bootstrap() {
   // Global validation and sanitization pipe
   app.useGlobalPipes(new GlobalValidationPipe());
 
-  // CORS configuration
-  app.enableCors();
+  // CORS configuration with specific options for development
+  app.enableCors({
+    origin: ['http://localhost:5173', 'http://localhost:5174'], // Frontend dev server URLs
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    credentials: true, // Allow credentials (cookies)
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+  });
+  
+  console.log('CORS configured for development environment');
   
   // Swagger documentation setup
   const config = new DocumentBuilder()

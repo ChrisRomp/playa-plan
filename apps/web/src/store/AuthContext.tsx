@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User } from '../types';
-import { auth } from '../lib/api';
+import { auth, clearJwtToken } from '../lib/api';
 import cookieService from '../lib/cookieService';
 
 /**
@@ -8,7 +8,7 @@ import cookieService from '../lib/cookieService';
  */
 interface AuthContextType {
   user: User | null;
-  requestVerificationCode: (email: string) => Promise<void>;
+  requestVerificationCode: (email: string) => Promise<boolean>;
   verifyCode: (email: string, code: string) => Promise<void>;
   logout: () => Promise<void>;
   isLoading: boolean;
@@ -17,16 +17,16 @@ interface AuthContextType {
 }
 
 /**
- * Authentication context with default values
+ * Create the auth context with default values
  */
 const AuthContext = createContext<AuthContextType>({
+  isAuthenticated: false,
+  isLoading: false,
   user: null,
-  requestVerificationCode: async () => {},
+  error: null,
+  requestVerificationCode: async () => false,
   verifyCode: async () => {},
   logout: async () => {},
-  isLoading: false,
-  error: null,
-  isAuthenticated: false
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -97,8 +97,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   /**
    * Request a verification code to be sent to the provided email
+   * @returns boolean indicating whether the verification code was successfully sent
    */
-  const requestVerificationCode = async (email: string) => {
+  const requestVerificationCode = async (email: string): Promise<boolean> => {
     // Reset error state and set loading
     setError(null);
     setIsLoading(true);
@@ -109,9 +110,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (email) {
         localStorage.setItem('pendingLoginEmail', email);
       }
+      return true; // Success
     } catch (err) {
       setError('Failed to send verification code. Please try again.');
       console.error('Failed to send verification code:', err);
+      return false; // Failure
     } finally {
       // Always ensure loading state is reset
       setIsLoading(false);
@@ -130,7 +133,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       // Verify code with the API
       const authResponse = await auth.verifyCode(email, code);
       
-      // Set authenticated state in cookie
+      // The JWT token is now stored by the auth.verifyCode method
+      // But we still set the authenticated state cookie for the UI
       await cookieService.setAuthenticatedState();
       setIsAuthenticated(true);
       
@@ -169,6 +173,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       
       // Clear local authentication state
       await cookieService.clearAuthTokens();
+      clearJwtToken(); // Clear JWT token from memory and request headers
       setIsAuthenticated(false);
       setUser(null);
     } catch (err) {

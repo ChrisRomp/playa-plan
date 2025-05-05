@@ -1,14 +1,18 @@
 import React from 'react';
 import { useAuth } from '../../store/AuthContext';
 import { useConfig } from '../../store/ConfigContext';
+import { useProfile } from '../../hooks/useProfile';
 import LoginFormReset from '../auth/LoginFormReset';
 import UserDashboard from './UserDashboard';
+import ProfilePage from '../profile/ProfilePage';
 
 const MainContent: React.FC = () => {
   const { user } = useAuth();
-  const { config, isLoading } = useConfig();
+  const { config, isLoading: configLoading } = useConfig();
+  const { isProfileComplete, isLoading: profileLoading } = useProfile();
   
-  if (isLoading || !config) {
+  // Show loading state if any of our crucial contexts are still loading
+  if (configLoading || !config || profileLoading) {
     return (
       <div className="bg-white rounded-lg shadow-md p-6 animate-pulse">
         <div className="h-4 bg-gray-200 rounded w-3/4 mb-4"></div>
@@ -40,7 +44,12 @@ const MainContent: React.FC = () => {
     );
   }
   
-  // User is authenticated, show user dashboard
+  // User is authenticated but profile is incomplete, redirect to profile page
+  if (!isProfileComplete) {
+    return <ProfilePage />;
+  }
+  
+  // User is authenticated and profile is complete, show user dashboard
   return <UserDashboard />;
 };
 
