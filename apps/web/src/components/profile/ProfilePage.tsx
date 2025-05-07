@@ -2,12 +2,12 @@ import React from 'react';
 import ProfileForm from './ProfileForm';
 
 /**
- * Profile Page Component
+ * Legacy Profile Page Component
  * Displays the profile form
  * 
  * IMPORTANT: This is the legacy component, being replaced by pages/ProfilePage.tsx
  */
-const ProfilePage: React.FC = () => {
+const LegacyProfilePage: React.FC = () => {
   
   // NOTE: This is the legacy ProfilePage component in the components directory
   // It's being gradually replaced by the new pages/ProfilePage.tsx that uses React Router
@@ -30,4 +30,4 @@ const ProfilePage: React.FC = () => {
   );
 };
 
-export default ProfilePage;
+export default LegacyProfilePage;

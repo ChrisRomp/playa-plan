@@ -175,4 +175,39 @@ describe('ProtectedRoute', () => {
     // Should show admin content
     expect(screen.getByText('Admin Page')).toBeInTheDocument();
   });
+
+  it('should redirect authenticated users from login page to dashboard', () => {
+    // Mock authenticated state
+    vi.mocked(useAuth).mockReturnValue({
+      isAuthenticated: true,
+      isLoading: false,
+      user: {
+        id: '1',
+        email: 'user@example.com',
+        name: 'Test User',
+        role: ROLES.USER,
+        isAuthenticated: true,
+        isEarlyRegistrationEnabled: false,
+        hasRegisteredForCurrentYear: false
+      },
+      error: null,
+      requestVerificationCode: vi.fn().mockResolvedValue(false),
+      verifyCode: vi.fn().mockResolvedValue(undefined),
+      logout: vi.fn().mockResolvedValue(undefined)
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/login']}>
+        <Routes>
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/login" element={<ProtectedRoute requiresAuth={false} />}>
+            <Route index element={<Login />} />
+          </Route>
+        </Routes>
+      </MemoryRouter>
+    );
+
+    // Should redirect to dashboard
+    expect(screen.getByText('Dashboard Page')).toBeInTheDocument();
+  });
 });

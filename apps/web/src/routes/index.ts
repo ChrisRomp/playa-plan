@@ -2,7 +2,7 @@
  * Centralized route configuration
  * Defines all application routes and their properties
  */
-import { UserRole } from '../types/auth';
+import { UserRole, ROLES } from '../types/auth';
 
 /**
  * Route configuration type
@@ -42,7 +42,7 @@ export const ROUTES = {
     path: '/admin',
     name: 'Admin',
     requiresAuth: true,
-    allowedRoles: ['ADMIN'],
+    allowedRoles: [ROLES.ADMIN],
   },
   SHIFTS: {
     path: '/shifts',

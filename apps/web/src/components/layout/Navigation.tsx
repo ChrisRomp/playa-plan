@@ -15,7 +15,7 @@ const Navigation: React.FC<NavigationProps> = ({
   isMobile = false,
   closeMenu
 }) => {
-  const { user, logout } = useAuth();
+  const { user, logout, isAuthenticated } = useAuth();
   
   const textColorClass = isScrolled || isMobile ? 'text-amber-900' : 'text-white';
   const hoverClass = isScrolled || isMobile ? 'hover:text-amber-600' : 'hover:text-amber-200';
@@ -24,7 +24,7 @@ const Navigation: React.FC<NavigationProps> = ({
   
   return (
     <nav className={`${isMobile ? 'flex flex-col py-4' : 'flex items-center space-x-0.5 md:space-x-1 overflow-x-auto max-w-full'}`}>
-      {!user?.isAuthenticated ? (
+      {!isAuthenticated ? (
         <Link
           to={PATHS.LOGIN}
           className={linkClass}
@@ -62,7 +62,7 @@ const Navigation: React.FC<NavigationProps> = ({
             <span>Shifts</span>
           </Link>
           
-          {(user.role === 'staff' || user.role === 'admin') && (
+          {user && (user.role === 'staff' || user.role === 'admin') && (
             <Link
               to={PATHS.DASHBOARD} /* Update this path when you add Reports page */
               className={linkClass}
@@ -73,7 +73,7 @@ const Navigation: React.FC<NavigationProps> = ({
             </Link>
           )}
           
-          {user.role === 'admin' && (
+          {user && user.role === 'admin' && (
             <Link
               to={PATHS.ADMIN}
               className={linkClass}
