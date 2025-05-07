@@ -11,6 +11,7 @@ import ProfilePage from '../pages/ProfilePage.tsx';
 import AdminPage from '../pages/AdminPage.tsx';
 import ShiftsPage from '../pages/ShiftsPage.tsx';
 import NotFoundPage from '../pages/NotFoundPage.tsx';
+import { ROLES } from '../types/auth.ts';
 
 /**
  * Application router component
@@ -33,7 +34,7 @@ const AppRouter: React.FC = () => {
       </Route>
       
       {/* Protected routes that require specific roles */}
-      <Route element={<ProtectedRoute requiresAuth={true} allowedRoles={['admin']} />}>
+      <Route element={<ProtectedRoute requiresAuth={true} allowedRoles={[ROLES.ADMIN]} />}>
         <Route path={ROUTES.ADMIN.path} element={<AdminPage />} />
       </Route>
       
