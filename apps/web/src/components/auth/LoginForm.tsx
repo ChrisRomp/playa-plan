@@ -17,7 +17,7 @@ const LoginForm: React.FC = () => {
   const [localLoading, setLocalLoading] = useState(false);
   
   // Get authentication context values
-  const { requestVerificationCode, verifyCode, error: authError, isAuthenticated } = useAuth();
+  const { requestVerificationCode, verifyCode, error: authError } = useAuth();
   const [error, setError] = useState('');
   
   // Initialize email from localStorage if available (for page refreshes)
@@ -47,14 +47,8 @@ const LoginForm: React.FC = () => {
     }
   }, [authError]);
 
-  // Redirect logic if user is already authenticated
-  useEffect(() => {
-    if (isAuthenticated) {
-      // Redirect to home page or dashboard
-      // In a real app with routing, we would use react-router's useNavigate here
-      window.location.href = '/';
-    }
-  }, [isAuthenticated]);
+  // Note: Redirect logic is now handled by the parent LoginPage component
+  // We no longer need to handle redirects here as LoginPage uses React Router's useNavigate
 
   /**
    * Handle sending verification code to the provided email

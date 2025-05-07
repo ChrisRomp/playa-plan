@@ -4,13 +4,13 @@ import ProtectedRoute from './ProtectedRoute';
 import { ROUTES } from './index';
 
 // Page components
-import HomePage from '../pages/HomePage';
-import LoginPage from '../pages/LoginPage';
-import DashboardPage from '../pages/DashboardPage';
-import ProfilePage from '../pages/ProfilePage';
-import AdminPage from '../pages/AdminPage';
-import ShiftsPage from '../pages/ShiftsPage';
-import NotFoundPage from '../pages/NotFoundPage';
+import HomePage from '../pages/HomePage.tsx';
+import LoginPage from '../pages/LoginPage.tsx';
+import DashboardPage from '../pages/DashboardPage.tsx';
+import ProfilePage from '../pages/ProfilePage.tsx';
+import AdminPage from '../pages/AdminPage.tsx';
+import ShiftsPage from '../pages/ShiftsPage.tsx';
+import NotFoundPage from '../pages/NotFoundPage.tsx';
 
 /**
  * Application router component
@@ -33,7 +33,7 @@ const AppRouter: React.FC = () => {
       </Route>
       
       {/* Protected routes that require specific roles */}
-      <Route element={<ProtectedRoute requiresAuth={true} allowedRoles={['ADMIN']} />}>
+      <Route element={<ProtectedRoute requiresAuth={true} allowedRoles={['admin']} />}>
         <Route path={ROUTES.ADMIN.path} element={<AdminPage />} />
       </Route>
       
