@@ -1,5 +1,11 @@
 import axios from 'axios';
+import cookieService from './cookieService';
 import { z } from 'zod';
+
+// Track authentication state to prevent duplicate API calls
+let _pendingAuthCheck = false;
+let _lastAuthResult = false; 
+let _lastAuthCheckTime = 0;
 
 // Extend AxiosRequestConfig to include the _retry property
 declare module 'axios' {
@@ -339,21 +345,57 @@ export const auth = {
     document.cookie.split(';').forEach(cookie => {
       document.cookie = cookie.replace(/^ +/, '').replace(/=.*/, '=;expires=' + new Date().toUTCString() + ';path=/');
     });
+    
+    // Update cached auth state after logout
+    _lastAuthResult = false;
+    _lastAuthCheckTime = Date.now();
+    
     return { data: { success: true } };
   },
   
   /**
    * Check if the user is currently authenticated
-   * This makes a lightweight API call to validate the current session
+   * First checks for the authenticated state before making an API call
    */
   checkAuth: async () => {
-    try {
-      // Use the test auth endpoint to check authentication
-      const response = await api.get<{ message: string }>('/auth/test');
-      return response.data.message === 'Authentication is working';
-    } catch {
-      // Intentionally ignoring error and returning false for failed auth check
+    // First check if user is authenticated according to client-side state
+    if (!cookieService.isAuthenticated()) {
+      console.log('Skip auth check - no auth cookie');
+      _lastAuthResult = false;
+      _lastAuthCheckTime = Date.now();
       return false;
+    }
+    
+    // Check if we have a recent auth result to use instead of making another API call
+    // Only use cached result if it's less than 5 seconds old
+    if (Date.now() - _lastAuthCheckTime < 5000) {
+      console.log('Using cached auth result:', _lastAuthResult);
+      return _lastAuthResult;
+    }
+    
+    // Prevent multiple simultaneous auth checks
+    if (_pendingAuthCheck) {
+      console.log('Auth check already in progress, waiting...');
+      // Wait for the pending check to complete (simple debouncing)
+      await new Promise(resolve => setTimeout(resolve, 100));
+      return _lastAuthResult;
+    }
+    
+    try {
+      _pendingAuthCheck = true;
+      console.log('Making auth test API call');
+      const response = await api.get<{ message: string }>('/auth/test');
+      _lastAuthResult = response.data.message === 'Authentication is working';
+      _lastAuthCheckTime = Date.now();
+      return _lastAuthResult;
+    } catch (e) {
+      // Log error details for debugging
+      console.log('Auth check failed:', e instanceof Error ? e.message : 'Unknown error');
+      _lastAuthResult = false;
+      _lastAuthCheckTime = Date.now();
+      return false;
+    } finally {
+      _pendingAuthCheck = false;
     }
   }
 };

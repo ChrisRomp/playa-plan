@@ -61,27 +61,50 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   useEffect(() => {
     // Reset any previous error state
     setError(null);
+    
+    // First check for client-side auth state to prevent unnecessary API calls
     const checkAuthStatus = async () => {
       setIsLoading(true);
+      
+      // Check if there's any indication of authentication in client cookies
+      // This prevents making any API calls when we know the user isn't authenticated
+      if (!cookieService.isAuthenticated()) {
+        console.log('No authentication cookie found, skipping API calls');
+        setIsAuthenticated(false);
+        setUser(null);
+        setIsLoading(false);
+        return;
+      }
+      
       try {
-        // Check if the user is already authenticated (via cookie or session)
+        // Only call the auth test endpoint if there's a client-side auth cookie
         const isAuthValid = await auth.checkAuth();
         setIsAuthenticated(isAuthValid);
         
+        // Only fetch profile if auth test passed
         if (isAuthValid) {
-          // If authenticated, fetch the user profile from the API
-          const userProfile = await auth.getProfile();
-          
-          // Transform API user data to our client User type
-          setUser({
-            id: userProfile.id,
-            name: `${userProfile.firstName} ${userProfile.lastName}`,
-            email: userProfile.email,
-            role: mapApiRoleToClientRole(userProfile.role),
-            isAuthenticated: true,
-            isEarlyRegistrationEnabled: false, // This would come from a complete profile
-            hasRegisteredForCurrentYear: false // This would come from a complete profile
-          });
+          try {
+            // If authenticated, fetch the user profile from the API
+            const userProfile = await auth.getProfile();
+            
+            // Transform API user data to our client User type
+            setUser({
+              id: userProfile.id,
+              name: `${userProfile.firstName} ${userProfile.lastName}`,
+              email: userProfile.email,
+              role: mapApiRoleToClientRole(userProfile.role),
+              isAuthenticated: true,
+              isEarlyRegistrationEnabled: false, // This would come from a complete profile
+              hasRegisteredForCurrentYear: false // This would come from a complete profile
+            });
+          } catch (profileErr) {
+            console.error('Profile fetch failed:', profileErr);
+            setIsAuthenticated(false);
+            setUser(null);
+          }
+        } else {
+          // Auth test failed, clear user data
+          setUser(null);
         }
       } catch (err) {
         console.error('Authentication check failed:', err);
