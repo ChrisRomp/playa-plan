@@ -1,21 +1,19 @@
-import React, { useEffect } from 'react';
-import { useProfile } from '../../hooks/useProfile';
+import React from 'react';
 import ProfileForm from './ProfileForm';
 
 /**
  * Profile Page Component
- * Displays the profile form and handles redirecting after profile completion
+ * Displays the profile form
+ * 
+ * IMPORTANT: This is the legacy component, being replaced by pages/ProfilePage.tsx
  */
 const ProfilePage: React.FC = () => {
-  const { isProfileComplete, isLoading } = useProfile();
   
-  // The MainContent component automatically handles displaying the correct view
-  // based on the isProfileComplete state, so we don't need to do any redirection here
-  // Just monitor the profile completion status for any other side effects if needed
-  useEffect(() => {
-    // This is intentionally left empty - the main content component 
-    // will automatically render the appropriate view when profile is complete
-  }, [isProfileComplete, isLoading]);
+  // NOTE: This is the legacy ProfilePage component in the components directory
+  // It's being gradually replaced by the new pages/ProfilePage.tsx that uses React Router
+  // This component is kept for backward compatibility during the transition period
+  
+  // Redirection is now handled by the React Router system
 
   return (
     <div className="max-w-3xl mx-auto">

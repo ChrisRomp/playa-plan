@@ -100,8 +100,9 @@ export const ProfileProvider: React.FC<{ children: ReactNode }> = ({ children })
           if (err && typeof err === 'object' && 'response' in err && 
               err.response && typeof err.response === 'object' && 'status' in err.response && 
               err.response.status === 401) {
-            console.warn('Authentication token invalid or expired, redirecting to login');
-            window.location.href = '/';
+            console.warn('Authentication token invalid or expired, authentication state will be updated');
+            // With React Router, redirection should be handled by the components
+            // using the isAuthenticated flag from AuthContext, not direct navigation here
           }
         } finally {
           setIsLoading(false);
@@ -140,8 +141,9 @@ export const ProfileProvider: React.FC<{ children: ReactNode }> = ({ children })
       
       // If profile update was successful, return to the main page
       if (complete) {
-        // Instead of redirecting, we'll let the MainContent component
-        // handle the conditional rendering based on isProfileComplete
+        // With the React Router implementation, redirection is now handled by
+        // the ProfilePage component using React Router's useNavigate hook
+        // The isProfileComplete flag is still used to determine redirection
       }
     } catch (err: unknown) {
       console.error('Failed to update profile:', err);

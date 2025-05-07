@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter } from 'react-router-dom';
+import { HashRouter } from 'react-router-dom';
 import { AuthProvider } from './store/AuthContext';
 import { ConfigProvider } from './store/ConfigContext';
 import { QueryProvider } from './lib/QueryProvider';
@@ -13,7 +13,7 @@ import AppRouter from './routes/AppRouter';
  */
 function App() {
   return (
-    <BrowserRouter>
+    <HashRouter>
       <QueryProvider>
         <ConfigProvider>
           <AuthProvider>
@@ -25,7 +25,7 @@ function App() {
           </AuthProvider>
         </ConfigProvider>
       </QueryProvider>
-    </BrowserRouter>
+    </HashRouter>
   );
 }
 
