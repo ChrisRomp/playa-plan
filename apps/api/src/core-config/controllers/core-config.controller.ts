@@ -10,23 +10,28 @@ import {
   UseInterceptors,
   ClassSerializerInterceptor,
   NotFoundException,
-  BadRequestException
+  BadRequestException,
+  HttpCode,
+  HttpStatus
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
+import { Public } from '../../auth/decorators/public.decorator';
 import { CoreConfigService } from '../services/core-config.service';
-import { CreateCoreConfigDto, UpdateCoreConfigDto, CoreConfigResponseDto } from '../dto';
+import { CreateCoreConfigDto, UpdateCoreConfigDto, CoreConfigResponseDto, PublicCoreConfigDto } from '../dto';
 import { UserRole } from '@prisma/client';
 
 /**
  * Controller for managing core configuration
+ * 
+ * Note: The JwtAuthGuard is applied globally, so we don't need it here.
+ * The RolesGuard needs to be applied after specific routes are marked with @Roles().
+ * Public routes are marked with @Public() to bypass authentication.
  */
 @ApiTags('core-config')
 @Controller('core-config')
 @UseInterceptors(ClassSerializerInterceptor)
-@UseGuards(JwtAuthGuard, RolesGuard)
 @ApiBearerAuth()
 export class CoreConfigController {
   constructor(private readonly coreConfigService: CoreConfigService) {}
@@ -45,6 +50,7 @@ export class CoreConfigController {
   @ApiResponse({ status: 403, description: 'Forbidden - requires admin role' })
   @Post()
   @Roles(UserRole.ADMIN)
+  @UseGuards(RolesGuard)
   async create(@Body() createCoreConfigDto: CreateCoreConfigDto): Promise<CoreConfigResponseDto> {
     try {
       const config = await this.coreConfigService.create(createCoreConfigDto);
@@ -94,6 +100,7 @@ export class CoreConfigController {
   @ApiResponse({ status: 403, description: 'Forbidden - requires admin role' })
   @Get()
   @Roles(UserRole.ADMIN)
+  @UseGuards(RolesGuard)
   async findAll(): Promise<CoreConfigResponseDto[]> {
     const configs = await this.coreConfigService.findAll();
     return configs.map(config => new CoreConfigResponseDto(config));
@@ -114,6 +121,7 @@ export class CoreConfigController {
   @ApiParam({ name: 'id', description: 'The ID of the core configuration' })
   @Get(':id')
   @Roles(UserRole.ADMIN)
+  @UseGuards(RolesGuard)
   async findOne(@Param('id') id: string): Promise<CoreConfigResponseDto> {
     try {
       const config = await this.coreConfigService.findOne(id);
@@ -142,6 +150,7 @@ export class CoreConfigController {
   @ApiParam({ name: 'id', description: 'The ID of the core configuration' })
   @Patch(':id')
   @Roles(UserRole.ADMIN)
+  @UseGuards(RolesGuard)
   async update(
     @Param('id') id: string,
     @Body() updateCoreConfigDto: UpdateCoreConfigDto
@@ -175,6 +184,7 @@ export class CoreConfigController {
   @ApiParam({ name: 'id', description: 'The ID of the core configuration' })
   @Delete(':id')
   @Roles(UserRole.ADMIN)
+  @UseGuards(RolesGuard)
   async remove(@Param('id') id: string): Promise<CoreConfigResponseDto> {
     try {
       const config = await this.coreConfigService.remove(id);
@@ -187,6 +197,45 @@ export class CoreConfigController {
         throw error;
       }
       throw new BadRequestException('Failed to delete core configuration');
+    }
+  }
+
+  /**
+   * Public endpoint for getting UI configuration elements
+   * This endpoint doesn't require authentication
+   */
+  @ApiOperation({ summary: 'Get public UI configuration' })
+  @ApiResponse({
+    status: 200,
+    description: 'Public UI configuration data.',
+    type: PublicCoreConfigDto,
+  })
+  @ApiResponse({ status: 404, description: 'Configuration not found' })
+  @Public() // Mark as public endpoint - no authentication required
+  @Get('public')
+  @HttpCode(HttpStatus.OK)
+  async getPublicConfig(): Promise<PublicCoreConfigDto> {
+    try {
+      const config = await this.coreConfigService.findCurrent();
+      
+      // Map to PublicCoreConfigDto to only expose UI-related fields
+      return new PublicCoreConfigDto({
+        campName: config.campName,
+        campDescription: config.campDescription,
+        homePageBlurb: config.homePageBlurb,
+        campBannerUrl: config.campBannerUrl,
+        campBannerAltText: config.campBannerAltText,
+        campIconUrl: config.campIconUrl,
+        campIconAltText: config.campIconAltText,
+        registrationYear: config.registrationYear,
+        earlyRegistrationOpen: config.earlyRegistrationOpen,
+        registrationOpen: config.registrationOpen
+      });
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      throw new NotFoundException('Core configuration not found');
     }
   }
 

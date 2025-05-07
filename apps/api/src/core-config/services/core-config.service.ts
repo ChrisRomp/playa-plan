@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { CreateCoreConfigDto, UpdateCoreConfigDto } from '../dto';
 import { CoreConfig } from '../entities/core-config.entity';
@@ -9,6 +9,8 @@ import { CoreConfig as PrismaCoreConfig, Prisma } from '@prisma/client';
  */
 @Injectable()
 export class CoreConfigService {
+  private readonly logger = new Logger(CoreConfigService.name);
+
   /**
    * Constructor for the CoreConfigService
    * @param prisma - The PrismaService for database access
@@ -128,13 +130,62 @@ export class CoreConfigService {
   }
 
   /**
+   * Generate a default configuration for new installations
+   * @returns A default CoreConfig entity
+   */
+  private createDefaultConfig(): CoreConfig {
+    this.logger.log('No configuration found in database, creating default configuration');
+    
+    const currentYear = new Date().getFullYear();
+    
+    return new CoreConfig({
+      id: 'default',
+      campName: 'PlayaPlan',
+      campDescription: 'A Burning Man camp registration and planning tool',
+      homePageBlurb: '<h2>Welcome to PlayaPlan</h2><p>Please log in as an admin and configure your site.</p>',
+      campBannerUrl: '/images/playa-plan-banner.png',
+      campBannerAltText: 'Desert landscape at sunset with art installations',
+      campIconUrl: '/icons/playa-plan-icon.png',
+      campIconAltText: 'PlayaPlan camp icon',
+      registrationYear: currentYear,
+      earlyRegistrationOpen: false,
+      registrationOpen: false,
+      registrationTerms: null,
+      allowDeferredDuesPayment: false,
+      stripeEnabled: false,
+      stripePublicKey: null,
+      stripeApiKey: null,
+      stripeWebhookSecret: null,
+      paypalEnabled: false,
+      paypalClientId: null,
+      paypalClientSecret: null,
+      paypalMode: 'sandbox',
+      smtpHost: null,
+      smtpPort: null,
+      smtpUsername: null,
+      smtpPassword: null,
+      smtpUseSsl: false,
+      senderEmail: null,
+      senderName: null,
+      timeZone: 'UTC',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+  }
+
+  /**
    * Get the current core configuration
+   * @param useDefault - Whether to return a default config if none exists (default: true)
    * @returns The current core configuration
    */
-  async findCurrent(): Promise<CoreConfig> {
+  async findCurrent(useDefault = true): Promise<CoreConfig> {
     const configs = await this.findAll();
     
     if (configs.length === 0) {
+      if (useDefault) {
+        // Return a default configuration instead of throwing an error
+        return this.createDefaultConfig();
+      }
       throw new NotFoundException('Core configuration not found');
     }
     

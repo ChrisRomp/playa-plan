@@ -8,7 +8,7 @@ declare module 'axios' {
   }
 }
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 // API client instance
 export const api = axios.create({
@@ -161,21 +161,24 @@ export const AuthResponseSchema = z.object({
 export const CoreConfigSchema = z.object({
   id: z.string(),
   campName: z.string(),
-  campDescription: z.string().optional(),
-  homePageBlurb: z.string().optional(),
-  campBannerUrl: z.string().optional(),
-  campBannerAltText: z.string().optional(),
-  campIconUrl: z.string().optional(),
-  campIconAltText: z.string().optional(),
+  campDescription: z.string().nullable().optional(),
+  homePageBlurb: z.string().nullable().optional(),
+  campBannerUrl: z.string().nullable().optional(),
+  campBannerAltText: z.string().nullable().optional(),
+  campIconUrl: z.string().nullable().optional(),
+  campIconAltText: z.string().nullable().optional(),
   registrationYear: z.number(),
   earlyRegistrationOpen: z.boolean(),
   registrationOpen: z.boolean(),
-  registrationTerms: z.string().optional(),
+  // Fix for "Expected string, received null" error
+  registrationTerms: z.string().nullable().optional(),
   allowDeferredDuesPayment: z.boolean(),
   stripeEnabled: z.boolean(),
-  stripePublicKey: z.string().optional(),
+  // Fix for "Expected string, received null" error
+  stripePublicKey: z.string().nullable().optional(),
   paypalEnabled: z.boolean(),
-  paypalClientId: z.string().optional(),
+  // Fix for "Expected string, received null" error
+  paypalClientId: z.string().nullable().optional(),
   paypalMode: z.enum(['sandbox', 'live']),
   timeZone: z.string(),
   createdAt: z.string(),
@@ -230,15 +233,44 @@ export const auth = {
    * Verify email code and login or register the user
    */
   verifyCode: async (email: string, code: string) => {
-    const response = await api.post<AuthResponse>('/auth/login-with-code', { email, code });
-    const parsedResponse = AuthResponseSchema.parse(response.data);
-    
-    // Store the JWT token and add it to future request headers
-    if (parsedResponse.accessToken) {
-      setJwtToken(parsedResponse.accessToken);
+    try {
+      console.log(`API: Verifying code for ${email}`);
+      const response = await api.post<AuthResponse>('/auth/login-with-code', { email, code });
+      
+      // Log response for debugging
+      console.log('API response:', response.status, response.statusText);
+      
+      // Parse and validate the response using Zod schema
+      const parsedResponse = AuthResponseSchema.parse(response.data);
+      
+      // Store the JWT token and add it to future request headers
+      if (parsedResponse.accessToken) {
+        setJwtToken(parsedResponse.accessToken);
+      }
+      
+      return parsedResponse;
+    } catch (error) {
+      // Properly type the error for safer access
+      const axiosError = error as {
+        message?: string;
+        response?: { 
+          status?: number; 
+          statusText?: string; 
+          data?: { message?: string; error?: string; statusCode?: number };
+        };
+      };
+      
+      console.error(
+        'Error verifying code:',
+        axiosError.message,
+        axiosError.response?.status,
+        axiosError.response?.statusText,
+        axiosError.response?.data
+      );
+      
+      // Important: Rethrow the error so it's properly caught by the AuthContext
+      throw new Error(axiosError.response?.data?.message || 'Failed to verify code. Please check your network connection.');
     }
-    
-    return parsedResponse;
   },
   
   /**
@@ -328,7 +360,41 @@ export const auth = {
 
 export const config = {
   getCurrent: async () => {
-    const response = await api.get<CoreConfig>('/core-config/current');
-    return CoreConfigSchema.parse(response.data);
+    try {
+      console.log('API: Fetching public configuration');
+      // Use the dedicated public endpoint that doesn't require authentication
+      const response = await api.get<CoreConfig>('/public/config');
+      console.log('API response:', response.status, response.statusText);
+      return CoreConfigSchema.parse(response.data);
+    } catch (error) {
+      // Properly type the error for safer access
+      const axiosError = error as {
+        message?: string;
+        code?: string;
+        response?: { 
+          status?: number; 
+          statusText?: string;
+          data?: { message?: string; error?: string };
+        };
+      };
+      
+      // Different error message based on error type (network vs API error)
+      let errorMessage = 'Failed to fetch configuration';
+      
+      // Network connectivity errors
+      if (axiosError.code === 'ERR_NETWORK' || 
+          axiosError.message?.includes('Network Error') ||
+          axiosError.message?.includes('Connection refused')) {
+        errorMessage = 'Cannot connect to API server - please check network connection or server status';
+      } 
+      // API errors
+      else if (axiosError.response) {
+        errorMessage = axiosError.response.data?.message || 
+                       `API Error (${axiosError.response.status}): ${axiosError.response.statusText}`;
+      }
+      
+      console.error('Error fetching configuration:', errorMessage, axiosError);
+      throw new Error(errorMessage);
+    }
   },
 };
