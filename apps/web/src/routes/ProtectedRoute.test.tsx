@@ -89,7 +89,7 @@ describe('ProtectedRoute', () => {
       },
       error: null,
       requestVerificationCode: vi.fn().mockResolvedValue(false),
-      verifyCode: vi.fn().mockResolvedValue(undefined),
+      verifyCode: vi  .fn().mockResolvedValue(undefined),
       logout: vi.fn().mockResolvedValue(undefined)
     });
 
