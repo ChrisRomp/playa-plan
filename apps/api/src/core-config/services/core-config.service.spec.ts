@@ -160,10 +160,16 @@ describe('CoreConfigService', () => {
       expect(result).toBeInstanceOf(CoreConfig);
     });
 
-    it('should throw NotFoundException if no configs found', async () => {
+    it('should return a default configuration if no configs found', async () => {
       mockPrismaService.coreConfig.findMany.mockResolvedValueOnce([]);
       
-      await expect(service.findCurrent()).rejects.toThrow(NotFoundException);
+      const result = await service.findCurrent();
+      
+      // Verify the result is a default configuration
+      expect(result).toBeDefined();
+      expect(result.id).toBe('default');
+      expect(result.campName).toBe('PlayaPlan');
+      expect(result.registrationYear).toBe(new Date().getFullYear());
       expect(mockPrismaService.coreConfig.findMany).toHaveBeenCalled();
     });
   });

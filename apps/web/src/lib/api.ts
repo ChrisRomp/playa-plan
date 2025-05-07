@@ -1,5 +1,11 @@
 import axios from 'axios';
+import cookieService from './cookieService';
 import { z } from 'zod';
+
+// Track authentication state to prevent duplicate API calls
+let _pendingAuthCheck = false;
+let _lastAuthResult = false; 
+let _lastAuthCheckTime = 0;
 
 // Extend AxiosRequestConfig to include the _retry property
 declare module 'axios' {
@@ -8,7 +14,7 @@ declare module 'axios' {
   }
 }
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 // API client instance
 export const api = axios.create({
@@ -161,21 +167,24 @@ export const AuthResponseSchema = z.object({
 export const CoreConfigSchema = z.object({
   id: z.string(),
   campName: z.string(),
-  campDescription: z.string().optional(),
-  homePageBlurb: z.string().optional(),
-  campBannerUrl: z.string().optional(),
-  campBannerAltText: z.string().optional(),
-  campIconUrl: z.string().optional(),
-  campIconAltText: z.string().optional(),
+  campDescription: z.string().nullable().optional(),
+  homePageBlurb: z.string().nullable().optional(),
+  campBannerUrl: z.string().nullable().optional(),
+  campBannerAltText: z.string().nullable().optional(),
+  campIconUrl: z.string().nullable().optional(),
+  campIconAltText: z.string().nullable().optional(),
   registrationYear: z.number(),
   earlyRegistrationOpen: z.boolean(),
   registrationOpen: z.boolean(),
-  registrationTerms: z.string().optional(),
+  // Fix for "Expected string, received null" error
+  registrationTerms: z.string().nullable().optional(),
   allowDeferredDuesPayment: z.boolean(),
   stripeEnabled: z.boolean(),
-  stripePublicKey: z.string().optional(),
+  // Fix for "Expected string, received null" error
+  stripePublicKey: z.string().nullable().optional(),
   paypalEnabled: z.boolean(),
-  paypalClientId: z.string().optional(),
+  // Fix for "Expected string, received null" error
+  paypalClientId: z.string().nullable().optional(),
   paypalMode: z.enum(['sandbox', 'live']),
   timeZone: z.string(),
   createdAt: z.string(),
@@ -230,15 +239,44 @@ export const auth = {
    * Verify email code and login or register the user
    */
   verifyCode: async (email: string, code: string) => {
-    const response = await api.post<AuthResponse>('/auth/login-with-code', { email, code });
-    const parsedResponse = AuthResponseSchema.parse(response.data);
-    
-    // Store the JWT token and add it to future request headers
-    if (parsedResponse.accessToken) {
-      setJwtToken(parsedResponse.accessToken);
+    try {
+      console.log(`API: Verifying code for ${email}`);
+      const response = await api.post<AuthResponse>('/auth/login-with-code', { email, code });
+      
+      // Log response for debugging
+      console.log('API response:', response.status, response.statusText);
+      
+      // Parse and validate the response using Zod schema
+      const parsedResponse = AuthResponseSchema.parse(response.data);
+      
+      // Store the JWT token and add it to future request headers
+      if (parsedResponse.accessToken) {
+        setJwtToken(parsedResponse.accessToken);
+      }
+      
+      return parsedResponse;
+    } catch (error) {
+      // Properly type the error for safer access
+      const axiosError = error as {
+        message?: string;
+        response?: { 
+          status?: number; 
+          statusText?: string; 
+          data?: { message?: string; error?: string; statusCode?: number };
+        };
+      };
+      
+      console.error(
+        'Error verifying code:',
+        axiosError.message,
+        axiosError.response?.status,
+        axiosError.response?.statusText,
+        axiosError.response?.data
+      );
+      
+      // Important: Rethrow the error so it's properly caught by the AuthContext
+      throw new Error(axiosError.response?.data?.message || 'Failed to verify code. Please check your network connection.');
     }
-    
-    return parsedResponse;
   },
   
   /**
@@ -307,28 +345,98 @@ export const auth = {
     document.cookie.split(';').forEach(cookie => {
       document.cookie = cookie.replace(/^ +/, '').replace(/=.*/, '=;expires=' + new Date().toUTCString() + ';path=/');
     });
+    
+    // Update cached auth state after logout
+    _lastAuthResult = false;
+    _lastAuthCheckTime = Date.now();
+    
     return { data: { success: true } };
   },
   
   /**
    * Check if the user is currently authenticated
-   * This makes a lightweight API call to validate the current session
+   * First checks for the authenticated state before making an API call
    */
   checkAuth: async () => {
-    try {
-      // Use the test auth endpoint to check authentication
-      const response = await api.get<{ message: string }>('/auth/test');
-      return response.data.message === 'Authentication is working';
-    } catch {
-      // Intentionally ignoring error and returning false for failed auth check
+    // First check if user is authenticated according to client-side state
+    if (!cookieService.isAuthenticated()) {
+      console.log('Skip auth check - no auth cookie');
+      _lastAuthResult = false;
+      _lastAuthCheckTime = Date.now();
       return false;
+    }
+    
+    // Check if we have a recent auth result to use instead of making another API call
+    // Only use cached result if it's less than 5 seconds old
+    if (Date.now() - _lastAuthCheckTime < 5000) {
+      console.log('Using cached auth result:', _lastAuthResult);
+      return _lastAuthResult;
+    }
+    
+    // Prevent multiple simultaneous auth checks
+    if (_pendingAuthCheck) {
+      console.log('Auth check already in progress, waiting...');
+      // Wait for the pending check to complete (simple debouncing)
+      await new Promise(resolve => setTimeout(resolve, 100));
+      return _lastAuthResult;
+    }
+    
+    try {
+      _pendingAuthCheck = true;
+      console.log('Making auth test API call');
+      const response = await api.get<{ message: string }>('/auth/test');
+      _lastAuthResult = response.data.message === 'Authentication is working';
+      _lastAuthCheckTime = Date.now();
+      return _lastAuthResult;
+    } catch (e) {
+      // Log error details for debugging
+      console.log('Auth check failed:', e instanceof Error ? e.message : 'Unknown error');
+      _lastAuthResult = false;
+      _lastAuthCheckTime = Date.now();
+      return false;
+    } finally {
+      _pendingAuthCheck = false;
     }
   }
 };
 
 export const config = {
   getCurrent: async () => {
-    const response = await api.get<CoreConfig>('/core-config/current');
-    return CoreConfigSchema.parse(response.data);
+    try {
+      console.log('API: Fetching public configuration');
+      // Use the dedicated public endpoint that doesn't require authentication
+      const response = await api.get<CoreConfig>('/public/config');
+      console.log('API response:', response.status, response.statusText);
+      return CoreConfigSchema.parse(response.data);
+    } catch (error) {
+      // Properly type the error for safer access
+      const axiosError = error as {
+        message?: string;
+        code?: string;
+        response?: { 
+          status?: number; 
+          statusText?: string;
+          data?: { message?: string; error?: string };
+        };
+      };
+      
+      // Different error message based on error type (network vs API error)
+      let errorMessage = 'Failed to fetch configuration';
+      
+      // Network connectivity errors
+      if (axiosError.code === 'ERR_NETWORK' || 
+          axiosError.message?.includes('Network Error') ||
+          axiosError.message?.includes('Connection refused')) {
+        errorMessage = 'Cannot connect to API server - please check network connection or server status';
+      } 
+      // API errors
+      else if (axiosError.response) {
+        errorMessage = axiosError.response.data?.message || 
+                       `API Error (${axiosError.response.status}): ${axiosError.response.statusText}`;
+      }
+      
+      console.error('Error fetching configuration:', errorMessage, axiosError);
+      throw new Error(errorMessage);
+    }
   },
 };

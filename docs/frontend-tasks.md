@@ -41,13 +41,17 @@
    - [x] Update AuthContext to use real API endpoints instead of mock data
    - [x] Implement proper JWT storage using HTTP-only cookies
    - [x] Handle authentication errors and edge cases
+   - [x] Implement caching and debouncing for authentication API calls
    - [ ] Complete registration flow with profile data collection
 
-3. [ ] Connect core configuration to API
+3. [x] Connect core configuration to API
    - [x] Set up ConfigContext structure 
-   - [ ] Update ConfigContext to fetch real data from API (currently using mock data)
-   - [ ] Handle configuration loading states
-   - [ ] Implement proper error handling for config fetching
+   - [x] Update ConfigContext to fetch real data from API via public endpoint
+   - [x] Implement public configuration endpoint for unauthenticated access
+   - [x] Handle configuration loading states
+   - [x] Implement proper error handling for config fetching
+   - [x] Add validation with Zod schema
+   - [x] Create fallback configuration when API calls fail
 
 4. [ ] Implement routing with React Router
    - [ ] Add route configuration

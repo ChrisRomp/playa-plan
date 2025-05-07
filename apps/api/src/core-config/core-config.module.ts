@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { CoreConfigController } from './controllers/core-config.controller';
+import { PublicConfigController } from './controllers/public-config.controller';
 import { CoreConfigService } from './services/core-config.service';
 import { PrismaModule } from '../common/prisma/prisma.module';
 
@@ -8,7 +9,7 @@ import { PrismaModule } from '../common/prisma/prisma.module';
  */
 @Module({
   imports: [PrismaModule],
-  controllers: [CoreConfigController],
+  controllers: [CoreConfigController, PublicConfigController],
   providers: [CoreConfigService],
   exports: [CoreConfigService],
 })
