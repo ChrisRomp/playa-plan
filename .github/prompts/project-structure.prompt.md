@@ -30,6 +30,8 @@ playaplan/
 
 ## NestJS Backend Detail `/apps/api`
 
+- API tasks: [API-tasks.md](../../docs/API-tasks.md)
+
 ```text
 api/
 ├── src/
@@ -142,6 +144,9 @@ common/testing/
 ```
 
 ## Web frontend detail `/apps/web`
+
+- Frontend spec: [frontend-spec.md](../../docs/frontend-spec.md)
+- Frontend tasks: [frontend-tasks.md](../../docs/frontend-tasks.md)
 
 ```text
 web/
