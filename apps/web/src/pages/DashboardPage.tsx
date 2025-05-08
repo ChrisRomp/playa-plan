@@ -10,7 +10,7 @@ import { PATHS } from '../routes';
  */
 const DashboardPage: React.FC = () => {
   const { user } = useAuth();
-  const { isProfileComplete } = useProfile();
+  const { profile, isProfileComplete } = useProfile(); // Destructure profile
   
   return (
     <div className="max-w-4xl mx-auto">
@@ -35,7 +35,13 @@ const DashboardPage: React.FC = () => {
       
       <div className="bg-white shadow-md rounded-lg overflow-hidden">
         <div className="p-6">
-          <h2 className="text-xl font-semibold mb-4">Welcome, {user?.name || 'Camper'}!</h2>
+          <h2 className="text-xl font-semibold mb-4">
+            Welcome,{' '}
+            {(profile?.playaName && profile.playaName.trim() !== '') 
+              ? profile.playaName 
+              : (user?.name || 'Camper')}
+            !
+          </h2>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="bg-gray-50 p-4 rounded-md">

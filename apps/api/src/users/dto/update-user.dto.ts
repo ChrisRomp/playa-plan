@@ -1,4 +1,4 @@
-import { IsEmail, IsEnum, IsOptional, IsString, MinLength, IsBoolean } from 'class-validator';
+import { IsEmail, IsEnum, IsOptional, IsString, MinLength, IsBoolean, MaxLength } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { UserRole } from '@prisma/client';
 
@@ -28,72 +28,90 @@ export class UpdateUserDto {
   @ApiPropertyOptional({
     description: 'User first name',
     example: 'John',
+    maxLength: 50,
   })
   @IsString()
+  @MaxLength(50, { message: 'First name must be at most 50 characters long' })
   @IsOptional()
   readonly firstName?: string;
 
   @ApiPropertyOptional({
     description: 'User last name',
     example: 'Doe',
+    maxLength: 50,
   })
   @IsString()
+  @MaxLength(50, { message: 'Last name must be at most 50 characters long' })
   @IsOptional()
   readonly lastName?: string;
 
   @ApiPropertyOptional({
     description: 'User playa name',
     example: 'Dusty',
+    maxLength: 50,
   })
   @IsString()
+  @MaxLength(50, { message: 'Playa name must be at most 50 characters long' })
   @IsOptional()
   readonly playaName?: string;
 
   @ApiPropertyOptional({
     description: 'Phone number',
     example: '+1-555-123-4567',
+    maxLength: 50,
   })
   @IsString()
+  @MaxLength(50, { message: 'Phone number must be at most 50 characters long' })
   @IsOptional()
   readonly phone?: string;
 
   @ApiPropertyOptional({
     description: 'City',
     example: 'San Francisco',
+    maxLength: 50,
   })
   @IsString()
+  @MaxLength(50, { message: 'City must be at most 50 characters long' })
   @IsOptional()
   readonly city?: string;
 
   @ApiPropertyOptional({
     description: 'State or province',
-    example: 'California',
+    example: 'CA',
+    maxLength: 50,
   })
   @IsString()
+  @MaxLength(50, { message: 'State/province must be at most 50 characters long' })
   @IsOptional()
   readonly stateProvince?: string;
 
   @ApiPropertyOptional({
     description: 'Country',
     example: 'United States',
+    maxLength: 50,
   })
   @IsString()
+  @MaxLength(50, { message: 'Country must be at most 50 characters long' })
   @IsOptional()
   readonly country?: string;
 
   @ApiPropertyOptional({
     description: 'Emergency contact information',
     example: 'Jane Doe, +1-555-987-6543, relationship: sister',
+    maxLength: 1024,
   })
   @IsString()
+  @MaxLength(1024, { message: 'Emergency contact must be at most 1024 characters long' })
   @IsOptional()
   readonly emergencyContact?: string;
 
   @ApiPropertyOptional({
     description: 'URL to user profile picture',
     example: 'https://example.com/profile.jpg',
+    maxLength: 1024,
   })
   @IsString()
+  @MaxLength(1024, { message: 'Profile picture URL must be at most 1024 characters long' })
   @IsOptional()
   readonly profilePicture?: string;
 
@@ -132,8 +150,10 @@ export class UpdateUserDto {
   @ApiPropertyOptional({
     description: 'Internal notes about the user (admin only)',
     example: 'Previous volunteer coordinator',
+    maxLength: 1024,
   })
   @IsString()
+  @MaxLength(1024, { message: 'Internal notes must be at most 1024 characters long' })
   @IsOptional()
   readonly internalNotes?: string;
 
