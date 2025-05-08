@@ -1,6 +1,8 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../../store/AuthContext';
 import { LogOut, User, Tent, Calendar, FileText, Settings } from 'lucide-react';
+import { PATHS } from '../../routes';
 
 interface NavigationProps {
   isScrolled: boolean;
@@ -13,77 +15,73 @@ const Navigation: React.FC<NavigationProps> = ({
   isMobile = false,
   closeMenu
 }) => {
-  const { user, logout } = useAuth();
-  
-  const handleLinkClick = () => {
-    if (closeMenu) closeMenu();
-  };
+  const { user, logout, isAuthenticated } = useAuth();
   
   const textColorClass = isScrolled || isMobile ? 'text-amber-900' : 'text-white';
   const hoverClass = isScrolled || isMobile ? 'hover:text-amber-600' : 'hover:text-amber-200';
   
-  const linkClass = `flex items-center gap-2 px-4 py-2 ${textColorClass} ${hoverClass} transition-colors duration-200`;
+  const linkClass = `flex items-center gap-2 px-3 py-2 ${textColorClass} ${hoverClass} transition-colors duration-200 whitespace-nowrap text-sm md:text-base`;
   
   return (
-    <nav className={`${isMobile ? 'flex flex-col py-4' : 'flex items-center space-x-1'}`}>
-      {!user?.isAuthenticated ? (
-        <a 
-          href="#" 
+    <nav className={`${isMobile ? 'flex flex-col py-4' : 'flex items-center space-x-0.5 md:space-x-1 overflow-x-auto max-w-full'}`}>
+      {!isAuthenticated ? (
+        <Link
+          to={PATHS.LOGIN}
           className={linkClass}
-          onClick={handleLinkClick}
+          onClick={() => closeMenu?.()}
         >
           <User size={18} />
-          <span>Sign In / Register</span>
-        </a>
+          <span>Sign In</span>
+        </Link>
       ) : (
         <>
-          <a 
-            href="#" 
+          <Link
+            to={PATHS.PROFILE}
             className={linkClass}
-            onClick={handleLinkClick}
+            onClick={() => closeMenu?.()}
           >
             <User size={18} />
             <span>Profile</span>
-          </a>
+          </Link>
           
-          <a 
-            href="#" 
+          <Link
+            to={PATHS.DASHBOARD}
             className={linkClass}
-            onClick={handleLinkClick}
+            onClick={() => closeMenu?.()}
           >
             <Tent size={18} />
-            <span>Camp Registration</span>
-          </a>
+            <span>Registration</span>
+          </Link>
           
-          <a 
-            href="#" 
+          <Link
+            to={PATHS.SHIFTS}
             className={linkClass}
-            onClick={handleLinkClick}
+            onClick={() => closeMenu?.()}
           >
             <Calendar size={18} />
-            <span>Work Schedule</span>
-          </a>
+            <span>Shifts</span>
+          </Link>
           
-          {(user.role === 'staff' || user.role === 'admin') && (
-            <a 
-              href="#" 
+          {user && (user.role === 'staff' || user.role === 'admin') && (
+            <Link
+              to={PATHS.DASHBOARD} /* Update this path when you add Reports page */
               className={linkClass}
-              onClick={handleLinkClick}
+              onClick={() => closeMenu?.()}
             >
               <FileText size={18} />
               <span>Reports</span>
-            </a>
+            </Link>
           )}
           
-          {user.role === 'admin' && (
-            <a 
-              href="#" 
+          {user && user.role === 'admin' && (
+            <Link
+              to={PATHS.ADMIN}
               className={linkClass}
-              onClick={handleLinkClick}
+              onClick={() => closeMenu?.()}
             >
               <Settings size={18} />
-              <span>Administration</span>
-            </a>
+              <span>Admin</span>
+            </Link>
           )}
           
           <button 

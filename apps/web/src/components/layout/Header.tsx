@@ -68,8 +68,8 @@ const Header: React.FC = () => {
         />
         
         <div className="absolute inset-0 flex flex-col justify-between p-4 md:p-8">
-          <div className="flex justify-between items-center relative z-20">
-            <div className="flex items-center space-x-4">
+          <div className="flex justify-between items-center relative z-20 w-full">
+            <div className="flex-shrink-0 flex items-center space-x-4">
               <img 
                 src={iconUrl} 
                 alt={config.iconAltText || `${config.name} camp icon`}
