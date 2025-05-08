@@ -1,0 +1,49 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Development Workflow
+
+## Getting Started
+
+1. Clone the repository
+2. Install dependencies: `npm install` at the root
+3. Start development:
+   - For frontend only: `npm run dev:web`
+   - For backend only: `npm run dev:api`
+   - For both: `npm run dev`
+
+## Development Guidelines
+
+- Follow Test-Driven Development (TDD) when implementing new features
+- Use SOLID principles
+- Methods should do one thing only
+- Maximum method length: 20 lines where practical
+- Descriptive naming:
+  - Methods: verb + noun (e.g., validateCredentials)
+  - Classes: noun (e.g., CredentialValidator)
+  - Tests: should + behavior (e.g., shouldValidateCredentials)
+- No abbreviations unless universally known
+- Keep nesting level <= 2 where practical
+
+## Testing
+
+Tests are located alongside the code they test:
+- Web: [apps/web/tests/](mdc:apps/web/tests)
+- API: [apps/api/test/](mdc:apps/api/test)
+
+Run tests with:
+- All tests: `npm test` at the root
+- Web tests: `npm test` in the web directory
+- API tests: `npm test` in the api directory
+
+## Code Quality
+
+Code quality is enforced with:
+- [.prettierrc](mdc:.prettierrc) - Code formatting
+- [eslint.config.cjs](mdc:eslint.config.cjs) - Linting
+- [.editorconfig](mdc:.editorconfig) - Editor consistency
+
+Format code with: `npm run format`
+Lint code with: `npm run lint`

@@ -1,0 +1,43 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Code Conventions
+
+## TypeScript
+
+- Use TypeScript for all new code
+- Explicitly type function parameters and return types
+- Use interfaces for object shapes, types for unions/intersections
+- Minimize use of `any`; use proper typing or `unknown` instead
+- Use readonly where applicable for immutable values
+
+## React (Frontend)
+
+- Prefer functional components with hooks over class components
+- Use TSX for components
+- Use custom hooks to share stateful logic
+- Keep components small and focused on a single responsibility
+- Organize components logically:
+  - Shared components in [apps/web/src/components/](mdc:apps/web/src/components)
+  - Pages in [apps/web/src/pages/](mdc:apps/web/src/pages)
+  - Layout components in [apps/web/src/components/layout/](mdc:apps/web/src/components/layout)
+
+## NestJS (Backend)
+
+- Follow the NestJS module pattern
+- Keep controllers thin, with business logic in services
+- Use DTOs for request validation
+- Use Prisma for database access
+- Follow RESTful API design principles
+- Use guards and interceptors for cross-cutting concerns
+
+## Testing
+
+- Every feature should have tests
+- Unit tests for business logic
+- Integration tests for API endpoints
+- E2E tests for critical user flows
+- Test file naming: `*.spec.ts` or `*.test.ts`
+- Use descriptive test names that explain the expected behavior
