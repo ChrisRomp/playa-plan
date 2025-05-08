@@ -114,6 +114,7 @@ const ProfileForm: React.FC = () => {
               value={formData.firstName}
               onChange={handleChange}
               required
+              maxLength={50}
               className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
             />
           </div>
@@ -129,6 +130,7 @@ const ProfileForm: React.FC = () => {
               value={formData.lastName}
               onChange={handleChange}
               required
+              maxLength={50}
               className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
             />
           </div>
@@ -144,6 +146,7 @@ const ProfileForm: React.FC = () => {
             name="playaName"
             value={formData.playaName}
             onChange={handleChange}
+            maxLength={50}
             className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
           />
           <p className="text-xs text-gray-500">If you have one</p>
@@ -169,14 +172,14 @@ const ProfileForm: React.FC = () => {
         <div className="space-y-2">
           <label htmlFor="phone" className="block text-sm font-medium text-gray-700">
             Phone Number*
-          </label>
-          <input
+          </label>            <input
             type="tel"
             id="phone"
             name="phone"
             value={formData.phone}
             onChange={handleChange}
             required
+            maxLength={50}
             className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
           />
         </div>
@@ -192,6 +195,7 @@ const ProfileForm: React.FC = () => {
               name="city"
               value={formData.city}
               onChange={handleChange}
+              maxLength={50}
               className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
             />
           </div>
@@ -206,6 +210,7 @@ const ProfileForm: React.FC = () => {
               name="stateProvince"
               value={formData.stateProvince}
               onChange={handleChange}
+              maxLength={50}
               className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
             />
           </div>
@@ -222,6 +227,7 @@ const ProfileForm: React.FC = () => {
               name="country"
               value={formData.country}
               onChange={handleChange}
+              maxLength={50}
               className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
             />
           </div>
@@ -236,7 +242,7 @@ const ProfileForm: React.FC = () => {
           
           <div className="space-y-2">
             <label htmlFor="emergencyContact" className="block text-sm font-medium text-gray-700">
-              Emergency Contact(s) (name, phone number, and relationship)
+              Emergency Contact(s)
             </label>
             <textarea
               id="emergencyContact"
@@ -246,9 +252,10 @@ const ProfileForm: React.FC = () => {
               required
               placeholder="Example: Jane Doe, (555) 123-4567, Sister"
               rows={3}
+              maxLength={1024}
               className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
             />
-            <p className="text-xs text-gray-500">Please include full name, phone number, and relationship to you</p>
+            <p className="text-xs text-gray-500">Please include name, phone number, and relationship to you</p>
           </div>
         </div>
       

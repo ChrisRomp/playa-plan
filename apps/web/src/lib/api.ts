@@ -139,20 +139,20 @@ api.interceptors.response.use(
 export const UserSchema = z.object({
   id: z.string(),
   email: z.string().email(),
-  firstName: z.string(),
-  lastName: z.string(),
-  playaName: z.string().nullable().optional(),
+  firstName: z.string().max(50),
+  lastName: z.string().max(50),
+  playaName: z.string().max(50).nullable().optional(),
   profilePicture: z.string().nullable().optional(),
   role: z.enum(['ADMIN', 'STAFF', 'PARTICIPANT']),
   isEmailVerified: z.boolean(),
   createdAt: z.string(),
   updatedAt: z.string(),
   // Include additional fields that may be needed for profile validation
-  phone: z.string().nullable().optional(),
-  city: z.string().nullable().optional(),
-  stateProvince: z.string().nullable().optional(),
-  country: z.string().nullable().optional(),
-  emergencyContact: z.string().nullable().optional(),
+  phone: z.string().max(50).nullable().optional(),
+  city: z.string().max(50).nullable().optional(),
+  stateProvince: z.string().max(50).nullable().optional(),
+  country: z.string().max(50).nullable().optional(),
+  emergencyContact: z.string().max(1024).nullable().optional(),
 });
 
 export const AuthResponseSchema = z.object({
