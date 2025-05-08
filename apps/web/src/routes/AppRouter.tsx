@@ -10,6 +10,7 @@ import DashboardPage from '../pages/DashboardPage.tsx';
 import ProfilePage from '../pages/ProfilePage.tsx';
 import AdminPage from '../pages/AdminPage.tsx';
 import AdminConfigPage from '../pages/AdminConfigPage.tsx';
+import AdminUserPage from '../pages/AdminUserPage.tsx';
 import ShiftsPage from '../pages/ShiftsPage.tsx';
 import NotFoundPage from '../pages/NotFoundPage.tsx';
 import { ROLES } from '../types/auth.ts';
@@ -38,6 +39,7 @@ const AppRouter: React.FC = () => {
       <Route element={<ProtectedRoute requiresAuth={true} allowedRoles={[ROLES.ADMIN]} />}>
         <Route path={ROUTES.ADMIN.path} element={<AdminPage />} />
         <Route path={ROUTES.ADMIN_CONFIG.path} element={<AdminConfigPage />} />
+        <Route path={ROUTES.ADMIN_USERS.path} element={<AdminUserPage />} />
       </Route>
       
       {/* 404 route */}

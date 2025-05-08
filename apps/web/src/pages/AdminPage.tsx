@@ -21,9 +21,9 @@ const AdminPage: React.FC = () => {
         <div className="bg-white p-6 rounded-lg shadow-md">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">User Management</h2>
           <p className="text-gray-600 mb-4">View and manage user accounts, roles, and permissions.</p>
-          <button className="text-blue-600 hover:text-blue-800 font-medium">
+          <Link to={ROUTES.ADMIN_USERS.path} className="text-blue-600 hover:text-blue-800 font-medium">
             Manage Users →
-          </button>
+          </Link>
         </div>
         
         <div className="bg-white p-6 rounded-lg shadow-md">

@@ -116,7 +116,7 @@
    - [ ] Work schedule management
 
 9. [ ] Admin pages
-   - [ ] User management
+   - [x] User management
    - [x] Core configuration management
      - [x] Basic camp information settings
      - [x] Banner and icon configuration with alt text fields
