@@ -83,10 +83,10 @@ const ProfileForm: React.FC = () => {
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-6">
+    <> {/* Replaced styled div with React.Fragment */}
       <h2 className="text-2xl font-bold mb-6">Complete Your Profile</h2>
       <p className="mb-4 text-gray-700">
-        Please complete your profile information before proceeding to registration.
+        Please complete or verify your profile information before proceeding to registration.
       </p>
       
       {error && (
@@ -231,32 +231,25 @@ const ProfileForm: React.FC = () => {
               className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
             />
           </div>
-          
-          <div className="space-y-2">
-            {/* Playa Name field has been moved to be full width below the name fields */}
-          </div>
         </div>
         
-        <div className="pt-4 border-t border-gray-200 mt-4">
-          <h3 className="text-lg font-medium mb-3">Emergency Contact Information*</h3>
-          
-          <div className="space-y-2">
-            <label htmlFor="emergencyContact" className="block text-sm font-medium text-gray-700">
-              Emergency Contact(s)
-            </label>
-            <textarea
-              id="emergencyContact"
-              name="emergencyContact"
-              value={formData.emergencyContact}
-              onChange={handleChange}
-              required
-              placeholder="Example: Jane Doe, (555) 123-4567, Sister"
-              rows={3}
-              maxLength={1024}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-            />
-            <p className="text-xs text-gray-500">Please include name, phone number, and relationship to you</p>
-          </div>
+        {/* Emergency Contact field, now part of the main form flow without a separate heading or border */}
+        <div className="space-y-2 mt-4"> {/* Added mt-4 for spacing */}
+          <label htmlFor="emergencyContact" className="block text-sm font-medium text-gray-700">
+            Emergency Contact(s)*
+          </label>
+          <textarea
+            id="emergencyContact"
+            name="emergencyContact"
+            value={formData.emergencyContact}
+            onChange={handleChange}
+            required
+            placeholder="Example: Jane Doe, (555) 123-4567, Sister"
+            rows={3}
+            maxLength={1024}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+          />
+          <p className="text-xs text-gray-500">Please include name, phone number, and relationship to you</p>
         </div>
       
         <div className="pt-4">
@@ -269,7 +262,7 @@ const ProfileForm: React.FC = () => {
           </button>
         </div>
       </form>
-    </div>
+    </> // Replaced styled div with React.Fragment
   );
 };
 
