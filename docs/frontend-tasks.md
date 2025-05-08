@@ -117,11 +117,13 @@
 
 9. [ ] Admin pages
    - [ ] User management
-   - [ ] Core configuration management
-     - [ ] Basic camp information settings
-     - [ ] Banner and icon configuration with alt text fields
-     - [ ] Registration settings management
-     - [ ] Payment processor configuration
+   - [x] Core configuration management
+     - [x] Basic camp information settings
+     - [x] Banner and icon configuration with alt text fields
+     - [x] Registration settings management
+     - [x] Payment processor configuration
+     - [x] Email configuration
+     - [x] System settings (timezone)
    - [ ] Camping options configuration
    - [ ] Job/category management
    - [ ] Shift management
@@ -162,9 +164,10 @@ This approach balances security and usability for the camp registration system, 
 To ensure WCAG 2.2 compliance for dynamic content from Core Configuration:
 
 1. **Banner and Image Accessibility**
-   - Add `bannerAltText` field to Core Configuration to store descriptive alt text for banner images
-   - Add `iconAltText` field to Core Configuration for camp icon alt text
-   - Implement proper image loading patterns with fallbacks and loading states
+   - [x] Add `bannerAltText` field to Core Configuration to store descriptive alt text for banner images
+   - [x] Add `iconAltText` field to Core Configuration for camp icon alt text
+   - [x] Implement proper image loading patterns with fallbacks and loading states
+   - [x] Support for both relative and absolute URLs for better portability
 
 2. **Rich Text Content Accessibility**
    - Sanitize HTML from campDescription and homePageBlurb
@@ -193,6 +196,8 @@ To implement the new alt text fields added to the Core Configuration API:
    - Added `campBannerAltText` and `campIconAltText` fields to the database schema
    - Updated all relevant DTOs and service implementations
    - Created database migrations
+   - Added custom `IsUrlOrRelativePath` validator to support both relative and absolute URLs
+   - Enhanced Core Configuration API to handle creation when updating non-existent configuration
 
 2. **Web Implementation Requirements:**
    - Update API client types to include new alt text fields

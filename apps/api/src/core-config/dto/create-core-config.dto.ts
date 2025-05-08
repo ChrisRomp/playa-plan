@@ -13,6 +13,7 @@ import {
   IsInt
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { IsUrlOrRelativePath } from '../validators/is-url-or-relative-path.validator';
 
 /**
  * DTO for creating a new core configuration
@@ -57,11 +58,13 @@ export class CreateCoreConfigDto {
    * Camp banner URL
    */
   @ApiProperty({
-    description: 'Camp banner URL',
-    example: 'https://example.com/banner.jpg',
+    description: 'Camp banner URL (can be a full URL or a relative path starting with /)',
+    example: '/images/banner.jpg',
     required: false
   })
-  @IsUrl()
+  @IsUrlOrRelativePath({
+    message: 'campBannerUrl must be either a valid URL or a relative path starting with /'
+  })
   @IsOptional()
   campBannerUrl?: string;
 
@@ -82,11 +85,13 @@ export class CreateCoreConfigDto {
    * Camp icon URL
    */
   @ApiProperty({
-    description: 'Camp icon URL',
-    example: 'https://example.com/icon.png',
+    description: 'Camp icon URL (can be a full URL or a relative path starting with /)',
+    example: '/icons/icon.png',
     required: false
   })
-  @IsUrl()
+  @IsUrlOrRelativePath({
+    message: 'campIconUrl must be either a valid URL or a relative path starting with /'
+  })
   @IsOptional()
   campIconUrl?: string;
 
