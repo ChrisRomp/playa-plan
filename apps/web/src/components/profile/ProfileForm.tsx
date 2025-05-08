@@ -1,8 +1,10 @@
-import React, { useState, ChangeEvent } from 'react';
+import React, { useState, ChangeEvent, useEffect } from 'react';
 import { useProfile } from '../../hooks/useProfile';
+import { useNavigate } from 'react-router-dom';
 
 const ProfileForm: React.FC = () => {
   const { profile, updateProfile, isLoading, error } = useProfile();
+  const navigate = useNavigate();
   
   const [formData, setFormData] = useState({
     firstName: profile?.firstName || '',
@@ -15,6 +17,23 @@ const ProfileForm: React.FC = () => {
     playaName: profile?.playaName || '',
     emergencyContact: profile?.emergencyContact || '',
   });
+  
+  // Update form data when profile changes
+  useEffect(() => {
+    if (profile) {
+      setFormData({
+        firstName: profile.firstName || '',
+        lastName: profile.lastName || '',
+        email: profile.email || '',
+        phone: profile.phone || '',
+        city: profile.city || '',
+        stateProvince: profile.stateProvince || '',
+        country: profile.country || '',
+        playaName: profile.playaName || '',
+        emergencyContact: profile.emergencyContact || '',
+      });
+    }
+  }, [profile]);
   
   const [successMessage, setSuccessMessage] = useState('');
 
@@ -29,8 +48,20 @@ const ProfileForm: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Reset success message
-    setSuccessMessage('');
+    // Validate required fields
+    const requiredFields = ['firstName', 'lastName', 'phone', 'emergencyContact'];
+    const missingFields = requiredFields.filter(field => !formData[field as keyof typeof formData]);
+    
+    if (missingFields.length > 0) {
+      setSuccessMessage('');
+      
+      // Find the first missing field and focus its input
+      const firstMissingField = document.getElementById(missingFields[0]);
+      if (firstMissingField) {
+        firstMissingField.focus();
+      }
+      return;
+    }
     
     try {
       await updateProfile({
@@ -44,7 +75,8 @@ const ProfileForm: React.FC = () => {
         emergencyContact: formData.emergencyContact,
       });
       
-      setSuccessMessage('Profile updated successfully!');
+      // Redirect to dashboard after successful save
+      navigate('/dashboard');
     } catch (err) {
       console.error('Error submitting profile:', err);
     }
@@ -65,7 +97,7 @@ const ProfileForm: React.FC = () => {
       
       {successMessage && (
         <div className="mb-4 p-3 bg-green-100 border border-green-400 text-green-700 rounded">
-          {successMessage}
+          <p className="font-medium">{successMessage}</p>
         </div>
       )}
       
@@ -103,6 +135,21 @@ const ProfileForm: React.FC = () => {
         </div>
         
         <div className="space-y-2">
+          <label htmlFor="playaName" className="block text-sm font-medium text-gray-700">
+            Playa Name
+          </label>
+          <input
+            type="text"
+            id="playaName"
+            name="playaName"
+            value={formData.playaName}
+            onChange={handleChange}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+          />
+          <p className="text-xs text-gray-500">If you have one</p>
+        </div>
+        
+        <div className="space-y-2">
           <label htmlFor="email" className="block text-sm font-medium text-gray-700">
             Email*
           </label>
@@ -116,7 +163,7 @@ const ProfileForm: React.FC = () => {
             disabled
             className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-50"
           />
-          <p className="text-xs text-gray-500">Email cannot be changed</p>
+          <p className="text-xs text-gray-500">Email cannot be changed (yet)</p>
         </div>
         
         <div className="space-y-2">
@@ -180,17 +227,7 @@ const ProfileForm: React.FC = () => {
           </div>
           
           <div className="space-y-2">
-            <label htmlFor="playaName" className="block text-sm font-medium text-gray-700">
-              Playa Name
-            </label>
-            <input
-              type="text"
-              id="playaName"
-              name="playaName"
-              value={formData.playaName}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-            />
+            {/* Playa Name field has been moved to be full width below the name fields */}
           </div>
         </div>
         
@@ -199,7 +236,7 @@ const ProfileForm: React.FC = () => {
           
           <div className="space-y-2">
             <label htmlFor="emergencyContact" className="block text-sm font-medium text-gray-700">
-              Emergency Contact (name, phone number, and relationship)
+              Emergency Contact(s) (name, phone number, and relationship)
             </label>
             <textarea
               id="emergencyContact"
