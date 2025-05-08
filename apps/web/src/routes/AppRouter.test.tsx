@@ -1,11 +1,10 @@
-import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import AppRouter from './AppRouter';
 import { useAuth } from '../store/AuthContext';
 import { ROUTES } from './index';
-import { ROLES, UserRole } from '../types/auth';
+import { ROLES } from '../types/auth';
 
 // Mock the page components to simplify testing
 vi.mock('../pages/HomePage.tsx', () => ({
@@ -78,7 +77,10 @@ describe('AppRouter', () => {
           id: '1', 
           email: 'user@example.com', 
           name: 'Test User',
-          role: ROLES.USER
+          role: ROLES.USER,
+          isAuthenticated: true,
+          isEarlyRegistrationEnabled: false,
+          hasRegisteredForCurrentYear: false
         },
         error: null,
         requestVerificationCode: vi.fn().mockResolvedValue(false),
@@ -115,7 +117,10 @@ describe('AppRouter', () => {
           id: '1', 
           email: 'user@example.com', 
           name: 'Test User',
-          role: ROLES.USER
+          role: ROLES.USER,
+          isAuthenticated: true,
+          isEarlyRegistrationEnabled: false,
+          hasRegisteredForCurrentYear: false
         },
         error: null,
         requestVerificationCode: vi.fn().mockResolvedValue(false),
@@ -136,7 +141,10 @@ describe('AppRouter', () => {
           id: '1', 
           email: 'user@example.com', 
           name: 'Test User',
-          role: ROLES.USER
+          role: ROLES.USER,
+          isAuthenticated: true,
+          isEarlyRegistrationEnabled: false,
+          hasRegisteredForCurrentYear: false
         },
         error: null,
         requestVerificationCode: vi.fn().mockResolvedValue(false),
@@ -159,7 +167,10 @@ describe('AppRouter', () => {
           id: '1', 
           email: 'admin@example.com', 
           name: 'Admin User',
-          role: ROLES.ADMIN
+          role: ROLES.ADMIN,
+          isAuthenticated: true,
+          isEarlyRegistrationEnabled: false,
+          hasRegisteredForCurrentYear: false
         },
         error: null,
         requestVerificationCode: vi.fn().mockResolvedValue(false),
@@ -180,7 +191,10 @@ describe('AppRouter', () => {
           id: '1', 
           email: 'user@example.com', 
           name: 'Regular User',
-          role: ROLES.USER
+          role: ROLES.USER,
+          isAuthenticated: true,
+          isEarlyRegistrationEnabled: false,
+          hasRegisteredForCurrentYear: false
         },
         error: null,
         requestVerificationCode: vi.fn().mockResolvedValue(false),
