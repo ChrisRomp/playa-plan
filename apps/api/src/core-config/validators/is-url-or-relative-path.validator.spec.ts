@@ -54,7 +54,7 @@ describe('IsUrlOrRelativePath', () => {
       { value: '#fragment-only', reason: 'fragment only, not a URL' }
     ];
 
-    for (const { value, reason } of invalidUrls) {
+    for (const { value } of invalidUrls) {
       const testObj = new TestClass(value);
       const errors = await validate(testObj);
       
