@@ -23,14 +23,41 @@ export function IsUrlOrRelativePath(validationOptions?: ValidationOptions) {
             return false;
           }
 
+          // Check for spaces at the beginning
+          if (value !== value.trim()) {
+            return false;
+          }
+
           // Check if it's a valid relative path starting with slash
           if (value.startsWith('/')) {
-            return true;
+            // Ensure there are no spaces in the path
+            if (value.includes(' ')) {
+              return false;
+            }
+            // Make sure it's a valid path format with at least one character after the slash
+            if (value.length > 1 && /^\/[a-zA-Z0-9]/.test(value)) {
+              return true;
+            }
+            return false;
+          }
+
+          // Check common protocol presence
+          const hasValidProtocol = /^(https?|ftp):\/\//.test(value);
+          if (!hasValidProtocol) {
+            return false;
           }
 
           // Check if it's a valid URL using URL constructor
           try {
-            new URL(value);
+            const url = new URL(value);
+            // Ensure it has a protocol and hostname
+            if (!url.protocol || !url.hostname) {
+              return false;
+            }
+            // Check for common URL issues
+            if (url.hostname === '' || url.protocol === ':') {
+              return false;
+            }
             return true;
           } catch {
             return false;

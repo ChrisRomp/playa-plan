@@ -43,21 +43,32 @@ describe('IsUrlOrRelativePath', () => {
   });
 
   it('should fail validation for invalid URLs and paths', async () => {
-    const testCases = [
-      'path/without/leading/slash',
-      'http:/missing-colon.com',
-      'ftp:only-scheme',
-      'just text with spaces',
-      '://invalid-url-format',
-      ' /space-before-slash',
-      '#fragment-only'
+    // Test each case individually
+    const invalidUrls = [
+      { value: 'path/without/leading/slash', reason: 'missing leading slash' },
+      { value: 'http:/missing-colon.com', reason: 'invalid URL format' },
+      { value: 'ftp:only-scheme', reason: 'missing hostname' },
+      { value: 'just text with spaces', reason: 'not a URL or path' },
+      { value: '://invalid-url-format', reason: 'missing protocol' },
+      { value: ' /space-before-slash', reason: 'space before slash' },
+      { value: '#fragment-only', reason: 'fragment only, not a URL' }
     ];
 
-    for (const testUrl of testCases) {
-      const testObj = new TestClass(testUrl);
+    for (const { value, reason } of invalidUrls) {
+      const testObj = new TestClass(value);
       const errors = await validate(testObj);
-      expect(errors.length).toBeGreaterThan(0);
-      expect(errors[0].constraints).toHaveProperty('isUrlOrRelativePath');
+      
+      // Log the test value and validation results for debugging
+      console.log(`Testing ${value} (${reason}): ${errors.length} errors`);
+      if (errors.length > 0) {
+        console.log(`  Constraints: ${JSON.stringify(errors[0].constraints)}`);
+      }
+      
+      expect(errors.length).toBeGreaterThan(0, `Expected '${value}' to fail validation because: ${reason}`);
+      
+      if (errors.length > 0) {
+        expect(errors[0].constraints).toHaveProperty('isUrlOrRelativePath');
+      }
     }
   });
 
