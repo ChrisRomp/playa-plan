@@ -64,11 +64,8 @@ describe('IsUrlOrRelativePath', () => {
         console.log(`  Constraints: ${JSON.stringify(errors[0].constraints)}`);
       }
       
-      expect(errors.length).toBeGreaterThan(0, `Expected '${value}' to fail validation because: ${reason}`);
-      
-      if (errors.length > 0) {
-        expect(errors[0].constraints).toHaveProperty('isUrlOrRelativePath');
-      }
+      expect(errors.length).toBeGreaterThan(0);
+      expect(errors[0].constraints).toHaveProperty('isUrlOrRelativePath');
     }
   });
 
