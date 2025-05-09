@@ -10,8 +10,8 @@ alwaysApply: false
 1. Clone the repository
 2. Install dependencies: `npm install` at the root
 3. Start development:
-   - For frontend only: `npm run dev:web`
-   - For backend only: `npm run dev:api`
+   - For frontend only: `cd apps/web && npm run dev`
+   - For backend only: `cd apps/api && npm run dev`
    - For both: `npm run dev`
 
 ## Development Guidelines
@@ -26,6 +26,7 @@ alwaysApply: false
   - Tests: should + behavior (e.g., shouldValidateCredentials)
 - No abbreviations unless universally known
 - Keep nesting level <= 2 where practical
+- Sign all git commits; do not bypass signature if there's an error signing
 
 ## Testing
 
