@@ -22,6 +22,20 @@ export class CampingOptionsService {
    */
   async create(createCampingOptionDto: CreateCampingOptionDto): Promise<CampingOption> {
     try {
+      // If campId is not provided, get the first active camp ID
+      if (!createCampingOptionDto.campId) {
+        const firstActiveCamp = await this.prisma.camp.findFirst({
+          where: { isActive: true },
+          orderBy: { createdAt: 'asc' },
+        });
+
+        if (!firstActiveCamp) {
+          throw new NotFoundException('No active camp found to associate with this camping option');
+        }
+
+        createCampingOptionDto.campId = firstActiveCamp.id;
+      }
+
       // Verify that the camp exists
       const camp = await this.prisma.camp.findUnique({
         where: { id: createCampingOptionDto.campId },

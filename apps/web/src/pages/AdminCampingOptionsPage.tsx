@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { useCampingOptions } from '../hooks/useCampingOptions';
 import { CampingOption } from '../lib/api';
 
@@ -73,10 +72,6 @@ const AdminCampingOptionsPage: React.FC = () => {
 
     if (formData.workShiftsRequired < 0) {
       errors.workShiftsRequired = 'Work shifts required cannot be negative';
-    }
-
-    if (!formData.campId) {
-      errors.campId = 'Camp ID is required';
     }
 
     setFormErrors(errors);
@@ -344,25 +339,6 @@ const AdminCampingOptionsPage: React.FC = () => {
                       Enabled
                     </label>
                   </div>
-                </div>
-                
-                {/* Camp ID (simplified for now) */}
-                <div className="col-span-1">
-                  <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="campId">
-                    Camp ID*
-                  </label>
-                  <input
-                    type="text"
-                    id="campId"
-                    name="campId"
-                    value={formData.campId}
-                    onChange={handleInputChange}
-                    className={`w-full px-3 py-2 border rounded-md ${
-                      formErrors.campId ? 'border-red-500' : 'border-gray-300'
-                    }`}
-                    required
-                  />
-                  {formErrors.campId && <p className="text-red-500 text-xs mt-1">{formErrors.campId}</p>}
                 </div>
                 
                 {/* Participant Dues */}

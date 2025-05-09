@@ -528,7 +528,7 @@ export const campingOptions = {
    * @param data The camping option data
    * @returns A promise that resolves to the created camping option
    */
-  create: async (data: Omit<CampingOption, 'id' | 'createdAt' | 'updatedAt' | 'currentRegistrations' | 'availabilityStatus' | 'fields'>): Promise<CampingOption> => {
+  create: async (data: Omit<CampingOption, 'id' | 'createdAt' | 'updatedAt' | 'currentRegistrations' | 'availabilityStatus' | 'fields' | 'campId'> & { campId?: string }): Promise<CampingOption> => {
     try {
       const response = await api.post<CampingOption>('/camping-options', data);
       return CampingOptionSchema.parse(response.data);
