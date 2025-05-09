@@ -58,12 +58,6 @@ describe('IsUrlOrRelativePath', () => {
       const testObj = new TestClass(value);
       const errors = await validate(testObj);
       
-      // Log the test value and validation results for debugging
-      console.log(`Testing ${value} (${reason}): ${errors.length} errors`);
-      if (errors.length > 0) {
-        console.log(`  Constraints: ${JSON.stringify(errors[0].constraints)}`);
-      }
-      
       expect(errors.length).toBeGreaterThan(0);
       expect(errors[0].constraints).toHaveProperty('isUrlOrRelativePath');
     }

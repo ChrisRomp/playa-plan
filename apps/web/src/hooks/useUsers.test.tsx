@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
+import { renderHook, act, waitFor } from '@testing-library/react';
 import { useUsers } from './useUsers';
 import { api } from '../lib/api';
 import { User } from '../types/users';
@@ -50,7 +50,7 @@ describe('useUsers', () => {
     const { result } = renderHook(() => useUsers());
 
     // Wait for the effect to run
-    await vi.waitFor(() => expect(result.current.loading).toBe(false));
+    await waitFor(() => expect(result.current.loading).toBe(false));
 
     // Verify API was called
     expect(api.get).toHaveBeenCalledWith('/users');
@@ -68,7 +68,7 @@ describe('useUsers', () => {
     const { result } = renderHook(() => useUsers());
 
     // Wait for the effect to run
-    await vi.waitFor(() => expect(result.current.loading).toBe(false));
+    await waitFor(() => expect(result.current.loading).toBe(false));
 
     // Verify error state
     expect(result.current.error).toBe('Failed to fetch');
@@ -163,7 +163,7 @@ describe('useUsers', () => {
     const { result } = renderHook(() => useUsers());
 
     // Wait for initial data load
-    await vi.waitFor(() => expect(result.current.loading).toBe(false));
+    await waitFor(() => expect(result.current.loading).toBe(false));
 
     // Call updateUser within act
     let user;
@@ -195,7 +195,7 @@ describe('useUsers', () => {
     const { result } = renderHook(() => useUsers());
     
     // Wait for initial data load
-    await vi.waitFor(() => expect(result.current.loading).toBe(false));
+    await waitFor(() => expect(result.current.loading).toBe(false));
     
     // Verify we have the expected number of users before deletion
     expect(result.current.users.length).toBe(2);
