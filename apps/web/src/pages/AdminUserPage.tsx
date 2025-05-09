@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { useUsers, User, CreateUserDTO, UpdateUserDTO } from '../hooks/useUsers';
+import { useUsers } from '../hooks/useUsers';
+import { User, CreateUserDTO, UpdateUserDTO } from '../types/users';
 import { ROUTES } from '../routes';
 
 /**
@@ -93,9 +94,9 @@ const AdminUserPage: React.FC = () => {
     
     if (type === 'checkbox') {
       const checked = (e.target as HTMLInputElement).checked;
-      setFormData(prev => ({ ...prev, [name]: checked }));
+      setFormData((prev: CreateUserDTO | UpdateUserDTO) => ({ ...prev, [name]: checked }));
     } else {
-      setFormData(prev => ({ ...prev, [name]: value }));
+      setFormData((prev: CreateUserDTO | UpdateUserDTO) => ({ ...prev, [name]: value }));
     }
   };
 

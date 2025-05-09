@@ -3,7 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import AdminUserPage from './AdminUserPage';
 import * as useUsersModule from '../hooks/useUsers';
-import { User } from '../hooks/useUsers';
+import { User } from '../types/users';
 
 // Mock the useUsers hook
 vi.mock('../hooks/useUsers', () => {
