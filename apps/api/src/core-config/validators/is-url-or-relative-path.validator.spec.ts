@@ -42,9 +42,23 @@ describe('IsUrlOrRelativePath', () => {
     }
   });
 
-  // Skip the failing test for now
-  it.skip('should fail validation for invalid URLs and paths', async () => {
-    // Our validator is more permissive than expected, which is fine for our use case
+  it('should fail validation for invalid URLs and paths', async () => {
+    const testCases = [
+      'path/without/leading/slash',
+      'http:/missing-colon.com',
+      'ftp:only-scheme',
+      'just text with spaces',
+      '://invalid-url-format',
+      ' /space-before-slash',
+      '#fragment-only'
+    ];
+
+    for (const testUrl of testCases) {
+      const testObj = new TestClass(testUrl);
+      const errors = await validate(testObj);
+      expect(errors.length).toBeGreaterThan(0);
+      expect(errors[0].constraints).toHaveProperty('isUrlOrRelativePath');
+    }
   });
 
   it('should pass validation for empty values', async () => {

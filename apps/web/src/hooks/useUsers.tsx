@@ -1,94 +1,12 @@
 import { useState, useCallback, useEffect } from 'react';
 import { api } from '../lib/api';
-import { z } from 'zod';
+import { User, UserSchema, UsersArraySchema, CreateUserDTO, UpdateUserDTO } from '../types/users';
 
-// Define User schema
-export const UserSchema = z.object({
-  id: z.string(),
-  email: z.string().email(),
-  firstName: z.string(),
-  lastName: z.string(),
-  playaName: z.string().nullable().optional(),
-  profilePicture: z.string().nullable().optional(),
-  role: z.enum(['ADMIN', 'STAFF', 'PARTICIPANT']),
-  isEmailVerified: z.boolean(),
-  createdAt: z.string(),
-  updatedAt: z.string(),
-  allowRegistration: z.boolean().optional(),
-  allowEarlyRegistration: z.boolean().optional(),
-  allowDeferredDuesPayment: z.boolean().optional(),
-  allowNoJob: z.boolean().optional(),
-  phone: z.string().optional().nullable(),
-  city: z.string().optional().nullable(),
-  stateProvince: z.string().optional().nullable(),
-  country: z.string().optional().nullable(),
-  emergencyContact: z.string().optional().nullable(),
-  internalNotes: z.string().optional().nullable(),
-});
-
-export type User = z.infer<typeof UserSchema>;
-export const UsersArraySchema = z.array(UserSchema);
-
-// Create User DTO schema
-export const CreateUserSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(8),
-  firstName: z.string(),
-  lastName: z.string(),
-  playaName: z.string().optional(),
-  role: z.enum(['ADMIN', 'STAFF', 'PARTICIPANT']).optional(),
-  phone: z.string().optional(),
-  city: z.string().optional(),
-  stateProvince: z.string().optional(),
-  country: z.string().optional(),
-  emergencyContact: z.string().optional(),
-  profilePicture: z.string().optional(),
-  allowRegistration: z.boolean().optional(),
-  allowEarlyRegistration: z.boolean().optional(),
-  allowDeferredDuesPayment: z.boolean().optional(),
-  allowNoJob: z.boolean().optional(),
-  internalNotes: z.string().optional(),
-});
-
-export type CreateUserDTO = z.infer<typeof CreateUserSchema>;
-
-// Update User DTO schema
-export const UpdateUserSchema = z.object({
-  email: z.string().email().optional(),
-  password: z.string().min(8).optional(),
-  firstName: z.string().optional(),
-  lastName: z.string().optional(),
-  playaName: z.string().optional(),
-  role: z.enum(['ADMIN', 'STAFF', 'PARTICIPANT']).optional(),
-  phone: z.string().optional(),
-  city: z.string().optional(),
-  stateProvince: z.string().optional(),
-  country: z.string().optional(),
-  emergencyContact: z.string().optional(),
-  profilePicture: z.string().optional(),
-  allowRegistration: z.boolean().optional(),
-  allowEarlyRegistration: z.boolean().optional(),
-  allowDeferredDuesPayment: z.boolean().optional(),
-  allowNoJob: z.boolean().optional(),
-  internalNotes: z.string().optional(),
-});
-
-export type UpdateUserDTO = z.infer<typeof UpdateUserSchema>;
-
-interface UseUsersReturn {
-  users: User[];
-  loading: boolean;
-  error: string | null;
-  fetchUsers: () => Promise<void>;
-  getUser: (id: string) => Promise<User | null>;
-  createUser: (user: CreateUserDTO) => Promise<User | null>;
-  updateUser: (id: string, user: UpdateUserDTO) => Promise<User | null>;
-  deleteUser: (id: string) => Promise<boolean>;
-  selectedUser: User | null;
-  setSelectedUser: (user: User | null) => void;
-}
-
-export function useUsers(): UseUsersReturn {
+/**
+ * Hook for managing user data
+ * Provides functions for fetching, creating, updating, and deleting users
+ */
+export function useUsers() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);

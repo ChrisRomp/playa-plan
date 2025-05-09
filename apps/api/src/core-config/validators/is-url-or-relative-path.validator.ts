@@ -14,7 +14,7 @@ export function IsUrlOrRelativePath(validationOptions?: ValidationOptions) {
       propertyName: propertyName,
       options: validationOptions,
       validator: {
-        validate(value: string | unknown, args: ValidationArguments) {
+        validate(value: string | unknown) {
           if (value === undefined || value === null || value === '') {
             return true; // Allow empty values (if optional)
           }
@@ -32,7 +32,7 @@ export function IsUrlOrRelativePath(validationOptions?: ValidationOptions) {
           try {
             new URL(value);
             return true;
-          } catch (e) {
+          } catch {
             return false;
           }
         },
