@@ -10,7 +10,7 @@ interface CampingOptionFormData {
   participantDues: number;
   staffDues: number;
   maxSignups: number;
-  campId: string;
+  campId?: string;
   jobCategoryIds: string[];
 }
 
@@ -40,7 +40,6 @@ const AdminCampingOptionsPage: React.FC = () => {
     participantDues: 0,
     staffDues: 0,
     maxSignups: 0,
-    campId: '',
     jobCategoryIds: [],
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
@@ -102,7 +101,6 @@ const AdminCampingOptionsPage: React.FC = () => {
       participantDues: 0,
       staffDues: 0,
       maxSignups: 0,
-      campId: '',
       jobCategoryIds: [],
     });
     setFormErrors({});
@@ -154,11 +152,21 @@ const AdminCampingOptionsPage: React.FC = () => {
         // Update existing option
         await updateCampingOption(selectedOption.id, formData);
       } else {
-        // Create new option
-        await createCampingOption(formData);
+        // Create new option - use data with empty campId omitted
+        const dataToSend = { ...formData };
+        
+        // Remove empty campId if it exists to let backend set it automatically
+        if (dataToSend.campId === '') {
+          delete dataToSend.campId;
+        }
+        
+        await createCampingOption(dataToSend);
       }
       
       setIsModalOpen(false);
+      
+      // Refresh the list of camping options
+      loadCampingOptions(true);
     } catch (err) {
       console.error('Error saving camping option:', err);
     } finally {

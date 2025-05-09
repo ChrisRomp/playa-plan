@@ -54,7 +54,9 @@ export const useCampingOptions = () => {
   /**
    * Create a new camping option
    */
-  const createCampingOption = useCallback(async (data: Omit<CampingOption, 'id' | 'createdAt' | 'updatedAt' | 'currentRegistrations' | 'availabilityStatus' | 'fields'>) => {
+  const createCampingOption = useCallback(async (
+    data: Omit<CampingOption, 'id' | 'createdAt' | 'updatedAt' | 'currentRegistrations' | 'availabilityStatus' | 'fields' | 'campId'> & { campId?: string }
+  ) => {
     setLoading(true);
     setError(null);
     
