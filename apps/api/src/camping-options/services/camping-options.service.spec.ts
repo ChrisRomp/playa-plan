@@ -45,6 +45,7 @@ describe('CampingOptionsService', () => {
   const mockPrismaService = {
     camp: {
       findUnique: jest.fn(),
+      findFirst: jest.fn(),
     },
     jobCategory: {
       findMany: jest.fn(),
@@ -118,6 +119,48 @@ describe('CampingOptionsService', () => {
       
       expect(result).toBeInstanceOf(CampingOption);
       expect(result.name).toEqual(mockCampingOption.name);
+    });
+
+    it('should assign the first active camp if campId is not provided', async () => {
+      const dto = { ...mockCreateCampingOptionDto };
+      delete dto.campId;
+      const firstActiveCamp = {
+        id: 'active-camp-id',
+        name: 'Active Camp',
+        description: 'A test active camp',
+        startDate: new Date('2024-01-01'),
+        endDate: new Date('2024-01-10'),
+        location: 'Test Location',
+        capacity: 100,
+        isActive: true,
+        createdAt: new Date('2023-12-01'),
+        updatedAt: new Date('2023-12-02'),
+      };
+      // Override the campingOption.create mock for this test to return the correct campId
+      const createSpy = jest.spyOn(prisma.campingOption, 'create').mockResolvedValueOnce({
+        ...mockCampingOption,
+        campId: 'active-camp-id',
+      });
+      const findFirstSpy = jest.spyOn(prisma.camp, 'findFirst').mockResolvedValueOnce(firstActiveCamp);
+      const findUniqueSpy = jest.spyOn(prisma.camp, 'findUnique').mockResolvedValueOnce(firstActiveCamp);
+      const result = await service.create(dto);
+      expect(prisma.camp.findFirst).toHaveBeenCalledWith({
+        where: { isActive: true },
+        orderBy: { createdAt: 'asc' },
+      });
+      expect(result).toBeInstanceOf(CampingOption);
+      expect(result.campId).toBe('active-camp-id');
+      // Restore the spies to avoid affecting other tests
+      findFirstSpy.mockRestore();
+      findUniqueSpy.mockRestore();
+      createSpy.mockRestore();
+    });
+
+    it('should throw NotFoundException if no active camp exists and campId is not provided', async () => {
+      const dto = { ...mockCreateCampingOptionDto };
+      delete dto.campId;
+      mockPrismaService.camp.findFirst = jest.fn().mockResolvedValueOnce(null);
+      await expect(service.create(dto)).rejects.toThrow(NotFoundException);
     });
 
     it('should throw NotFoundException if camp not found', async () => {

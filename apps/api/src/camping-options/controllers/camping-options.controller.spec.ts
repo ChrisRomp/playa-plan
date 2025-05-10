@@ -261,5 +261,15 @@ describe('CampingOptionsController', () => {
       expect(fieldsService.remove).toHaveBeenCalledWith(fieldId);
       expect(result).toEqual(mockField);
     });
+
+    it('should throw NotFoundException if field does not belong to the camping option (updateField)', async () => {
+      const campingOptionId = 'test-id';
+      const fieldId = 'field-id';
+      const updateDto = { displayName: 'Updated Field' };
+      // The field's campingOptionId does not match the requested campingOptionId
+      jest.spyOn(service, 'findOne').mockResolvedValueOnce({ id: campingOptionId } as unknown as CampingOption);
+      jest.spyOn(fieldsService, 'findOne').mockResolvedValueOnce({ id: fieldId, campingOptionId: 'other-option-id' } as unknown as CampingOptionField);
+      await expect(controller.updateField(campingOptionId, fieldId, updateDto)).rejects.toThrow(NotFoundException);
+    });
   });
 }); 
