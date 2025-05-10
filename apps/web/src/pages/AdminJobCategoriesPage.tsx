@@ -109,7 +109,9 @@ export default function AdminJobCategoriesPage() {
             </tr>
           </thead>
           <tbody>
-            {categories.map((cat) => (
+            {[...categories]
+              .sort((a, b) => a.name.localeCompare(b.name))
+              .map((cat) => (
               <tr key={cat.id} className="hover:bg-gray-50">
                 <td className="px-4 py-2 border-b">{cat.name}</td>
                 <td className="px-4 py-2 border-b">{cat.description}</td>
