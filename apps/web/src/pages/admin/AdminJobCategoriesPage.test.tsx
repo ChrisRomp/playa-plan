@@ -95,4 +95,37 @@ describe('AdminJobCategoriesPage', () => {
     render(<AdminJobCategoriesPage />);
     expect(screen.getByText('Failed to fetch')).toBeInTheDocument();
   });
+
+  it('should render the empty state when no categories are available', () => {
+    vi.spyOn(useJobCategoriesModule, 'useJobCategories').mockReturnValue({
+      categories: [],
+      loading: false,
+      error: null,
+      fetchCategories: vi.fn(),
+      createCategory: vi.fn(),
+      updateCategory: vi.fn(),
+      deleteCategory: vi.fn(),
+    });
+    render(<AdminJobCategoriesPage />);
+    expect(screen.getByText('No job categories found.')).toBeInTheDocument();
+  });
+
+  it('should display error message when deleteCategory fails', async () => {
+    // Simulate a deletion error
+    const errorMessage = 'Cannot delete category because it is in use by one or more jobs.';
+    deleteCategory.mockRejectedValue(new Error(errorMessage));
+    
+    render(<AdminJobCategoriesPage />);
+    
+    // Open the delete confirmation modal
+    fireEvent.click(screen.getByLabelText('Delete Kitchen'));
+    
+    // Confirm deletion
+    fireEvent.click(screen.getByTestId('confirm-delete-button'));
+    
+    // Verify error message is displayed
+    await waitFor(() => {
+      expect(screen.getByText(errorMessage)).toBeInTheDocument();
+    });
+  });
 }); 

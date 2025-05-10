@@ -30,6 +30,7 @@ export default function AdminJobCategoriesPage() {
     setForm({ name: '', description: '' });
     setFormError(null);
     setDeleteError(null);
+    setDeleteId(null);
     setModalOpen(true);
   };
 
@@ -38,6 +39,7 @@ export default function AdminJobCategoriesPage() {
     setForm({ name: category.name, description: category.description });
     setFormError(null);
     setDeleteError(null);
+    setDeleteId(null);
     setModalOpen(true);
   };
 
