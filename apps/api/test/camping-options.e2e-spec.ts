@@ -4,24 +4,6 @@ import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/common/prisma/prisma.service';
 import { UserRole } from '@prisma/client';
-import { CampingOption } from '../src/camping-options/entities/camping-option.entity';
-import { CampingOptionField } from '../src/camping-options/entities/camping-option-field.entity';
-
-// Interface for raw camping option results
-interface RawCampingOption {
-  id: string;
-  name: string;
-  description: string | null;
-  enabled: boolean;
-  workShiftsRequired: number;
-  participantDues: number;
-  staffDues: number;
-  maxSignups: number;
-  campId: string;
-  jobCategoryIds: string[];
-  createdAt: Date;
-  updatedAt: Date;
-}
 
 // Mock SendGrid
 jest.mock('@sendgrid/mail', () => ({

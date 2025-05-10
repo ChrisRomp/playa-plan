@@ -4,13 +4,11 @@ import { CampingOptionsService } from '../services/camping-options.service';
 import { 
   CreateCampingOptionDto, 
   UpdateCampingOptionDto, 
-  CampingOptionResponseDto,
   CreateCampingOptionFieldDto,
   UpdateCampingOptionFieldDto
 } from '../dto';
 import { CampingOption } from '../entities/camping-option.entity';
 import { NotFoundException } from '@nestjs/common';
-import { UserRole } from '@prisma/client';
 import { CampingOptionFieldsService } from '../services/camping-option-fields.service';
 import { CampingOptionField } from '../entities/camping-option-field.entity';
 import { FieldType } from '../entities/camping-option-field.entity';
