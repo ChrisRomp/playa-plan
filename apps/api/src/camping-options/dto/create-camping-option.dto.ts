@@ -107,9 +107,11 @@ export class CreateCampingOptionDto {
   @ApiProperty({
     description: 'ID of the camp this option belongs to',
     example: 'c12345-67890',
+    required: false
   })
   @IsUUID()
-  campId!: string;
+  @IsOptional()
+  campId?: string;
   
   /**
    * Array of job category IDs required for this camping option

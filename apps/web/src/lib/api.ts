@@ -191,10 +191,44 @@ export const CoreConfigSchema = z.object({
   updatedAt: z.string(),
 });
 
+export const CampingOptionFieldSchema = z.object({
+  id: z.string(),
+  displayName: z.string(),
+  description: z.string().nullable().optional(),
+  dataType: z.enum(['STRING', 'MULTILINE_STRING', 'INTEGER', 'NUMBER', 'BOOLEAN', 'DATE']),
+  required: z.boolean(),
+  maxLength: z.number().nullable().optional(),
+  minValue: z.number().nullable().optional(),
+  maxValue: z.number().nullable().optional(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  campingOptionId: z.string(),
+});
+
+export const CampingOptionSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string().nullable().optional(),
+  enabled: z.boolean(),
+  workShiftsRequired: z.number(),
+  participantDues: z.number(),
+  staffDues: z.number(),
+  maxSignups: z.number(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  campId: z.string(),
+  jobCategoryIds: z.array(z.string()),
+  currentRegistrations: z.number().optional(),
+  availabilityStatus: z.boolean().optional(),
+  fields: z.array(CampingOptionFieldSchema).optional(),
+});
+
 // API Types
 export type User = z.infer<typeof UserSchema>;
 export type AuthResponse = z.infer<typeof AuthResponseSchema>;
 export type CoreConfig = z.infer<typeof CoreConfigSchema>;
+export type CampingOption = z.infer<typeof CampingOptionSchema>;
+export type CampingOptionField = z.infer<typeof CampingOptionFieldSchema>;
 
 // API Functions
 export const auth = {
@@ -437,6 +471,165 @@ export const config = {
       
       console.error('Error fetching configuration:', errorMessage, axiosError);
       throw new Error(errorMessage);
+    }
+  },
+};
+
+// Camping options API functions
+export const campingOptions = {
+  /**
+   * Get all camping options
+   * @param includeDisabled Whether to include disabled options (default: false)
+   * @param campId Optional camp ID to filter by
+   * @returns A promise that resolves to an array of camping options
+   */
+  getAll: async (includeDisabled = false, campId?: string): Promise<CampingOption[]> => {
+    try {
+      let url = '/camping-options';
+      const params = new URLSearchParams();
+      
+      if (includeDisabled) {
+        params.append('includeDisabled', 'true');
+      }
+      
+      if (campId) {
+        params.append('campId', campId);
+      }
+      
+      if (params.toString()) {
+        url += `?${params.toString()}`;
+      }
+      
+      const response = await api.get<CampingOption[]>(url);
+      return response.data.map(option => CampingOptionSchema.parse(option));
+    } catch (error) {
+      console.error('Error fetching camping options:', error);
+      throw error;
+    }
+  },
+  
+  /**
+   * Get a camping option by ID
+   * @param id The ID of the camping option
+   * @returns A promise that resolves to the camping option
+   */
+  getById: async (id: string): Promise<CampingOption> => {
+    try {
+      const response = await api.get<CampingOption>(`/camping-options/${id}`);
+      return CampingOptionSchema.parse(response.data);
+    } catch (error) {
+      console.error(`Error fetching camping option with ID ${id}:`, error);
+      throw error;
+    }
+  },
+  
+  /**
+   * Create a new camping option
+   * @param data The camping option data
+   * @returns A promise that resolves to the created camping option
+   */
+  create: async (data: Omit<CampingOption, 'id' | 'createdAt' | 'updatedAt' | 'currentRegistrations' | 'availabilityStatus' | 'fields' | 'campId'> & { campId?: string }): Promise<CampingOption> => {
+    try {
+      const response = await api.post<CampingOption>('/camping-options', data);
+      return CampingOptionSchema.parse(response.data);
+    } catch (error) {
+      console.error('Error creating camping option:', error);
+      throw error;
+    }
+  },
+  
+  /**
+   * Update a camping option
+   * @param id The ID of the camping option to update
+   * @param data The data to update
+   * @returns A promise that resolves to the updated camping option
+   */
+  update: async (id: string, data: Partial<Omit<CampingOption, 'id' | 'createdAt' | 'updatedAt' | 'currentRegistrations' | 'availabilityStatus' | 'fields'>>): Promise<CampingOption> => {
+    try {
+      const response = await api.patch<CampingOption>(`/camping-options/${id}`, data);
+      return CampingOptionSchema.parse(response.data);
+    } catch (error) {
+      console.error(`Error updating camping option with ID ${id}:`, error);
+      throw error;
+    }
+  },
+  
+  /**
+   * Delete a camping option
+   * @param id The ID of the camping option to delete
+   * @returns A promise that resolves to the deleted camping option
+   */
+  delete: async (id: string): Promise<CampingOption> => {
+    try {
+      const response = await api.delete<CampingOption>(`/camping-options/${id}`);
+      return CampingOptionSchema.parse(response.data);
+    } catch (error) {
+      console.error(`Error deleting camping option with ID ${id}:`, error);
+      throw error;
+    }
+  },
+  
+  /**
+   * Get all fields for a camping option
+   * @param campingOptionId The ID of the camping option
+   * @returns A promise that resolves to an array of camping option fields
+   */
+  getFields: async (campingOptionId: string): Promise<CampingOptionField[]> => {
+    try {
+      const response = await api.get<CampingOptionField[]>(`/camping-options/${campingOptionId}/fields`);
+      return response.data.map(field => CampingOptionFieldSchema.parse(field));
+    } catch (error) {
+      console.error(`Error fetching fields for camping option with ID ${campingOptionId}:`, error);
+      throw error;
+    }
+  },
+  
+  /**
+   * Create a new field for a camping option
+   * @param campingOptionId The ID of the camping option
+   * @param data The field data
+   * @returns A promise that resolves to the created field
+   */
+  createField: async (campingOptionId: string, data: Omit<CampingOptionField, 'id' | 'createdAt' | 'updatedAt' | 'campingOptionId'>): Promise<CampingOptionField> => {
+    try {
+      const response = await api.post<CampingOptionField>(`/camping-options/${campingOptionId}/fields`, data);
+      return CampingOptionFieldSchema.parse(response.data);
+    } catch (error) {
+      console.error(`Error creating field for camping option with ID ${campingOptionId}:`, error);
+      throw error;
+    }
+  },
+  
+  /**
+   * Update a field
+   * @param campingOptionId The ID of the camping option
+   * @param fieldId The ID of the field to update
+   * @param data The data to update
+   * @returns A promise that resolves to the updated field
+   */
+  updateField: async (campingOptionId: string, fieldId: string, data: Partial<Omit<CampingOptionField, 'id' | 'createdAt' | 'updatedAt' | 'campingOptionId'>>): Promise<CampingOptionField> => {
+    try {
+      const response = await api.patch<CampingOptionField>(`/camping-options/${campingOptionId}/fields/${fieldId}`, data);
+      return CampingOptionFieldSchema.parse(response.data);
+    } catch (error) {
+      console.error(`Error updating field with ID ${fieldId}:`, error);
+      throw error;
+    }
+  },
+  
+  /**
+   * Delete a field
+   * @param campingOptionId The ID of the camping option
+   * @param fieldId The ID of the field to delete
+   * @returns A promise that resolves to the deleted field
+   */
+  deleteField: async (campingOptionId: string, fieldId: string): Promise<CampingOptionField> => {
+    try {
+      const response = await api.delete<CampingOptionField>(`/camping-options/${campingOptionId}/fields/${fieldId}`);
+      return CampingOptionFieldSchema.parse(response.data);
+    } catch (error) {
+      console.error(`Error deleting field with ID ${fieldId}:`, error);
+      throw error;
     }
   },
 };

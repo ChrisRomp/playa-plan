@@ -1,0 +1,45 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Playa Plan - Architecture Overview
+
+## System Architecture
+
+Playa Plan is a full-stack application for managing camp planning and registration:
+
+- **Frontend**: React SPA with Vite, TypeScript, and Tailwind CSS
+- **Backend**: NestJS API with TypeScript
+- **Database**: PostgreSQL via Prisma ORM
+- **Authentication**: JWT-based auth with role-based access control
+
+## Data Flow
+
+1. User interactions in the frontend trigger API calls to the backend
+2. Backend validates requests, processes business logic, and persists data
+3. Frontend receives responses and updates UI accordingly
+
+## Key Modules
+
+### Frontend Modules
+
+- **Authentication**: User login, registration, session management
+- **Camp Management**: Creating and managing camps
+- **Registration**: User registration for camps
+- **Shifts**: Scheduling and managing volunteer shifts
+- **Payments**: Processing and tracking payments
+
+### Backend Modules
+
+- **Authentication** [apps/api/src/auth/](mdc:apps/api/src/auth): User authentication and authorization
+- **Users** [apps/api/src/users/](mdc:apps/api/src/users): User management
+- **Camps** [apps/api/src/camps/](mdc:apps/api/src/camps): Camp configuration and management
+- **Registrations** [apps/api/src/registrations/](mdc:apps/api/src/registrations): Managing camp registrations
+- **Payments** [apps/api/src/payments/](mdc:apps/api/src/payments): Payment processing and tracking
+- **Shifts** [apps/api/src/shifts/](mdc:apps/api/src/shifts): Volunteer shift management
+- **Notifications** [apps/api/src/notifications/](mdc:apps/api/src/notifications): Email and notification delivery
+
+## Database Schema
+
+The database schema is defined using Prisma and can be found in [apps/api/prisma/schema.prisma](mdc:apps/api/prisma/schema.prisma).

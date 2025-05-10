@@ -189,6 +189,47 @@ describe('CoreConfigController', () => {
     });
   });
 
+  describe('updateCurrent', () => {
+    it('should update the current configuration', async () => {
+      const result = await controller.updateCurrent(mockUpdateConfigDto);
+      
+      expect(service.findCurrent).toHaveBeenCalledWith(false);
+      expect(service.update).toHaveBeenCalledWith(mockCoreConfig.id, mockUpdateConfigDto);
+      expect(result).toBeInstanceOf(CoreConfigResponseDto);
+      expect(result.campName).toEqual(mockUpdateConfigDto.campName);
+    });
+
+    it('should create a new configuration if none exists', async () => {
+      // Mock the findCurrent to throw NotFoundException
+      mockCoreConfigService.findCurrent.mockRejectedValueOnce(new NotFoundException('Config not found'));
+      
+      const result = await controller.updateCurrent(mockUpdateConfigDto);
+      
+      expect(service.findCurrent).toHaveBeenCalledWith(false);
+      expect(service.create).toHaveBeenCalled();
+      expect(result).toBeInstanceOf(CoreConfigResponseDto);
+    });
+
+    it('should throw BadRequestException if campName is missing when creating', async () => {
+      // Mock the findCurrent to throw NotFoundException
+      mockCoreConfigService.findCurrent.mockRejectedValueOnce(new NotFoundException('Config not found'));
+      
+      // Create an update DTO without campName
+      const dtoBadCreate = { ...mockUpdateConfigDto };
+      delete dtoBadCreate.campName;
+      
+      await expect(controller.updateCurrent(dtoBadCreate)).rejects.toThrow(BadRequestException);
+      expect(service.findCurrent).toHaveBeenCalledWith(false);
+      expect(service.create).not.toHaveBeenCalled();
+    });
+
+    it('should throw BadRequestException if update/create fails', async () => {
+      mockCoreConfigService.update.mockRejectedValueOnce(new BadRequestException('Update failed'));
+      
+      await expect(controller.updateCurrent(mockUpdateConfigDto)).rejects.toThrow(BadRequestException);
+    });
+  });
+
   describe('remove', () => {
     it('should delete a configuration', async () => {
       const result = await controller.remove('test-id');

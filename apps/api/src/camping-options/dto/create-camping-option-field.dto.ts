@@ -7,7 +7,6 @@ import {
   IsOptional, 
   IsUUID,
   Min,
-  Max,
   ValidateIf
 } from 'class-validator';
 import { Type } from 'class-transformer';
@@ -111,7 +110,9 @@ export class CreateCampingOptionFieldDto {
   @ApiProperty({
     description: 'ID of the camping option this field belongs to',
     example: 'c12345-67890',
+    required: false,
   })
   @IsUUID()
-  campingOptionId!: string;
+  @IsOptional()
+  campingOptionId?: string;
 } 

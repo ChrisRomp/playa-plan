@@ -88,6 +88,61 @@ export class CoreConfigController {
   }
 
   /**
+   * Update current configuration (Admin only)
+   */
+  @ApiOperation({ summary: 'Update current configuration' })
+  @ApiResponse({
+    status: 200,
+    description: 'The current configuration has been successfully updated.',
+    type: CoreConfigResponseDto,
+  })
+  @ApiResponse({ status: 400, description: 'Bad request' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - requires admin role' })
+  @ApiResponse({ status: 404, description: 'Configuration not found' })
+  @Patch('current')
+  @Roles(UserRole.ADMIN)
+  @UseGuards(RolesGuard)
+  async updateCurrent(@Body() updateCoreConfigDto: UpdateCoreConfigDto): Promise<CoreConfigResponseDto> {
+    try {
+      // First try to get the current config to get its ID
+      try {
+        const currentConfig = await this.coreConfigService.findCurrent(false);
+        // Update existing config
+        const config = await this.coreConfigService.update(currentConfig.id, updateCoreConfigDto);
+        return new CoreConfigResponseDto(config);
+      } catch (err) {
+        if (err instanceof NotFoundException) {
+          // No configuration exists yet, so create one
+          // We need to convert the UpdateCoreConfigDto to CreateCoreConfigDto
+          // Required fields in CreateCoreConfigDto are campName and registrationYear
+          if (!updateCoreConfigDto.campName) {
+            throw new BadRequestException('Camp name is required when creating a new configuration');
+          }
+          
+          const createDto: CreateCoreConfigDto = {
+            campName: updateCoreConfigDto.campName,
+            registrationYear: updateCoreConfigDto.registrationYear ?? new Date().getFullYear(),
+            ...updateCoreConfigDto
+          };
+          
+          const newConfig = await this.coreConfigService.create(createDto);
+          return new CoreConfigResponseDto(newConfig);
+        }
+        throw err;
+      }
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new BadRequestException('Failed to update core configuration');
+    }
+  }
+
+  /**
    * Get all configurations (Admin only)
    */
   @ApiOperation({ summary: 'Get all configurations' })

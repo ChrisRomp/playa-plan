@@ -44,6 +44,30 @@ export const ROUTES = {
     requiresAuth: true,
     allowedRoles: [ROLES.ADMIN],
   },
+  ADMIN_CONFIG: {
+    path: '/admin/configuration',
+    name: 'Configuration',
+    requiresAuth: true,
+    allowedRoles: [ROLES.ADMIN],
+  },
+  ADMIN_USERS: {
+    path: '/admin/users',
+    name: 'User Management',
+    requiresAuth: true,
+    allowedRoles: [ROLES.ADMIN],
+  },
+  ADMIN_CAMPING_OPTIONS: {
+    path: '/admin/camping-options',
+    name: 'Camping Options',
+    requiresAuth: true,
+    allowedRoles: [ROLES.ADMIN],
+  },
+  ADMIN_CAMPING_OPTION_FIELDS: {
+    path: '/admin/camping-options/:optionId/fields',
+    name: 'Camping Option Fields',
+    requiresAuth: true,
+    allowedRoles: [ROLES.ADMIN],
+  },
   SHIFTS: {
     path: '/shifts',
     name: 'Shifts',

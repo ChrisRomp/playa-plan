@@ -1,14 +1,22 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { CampingOptionsController } from './camping-options.controller';
 import { CampingOptionsService } from '../services/camping-options.service';
-import { CreateCampingOptionDto, UpdateCampingOptionDto, CampingOptionResponseDto } from '../dto';
+import { 
+  CreateCampingOptionDto, 
+  UpdateCampingOptionDto, 
+  CreateCampingOptionFieldDto,
+  UpdateCampingOptionFieldDto
+} from '../dto';
 import { CampingOption } from '../entities/camping-option.entity';
 import { NotFoundException } from '@nestjs/common';
-import { UserRole } from '@prisma/client';
+import { CampingOptionFieldsService } from '../services/camping-option-fields.service';
+import { CampingOptionField } from '../entities/camping-option-field.entity';
+import { FieldType } from '../entities/camping-option-field.entity';
 
 describe('CampingOptionsController', () => {
   let controller: CampingOptionsController;
   let service: CampingOptionsService;
+  let fieldsService: CampingOptionFieldsService;
 
   const mockCampingOption = {
     id: 'test-id',
@@ -71,6 +79,14 @@ describe('CampingOptionsController', () => {
   };
 
   beforeEach(async () => {
+    const mockCampingOptionFieldsService = {
+      findAll: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+      remove: jest.fn(),
+      findOne: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       controllers: [CampingOptionsController],
       providers: [
@@ -78,11 +94,16 @@ describe('CampingOptionsController', () => {
           provide: CampingOptionsService,
           useValue: mockCampingOptionsService,
         },
+        {
+          provide: CampingOptionFieldsService,
+          useValue: mockCampingOptionFieldsService,
+        },
       ],
     }).compile();
 
     controller = module.get<CampingOptionsController>(CampingOptionsController);
     service = module.get<CampingOptionsService>(CampingOptionsService);
+    fieldsService = module.get<CampingOptionFieldsService>(CampingOptionFieldsService);
   });
 
   afterEach(() => {
@@ -157,6 +178,98 @@ describe('CampingOptionsController', () => {
         ...mockResponseDto,
         availabilityStatus: false
       }));
+    });
+  });
+
+  describe('fields', () => {
+    it('should get fields for a camping option', async () => {
+      const campingOptionId = 'test-id';
+      const mockFields = [{ id: 'field-id', displayName: 'Test Field' }] as unknown as CampingOptionField[];
+      
+      jest.spyOn(service, 'findOne').mockResolvedValueOnce({ id: campingOptionId } as unknown as CampingOption);
+      jest.spyOn(fieldsService, 'findAll').mockResolvedValueOnce(mockFields);
+      
+      const result = await controller.getFields(campingOptionId);
+      
+      expect(service.findOne).toHaveBeenCalledWith(campingOptionId);
+      expect(fieldsService.findAll).toHaveBeenCalledWith(campingOptionId);
+      expect(result).toEqual(mockFields);
+    });
+    
+    it('should throw NotFoundException when camping option does not exist', async () => {
+      const campingOptionId = 'test-id';
+      
+      jest.spyOn(service, 'findOne').mockRejectedValueOnce(new NotFoundException());
+      
+      await expect(controller.getFields(campingOptionId)).rejects.toThrow(NotFoundException);
+      expect(service.findOne).toHaveBeenCalledWith(campingOptionId);
+    });
+    
+    it('should create a field for a camping option', async () => {
+      const campingOptionId = 'test-id';
+      const createDto: CreateCampingOptionFieldDto = {
+        displayName: 'Test Field',
+        dataType: FieldType.STRING,
+        required: false,
+      };
+      const expectedDto = { ...createDto, campingOptionId };
+      const mockField = { id: 'field-id', ...expectedDto } as unknown as CampingOptionField;
+      
+      jest.spyOn(service, 'findOne').mockResolvedValueOnce({ id: campingOptionId } as unknown as CampingOption);
+      jest.spyOn(fieldsService, 'create').mockResolvedValueOnce(mockField);
+      
+      const result = await controller.createField(campingOptionId, createDto);
+      
+      expect(service.findOne).toHaveBeenCalledWith(campingOptionId);
+      expect(fieldsService.create).toHaveBeenCalledWith(expectedDto);
+      expect(result).toEqual(mockField);
+    });
+    
+    it('should update a field for a camping option', async () => {
+      const campingOptionId = 'test-id';
+      const fieldId = 'field-id';
+      const updateDto: UpdateCampingOptionFieldDto = { 
+        displayName: 'Updated Field'
+      };
+      const mockField = { id: fieldId, campingOptionId, ...updateDto } as unknown as CampingOptionField;
+      
+      jest.spyOn(service, 'findOne').mockResolvedValueOnce({ id: campingOptionId } as unknown as CampingOption);
+      jest.spyOn(fieldsService, 'findOne').mockResolvedValueOnce({ id: fieldId, campingOptionId } as unknown as CampingOptionField);
+      jest.spyOn(fieldsService, 'update').mockResolvedValueOnce(mockField);
+      
+      const result = await controller.updateField(campingOptionId, fieldId, updateDto);
+      
+      expect(service.findOne).toHaveBeenCalledWith(campingOptionId);
+      expect(fieldsService.findOne).toHaveBeenCalledWith(fieldId);
+      expect(fieldsService.update).toHaveBeenCalledWith(fieldId, updateDto);
+      expect(result).toEqual(mockField);
+    });
+    
+    it('should delete a field for a camping option', async () => {
+      const campingOptionId = 'test-id';
+      const fieldId = 'field-id';
+      const mockField = { id: fieldId, campingOptionId } as unknown as CampingOptionField;
+      
+      jest.spyOn(service, 'findOne').mockResolvedValueOnce({ id: campingOptionId } as unknown as CampingOption);
+      jest.spyOn(fieldsService, 'findOne').mockResolvedValueOnce({ id: fieldId, campingOptionId } as unknown as CampingOptionField);
+      jest.spyOn(fieldsService, 'remove').mockResolvedValueOnce(mockField);
+      
+      const result = await controller.deleteField(campingOptionId, fieldId);
+      
+      expect(service.findOne).toHaveBeenCalledWith(campingOptionId);
+      expect(fieldsService.findOne).toHaveBeenCalledWith(fieldId);
+      expect(fieldsService.remove).toHaveBeenCalledWith(fieldId);
+      expect(result).toEqual(mockField);
+    });
+
+    it('should throw NotFoundException if field does not belong to the camping option (updateField)', async () => {
+      const campingOptionId = 'test-id';
+      const fieldId = 'field-id';
+      const updateDto = { displayName: 'Updated Field' };
+      // The field's campingOptionId does not match the requested campingOptionId
+      jest.spyOn(service, 'findOne').mockResolvedValueOnce({ id: campingOptionId } as unknown as CampingOption);
+      jest.spyOn(fieldsService, 'findOne').mockResolvedValueOnce({ id: fieldId, campingOptionId: 'other-option-id' } as unknown as CampingOptionField);
+      await expect(controller.updateField(campingOptionId, fieldId, updateDto)).rejects.toThrow(NotFoundException);
     });
   });
 }); 

@@ -3,148 +3,40 @@ description:
 globs: 
 alwaysApply: true
 ---
-# PlayaPlan planned project folder structure
+# Playa Plan - Project Structure Guide
 
-## Top-level planned project structure
+This is a monorepo containing a full-stack application for camp planning and management.
 
-```text
-playaplan/
-├── apps/
-│   ├── api/                    # NestJS backend (PlayaPlan API)
-│   │   ├── src/
-│   │   ├── prisma/
-│   │   ├── test/
-│   │   └── ...
-│   └── web/                    # React frontend (PlayaPlan UI)
-│       ├── src/
-│       └── public/
-├── libs/                       # Shared libraries between frontend and backend
-│   ├── types/                  # Shared TypeScript types/interfaces (e.g., DTOs)
-│   ├── constants/              # Shared constants (e.g., role enums)
-│   ├── validation/             # Shared validation schemas
-│   └── utils/                  # Shared utility functions
-├── docker/                     # Docker and compose files (if using)
-├── .github/                    # GitHub workflows (CI/CD)
-├── package.json                # Root dependencies and scripts
-├── tsconfig.base.json          # Shared TypeScript config
-├── README.md
-└── .env                        # Root environment variables (or use .env files per app)
-```
+## Repository Structure
 
-## NestJS Backend Detail `/apps/api`
+- [package.json](mdc:package.json) - Root package defining workspaces and shared dependencies
+- [apps/](mdc:apps) - Contains the frontend and backend applications
+  - [apps/web/](mdc:apps/web) - React/Vite frontend application
+  - [apps/api/](mdc:apps/api) - NestJS backend API
+- [libs/](mdc:libs) - Shared libraries used across applications
+  - [libs/types/](mdc:libs/types) - Shared TypeScript types/interfaces
 
-```text
-api/
-├── src/
-│   ├── main.ts
-│   ├── app.module.ts
-│   ├── users/                  # Example feature module
-│   │   ├── users.module.ts
-│   │   ├── controllers/
-│   │   │   ├── user.controller.ts
-│   │   │   └── user.controller.spec.ts  # Unit tests for controller
-│   │   ├── services/
-│   │   │   ├── user.service.ts
-│   │   │   └── user.service.spec.ts     # Unit tests for service
-│   │   ├── dto/
-│   │   │   └── create-user.dto.ts
-│   │   └── entities/
-│   │       └── user.entity.ts
-│   ├── auth/
-│   ├── camps/
-│   ├── jobs/
-│   ├── shifts/
-│   ├── registrations/
-│   ├── payments/
-│   ├── notifications/
-│   └── common/                 # Global guards, interceptors, decorators
-│       ├── guards/
-│       │   ├── auth.guard.ts
-│       │   └── auth.guard.spec.ts       # Unit tests for guards
-│       ├── filters/
-│       │   ├── http-exception.filter.ts
-│       │   └── http-exception.filter.spec.ts
-│       ├── interceptors/
-│       │   ├── logging.interceptor.ts
-│       │   └── logging.interceptor.spec.ts
-│       ├── middleware/
-│       ├── pipes/
-│       │   ├── validation.pipe.ts
-│       │   └── validation.pipe.spec.ts
-│       ├── testing/                     # Testing utilities
-│       │   ├── test-utils.ts
-│       │   ├── mocks/                   # Mock factories
-│       │   │   ├── prisma.mock.ts
-│       │   │   └── user.mock.ts
-│       │   └── fixtures/                # Test data fixtures
-│       │       └── user.fixture.ts
-│       └── prisma/                      # Prisma service
-├── prisma/
-│   ├── schema.prisma
-│   └── migrations/
-├── test/                       # e2e or integration tests
-│   ├── jest-e2e.json
-│   ├── app.e2e-spec.ts         # Application-wide e2e tests
-│   ├── users/                  # Feature-specific e2e tests
-│   │   └── users.e2e-spec.ts
-│   └── auth/
-│       └── auth.e2e-spec.ts
-└── package.json
-```
+## Frontend (Web)
 
-## Test-Driven Development Structure
+The frontend is a React application built with Vite:
+- [apps/web/src/main.tsx](mdc:apps/web/src/main.tsx) - Entry point
+- [apps/web/src/App.tsx](mdc:apps/web/src/App.tsx) - Main application component
+- [apps/web/src/components/](mdc:apps/web/src/components) - Reusable UI components
+- [apps/web/src/pages/](mdc:apps/web/src/pages) - Page-level components
+- [apps/web/src/routes/](mdc:apps/web/src/routes) - Routing configuration
+- [apps/web/src/store/](mdc:apps/web/src/store) - State management
+- [apps/web/src/hooks/](mdc:apps/web/src/hooks) - Custom React hooks
+- [apps/web/src/utils/](mdc:apps/web/src/utils) - Utility functions
 
-For TDD approach across the application, follow these patterns:
+## Backend (API)
 
-### Unit Testing Structure
-
-```text
-feature-module/
-├── controllers/
-│   ├── controller.ts
-│   └── controller.spec.ts      # Controller tests (mock the service)
-├── services/
-│   ├── service.ts
-│   └── service.spec.ts         # Service tests (mock external dependencies)
-├── guards/
-│   ├── guard.ts
-│   └── guard.spec.ts           # Guard tests
-├── pipes/
-│   ├── pipe.ts
-│   └── pipe.spec.ts            # Pipe tests
-└── filters/
-    ├── filter.ts
-    └── filter.spec.ts          # Filter tests
-```
-
-### Integration Testing Structure
-
-```text
-test/
-├── jest-e2e.json               # Configuration for e2e tests
-├── setup.ts                    # Test setup/teardown hooks
-└── feature-module/
-    ├── feature-create.e2e-spec.ts  # Test specific feature operations
-    ├── feature-update.e2e-spec.ts
-    └── feature-delete.e2e-spec.ts
-```
-
-### Test Utilities and Helpers
-
-```text
-common/testing/
-├── test-utils.ts               # Shared testing utilities
-├── mocks/                      # Mock factories
-│   ├── service.mock.ts
-│   ├── repository.mock.ts
-│   └── external-api.mock.ts
-└── fixtures/                   # Test data
-    ├── user.fixture.ts
-    ├── camp.fixture.ts
-    └── job.fixture.ts
-```
-
-## Web frontend detail `/apps/web`
-
-Reference [frontend-spec.md](../../docs/frontend-spec.md)
-
+The backend is a NestJS application:
+- [apps/api/src/main.ts](mdc:apps/api/src/main.ts) - Entry point
+- [apps/api/src/app.module.ts](mdc:apps/api/src/app.module.ts) - Main module
+- [apps/api/src/auth/](mdc:apps/api/src/auth) - Authentication
+- [apps/api/src/camps/](mdc:apps/api/src/camps) - Camp management
+- [apps/api/src/users/](mdc:apps/api/src/users) - User management
+- [apps/api/src/payments/](mdc:apps/api/src/payments) - Payment processing
+- [apps/api/src/shifts/](mdc:apps/api/src/shifts) - Shift management
+- [apps/api/src/registrations/](mdc:apps/api/src/registrations) - Registration management
+- [apps/api/prisma/](mdc:apps/api/prisma) - Database schema and migrations

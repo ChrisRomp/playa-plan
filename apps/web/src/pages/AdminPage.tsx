@@ -1,5 +1,7 @@
 import React from 'react';
 import { useAuth } from '../store/AuthContext';
+import { Link } from 'react-router-dom';
+import { ROUTES } from '../routes';
 
 /**
  * Admin page component for system management
@@ -19,17 +21,25 @@ const AdminPage: React.FC = () => {
         <div className="bg-white p-6 rounded-lg shadow-md">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">User Management</h2>
           <p className="text-gray-600 mb-4">View and manage user accounts, roles, and permissions.</p>
-          <button className="text-blue-600 hover:text-blue-800 font-medium">
+          <Link to={ROUTES.ADMIN_USERS.path} className="text-blue-600 hover:text-blue-800 font-medium">
             Manage Users →
-          </button>
+          </Link>
         </div>
         
         <div className="bg-white p-6 rounded-lg shadow-md">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Camp Configuration</h2>
           <p className="text-gray-600 mb-4">Update camp settings, dates, and registration options.</p>
-          <button className="text-blue-600 hover:text-blue-800 font-medium">
+          <Link to={ROUTES.ADMIN_CONFIG.path} className="text-blue-600 hover:text-blue-800 font-medium">
             Edit Configuration →
-          </button>
+          </Link>
+        </div>
+        
+        <div className="bg-white p-6 rounded-lg shadow-md">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Camping Options</h2>
+          <p className="text-gray-600 mb-4">Manage camping options and their custom fields.</p>
+          <Link to={ROUTES.ADMIN_CAMPING_OPTIONS.path} className="text-blue-600 hover:text-blue-800 font-medium">
+            Manage Camping Options →
+          </Link>
         </div>
         
         <div className="bg-white p-6 rounded-lg shadow-md">

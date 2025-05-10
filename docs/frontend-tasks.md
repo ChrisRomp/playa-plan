@@ -116,13 +116,17 @@
    - [ ] Work schedule management
 
 9. [ ] Admin pages
-   - [ ] User management
-   - [ ] Core configuration management
-     - [ ] Basic camp information settings
-     - [ ] Banner and icon configuration with alt text fields
-     - [ ] Registration settings management
-     - [ ] Payment processor configuration
-   - [ ] Camping options configuration
+   - [x] User management
+   - [x] Core configuration management
+     - [x] Basic camp information settings
+     - [x] Banner and icon configuration with alt text fields
+     - [x] Registration settings management
+     - [x] Payment processor configuration
+     - [x] Email configuration
+     - [x] System settings (timezone)
+   - [x] Camping options configuration
+     - [x] Create basic CRUD operations for camping options
+     - [x] Custom fields management for camping options
    - [ ] Job/category management
    - [ ] Shift management
    - [ ] Payment management (including manual payments)
@@ -162,9 +166,10 @@ This approach balances security and usability for the camp registration system, 
 To ensure WCAG 2.2 compliance for dynamic content from Core Configuration:
 
 1. **Banner and Image Accessibility**
-   - Add `bannerAltText` field to Core Configuration to store descriptive alt text for banner images
-   - Add `iconAltText` field to Core Configuration for camp icon alt text
-   - Implement proper image loading patterns with fallbacks and loading states
+   - [x] Add `bannerAltText` field to Core Configuration to store descriptive alt text for banner images
+   - [x] Add `iconAltText` field to Core Configuration for camp icon alt text
+   - [x] Implement proper image loading patterns with fallbacks and loading states
+   - [x] Support for both relative and absolute URLs for better portability
 
 2. **Rich Text Content Accessibility**
    - Sanitize HTML from campDescription and homePageBlurb
@@ -193,6 +198,8 @@ To implement the new alt text fields added to the Core Configuration API:
    - Added `campBannerAltText` and `campIconAltText` fields to the database schema
    - Updated all relevant DTOs and service implementations
    - Created database migrations
+   - Added custom `IsUrlOrRelativePath` validator to support both relative and absolute URLs
+   - Enhanced Core Configuration API to handle creation when updating non-existent configuration
 
 2. **Web Implementation Requirements:**
    - Update API client types to include new alt text fields
@@ -252,3 +259,64 @@ web/
 ```
 
 Note: Components marked with "NEEDED" should be created as part of the implementation plan.
+
+### Frontend Tasks
+
+- [x] Setup Frontend Application Structure
+  - [x] Set up react router
+  - [x] Create page components for main routes
+  - [x] User authentication context
+  - [x] Protected routes implementation
+  - [x] Navigation component
+  - [x] API client setup
+
+- [x] Authentication Flows
+  - [x] Email-based authentication
+  - [x] Email verification flow
+  - [x] User registration
+  - [x] Profile completion
+  - [x] Login/logout functionality
+  - [x] Auth state persistence
+
+- [ ] Admin Section
+  - [x] Admin dashboard view
+  - [x] Camp configuration management
+  - [x] Camping options configuration (Note: Custom fields management needs to be implemented)
+  - [ ] User management interface
+  - [ ] Reports and analytics view
+  - [ ] System settings
+
+- [ ] User Dashboard
+  - [ ] Personal profile management
+  - [ ] Registration status view
+  - [ ] Payment history
+  - [ ] Shift signup interface
+  - [ ] Notification center
+
+- [ ] Registration Flow
+  - [ ] Multi-step registration process
+  - [ ] Camping option selection
+  - [ ] Custom fields based on selection
+  - [ ] Terms acceptance
+  - [ ] Payment integration
+  - [ ] Confirmation page
+
+- [ ] Volunteer Shift Management
+  - [ ] Available shifts view
+  - [ ] Shift signup functionality
+  - [ ] Shift calendar view
+  - [ ] Volunteer hours tracking
+  - [ ] Department-specific views
+
+- [ ] Responsive Design
+  - [ ] Mobile-friendly layouts
+  - [ ] Responsive navigation
+  - [ ] Touch-friendly interface elements
+  - [ ] Offline support
+
+- [ ] Testing
+  - [x] Unit tests for components
+  - [x] Unit tests for hooks
+  - [ ] Integration tests
+  - [ ] End-to-end tests
+  - [ ] Accessibility tests
