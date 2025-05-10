@@ -242,8 +242,8 @@ export class CampingOptionsController {
   @ApiResponse({ status: 403, description: 'Forbidden - requires admin role' })
   @ApiResponse({ status: 404, description: 'Camping option not found' })
   @ApiParam({ name: 'id', description: 'The ID of the camping option' })
-  @Post(':id/fields')
   @Roles(UserRole.ADMIN)
+  @Post(':id/fields')
   async createField(
     @Param('id') id: string, 
     @Body() createDto: CreateCampingOptionFieldDto
@@ -278,8 +278,8 @@ export class CampingOptionsController {
   @ApiResponse({ status: 404, description: 'Camping option or field not found' })
   @ApiParam({ name: 'id', description: 'The ID of the camping option' })
   @ApiParam({ name: 'fieldId', description: 'The ID of the field' })
-  @Patch(':id/fields/:fieldId')
   @Roles(UserRole.ADMIN)
+  @Patch(':id/fields/:fieldId')
   async updateField(
     @Param('id') id: string, 
     @Param('fieldId') fieldId: string,
@@ -318,8 +318,8 @@ export class CampingOptionsController {
   @ApiResponse({ status: 404, description: 'Camping option or field not found' })
   @ApiParam({ name: 'id', description: 'The ID of the camping option' })
   @ApiParam({ name: 'fieldId', description: 'The ID of the field' })
-  @Delete(':id/fields/:fieldId')
   @Roles(UserRole.ADMIN)
+  @Delete(':id/fields/:fieldId')
   async deleteField(
     @Param('id') id: string,
     @Param('fieldId') fieldId: string
