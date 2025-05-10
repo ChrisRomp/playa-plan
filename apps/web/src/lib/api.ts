@@ -633,3 +633,42 @@ export const campingOptions = {
     }
   },
 };
+
+// Job Category Schema
+export const JobCategorySchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string(),
+});
+
+export type JobCategory = z.infer<typeof JobCategorySchema>;
+
+export const jobCategories = {
+  getAll: async (): Promise<JobCategory[]> => {
+    const response = await api.get<JobCategory[]>("/job-categories");
+    return response.data.map((item: unknown) => JobCategorySchema.parse(item));
+  },
+  getById: async (id: string): Promise<JobCategory> => {
+    const response = await api.get<JobCategory>(`/job-categories/${id}`);
+    return JobCategorySchema.parse(response.data);
+  },
+  create: async (data: Omit<JobCategory, 'id'>): Promise<JobCategory> => {
+    const response = await api.post<JobCategory>("/job-categories", data);
+    return JobCategorySchema.parse(response.data);
+  },
+  update: async (id: string, data: Partial<Omit<JobCategory, 'id'>>): Promise<JobCategory> => {
+    const response = await api.patch<JobCategory>(`/job-categories/${id}`, data);
+    return JobCategorySchema.parse(response.data);
+  },
+  delete: async (id: string): Promise<JobCategory> => {
+    try {
+      const response = await api.delete<JobCategory>(`/job-categories/${id}`);
+      return JobCategorySchema.parse(response.data);
+    } catch (error) {
+      if (error && typeof error === 'object' && 'response' in error) {
+        throw error;
+      }
+      throw new Error('Failed to delete job category.');
+    }
+  },
+};

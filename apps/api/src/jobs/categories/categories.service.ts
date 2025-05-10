@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
@@ -55,8 +55,17 @@ export class CategoriesService {
       return await this.prisma.jobCategory.delete({
         where: { id },
       });
-    } catch (error) {
-      throw new NotFoundException(`Category with ID ${id} not found`);
+    } catch (error: unknown) {
+      if (typeof error === 'object' && error !== null && 'code' in error) {
+        const code = (error as { code?: string }).code;
+        if (code === 'P2025') {
+          throw new NotFoundException(`Category with ID ${id} not found`);
+        }
+        if (code === 'P2003') {
+          throw new ConflictException('Cannot delete category because it is in use by one or more jobs.');
+        }
+      }
+      throw error;
     }
   }
 } 

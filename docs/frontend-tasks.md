@@ -127,6 +127,8 @@
    - [x] Camping options configuration
      - [x] Create basic CRUD operations for camping options
      - [x] Custom fields management for camping options
+     - [ ] Fix: Constraints not always showing (multiline max)
+     - [ ] Fix: Show friendly names for Type in list view
    - [ ] Job/category management
    - [ ] Shift management
    - [ ] Payment management (including manual payments)
