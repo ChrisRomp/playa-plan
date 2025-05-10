@@ -4,6 +4,8 @@ import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/common/prisma/prisma.service';
 import { UserRole } from '@prisma/client';
+import { CampingOption } from '../src/camping-options/entities/camping-option.entity';
+import { CampingOptionField } from '../src/camping-options/entities/camping-option-field.entity';
 
 // Interface for raw camping option results
 interface RawCampingOption {
@@ -363,6 +365,154 @@ describe('CampingOptionsController (e2e)', () => {
         .delete(`/camping-options/${campingOptionId}`)
         .set('Authorization', `Bearer ${userToken}`)
         .expect(403);
+    });
+  });
+
+  describe('Camping Option Fields Endpoints', () => {
+    let testFieldId: string;
+    let testCampingOptionId: string;
+    
+    beforeAll(async () => {
+      // Create a camping option to test fields with
+      const campingOption = await prisma.campingOption.create({
+        data: {
+          name: 'Test Camping Option for Fields',
+          description: 'Test Description for Fields',
+          enabled: true,
+          workShiftsRequired: 1,
+          participantDues: 200.00,
+          staffDues: 100.00,
+          maxSignups: 30,
+          campId: testCampId,
+          jobCategoryIds: [testJobCategoryId],
+        },
+      });
+
+      testCampingOptionId = campingOption.id;
+    });
+    
+    it('should create a camping option field (admin)', async () => {
+      const createFieldDto = {
+        displayName: 'Test Field',
+        description: 'A test field for camping option',
+        dataType: 'TEXT',
+        required: true,
+        maxLength: 100
+      };
+      
+      const response = await request(app.getHttpServer())
+        .post(`/camping-options/${testCampingOptionId}/fields`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send(createFieldDto)
+        .expect(201);
+        
+      expect(response.body.displayName).toBe(createFieldDto.displayName);
+      expect(response.body.dataType).toBe(createFieldDto.dataType);
+      expect(response.body.campingOptionId).toBe(testCampingOptionId);
+      
+      testFieldId = response.body.id;
+    });
+    
+    it('should not create a camping option field (non-admin)', async () => {
+      const createFieldDto = {
+        displayName: 'Test Field',
+        description: 'A test field for camping option',
+        dataType: 'TEXT',
+        required: true,
+        maxLength: 100
+      };
+      
+      await request(app.getHttpServer())
+        .post(`/camping-options/${testCampingOptionId}/fields`)
+        .set('Authorization', `Bearer ${userToken}`)
+        .send(createFieldDto)
+        .expect(403);
+    });
+    
+    it('should get all fields for a camping option', async () => {
+      const response = await request(app.getHttpServer())
+        .get(`/camping-options/${testCampingOptionId}/fields`)
+        .set('Authorization', `Bearer ${userToken}`)
+        .expect(200);
+        
+      expect(Array.isArray(response.body)).toBe(true);
+      expect(response.body.length).toBeGreaterThan(0);
+      
+      // Field should be in the response
+      const foundField = response.body.find((field: { id: string }) => field.id === testFieldId);
+      expect(foundField).toBeDefined();
+    });
+    
+    it('should update a camping option field (admin)', async () => {
+      const updateFieldDto = {
+        displayName: 'Updated Field Name',
+        required: false
+      };
+      
+      const response = await request(app.getHttpServer())
+        .patch(`/camping-options/${testCampingOptionId}/fields/${testFieldId}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send(updateFieldDto)
+        .expect(200);
+        
+      expect(response.body.displayName).toBe(updateFieldDto.displayName);
+      expect(response.body.required).toBe(updateFieldDto.required);
+    });
+    
+    it('should not update a camping option field (non-admin)', async () => {
+      const updateFieldDto = {
+        displayName: 'Should Not Update'
+      };
+      
+      await request(app.getHttpServer())
+        .patch(`/camping-options/${testCampingOptionId}/fields/${testFieldId}`)
+        .set('Authorization', `Bearer ${userToken}`)
+        .send(updateFieldDto)
+        .expect(403);
+    });
+    
+    it('should delete a camping option field (admin)', async () => {
+      await request(app.getHttpServer())
+        .delete(`/camping-options/${testCampingOptionId}/fields/${testFieldId}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(200);
+        
+      // Verify it's deleted
+      const response = await request(app.getHttpServer())
+        .get(`/camping-options/${testCampingOptionId}/fields`)
+        .set('Authorization', `Bearer ${userToken}`)
+        .expect(200);
+        
+      const foundField = response.body.find((field: { id: string }) => field.id === testFieldId);
+      expect(foundField).toBeUndefined();
+    });
+    
+    it('should not delete a camping option field (non-admin)', async () => {
+      // Create a new field to delete
+      const createFieldDto = {
+        displayName: 'Field To Delete',
+        dataType: 'TEXT'
+      };
+      
+      const createResponse = await request(app.getHttpServer())
+        .post(`/camping-options/${testCampingOptionId}/fields`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send(createFieldDto)
+        .expect(201);
+        
+      const fieldToDeleteId = createResponse.body.id;
+      
+      // Try to delete as non-admin user
+      await request(app.getHttpServer())
+        .delete(`/camping-options/${testCampingOptionId}/fields/${fieldToDeleteId}`)
+        .set('Authorization', `Bearer ${userToken}`)
+        .expect(403);
+      
+      // Clean up
+      await request(app.getHttpServer())
+        .delete(`/camping-options/${testCampingOptionId}/fields/${fieldToDeleteId}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(200);
     });
   });
 }); 

@@ -1,5 +1,5 @@
 import { renderHook, act, waitFor } from '@testing-library/react';
-import { campingOptions } from '../lib/api';
+import { campingOptions, CampingOptionField } from '../lib/api';
 import { useCampingOptions } from './useCampingOptions';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 
@@ -16,6 +16,7 @@ vi.mock('../lib/api', () => ({
     updateField: vi.fn(),
     deleteField: vi.fn(),
   },
+  CampingOptionField: {}, // Mock this for TypeScript
 }));
 
 // Mock camping option data
@@ -60,7 +61,7 @@ const mockFields = [
     id: 'field1',
     displayName: 'Test Field 1',
     description: 'Field description',
-    dataType: 'TEXT' as const,
+    dataType: 'STRING' as const,
     required: true,
     maxLength: 100,
     minValue: null,
@@ -302,7 +303,7 @@ describe('useCampingOptions', () => {
     const newField = {
       displayName: 'New Field',
       description: 'New field description',
-      dataType: 'TEXT' as const,
+      dataType: 'STRING' as const,
       required: true,
       maxLength: 200
     };
@@ -405,5 +406,59 @@ describe('useCampingOptions', () => {
       expect(result.current.fields.find(f => f.id === 'field1')).toBeUndefined();
       expect(result.current.loading).toBe(false);
     });
+  });
+
+  it('should handle legacy dataType conversion', async () => {
+    // Test data with a legacy 'TEXT' dataType that should be converted to 'STRING'
+    const legacyFieldData = {
+      displayName: 'Legacy Text Field',
+      description: 'Uses old TEXT type',
+      dataType: 'TEXT' as unknown as CampingOptionField['dataType'], // Cast to supported type
+      required: true,
+      maxLength: 100
+    };
+    
+    const convertedField = {
+      ...legacyFieldData,
+      id: 'converted-field-1',
+      dataType: 'STRING', // The API should receive STRING instead of TEXT
+      createdAt: '2023-01-05T00:00:00Z',
+      updatedAt: '2023-01-05T00:00:00Z',
+      campingOptionId: '1'
+    };
+    
+    // Mock the API call and capture the passed parameters
+    let capturedData: Record<string, unknown> = {};
+    (campingOptions.createField as unknown as ReturnType<typeof vi.fn>).mockImplementation((id, data) => {
+      capturedData = data as Record<string, unknown>;
+      return Promise.resolve(convertedField);
+    });
+    
+    // Render the hook
+    const { result } = renderHook(() => useCampingOptions());
+    
+    // Call create with legacy dataType
+    await act(async () => {
+      await result.current.createCampingOptionField('1', legacyFieldData);
+    });
+    
+    // Verify the conversion happened before API call
+    expect(capturedData.dataType).toBe('STRING');
+    
+    // Also test with SELECT type
+    const legacySelectData = {
+      displayName: 'Legacy Select Field',
+      description: 'Uses old SELECT type',
+      dataType: 'SELECT' as unknown as CampingOptionField['dataType'], // Cast to supported type
+      required: false
+    };
+    
+    // Call create with another legacy dataType
+    await act(async () => {
+      await result.current.createCampingOptionField('1', legacySelectData);
+    });
+    
+    // Verify this conversion also worked
+    expect(capturedData.dataType).toBe('STRING');
   });
 }); 

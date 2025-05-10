@@ -11,7 +11,7 @@
         "dev:web": "npm run dev --workspace=web",
         "build": "tsc && vite build",
         "format": "prettier --write \"apps/**/*.{ts,tsx}\" \"libs/**/*.{ts,tsx}\"",
-        "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+        "lint": "eslint . --config eslint.config.cjs --ext .js,.jsx,.ts,.tsx --report-unused-disable-directives --max-warnings 0",
         "preview": "vite preview",
         "test": "npm run test --workspaces --if-present",
         "test:watch": "npm run test:watch --workspaces --if-present",

@@ -17,12 +17,15 @@ import { Roles } from '../../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { CampingOptionsService } from '../services/camping-options.service';
+import { CampingOptionFieldsService } from '../services/camping-option-fields.service';
 import { 
   CreateCampingOptionDto, 
   UpdateCampingOptionDto,
-  CampingOptionResponseDto 
+  CampingOptionResponseDto,
+  CreateCampingOptionFieldDto,
+  UpdateCampingOptionFieldDto,
+  CampingOptionFieldResponseDto
 } from '../dto';
-import { CampingOption } from '../entities/camping-option.entity';
 import { UserRole } from '@prisma/client';
 
 /**
@@ -34,7 +37,10 @@ import { UserRole } from '@prisma/client';
 @UseGuards(JwtAuthGuard, RolesGuard)
 @ApiBearerAuth()
 export class CampingOptionsController {
-  constructor(private readonly campingOptionsService: CampingOptionsService) {}
+  constructor(
+    private readonly campingOptionsService: CampingOptionsService,
+    private readonly campingOptionFieldsService: CampingOptionFieldsService
+  ) {}
 
   /**
    * Create a new camping option (Admin only)
@@ -195,5 +201,144 @@ export class CampingOptionsController {
     responseDto.availabilityStatus = false;
     
     return responseDto;
+  }
+
+  /**
+   * Get all fields for a camping option
+   */
+  @ApiOperation({ summary: 'Get all fields for a camping option' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'List of camping option fields',
+    type: [CampingOptionFieldResponseDto],
+  })
+  @ApiResponse({ status: 404, description: 'Camping option not found' })
+  @ApiParam({ name: 'id', description: 'The ID of the camping option' })
+  @Get(':id/fields')
+  async getFields(@Param('id') id: string): Promise<CampingOptionFieldResponseDto[]> {
+    // First check if the camping option exists
+    try {
+      await this.campingOptionsService.findOne(id);
+    } catch {
+      throw new NotFoundException(`Camping option with ID ${id} not found`);
+    }
+    
+    // Then get the fields
+    const fields = await this.campingOptionFieldsService.findAll(id);
+    return fields as CampingOptionFieldResponseDto[];
+  }
+
+  /**
+   * Create a new field for a camping option (Admin only)
+   */
+  @ApiOperation({ summary: 'Create a new field for a camping option' })
+  @ApiResponse({ 
+    status: 201, 
+    description: 'The field has been successfully created.',
+    type: CampingOptionFieldResponseDto,
+  })
+  @ApiResponse({ status: 400, description: 'Bad request' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - requires admin role' })
+  @ApiResponse({ status: 404, description: 'Camping option not found' })
+  @ApiParam({ name: 'id', description: 'The ID of the camping option' })
+  @Post(':id/fields')
+  @Roles(UserRole.ADMIN)
+  async createField(
+    @Param('id') id: string, 
+    @Body() createDto: CreateCampingOptionFieldDto
+  ): Promise<CampingOptionFieldResponseDto> {
+    // First check if the camping option exists
+    try {
+      await this.campingOptionsService.findOne(id);
+    } catch {
+      throw new NotFoundException(`Camping option with ID ${id} not found`);
+    }
+    
+    // Set the camping option ID in the DTO
+    const fieldData = { ...createDto, campingOptionId: id };
+    
+    // Create the field
+    const field = await this.campingOptionFieldsService.create(fieldData);
+    return field as CampingOptionFieldResponseDto;
+  }
+
+  /**
+   * Update a field for a camping option (Admin only)
+   */
+  @ApiOperation({ summary: 'Update a field for a camping option' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'The field has been successfully updated.',
+    type: CampingOptionFieldResponseDto,
+  })
+  @ApiResponse({ status: 400, description: 'Bad request' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - requires admin role' })
+  @ApiResponse({ status: 404, description: 'Camping option or field not found' })
+  @ApiParam({ name: 'id', description: 'The ID of the camping option' })
+  @ApiParam({ name: 'fieldId', description: 'The ID of the field' })
+  @Patch(':id/fields/:fieldId')
+  @Roles(UserRole.ADMIN)
+  async updateField(
+    @Param('id') id: string, 
+    @Param('fieldId') fieldId: string,
+    @Body() updateDto: UpdateCampingOptionFieldDto
+  ): Promise<CampingOptionFieldResponseDto> {
+    // First check if the camping option exists
+    try {
+      await this.campingOptionsService.findOne(id);
+    } catch {
+      throw new NotFoundException(`Camping option with ID ${id} not found`);
+    }
+    
+    // Check if the field exists and belongs to this camping option
+    const existingField = await this.campingOptionFieldsService.findOne(fieldId);
+    if (existingField.campingOptionId !== id) {
+      throw new NotFoundException(`Field with ID ${fieldId} not found for camping option with ID ${id}`);
+    }
+    
+    // Update the field
+    const field = await this.campingOptionFieldsService.update(fieldId, updateDto);
+    return field as CampingOptionFieldResponseDto;
+  }
+
+  /**
+   * Delete a field for a camping option (Admin only)
+   */
+  @ApiOperation({ summary: 'Delete a field for a camping option' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'The field has been successfully deleted.',
+    type: CampingOptionFieldResponseDto,
+  })
+  @ApiResponse({ status: 400, description: 'Bad request' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - requires admin role' })
+  @ApiResponse({ status: 404, description: 'Camping option or field not found' })
+  @ApiParam({ name: 'id', description: 'The ID of the camping option' })
+  @ApiParam({ name: 'fieldId', description: 'The ID of the field' })
+  @Delete(':id/fields/:fieldId')
+  @Roles(UserRole.ADMIN)
+  async deleteField(
+    @Param('id') id: string,
+    @Param('fieldId') fieldId: string
+  ): Promise<CampingOptionFieldResponseDto> {
+    // First check if the camping option exists
+    try {
+      await this.campingOptionsService.findOne(id);
+    } catch {
+      throw new NotFoundException(`Camping option with ID ${id} not found`);
+    }
+    
+    // Check if the field exists and belongs to this camping option
+    const existingField = await this.campingOptionFieldsService.findOne(fieldId);
+    if (existingField.campingOptionId !== id) {
+      throw new NotFoundException(`Field with ID ${fieldId} not found for camping option with ID ${id}`);
+    }
+    
+    // Delete the field
+    const field = await this.campingOptionFieldsService.remove(fieldId);
+    return field as CampingOptionFieldResponseDto;
   }
 } 

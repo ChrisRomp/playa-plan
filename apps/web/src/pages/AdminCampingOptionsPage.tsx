@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useCampingOptions } from '../hooks/useCampingOptions';
 import { CampingOption } from '../lib/api';
 
@@ -18,6 +19,7 @@ interface CampingOptionFormData {
  * Admin page for managing camping options
  */
 const AdminCampingOptionsPage: React.FC = () => {
+  const navigate = useNavigate();
   const { 
     options, 
     loading, 
@@ -138,6 +140,10 @@ const AdminCampingOptionsPage: React.FC = () => {
     }
   };
 
+  const handleManageFields = (optionId: string) => {
+    navigate(`/admin/camping-options/${optionId}/fields`);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -242,6 +248,12 @@ const AdminCampingOptionsPage: React.FC = () => {
                             className="text-blue-500 hover:text-blue-700"
                           >
                             Edit
+                          </button>
+                          <button
+                            onClick={() => handleManageFields(option.id)}
+                            className="text-green-500 hover:text-green-700"
+                          >
+                            Fields
                           </button>
                           <button
                             onClick={() => handleDeleteClick(option.id)}

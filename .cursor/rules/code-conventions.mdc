@@ -10,7 +10,7 @@ alwaysApply: true
 - Use TypeScript for all new code
 - Explicitly type function parameters and return types
 - Use interfaces for object shapes, types for unions/intersections
-- Minimize use of `any`; use proper typing or `unknown` instead
+- Minimize use of `any`; use proper typing (preferred) or `unknown` instead
 - Use readonly where applicable for immutable values
 
 ## React (Frontend)

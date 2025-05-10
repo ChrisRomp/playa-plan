@@ -145,6 +145,30 @@ export const useCampingOptions = () => {
   }, []);
 
   /**
+   * Helper function to convert legacy dataTypes to supported values
+   */
+  const convertLegacyDataType = useCallback((dataType: string): CampingOptionField['dataType'] => {
+    // If the dataType is not one of the supported values, map it to a default
+    switch (dataType) {
+      // Map old values to new ones
+      case 'TEXT': return 'STRING';
+      case 'SELECT': return 'STRING';
+      // For values that are already valid, TypeScript will narrow the type
+      case 'STRING':
+      case 'MULTILINE_STRING':
+      case 'INTEGER':
+      case 'NUMBER': 
+      case 'BOOLEAN':
+      case 'DATE':
+        return dataType;
+      // For anything else, default to STRING (shouldn't happen with proper validation)
+      default:
+        console.warn(`Unrecognized dataType "${dataType}" converted to STRING`);
+        return 'STRING';
+    }
+  }, []);
+
+  /**
    * Create a new field for a camping option
    */
   const createCampingOptionField = useCallback(async (
@@ -155,7 +179,14 @@ export const useCampingOptions = () => {
     setError(null);
     
     try {
-      const newField = await campingOptions.createField(campingOptionId, data);
+      // Clone the data to avoid modifying the original
+      const mappedData = { 
+        ...data,
+        // Convert potential legacy dataType values safely
+        dataType: convertLegacyDataType(data.dataType as string) 
+      };
+      
+      const newField = await campingOptions.createField(campingOptionId, mappedData);
       setFields(prev => [...prev, newField]);
       return newField;
     } catch (err) {
@@ -165,7 +196,7 @@ export const useCampingOptions = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [convertLegacyDataType]);
 
   /**
    * Update a field
@@ -179,7 +210,15 @@ export const useCampingOptions = () => {
     setError(null);
     
     try {
-      const updatedField = await campingOptions.updateField(campingOptionId, fieldId, data);
+      // Clone the data to avoid modifying the original
+      const mappedData = { ...data };
+      
+      // If dataType is provided, convert any legacy values
+      if (mappedData.dataType) {
+        mappedData.dataType = convertLegacyDataType(mappedData.dataType as string);
+      }
+      
+      const updatedField = await campingOptions.updateField(campingOptionId, fieldId, mappedData);
       setFields(prev => prev.map(field => field.id === fieldId ? updatedField : field));
       return updatedField;
     } catch (err) {
@@ -189,7 +228,7 @@ export const useCampingOptions = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [convertLegacyDataType]);
 
   /**
    * Delete a field

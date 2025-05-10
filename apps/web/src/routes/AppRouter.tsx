@@ -12,6 +12,7 @@ import AdminPage from '../pages/AdminPage.tsx';
 import AdminConfigPage from '../pages/AdminConfigPage.tsx';
 import AdminUserPage from '../pages/AdminUserPage.tsx';
 import AdminCampingOptionsPage from '../pages/AdminCampingOptionsPage.tsx';
+import AdminCampingOptionFieldsPage from '../pages/AdminCampingOptionFieldsPage.tsx';
 import ShiftsPage from '../pages/ShiftsPage.tsx';
 import NotFoundPage from '../pages/NotFoundPage.tsx';
 import { ROLES } from '../types/auth.ts';
@@ -42,6 +43,7 @@ const AppRouter: React.FC = () => {
         <Route path={ROUTES.ADMIN_CONFIG.path} element={<AdminConfigPage />} />
         <Route path={ROUTES.ADMIN_USERS.path} element={<AdminUserPage />} />
         <Route path={ROUTES.ADMIN_CAMPING_OPTIONS.path} element={<AdminCampingOptionsPage />} />
+        <Route path={ROUTES.ADMIN_CAMPING_OPTION_FIELDS.path} element={<AdminCampingOptionFieldsPage />} />
       </Route>
       
       {/* 404 route */}

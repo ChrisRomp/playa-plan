@@ -126,7 +126,7 @@
      - [x] System settings (timezone)
    - [x] Camping options configuration
      - [x] Create basic CRUD operations for camping options
-     - [ ] Custom fields management for camping options
+     - [x] Custom fields management for camping options
    - [ ] Job/category management
    - [ ] Shift management
    - [ ] Payment management (including manual payments)
