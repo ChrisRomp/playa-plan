@@ -74,6 +74,9 @@
    - [x] Basic user registration via email verification
    - [x] Complete registration flow with profile data collection
    - [ ] CAPTCHA integration for security
+     - [ ] Implement reCAPTCHA or similar for login/registration forms
+     - [ ] Add server-side verification of CAPTCHA tokens
+     - [ ] Handle CAPTCHA errors and accessibility concerns
 
 2. [x] User profile management
    - [x] Complete profile form with all required fields
@@ -84,7 +87,13 @@
    - [ ] Registration flow with profile confirmation
    - [ ] Camping option selection with capacity indicators
    - [ ] Dynamic custom fields based on camping option
+     - [ ] Implement field validation based on type (min/max values, string lengths)
+     - [ ] Show appropriate input types (numeric, date, text, etc.)
+     - [ ] Support conditional field display based on selected camping options
    - [ ] Terms acceptance functionality
+     - [ ] Display camp terms from core configuration
+     - [ ] Require explicit acceptance with checkbox or similar control
+     - [ ] Store acceptance with registration record
    - [ ] Work shift selection based on camping options
    - [ ] Alternative handling when shifts are full
 
@@ -104,6 +113,11 @@
    - [ ] Job shift browsing
    - [ ] Shift registration
    - [ ] Schedule viewing by day/category
+     - [ ] Implement grouped view by day and category
+     - [ ] Show available spots per shift
+     - [ ] Different views for staff vs. regular users
+     - [ ] Allow filtering and searching
+   - [ ] Conflict detection for overlapping shifts
 
 7. [ ] Notification system
    - [x] UI notifications component
@@ -130,9 +144,20 @@
      - [ ] Fix: Constraints not always showing (multiline max)
      - [ ] Fix: Show friendly names for Type in list view
    - [ ] Job/category management
+     - [x] Basic CRUD for job categories
+     - [ ] Support for "staff only" job category designation
+     - [ ] Support for "always required" job category functionality
+     - [ ] Job management interface for creating and editing jobs
    - [ ] Shift management
+     - [ ] Create and manage job shifts by day/time
+     - [ ] Set max participants per shift
+     - [ ] Assign shifts to job categories
    - [ ] Payment management (including manual payments)
    - [ ] Refund processing
+     - [ ] Interface for admins to initiate refunds
+     - [ ] Support automated refunds via payment processors
+     - [ ] Manual refund recording
+     - [ ] Registration status update after refund
 
 10. [ ] Data management
     - [ ] Data export functionality (CSV/Excel)
