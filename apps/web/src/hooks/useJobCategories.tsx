@@ -66,9 +66,9 @@ export function useJobCategories(): UseJobCategoriesResult {
       await jobCategories.delete(id);
       setCategories((prev) => prev.filter((cat) => cat.id !== id));
       return true;
-    } catch (err) {
+    } catch {
       setError('Failed to delete job category');
-      throw err;
+      return false;
     } finally {
       setLoading(false);
     }

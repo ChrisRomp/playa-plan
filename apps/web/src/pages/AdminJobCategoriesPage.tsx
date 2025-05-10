@@ -15,6 +15,7 @@ export default function AdminJobCategoriesPage() {
     createCategory,
     updateCategory,
     deleteCategory,
+    error,
   } = useJobCategories();
 
   const [modalOpen, setModalOpen] = useState(false);
@@ -91,6 +92,7 @@ export default function AdminJobCategoriesPage() {
   return (
     <div className="max-w-3xl mx-auto p-4">
       <h1 className="text-2xl font-bold mb-4">Job Category Management</h1>
+      {error && <div className="text-red-600 mb-2">{error}</div>}
       {deleteError && <div className="text-red-600 mb-2">{deleteError}</div>}
       <button
         className="mb-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 focus:outline-none focus:ring"
