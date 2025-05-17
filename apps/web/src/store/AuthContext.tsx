@@ -176,8 +176,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       // Clear any stored email after successful verification
       localStorage.removeItem('pendingLoginEmail');
     } catch (err) {
-      setError('Invalid verification code. Please try again.');
+      // Extract error message from the Error object or use a default message
+      const errorMessage = err instanceof Error 
+        ? err.message 
+        : 'Invalid verification code. Please try again.';
+      
+      setError(errorMessage);
       console.error('Verification failed:', err);
+      
+      // Rethrow the error so it can be caught by the component
+      throw err;
     } finally {
       // Always ensure loading state is reset
       setIsLoading(false);
