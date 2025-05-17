@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty } from 'class-validator';
+import { IsString, IsNotEmpty, IsBoolean, IsOptional } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateCategoryDto {
@@ -17,4 +17,14 @@ export class CreateCategoryDto {
   @IsString()
   @IsNotEmpty()
   description!: string;
+
+  @ApiProperty({
+    description: 'Whether the category should only be visible to staff members',
+    example: false,
+    default: false,
+    required: false,
+  })
+  @IsBoolean()
+  @IsOptional()
+  staffOnly?: boolean;
 } 

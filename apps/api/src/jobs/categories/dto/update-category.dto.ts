@@ -1,4 +1,4 @@
-import { IsString, IsOptional } from 'class-validator';
+import { IsString, IsOptional, IsBoolean } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class UpdateCategoryDto {
@@ -19,4 +19,13 @@ export class UpdateCategoryDto {
   @IsString()
   @IsOptional()
   description?: string;
+
+  @ApiProperty({
+    description: 'Whether the category should only be visible to staff members',
+    example: false,
+    required: false,
+  })
+  @IsBoolean()
+  @IsOptional()
+  staffOnly?: boolean;
 } 

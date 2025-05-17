@@ -4,8 +4,8 @@ import * as api from '../lib/api';
 import { describe, it, vi, beforeEach } from 'vitest';
 
 const mockCategories = [
-  { id: '1', name: 'Kitchen', description: 'Kitchen jobs' },
-  { id: '2', name: 'Greeter', description: 'Greeting jobs' },
+  { id: '1', name: 'Kitchen', description: 'Kitchen jobs', staffOnly: false },
+  { id: '2', name: 'Greeter', description: 'Greeting jobs', staffOnly: true },
 ];
 
 describe('useJobCategories', () => {
@@ -36,14 +36,31 @@ describe('useJobCategories', () => {
 
   it('should create a category', async () => {
     vi.spyOn(api.jobCategories, 'getAll').mockResolvedValue([]);
-    const created = { id: '3', name: 'New', description: 'Desc' };
+    const created = { id: '3', name: 'New', description: 'Desc', staffOnly: false };
     vi.spyOn(api.jobCategories, 'create').mockResolvedValue(created);
     const { result } = renderHook(() => useJobCategories());
     await act(async () => {
       await result.current.fetchCategories();
-      await result.current.createCategory({ name: 'New', description: 'Desc' });
+      await result.current.createCategory({ name: 'New', description: 'Desc', staffOnly: false });
     });
     expect(result.current.categories).toContainEqual(created);
+  });
+
+  it('should create a staff-only category', async () => {
+    vi.spyOn(api.jobCategories, 'getAll').mockResolvedValue([]);
+    const created = { id: '4', name: 'Staff Only', description: 'Staff jobs', staffOnly: true };
+    vi.spyOn(api.jobCategories, 'create').mockResolvedValue(created);
+    const { result } = renderHook(() => useJobCategories());
+    await act(async () => {
+      await result.current.fetchCategories();
+      await result.current.createCategory({ name: 'Staff Only', description: 'Staff jobs', staffOnly: true });
+    });
+    expect(result.current.categories).toContainEqual(created);
+    expect(api.jobCategories.create).toHaveBeenCalledWith({
+      name: 'Staff Only', 
+      description: 'Staff jobs', 
+      staffOnly: true
+    });
   });
 
   it('should handle create error', async () => {
@@ -52,7 +69,7 @@ describe('useJobCategories', () => {
     const { result } = renderHook(() => useJobCategories());
     await act(async () => {
       await result.current.fetchCategories();
-      await result.current.createCategory({ name: 'Bad', description: 'Bad' });
+      await result.current.createCategory({ name: 'Bad', description: 'Bad', staffOnly: false });
     });
     expect(result.current.error).toBe('Failed to create job category');
   });
@@ -67,6 +84,19 @@ describe('useJobCategories', () => {
       await result.current.updateCategory('1', { name: 'Updated' });
     });
     expect(result.current.categories[0].name).toBe('Updated');
+  });
+
+  it('should update a category to be staff-only', async () => {
+    vi.spyOn(api.jobCategories, 'getAll').mockResolvedValue(mockCategories);
+    const updated = { ...mockCategories[0], staffOnly: true };
+    vi.spyOn(api.jobCategories, 'update').mockResolvedValue(updated);
+    const { result } = renderHook(() => useJobCategories());
+    await act(async () => {
+      await result.current.fetchCategories();
+      await result.current.updateCategory('1', { staffOnly: true });
+    });
+    expect(result.current.categories[0].staffOnly).toBe(true);
+    expect(api.jobCategories.update).toHaveBeenCalledWith('1', { staffOnly: true });
   });
 
   it('should handle update error', async () => {
