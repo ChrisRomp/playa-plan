@@ -5,8 +5,7 @@ import { NotFoundException, ConflictException } from '@nestjs/common';
 
 describe('CategoriesService', () => {
   let service: CategoriesService;
-  let prismaService: PrismaService;
-
+  
   // Mock data
   const mockCategories = [
     {
@@ -56,7 +55,6 @@ describe('CategoriesService', () => {
     }).compile();
 
     service = module.get<CategoriesService>(CategoriesService);
-    prismaService = module.get<PrismaService>(PrismaService);
 
     // Reset mock implementation for each test
     jest.clearAllMocks();
