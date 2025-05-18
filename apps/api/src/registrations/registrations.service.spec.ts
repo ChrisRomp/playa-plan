@@ -301,6 +301,16 @@ describe('RegistrationsService', () => {
       });
       expect(mockPrismaService.registration.delete).toHaveBeenCalledWith({
         where: { id: registrationId },
+        include: {
+          user: true,
+          job: {
+            include: {
+              category: true,
+              shift: true,
+            }
+          },
+          payment: true,
+        },
       });
       expect(result).toEqual(mockRegistration);
     });

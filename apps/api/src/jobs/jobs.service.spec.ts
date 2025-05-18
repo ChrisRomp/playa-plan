@@ -93,6 +93,7 @@ describe('JobsService', () => {
           name: createJobDto.name,
           description: createJobDto.description,
           location: createJobDto.location,
+          maxRegistrations: 10,
           category: {
             connect: { id: createJobDto.categoryId }
           },
