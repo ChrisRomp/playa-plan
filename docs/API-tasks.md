@@ -26,6 +26,7 @@
   - [ ] Develop database restoration procedures and documentation
   - [ ] Configure backup monitoring and alerting
   - [ ] Test restoration procedures regularly
+- [ ] Set up default production seed data
 
 ## 2. 🛡️ Core Security & User Management
 
@@ -82,6 +83,7 @@
   - [ ] Integrate Turnstile API with authentication endpoints
   - [ ] Add server-side validation of Turnstile tokens
   - [ ] Implement fallback mechanisms for accessibility
+- [ ] Implement new site setup flow
 
 ## 3. 📚 Core Domain Modules
 
@@ -300,6 +302,10 @@
   - [ ] Excel export capability
 - [ ] Write unit tests for reporting module
 - [ ] Write integration tests for reporting endpoints
+- [ ] Logging
+  - [ ] Set up logging data structures
+  - [ ] Set up logging API
+  - [ ] Log all admin actions
 
 ## 8. 📚 Shared Libraries and Documentation
 
