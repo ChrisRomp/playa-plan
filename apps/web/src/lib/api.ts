@@ -243,7 +243,15 @@ export interface IShift {
   id: string;
   name: string;
   description: string;
+  /** 
+   * ISO string with a placeholder date (e.g., 2025-01-01) and the time
+   * The date portion is just a placeholder - only the time is relevant
+   */
   startTime: string;
+  /** 
+   * ISO string with a placeholder date (e.g., 2025-01-01) and the time
+   * The date portion is just a placeholder - only the time is relevant
+   */
   endTime: string;
   dayOfWeek: string;
   campId: string;

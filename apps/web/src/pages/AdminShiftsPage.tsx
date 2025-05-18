@@ -105,6 +105,12 @@ export default function AdminShiftsPage() {
       if (!isNaN(numValue)) {
         setForm({ ...form, [name]: numValue });
       }
+    } else if (type === 'time' && (name === 'startTime' || name === 'endTime')) {
+      // For time inputs, combine with static date (January 1, 2025)
+      const [hours, minutes] = value.split(':').map(Number);
+      const staticDate = new Date(2025, 0, 1); // January 1, 2025
+      staticDate.setHours(hours, minutes, 0, 0);
+      setForm({ ...form, [name]: staticDate.toISOString() });
     } else {
       setForm({ ...form, [name]: value });
     }
@@ -165,14 +171,16 @@ export default function AdminShiftsPage() {
 
   const formatDateForInput = (dateString: string): string => {
     const date = new Date(dateString);
-    return date.toISOString().substring(0, 16); // Format: YYYY-MM-DDThh:mm
+    // Extract only the time part (HH:MM)
+    return date.toTimeString().substring(0, 5);
   };
 
   const getTodayAtTime = (timeString: string): string => {
+    // Use a static date (January 1, 2025) with the specified time
     const [hours, minutes] = timeString.split(':').map(Number);
-    const today = new Date();
-    today.setHours(hours, minutes, 0, 0);
-    return today.toISOString().substring(0, 16); // Format: YYYY-MM-DDThh:mm
+    const staticDate = new Date(2025, 0, 1); // January 1, 2025
+    staticDate.setHours(hours, minutes, 0, 0);
+    return staticDate.toISOString();
   };
 
   const getDayOfWeekLabel = (value: string): string => {
@@ -338,9 +346,9 @@ export default function AdminShiftsPage() {
                 <input
                   id="startTime"
                   name="startTime"
-                  type="datetime-local"
+                  type="time"
                   className="w-full border rounded px-3 py-2"
-                  value={form.startTime}
+                  value={formatDateForInput(form.startTime)}
                   onChange={handleFormChange}
                   required
                 />
@@ -350,9 +358,9 @@ export default function AdminShiftsPage() {
                 <input
                   id="endTime"
                   name="endTime"
-                  type="datetime-local"
+                  type="time"
                   className="w-full border rounded px-3 py-2"
-                  value={form.endTime}
+                  value={formatDateForInput(form.endTime)}
                   onChange={handleFormChange}
                   required
                 />

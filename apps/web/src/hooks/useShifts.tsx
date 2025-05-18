@@ -5,7 +5,15 @@ import { shifts, Shift } from '../lib/api';
 export type ShiftInput = Omit<Shift, 'id' | 'jobs'> & {
   name: string;
   description: string;
+  /**
+   * ISO string containing a placeholder date (2025-01-01) with the actual time
+   * The date portion is not displayed to users, only the time is relevant
+   */
   startTime: string;
+  /**
+   * ISO string containing a placeholder date (2025-01-01) with the actual time
+   * The date portion is not displayed to users, only the time is relevant
+   */
   endTime: string;
   dayOfWeek: string;
   campId: string;

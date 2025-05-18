@@ -453,7 +453,7 @@ export default function RegistrationPage() {
     return `${shift.dayOfWeek} | ${formatTime(shift.startTime)} - ${formatTime(shift.endTime)}`;
   };
 
-  // Format time string for display
+  // Format time string for display - extracts only the time part, ignoring the placeholder date
   const formatTime = (timeString: string): string => {
     const date = new Date(timeString);
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
