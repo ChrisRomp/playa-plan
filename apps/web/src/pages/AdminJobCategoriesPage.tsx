@@ -6,6 +6,7 @@ import { isAxiosError } from 'axios';
 interface CategoryFormState {
   name: string;
   description: string;
+  staffOnly: boolean;
 }
 
 export default function AdminJobCategoriesPage() {
@@ -20,14 +21,14 @@ export default function AdminJobCategoriesPage() {
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
-  const [form, setForm] = useState<CategoryFormState>({ name: '', description: '' });
+  const [form, setForm] = useState<CategoryFormState>({ name: '', description: '', staffOnly: false });
   const [formError, setFormError] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const openAddModal = () => {
     setEditId(null);
-    setForm({ name: '', description: '' });
+    setForm({ name: '', description: '', staffOnly: false });
     setFormError(null);
     setDeleteError(null);
     setDeleteId(null);
@@ -36,7 +37,11 @@ export default function AdminJobCategoriesPage() {
 
   const openEditModal = (category: JobCategory) => {
     setEditId(category.id);
-    setForm({ name: category.name, description: category.description });
+    setForm({ 
+      name: category.name, 
+      description: category.description,
+      staffOnly: category.staffOnly || false
+    });
     setFormError(null);
     setDeleteError(null);
     setDeleteId(null);
@@ -51,7 +56,11 @@ export default function AdminJobCategoriesPage() {
   };
 
   const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+    const value = e.target.type === 'checkbox' 
+      ? (e.target as HTMLInputElement).checked 
+      : e.target.value;
+    
+    setForm({ ...form, [e.target.name]: value });
   };
 
   const handleFormSubmit = async (e: React.FormEvent) => {
@@ -109,6 +118,7 @@ export default function AdminJobCategoriesPage() {
             <tr>
               <th className="px-4 py-2 border-b">Name</th>
               <th className="px-4 py-2 border-b">Description</th>
+              <th className="px-4 py-2 border-b">Staff Only</th>
               <th className="px-4 py-2 border-b">Actions</th>
             </tr>
           </thead>
@@ -119,6 +129,17 @@ export default function AdminJobCategoriesPage() {
               <tr key={cat.id} className="hover:bg-gray-50">
                 <td className="px-4 py-2 border-b">{cat.name}</td>
                 <td className="px-4 py-2 border-b">{cat.description}</td>
+                <td className="px-4 py-2 border-b text-center">
+                  {cat.staffOnly ? (
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                      Staff Only
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                      All Users
+                    </span>
+                  )}
+                </td>
                 <td className="px-4 py-2 border-b text-center">
                   <div className="flex justify-center space-x-2">
                     <button
@@ -142,7 +163,7 @@ export default function AdminJobCategoriesPage() {
             ))}
             {categories.length === 0 && !loading && (
               <tr>
-                <td colSpan={3} className="text-center py-4 text-gray-500">No job categories found.</td>
+                <td colSpan={4} className="text-center py-4 text-gray-500">No job categories found.</td>
               </tr>
             )}
           </tbody>
@@ -181,6 +202,19 @@ export default function AdminJobCategoriesPage() {
                   maxLength={500}
                   rows={3}
                 />
+              </div>
+              <div className="mb-4 flex items-center">
+                <input
+                  id="staffOnly"
+                  name="staffOnly"
+                  type="checkbox"
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  checked={form.staffOnly}
+                  onChange={handleFormChange}
+                />
+                <label htmlFor="staffOnly" className="ml-2 block text-sm text-gray-900">
+                  Only visible to staff
+                </label>
               </div>
               {formError && <div className="text-red-600 mb-2">{formError}</div>}
               <div className="flex justify-end gap-2">

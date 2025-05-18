@@ -145,7 +145,7 @@
      - [ ] Fix: Show friendly names for Type in list view
    - [ ] Job/category management
      - [x] Basic CRUD for job categories
-     - [ ] Support for "staff only" job category designation
+     - [x] Support for "staff only" job category designation
      - [ ] Support for "always required" job category functionality
      - [ ] Job management interface for creating and editing jobs
    - [ ] Shift management

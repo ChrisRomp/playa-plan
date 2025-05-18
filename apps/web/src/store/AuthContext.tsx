@@ -1,45 +1,10 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { useState, useEffect, ReactNode } from 'react';
 import { User } from '../types';
 import { auth, clearJwtToken } from '../lib/api';
 import cookieService from '../lib/cookieService';
+import { AuthContext, mapApiRoleToClientRole } from './authUtils';
 
-/**
- * Authentication context interface
- */
-interface AuthContextType {
-  user: User | null;
-  requestVerificationCode: (email: string) => Promise<boolean>;
-  verifyCode: (email: string, code: string) => Promise<void>;
-  logout: () => Promise<void>;
-  isLoading: boolean;
-  error: string | null;
-  isAuthenticated: boolean;
-}
 
-/**
- * Create the auth context with default values
- */
-const AuthContext = createContext<AuthContextType>({
-  isAuthenticated: false,
-  isLoading: false,
-  user: null,
-  error: null,
-  requestVerificationCode: async () => false,
-  verifyCode: async () => {},
-  logout: async () => {},
-});
-
-export const useAuth = () => useContext(AuthContext);
-
-/**
- * Maps API role strings to client-side role enum values
- */
-function mapApiRoleToClientRole(apiRole: string): 'admin' | 'staff' | 'user' {
-  const role = apiRole.toUpperCase();
-  if (role === 'ADMIN') return 'admin';
-  if (role === 'STAFF') return 'staff';
-  return 'user';
-}
 
 /**
  * AuthProvider component that manages authentication state
@@ -176,8 +141,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       // Clear any stored email after successful verification
       localStorage.removeItem('pendingLoginEmail');
     } catch (err) {
-      setError('Invalid verification code. Please try again.');
+      // Extract error message from the Error object or use a default message
+      const errorMessage = err instanceof Error 
+        ? err.message 
+        : 'Invalid verification code. Please try again.';
+      
+      setError(errorMessage);
       console.error('Verification failed:', err);
+      
+      // Rethrow the error so it can be caught by the component
+      throw err;
     } finally {
       // Always ensure loading state is reset
       setIsLoading(false);

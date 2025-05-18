@@ -639,6 +639,7 @@ export const JobCategorySchema = z.object({
   id: z.string(),
   name: z.string(),
   description: z.string(),
+  staffOnly: z.boolean().default(false),
 });
 
 export type JobCategory = z.infer<typeof JobCategorySchema>;

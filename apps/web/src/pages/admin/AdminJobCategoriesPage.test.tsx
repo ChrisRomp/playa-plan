@@ -5,8 +5,8 @@ import { describe, it, vi, beforeEach } from 'vitest';
 import type { Mock } from 'vitest';
 
 const mockCategories = [
-  { id: '1', name: 'Kitchen', description: 'Kitchen jobs' },
-  { id: '2', name: 'Greeter', description: 'Greeting jobs' },
+  { id: '1', name: 'Kitchen', description: 'Kitchen jobs', staffOnly: false },
+  { id: '2', name: 'Greeter', description: 'Greeting jobs', staffOnly: true },
 ];
 
 describe('AdminJobCategoriesPage', () => {
@@ -32,8 +32,27 @@ describe('AdminJobCategoriesPage', () => {
   it('should render the job categories table', () => {
     render(<AdminJobCategoriesPage />);
     expect(screen.getByText('Job Category Management')).toBeInTheDocument();
+    
+    // Check that the categories are rendered
     expect(screen.getByText('Kitchen')).toBeInTheDocument();
     expect(screen.getByText('Greeter')).toBeInTheDocument();
+    expect(screen.getByText('All Users')).toBeInTheDocument();
+    
+    // Check staffOnly status by finding the table rows and checking the staffOnly cell
+    const table = screen.getByRole('table');
+    const rows = table.querySelectorAll('tbody tr');
+    
+    // Check that we have the expected number of rows
+    expect(rows).toHaveLength(2); // 2 categories from mock data
+    
+    // Count how many rows have staffOnly set to true
+    const staffOnlyCount = Array.from(rows).filter(row => {
+      const staffOnlyCell = row.querySelector('td:nth-child(3)'); // 3rd column is staffOnly
+      return staffOnlyCell?.textContent?.includes('Staff Only') || false;
+    }).length;
+    
+    // Verify that we have 1 staffOnly category (from mock data)
+    expect(staffOnlyCount).toBe(1);
   });
 
   it('should open and submit the add category modal', async () => {
@@ -41,19 +60,56 @@ describe('AdminJobCategoriesPage', () => {
     fireEvent.click(screen.getByLabelText('Add job category'));
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'NewCat' } });
     fireEvent.change(screen.getByLabelText('Description'), { target: { value: 'Desc' } });
+    // By default, staffOnly should be unchecked
+    expect(screen.getByLabelText(/Only visible to staff/)).not.toBeChecked();
     fireEvent.click(screen.getByText('Add Category'));
     await waitFor(() => {
-      expect(createCategory).toHaveBeenCalledWith({ name: 'NewCat', description: 'Desc' });
+      expect(createCategory).toHaveBeenCalledWith({ 
+        name: 'NewCat', 
+        description: 'Desc',
+        staffOnly: false 
+      });
     });
+  });
+
+  it('should set staffOnly to true when checkbox is checked in add modal', async () => {
+    render(<AdminJobCategoriesPage />);
+    fireEvent.click(screen.getByLabelText('Add job category'));
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'StaffCat' } });
+    fireEvent.change(screen.getByLabelText('Description'), { target: { value: 'Staff Desc' } });
+    fireEvent.click(screen.getByLabelText(/Only visible to staff/));
+    fireEvent.click(screen.getByText('Add Category'));
+    await waitFor(() => {
+      expect(createCategory).toHaveBeenCalledWith({ 
+        name: 'StaffCat', 
+        description: 'Staff Desc',
+        staffOnly: true 
+      });
+    });
+  });
+
+  it('should open edit modal with staffOnly checked for staff-only categories', () => {
+    render(<AdminJobCategoriesPage />);
+    // Open the Greeter category (staffOnly: true)
+    fireEvent.click(screen.getByLabelText('Edit Greeter'));
+    expect(screen.getByLabelText(/Only visible to staff/)).toBeChecked();
   });
 
   it('should open and submit the edit category modal', async () => {
     render(<AdminJobCategoriesPage />);
     fireEvent.click(screen.getByLabelText('Edit Kitchen'));
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Updated' } });
+    // Checkbox should be unchecked by default for "Kitchen" category
+    expect(screen.getByLabelText(/Only visible to staff/)).not.toBeChecked();
+    // Check the staffOnly checkbox
+    fireEvent.click(screen.getByLabelText(/Only visible to staff/));
     fireEvent.click(screen.getByText('Save Changes'));
     await waitFor(() => {
-      expect(updateCategory).toHaveBeenCalledWith('1', { name: 'Updated', description: 'Kitchen jobs' });
+      expect(updateCategory).toHaveBeenCalledWith('1', { 
+        name: 'Updated', 
+        description: 'Kitchen jobs',
+        staffOnly: true 
+      });
     });
   });
 

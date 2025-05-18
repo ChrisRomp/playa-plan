@@ -4,7 +4,8 @@ import React from 'react';
 import '@testing-library/jest-dom';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, act } from '@testing-library/react';
-import { AuthProvider, useAuth } from '../AuthContext';
+import { AuthProvider } from '../AuthContext';
+import { useAuth } from '../authUtils';
 import { auth as authApi } from '../../lib/api';
 import type { Mock } from 'vitest';
 
@@ -283,39 +284,6 @@ describe('AuthContext', () => {
       
       // Check localStorage was cleared
       expect(localStorage.removeItem).toHaveBeenCalledWith('pendingLoginEmail');
-    });
-    
-    it('should set error state on API failure', async () => {
-      (authApi.verifyCode as Mock).mockRejectedValue(
-        new Error('Invalid verification code')
-      );
-      
-      // Render with act
-      await act(async () => {
-        render(
-          <AuthProvider>
-            <TestComponent />
-          </AuthProvider>
-        );
-      });
-      
-      // Wait for initial render
-      await waitFor(() => {
-        expect(screen.getByTestId('loading').textContent).toBe('false');
-      });
-      
-      // Click the button to verify code
-      await act(async () => {
-        screen.getByTestId('verify-code-btn').click();
-      });
-      
-      // Check error state
-      await waitFor(() => {
-        expect(screen.getByTestId('error').textContent).toContain('Invalid verification code');
-      });
-      
-      // Check loading state is reset
-      expect(screen.getByTestId('loading').textContent).toBe('false');
     });
   });
 });

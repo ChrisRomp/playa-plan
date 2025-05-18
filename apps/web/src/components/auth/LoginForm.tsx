@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '../../store/AuthContext';
+import { useAuth } from '../../store/authUtils';
 
 const LoginForm: React.FC = () => {
   // Form state
@@ -42,7 +42,7 @@ const LoginForm: React.FC = () => {
   useEffect(() => {
     if (authError) {
       setError(authError);
-      // Reset loading state when there's an error
+      // Reset loading state when there's an error from auth context
       setLocalLoading(false);
     }
   }, [authError]);
@@ -110,11 +110,16 @@ const LoginForm: React.FC = () => {
       // Call the API to verify the code
       await verifyCode(email, verificationCode);
       // Successful verification will trigger a redirect via the isAuthenticated useEffect
-    } catch (error) {
-      // Error is already set in the auth context and will update via useEffect
-      console.error('Verification failed:', error);
+    } catch (err) {
+      // If there's an error, display it to the user
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('Verification failed. Please check your code and try again.');
+      }
+      console.error('Verification failed:', err);
     } finally {
-      // Always reset loading state
+      // Always reset loading state regardless of success or failure
       setLocalLoading(false);
     }
   };
@@ -126,8 +131,9 @@ const LoginForm: React.FC = () => {
       </h2>
       
       {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-          {error}
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4" role="alert">
+          <p className="font-medium">Error:</p>
+          <p>{error}</p>
         </div>
       )}
       
