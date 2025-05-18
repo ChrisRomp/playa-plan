@@ -1,6 +1,6 @@
 import React from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
-import { useAuth } from '../store/AuthContext';
+import { useAuth } from '../store/authUtils';
 import { UserRole } from '../types/auth';
 import { PATHS } from './index';
 

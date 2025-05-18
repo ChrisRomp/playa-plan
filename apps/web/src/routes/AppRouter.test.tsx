@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import AppRouter from './AppRouter';
-import { useAuth } from '../store/AuthContext';
+import { useAuth } from '../store/authUtils';
 import { ROUTES } from './index';
 import { ROLES } from '../types/auth';
 

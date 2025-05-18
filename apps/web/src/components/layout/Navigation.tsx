@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { useAuth } from '../../store/AuthContext';
+import { useAuth } from '../../store/authUtils';
 import { LogOut, User, Tent, Calendar, FileText, Settings } from 'lucide-react';
 import { PATHS } from '../../routes';
 

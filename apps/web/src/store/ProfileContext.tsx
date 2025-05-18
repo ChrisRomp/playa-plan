@@ -1,5 +1,5 @@
 import React, { createContext, useState, useEffect, ReactNode } from 'react';
-import { useAuth } from './AuthContext';
+import { useAuth } from './authUtils';
 import { api, auth } from '../lib/api';
 
 interface UserProfile {
