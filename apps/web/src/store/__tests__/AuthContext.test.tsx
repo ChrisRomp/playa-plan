@@ -288,14 +288,19 @@ describe('AuthContext', () => {
     it('should set error state on API failure', async () => {
       // Create a promise that we can resolve when the error is caught
       let errorCaught = false;
+      let rejectionHandler: ((reason: unknown) => void) | undefined;
+      
       const errorPromise = new Promise<void>((resolve) => {
-        // Listen for unhandled rejections
-        process.on('unhandledRejection', (reason) => {
+        // Store the handler so we can remove it later
+        rejectionHandler = (reason) => {
           if (reason instanceof Error && reason.message === 'Invalid verification code') {
             errorCaught = true;
             resolve();
           }
-        });
+        };
+        
+        // Add the specific handler
+        process.on('unhandledRejection', rejectionHandler);
       });
 
       const error = new Error('Invalid verification code');
@@ -345,8 +350,10 @@ describe('AuthContext', () => {
         // Verify the error was caught
         expect(errorCaught).toBe(true);
       } finally {
-        // Clean up the listener
-        process.removeAllListeners('unhandledRejection');
+        // Clean up the specific listener
+        if (rejectionHandler) {
+          process.off('unhandledRejection', rejectionHandler);
+        }
         // Restore console.error
         console.error = originalError;
       }

@@ -32,10 +32,27 @@ describe('AdminJobCategoriesPage', () => {
   it('should render the job categories table', () => {
     render(<AdminJobCategoriesPage />);
     expect(screen.getByText('Job Category Management')).toBeInTheDocument();
+    
+    // Check that the categories are rendered
     expect(screen.getByText('Kitchen')).toBeInTheDocument();
     expect(screen.getByText('Greeter')).toBeInTheDocument();
     expect(screen.getByText('All Users')).toBeInTheDocument();
-    expect(screen.getAllByText('Staff Only')).toHaveLength(2);
+    
+    // Check staffOnly status by finding the table rows and checking the staffOnly cell
+    const table = screen.getByRole('table');
+    const rows = table.querySelectorAll('tbody tr');
+    
+    // Check that we have the expected number of rows
+    expect(rows).toHaveLength(2); // 2 categories from mock data
+    
+    // Count how many rows have staffOnly set to true
+    const staffOnlyCount = Array.from(rows).filter(row => {
+      const staffOnlyCell = row.querySelector('td:nth-child(3)'); // 3rd column is staffOnly
+      return staffOnlyCell?.textContent?.includes('Staff Only') || false;
+    }).length;
+    
+    // Verify that we have 1 staffOnly category (from mock data)
+    expect(staffOnlyCount).toBe(1);
   });
 
   it('should open and submit the add category modal', async () => {
