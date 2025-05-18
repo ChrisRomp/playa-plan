@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useJobs } from '../hooks/useJobs';
 import { useJobCategories } from '../hooks/useJobCategories';
+import { useShifts } from '../hooks/useShifts';
 import { Job } from '../lib/api';
 import { isAxiosError } from 'axios';
 
@@ -9,6 +10,8 @@ interface JobFormState {
   description: string;
   location: string;
   categoryId: string;
+  shiftId: string;
+  maxRegistrations: number;
 }
 
 export default function AdminJobsPage() {
@@ -26,6 +29,11 @@ export default function AdminJobsPage() {
     loading: categoriesLoading,
   } = useJobCategories();
 
+  const {
+    shifts,
+    loading: shiftsLoading,
+  } = useShifts();
+
   const [modalOpen, setModalOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState<JobFormState>({
@@ -33,6 +41,8 @@ export default function AdminJobsPage() {
     description: '',
     location: '',
     categoryId: '',
+    shiftId: '',
+    maxRegistrations: 5,
   });
   const [formError, setFormError] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -48,6 +58,16 @@ export default function AdminJobsPage() {
     }
   }, [categories, form.categoryId]);
 
+  // Set initial shiftId when shifts are loaded
+  useEffect(() => {
+    if (shifts.length > 0 && !form.shiftId) {
+      setForm(prevForm => ({
+        ...prevForm,
+        shiftId: shifts[0].id
+      }));
+    }
+  }, [shifts, form.shiftId]);
+
   const openAddModal = () => {
     setEditId(null);
     setForm({
@@ -55,6 +75,8 @@ export default function AdminJobsPage() {
       description: '',
       location: '',
       categoryId: categories.length > 0 ? categories[0].id : '',
+      shiftId: shifts.length > 0 ? shifts[0].id : '',
+      maxRegistrations: 5,
     });
     setFormError(null);
     setDeleteError(null);
@@ -69,6 +91,8 @@ export default function AdminJobsPage() {
       description: job.description,
       location: job.location,
       categoryId: job.categoryId,
+      shiftId: job.shiftId,
+      maxRegistrations: job.maxRegistrations,
     });
     setFormError(null);
     setDeleteError(null);
@@ -84,19 +108,28 @@ export default function AdminJobsPage() {
   };
 
   const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    const value = e.target.type === 'checkbox' 
-      ? (e.target as HTMLInputElement).checked 
-      : e.target.value;
+    const value = 
+      e.target.type === 'checkbox' 
+        ? (e.target as HTMLInputElement).checked 
+        : e.target.type === 'number'
+          ? parseInt(e.target.value, 10)
+          : e.target.value;
     
     setForm({ ...form, [e.target.name]: value });
   };
 
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.name.trim() || !form.description.trim() || !form.location.trim() || !form.categoryId) {
+    if (!form.name.trim() || !form.description.trim() || !form.location.trim() || !form.categoryId || !form.shiftId) {
       setFormError('All fields are required.');
       return;
     }
+    
+    if (form.maxRegistrations <= 0) {
+      setFormError('Maximum registrations must be a positive number.');
+      return;
+    }
+    
     setFormError(null);
     if (editId) {
       await updateJob(editId, form);
@@ -137,7 +170,22 @@ export default function AdminJobsPage() {
     return categories.find(cat => cat.id === id);
   };
 
-  const loading = jobsLoading || categoriesLoading;
+  const getShiftNameById = (id: string): string => {
+    const shift = shifts.find(s => s.id === id);
+    return shift ? `${shift.dayOfWeek} (${formatTime(shift.startTime)} - ${formatTime(shift.endTime)})` : 'Unknown Shift';
+  };
+
+  const formatTime = (timeString: string): string => {
+    try {
+      const date = new Date(timeString);
+      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    } catch {
+      // Return the original string if parsing fails
+      return timeString;
+    }
+  };
+
+  const loading = jobsLoading || categoriesLoading || shiftsLoading;
 
   return (
     <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">
@@ -173,6 +221,8 @@ export default function AdminJobsPage() {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Location</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Shift</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Max Registrations</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Staff Only</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Always Required</th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
@@ -181,11 +231,11 @@ export default function AdminJobsPage() {
             <tbody className="bg-white divide-y divide-gray-200">
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-4 text-center">Loading...</td>
+                  <td colSpan={9} className="px-6 py-4 text-center">Loading...</td>
                 </tr>
               ) : jobs.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-4 text-center">No jobs found.</td>
+                  <td colSpan={9} className="px-6 py-4 text-center">No jobs found.</td>
                 </tr>
               ) : (
                 jobs.map((job) => (
@@ -194,6 +244,8 @@ export default function AdminJobsPage() {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{job.description}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{job.location}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{getCategoryNameById(job.categoryId)}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{getShiftNameById(job.shiftId)}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{job.maxRegistrations}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       <span className="italic text-gray-400">(from category)</span> {job.staffOnly ? 'Yes' : 'No'}
                     </td>
@@ -285,6 +337,39 @@ export default function AdminJobsPage() {
                     </option>
                   ))}
                 </select>
+              </div>
+              
+              <div className="mb-4">
+                <label htmlFor="shiftId" className="block font-medium mb-1">Shift</label>
+                <select
+                  id="shiftId"
+                  name="shiftId"
+                  className="w-full border rounded px-3 py-2"
+                  value={form.shiftId}
+                  onChange={handleFormChange}
+                  required
+                >
+                  <option value="">Select a shift</option>
+                  {shifts.map((shift) => (
+                    <option key={shift.id} value={shift.id}>
+                      {shift.name} - {shift.dayOfWeek} ({formatTime(shift.startTime)} - {formatTime(shift.endTime)})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              
+              <div className="mb-4">
+                <label htmlFor="maxRegistrations" className="block font-medium mb-1">Maximum Registrations</label>
+                <input
+                  id="maxRegistrations"
+                  name="maxRegistrations"
+                  type="number"
+                  min="1"
+                  className="w-full border rounded px-3 py-2"
+                  value={form.maxRegistrations}
+                  onChange={handleFormChange}
+                  required
+                />
               </div>
               
               {/* Display derived properties from the selected category */}

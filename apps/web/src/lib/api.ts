@@ -260,6 +260,7 @@ export interface IJob {
   shiftId: string;
   shift?: IShift;
   maxRegistrations: number;
+  currentRegistrations?: number;
   staffOnly?: boolean;
   alwaysRequired?: boolean;
 }
@@ -275,38 +276,41 @@ export const JobCategorySchema = z.object({
 
 export type JobCategory = z.infer<typeof JobCategorySchema>;
 
-// Shift Schema
-export const ShiftSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  description: z.string(),
-  startTime: z.string(),
-  endTime: z.string(),
-  dayOfWeek: z.string(),
-  campId: z.string(),
-  jobs: z.array(z.lazy(() => JobSchema)).optional(),
-});
+// Break circular references with explicit typing
+export const ShiftSchema: z.ZodType<IShift> = z.lazy(() => 
+  z.object({
+    id: z.string(),
+    name: z.string(),
+    description: z.string(),
+    startTime: z.string(),
+    endTime: z.string(),
+    dayOfWeek: z.string(),
+    campId: z.string(),
+    jobs: z.array(JobSchema).optional(),
+  })
+);
 
 export type Shift = z.infer<typeof ShiftSchema>;
 
-// Job Schema
-export const JobSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  description: z.string(),
-  location: z.string(),
-  categoryId: z.string(),
-  category: JobCategorySchema.optional(),
-  shiftId: z.string(),
-  shift: z.lazy(() => ShiftSchema).optional(),
-  maxRegistrations: z.number(),
-});
+// Job Schema with lazy evaluation
+export const JobSchema: z.ZodType<IJob> = z.lazy(() => 
+  z.object({
+    id: z.string(),
+    name: z.string(),
+    description: z.string(),
+    location: z.string(),
+    categoryId: z.string(),
+    category: JobCategorySchema.optional(),
+    shiftId: z.string(),
+    shift: ShiftSchema.optional(),
+    maxRegistrations: z.number(),
+    currentRegistrations: z.number().optional(),
+    staffOnly: z.boolean().optional(),
+    alwaysRequired: z.boolean().optional(),
+  })
+);
 
-export type Job = z.infer<typeof JobSchema> & {
-  // These fields are derived from the job's category, not stored directly on the job
-  staffOnly: boolean;
-  alwaysRequired: boolean;
-};
+export type Job = z.infer<typeof JobSchema>;
 
 // API Functions
 export const auth = {

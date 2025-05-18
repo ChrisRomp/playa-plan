@@ -17,6 +17,9 @@ vi.mock('../../lib/api', () => {
     jobs: {
       getAll: vi.fn(),
     },
+    shifts: {
+      getAll: vi.fn(),
+    }
   };
 });
 
@@ -78,27 +81,50 @@ describe('useRegistration', () => {
   const mockShifts = [
     {
       id: 'shift-1',
-      jobId: 'job-1',
-      jobCategoryId: 'job-cat-1',
-      jobName: 'Line Cook',
-      categoryName: 'Kitchen',
-      day: 'Monday',
-      startTime: '09:00',
-      endTime: '13:00',
-      maxParticipants: 5,
-      currentParticipants: 2,
+      name: 'Morning Shift',
+      description: 'Morning kitchen shift',
+      startTime: '2023-06-01T09:00:00Z',
+      endTime: '2023-06-01T13:00:00Z',
+      dayOfWeek: 'MONDAY',
+      campId: 'camp-1',
     },
     {
       id: 'shift-2',
-      jobId: 'job-2',
-      jobCategoryId: 'job-cat-4',
-      jobName: 'Safety Officer',
-      categoryName: 'Safety',
-      day: 'Tuesday',
-      startTime: '14:00',
-      endTime: '18:00',
-      maxParticipants: 3,
-      currentParticipants: 1,
+      name: 'Safety Shift',
+      description: 'Afternoon safety shift',
+      startTime: '2023-06-02T14:00:00Z',
+      endTime: '2023-06-02T18:00:00Z',
+      dayOfWeek: 'TUESDAY',
+      campId: 'camp-1',
+    },
+  ];
+
+  const mockJobs = [
+    {
+      id: 'job-1',
+      name: 'Line Cook',
+      description: 'Cooking on the line',
+      location: 'Kitchen',
+      categoryId: 'job-cat-1',
+      category: mockJobCategories[0],
+      shiftId: 'shift-1',
+      maxRegistrations: 5,
+      currentRegistrations: 2,
+      staffOnly: false,
+      alwaysRequired: false,
+    },
+    {
+      id: 'job-2',
+      name: 'Safety Officer',
+      description: 'Safety monitoring',
+      location: 'Camp-wide',
+      categoryId: 'job-cat-4',
+      category: mockJobCategories[3],
+      shiftId: 'shift-2',
+      maxRegistrations: 3,
+      currentRegistrations: 1,
+      staffOnly: false,
+      alwaysRequired: true,
     },
   ];
 
@@ -114,16 +140,8 @@ describe('useRegistration', () => {
     });
     
     (apiModule.jobCategories.getAll as Mock).mockResolvedValue(mockJobCategories);
-    
-    // Mock jobs API
-    const mockJobs = mockShifts.map(shift => ({
-      id: shift.jobId,
-      name: shift.jobName,
-      categoryId: shift.jobCategoryId,
-      maxRegistrations: shift.maxParticipants,
-      currentRegistrations: shift.currentParticipants
-    }));
     (apiModule.jobs.getAll as Mock).mockResolvedValue(mockJobs);
+    (apiModule.shifts.getAll as Mock).mockResolvedValue(mockShifts);
   });
 
   it('should initialize with empty state', () => {
@@ -131,7 +149,8 @@ describe('useRegistration', () => {
     
     expect(result.current.campingOptions).toEqual([]);
     expect(result.current.jobCategories).toEqual([]);
-    expect(result.current.availableJobs).toEqual([]);
+    expect(result.current.jobs).toEqual([]);
+    expect(result.current.shifts).toEqual([]);
     expect(result.current.loading).toBe(false);
     expect(result.current.error).toBeNull();
   });
@@ -149,7 +168,7 @@ describe('useRegistration', () => {
     expect(result.current.campingOptions[1].id).toBe('camp-2');
   });
 
-  it('should fetch job categories using jobCategories.getAll()', async () => {
+  it('should fetch job categories', async () => {
     const { result } = renderHook(() => useRegistration());
     
     await act(async () => {
@@ -162,7 +181,20 @@ describe('useRegistration', () => {
     expect(result.current.jobCategories[3].alwaysRequired).toBe(true);
   });
 
-  describe('fetchAvailableJobs', () => {
+  it('should fetch shifts', async () => {
+    const { result } = renderHook(() => useRegistration());
+    
+    await act(async () => {
+      await result.current.fetchShifts();
+    });
+    
+    expect(apiModule.shifts.getAll).toHaveBeenCalled();
+    expect(result.current.shifts).toHaveLength(2);
+    expect(result.current.shifts[0].id).toBe('shift-1');
+    expect(result.current.shifts[1].id).toBe('shift-2');
+  });
+
+  describe('fetchJobs', () => {
     it('should include alwaysRequired categories in request even when no camping options selected', async () => {
       const { result } = renderHook(() => useRegistration());
       
@@ -173,11 +205,9 @@ describe('useRegistration', () => {
       
       // Now fetch jobs without selecting any camping options
       await act(async () => {
-        await result.current.fetchAvailableJobs([]);
+        await result.current.fetchJobs([]);
       });
       
-      // Since we're now using jobs.getAll() and filtering client-side, we need to verify
-      // that the jobs.getAll method was called
       expect(apiModule.jobs.getAll).toHaveBeenCalled();
     });
     
@@ -196,7 +226,7 @@ describe('useRegistration', () => {
       
       // Now fetch jobs selecting the first camping option
       await act(async () => {
-        await result.current.fetchAvailableJobs(['camp-1']);
+        await result.current.fetchJobs(['camp-1']);
       });
       
       // Verify jobs.getAll was called
@@ -207,14 +237,14 @@ describe('useRegistration', () => {
       const { result } = renderHook(() => useRegistration());
       
       // Mock an error response
-      (apiModule.jobs.getAll as Mock).mockRejectedValueOnce(new Error('Failed to fetch available jobs'));
+      (apiModule.jobs.getAll as Mock).mockRejectedValueOnce(new Error('Failed to fetch jobs'));
       
       await act(async () => {
-        await result.current.fetchAvailableJobs(['camp-1']);
+        await result.current.fetchJobs(['camp-1']);
       });
       
-      expect(result.current.error).toBe('Failed to fetch available jobs');
-      expect(result.current.availableJobs).toEqual([]);
+      expect(result.current.error).toBe('Failed to fetch jobs');
+      expect(result.current.jobs).toEqual([]);
     });
   });
 

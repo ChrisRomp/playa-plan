@@ -1,191 +1,160 @@
-import { renderHook, act, waitFor } from '@testing-library/react';
+import { renderHook, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { useShifts } from '../useShifts';
-import { shifts } from '../../lib/api';
+import { useShifts, ShiftInput } from '../useShifts';
+import * as apiModule from '../../lib/api';
+import { Mock } from 'vitest';
 
-// Mock the API
-vi.mock('../../lib/api', () => ({
-  shifts: {
-    getAll: vi.fn(),
-    getById: vi.fn(),
-    create: vi.fn(),
-    update: vi.fn(),
-    delete: vi.fn(),
-    getRegistrations: vi.fn(),
-  },
-}));
+// Mock the API module
+vi.mock('../../lib/api', () => {
+  return {
+    shifts: {
+      getAll: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+    },
+  };
+});
 
 describe('useShifts', () => {
   const mockShifts = [
-    { 
-      id: '1', 
-      jobId: 'job1',
-      startTime: '2023-06-01T09:00:00.000Z',
-      endTime: '2023-06-01T17:00:00.000Z',
-      maxParticipants: 5,
-      dayOfWeek: 'MONDAY',
+    {
+      id: '1',
       name: 'Morning Shift',
-      description: 'Morning shift description',
-      location: 'Main Area',
+      description: 'Morning kitchen duty',
+      startTime: '2023-06-01T09:00:00Z',
+      endTime: '2023-06-01T13:00:00Z',
+      dayOfWeek: 'MONDAY',
+      campId: 'camp-1',
     },
-    { 
-      id: '2', 
-      jobId: 'job2',
-      startTime: '2023-06-02T13:00:00.000Z',
-      endTime: '2023-06-02T21:00:00.000Z',
-      maxParticipants: 3,
-      dayOfWeek: 'TUESDAY',
+    {
+      id: '2',
       name: 'Afternoon Shift',
-      description: 'Afternoon shift description',
-      location: 'Kitchen',
+      description: 'Afternoon kitchen duty',
+      startTime: '2023-06-01T14:00:00Z',
+      endTime: '2023-06-01T18:00:00Z',
+      dayOfWeek: 'MONDAY',
+      campId: 'camp-1',
     },
   ];
 
   beforeEach(() => {
-    vi.resetAllMocks();
-    (shifts.getAll as ReturnType<typeof vi.fn>).mockResolvedValue(mockShifts);
+    vi.clearAllMocks();
+    
+    // Default mock implementations
+    (apiModule.shifts.getAll as Mock).mockResolvedValue(mockShifts);
+    (apiModule.shifts.create as Mock).mockImplementation((data: ShiftInput) => 
+      Promise.resolve({ id: '3', ...data })
+    );
+    (apiModule.shifts.update as Mock).mockImplementation((id: string, data: Partial<ShiftInput>) => 
+      Promise.resolve({ id, ...data })
+    );
+    (apiModule.shifts.delete as Mock).mockResolvedValue(undefined);
   });
 
   it('should fetch shifts on mount', async () => {
     const { result } = renderHook(() => useShifts());
-
-    expect(result.current.loading).toBe(true);
-    expect(shifts.getAll).toHaveBeenCalledTimes(1);
-
-    await waitFor(() => {
-      expect(result.current.loading).toBe(false);
+    
+    // Wait for the useEffect to run
+    await vi.waitFor(() => {
+      expect(result.current.shifts).toHaveLength(2);
     });
-
-    expect(result.current.shifts).toEqual(mockShifts);
-    expect(result.current.error).toBeNull();
+    
+    expect(apiModule.shifts.getAll).toHaveBeenCalled();
+    expect(result.current.shifts[0].id).toBe('1');
+    expect(result.current.shifts[1].id).toBe('2');
   });
 
   it('should create a shift', async () => {
+    const { result } = renderHook(() => useShifts());
+    
     const newShift = {
-      jobId: 'job3',
-      startTime: '2023-06-03T09:00:00.000Z',
-      endTime: '2023-06-03T17:00:00.000Z',
-      maxParticipants: 4,
-      dayOfWeek: 'WEDNESDAY',
       name: 'New Shift',
       description: 'New shift description',
-      location: 'Garden',
+      startTime: '2023-06-02T09:00:00Z',
+      endTime: '2023-06-02T13:00:00Z',
+      dayOfWeek: 'TUESDAY',
+      campId: 'camp-1',
     };
-
-    const createdShift = { ...newShift, id: '3' };
-    (shifts.create as ReturnType<typeof vi.fn>).mockResolvedValue(createdShift);
-
-    const { result } = renderHook(() => useShifts());
-
-    await waitFor(() => {
-      expect(result.current.loading).toBe(false);
-    });
-
+    
+    let createdShift;
     await act(async () => {
-      const created = await result.current.createShift(newShift);
-      expect(created).toEqual(createdShift);
+      createdShift = await result.current.createShift(newShift);
     });
-
-    expect(shifts.create).toHaveBeenCalledWith(newShift);
-    expect(result.current.shifts).toEqual([...mockShifts, createdShift]);
+    
+    expect(apiModule.shifts.create).toHaveBeenCalledWith(newShift);
+    expect(createdShift).toEqual({ id: '3', ...newShift });
+    // Should update the local state
+    expect(result.current.shifts).toContainEqual({ id: '3', ...newShift });
   });
 
   it('should update a shift', async () => {
-    const updateData = {
-      name: 'Updated Shift',
-      description: 'Updated Description',
-      maxParticipants: 8,
-    };
-
-    const updatedShift = { ...mockShifts[0], ...updateData };
-    (shifts.update as ReturnType<typeof vi.fn>).mockResolvedValue(updatedShift);
-
     const { result } = renderHook(() => useShifts());
-
-    await waitFor(() => {
-      expect(result.current.loading).toBe(false);
+    
+    // Ensure shifts are loaded first
+    await vi.waitFor(() => {
+      expect(result.current.shifts).toHaveLength(2);
     });
-
+    
+    const updatedData = {
+      name: 'Updated Shift',
+      description: 'Updated description',
+    };
+    
+    let updatedShift;
     await act(async () => {
-      const updated = await result.current.updateShift('1', updateData);
-      expect(updated).toEqual(updatedShift);
+      updatedShift = await result.current.updateShift('1', updatedData);
     });
-
-    expect(shifts.update).toHaveBeenCalledWith('1', updateData);
-    expect(result.current.shifts[0]).toEqual(updatedShift);
+    
+    expect(apiModule.shifts.update).toHaveBeenCalledWith('1', updatedData);
+    expect(updatedShift).toEqual({ id: '1', ...updatedData });
+    
+    // Check that the state was updated
+    const updatedShiftInState = result.current.shifts.find(s => s.id === '1');
+    expect(updatedShiftInState).toBeDefined();
+    expect(updatedShiftInState?.name).toBe('Updated Shift');
   });
 
   it('should delete a shift', async () => {
-    (shifts.delete as ReturnType<typeof vi.fn>).mockResolvedValue(mockShifts[0]);
-
     const { result } = renderHook(() => useShifts());
-
-    await waitFor(() => {
-      expect(result.current.loading).toBe(false);
+    
+    // Ensure shifts are loaded first
+    await vi.waitFor(() => {
+      expect(result.current.shifts).toHaveLength(2);
     });
-
+    
     await act(async () => {
-      const deleted = await result.current.deleteShift('1');
-      expect(deleted).toBe(true);
+      await result.current.deleteShift('1');
     });
-
-    expect(shifts.delete).toHaveBeenCalledWith('1');
-    expect(result.current.shifts).toEqual([mockShifts[1]]);
+    
+    expect(apiModule.shifts.delete).toHaveBeenCalledWith('1');
+    
+    // Check that the shift was removed from state
+    expect(result.current.shifts).toHaveLength(1);
+    expect(result.current.shifts.find(s => s.id === '1')).toBeUndefined();
   });
 
   it('should fetch shifts with filters', async () => {
-    const filters = { jobId: 'job1', dayOfWeek: 'MONDAY' };
-    const filteredShifts = [mockShifts[0]];
-    
-    (shifts.getAll as ReturnType<typeof vi.fn>).mockResolvedValue(filteredShifts);
-    
     const { result } = renderHook(() => useShifts());
     
-    await waitFor(() => {
-      expect(result.current.loading).toBe(false);
-    });
-    
     await act(async () => {
-      await result.current.fetchShifts(filters);
+      await result.current.fetchShifts({ dayOfWeek: 'MONDAY' });
     });
     
-    expect(shifts.getAll).toHaveBeenCalledWith(filters);
-    expect(result.current.shifts).toEqual(filteredShifts);
-  });
-
-  it('should get shift registrations', async () => {
-    const mockRegistrations = [
-      { id: 'reg1', userId: 'user1', shiftId: '1', status: 'CONFIRMED' },
-      { id: 'reg2', userId: 'user2', shiftId: '1', status: 'PENDING' },
-    ];
-    
-    (shifts.getRegistrations as ReturnType<typeof vi.fn>).mockResolvedValue(mockRegistrations);
-    
-    const { result } = renderHook(() => useShifts());
-    
-    await waitFor(() => {
-      expect(result.current.loading).toBe(false);
-    });
-    
-    let registrations;
-    await act(async () => {
-      registrations = await result.current.getShiftRegistrations('1');
-    });
-    
-    expect(shifts.getRegistrations).toHaveBeenCalledWith('1');
-    expect(registrations).toEqual(mockRegistrations);
+    expect(apiModule.shifts.getAll).toHaveBeenCalledWith({ dayOfWeek: 'MONDAY' });
   });
 
   it('should handle errors when fetching shifts', async () => {
-    (shifts.getAll as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('Failed to fetch'));
+    (apiModule.shifts.getAll as Mock).mockRejectedValueOnce(new Error('Failed to fetch shifts'));
     
     const { result } = renderHook(() => useShifts());
-
-    await waitFor(() => {
-      expect(result.current.loading).toBe(false);
+    
+    // Wait for the component to finish rendering
+    await vi.waitFor(() => {
+      expect(result.current.error).not.toBeNull();
     });
-
-    expect(result.current.shifts).toEqual([]);
+    
     expect(result.current.error).toBe('Failed to fetch shifts');
+    expect(result.current.shifts).toEqual([]);
   });
 }); 

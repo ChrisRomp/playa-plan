@@ -1,8 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import { jobs, Job } from '../lib/api';
 
-// Type for job inputs without derived fields
-export type JobInput = Omit<Job, 'id' | 'category' | 'staffOnly' | 'alwaysRequired'>;
+// Type for job inputs without derived/readonly fields
+export type JobInput = Omit<Job, 'id' | 'category' | 'shift' | 'staffOnly' | 'alwaysRequired'> & {
+  categoryId: string;
+  shiftId: string;
+  maxRegistrations: number;
+};
 
 interface UseJobsResult {
   jobs: Job[];

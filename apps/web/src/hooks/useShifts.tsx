@@ -1,15 +1,24 @@
 import { useCallback, useEffect, useState } from 'react';
 import { shifts, Shift } from '../lib/api';
 
+// Define the type for shift input data
+export type ShiftInput = Omit<Shift, 'id' | 'jobs'> & {
+  name: string;
+  description: string;
+  startTime: string;
+  endTime: string;
+  dayOfWeek: string;
+  campId: string;
+};
+
 interface UseShiftsResult {
   shifts: Shift[];
   loading: boolean;
   error: string | null;
-  fetchShifts: (filters?: { jobId?: string; dayOfWeek?: string }) => Promise<void>;
-  createShift: (data: Omit<Shift, 'id' | 'job'>) => Promise<Shift | null>;
-  updateShift: (id: string, data: Partial<Omit<Shift, 'id' | 'job'>>) => Promise<Shift | null>;
+  fetchShifts: (filters?: { dayOfWeek?: string }) => Promise<void>;
+  createShift: (data: ShiftInput) => Promise<Shift | null>;
+  updateShift: (id: string, data: Partial<ShiftInput>) => Promise<Shift | null>;
   deleteShift: (id: string) => Promise<boolean>;
-  getShiftRegistrations: (shiftId: string) => Promise<unknown[]>;
 }
 
 export function useShifts(): UseShiftsResult {
@@ -17,7 +26,7 @@ export function useShifts(): UseShiftsResult {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchShifts = useCallback(async (filters?: { jobId?: string; dayOfWeek?: string }) => {
+  const fetchShifts = useCallback(async (filters?: { dayOfWeek?: string }) => {
     setLoading(true);
     setError(null);
     try {
@@ -30,7 +39,7 @@ export function useShifts(): UseShiftsResult {
     }
   }, []);
 
-  const createShift = useCallback(async (data: Omit<Shift, 'id' | 'job'>) => {
+  const createShift = useCallback(async (data: ShiftInput) => {
     setLoading(true);
     setError(null);
     try {
@@ -45,7 +54,7 @@ export function useShifts(): UseShiftsResult {
     }
   }, []);
 
-  const updateShift = useCallback(async (id: string, data: Partial<Omit<Shift, 'id' | 'job'>>) => {
+  const updateShift = useCallback(async (id: string, data: Partial<ShiftInput>) => {
     setLoading(true);
     setError(null);
     try {
@@ -75,20 +84,6 @@ export function useShifts(): UseShiftsResult {
     }
   }, []);
 
-  const getShiftRegistrations = useCallback(async (shiftId: string) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const registrations = await shifts.getRegistrations(shiftId);
-      return registrations;
-    } catch {
-      setError('Failed to fetch shift registrations');
-      return [];
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
   useEffect(() => {
     fetchShifts();
   }, [fetchShifts]);
@@ -101,6 +96,5 @@ export function useShifts(): UseShiftsResult {
     createShift,
     updateShift,
     deleteShift,
-    getShiftRegistrations,
   };
 } 

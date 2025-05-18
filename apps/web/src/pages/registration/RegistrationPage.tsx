@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useRegistration, RegistrationFormData, Shift } from '../../hooks/useRegistration';
+import { useRegistration, RegistrationFormData } from '../../hooks/useRegistration';
 import { JobCategory, Job } from '../../lib/api';
 
 export default function RegistrationPage() {
@@ -8,13 +8,14 @@ export default function RegistrationPage() {
   const {
     campingOptions,
     jobCategories,
-    shifts,
     jobs,
+    shifts,
     loading,
     error,
     fetchCampingOptions,
     fetchJobCategories,
     fetchShifts,
+    fetchJobs,
     submitRegistration,
   } = useRegistration();
 
@@ -31,14 +32,15 @@ export default function RegistrationPage() {
   useEffect(() => {
     fetchCampingOptions();
     fetchJobCategories();
-  }, [fetchCampingOptions, fetchJobCategories]);
+    fetchShifts();
+  }, [fetchCampingOptions, fetchJobCategories, fetchShifts]);
 
-  // When camping options change, fetch shifts
+  // When camping options change, fetch jobs
   useEffect(() => {
     if (formData.campingOptions.length > 0 || hasAlwaysRequiredCategories(jobCategories)) {
-      fetchShifts(formData.campingOptions);
+      fetchJobs(formData.campingOptions);
     }
-  }, [formData.campingOptions, jobCategories, fetchShifts]);
+  }, [formData.campingOptions, jobCategories, fetchJobs]);
 
   // Check if there are any always required job categories
   const hasAlwaysRequiredCategories = (categories: JobCategory[]): boolean => {
@@ -83,7 +85,7 @@ export default function RegistrationPage() {
     );
     
     const campingJobsRequired = selectedOptions.reduce(
-      (total, option) => total + option.jobsRequired, 
+      (total, option) => total + option.shiftsRequired, 
       0
     );
     
@@ -216,7 +218,7 @@ export default function RegistrationPage() {
                 <div className="ml-2">
                   <div className="font-medium">{option.name}</div>
                   <div className="text-sm text-gray-600">
-                    Dues: ${option.participantDues} | Required Jobs: {option.jobsRequired}
+                    Dues: ${option.participantDues} | Required Jobs: {option.shiftsRequired}
                   </div>
                   {option.maxSignups > 0 && (
                     <div className="text-sm text-gray-600">
@@ -235,7 +237,7 @@ export default function RegistrationPage() {
                 <div key={option.id} className="border p-4 rounded bg-gray-100 opacity-70">
                   <div className="font-medium">{option.name} (Full)</div>
                   <div className="text-sm text-gray-600">
-                    Dues: ${option.participantDues} | Required Jobs: {option.jobsRequired}
+                    Dues: ${option.participantDues} | Required Jobs: {option.shiftsRequired}
                   </div>
                 </div>
               ))}
@@ -343,13 +345,13 @@ export default function RegistrationPage() {
                     <div className="ml-2">
                       <div>{job.name}</div>
                       <div className="text-sm text-gray-600">
-                        Category: {job.categoryName}
+                        Category: {job.category ? job.category.name : 'Unknown'}
                       </div>
                       <div className="text-sm text-gray-600">
                         {getShiftInfoForJob(job)}
                       </div>
                       <div className="text-sm text-gray-600">
-                        Spots: {job.maxRegistrations - (job.currentRegistrations || 0)} of {job.maxRegistrations} available
+                        Spots: {job.maxRegistrations} available
                       </div>
                     </div>
                   </label>
@@ -451,7 +453,13 @@ export default function RegistrationPage() {
     return `${shift.dayOfWeek} | ${formatTime(shift.startTime)} - ${formatTime(shift.endTime)}`;
   };
 
-  if (loading && !shifts.length && !campingOptions.length) {
+  // Format time string for display
+  const formatTime = (timeString: string): string => {
+    const date = new Date(timeString);
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
+  if (loading && !jobs.length && !campingOptions.length) {
     return <div className="p-6">Loading registration data...</div>;
   }
 

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { z } from 'zod';
-import { JobCategory, Job, api, jobCategories, jobs } from '../lib/api';
+import { JobCategory, Job, api, jobCategories, jobs, shifts, Shift } from '../lib/api';
 
 // Define types for registration data
 export interface RegistrationFormData {
@@ -30,7 +30,8 @@ export type CampingOption = z.infer<typeof CampingOptionSchema>;
 export function useRegistration() {
   const [campingOptions, setCampingOptions] = useState<CampingOption[]>([]);
   const [categories, setCategories] = useState<JobCategory[]>([]);
-  const [availableJobs, setAvailableJobs] = useState<Job[]>([]);
+  const [jobsList, setJobsList] = useState<Job[]>([]);
+  const [shiftsList, setShiftsList] = useState<Shift[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -67,8 +68,23 @@ export function useRegistration() {
     }
   };
 
-  // Fetch available jobs 
-  const fetchAvailableJobs = async (campingOptionIds: string[] = []) => {
+  // Fetch shifts
+  const fetchShifts = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await shifts.getAll();
+      setShiftsList(result);
+    } catch (err) {
+      setError('Failed to fetch shifts');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch jobs 
+  const fetchJobs = async (campingOptionIds: string[] = []) => {
     setLoading(true);
     setError(null);
     try {
@@ -110,9 +126,9 @@ export function useRegistration() {
         ? allJobs.filter(job => categoryIds.includes(job.categoryId))
         : allJobs;
         
-      setAvailableJobs(filteredJobs);
+      setJobsList(filteredJobs);
     } catch (err) {
-      setError('Failed to fetch available jobs');
+      setError('Failed to fetch jobs');
       console.error(err);
     } finally {
       setLoading(false);
@@ -138,12 +154,14 @@ export function useRegistration() {
   return {
     campingOptions,
     jobCategories: categories,
-    availableJobs,
+    jobs: jobsList,
+    shifts: shiftsList,
     loading,
     error,
     fetchCampingOptions,
     fetchJobCategories,
-    fetchAvailableJobs,
+    fetchShifts,
+    fetchJobs,
     submitRegistration,
   };
 }
