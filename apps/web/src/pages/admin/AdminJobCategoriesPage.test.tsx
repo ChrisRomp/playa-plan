@@ -46,9 +46,19 @@ describe('AdminJobCategoriesPage', () => {
     // Check that we have the expected number of rows
     expect(rows).toHaveLength(3); // 3 categories from mock data
     
+    // Find the header indexes for reliable column selection
+    const headerRow = table.querySelector('thead tr');
+    if (!headerRow) {
+      throw new Error('Table header not found');
+    }
+    
+    const headers = Array.from(headerRow.querySelectorAll('th'));
+    const staffOnlyColumnIndex = headers.findIndex(th => th.textContent === 'Staff Only');
+    const alwaysRequiredColumnIndex = headers.findIndex(th => th.textContent === 'Always Required');
+    
     // Count how many rows have staffOnly set to true
     const staffOnlyCount = Array.from(rows).filter(row => {
-      const staffOnlyCell = row.querySelector('td:nth-child(3)'); // 3rd column is staffOnly
+      const staffOnlyCell = row.querySelector(`td:nth-child(${staffOnlyColumnIndex + 1})`);
       return staffOnlyCell?.textContent?.includes('Staff Only') || false;
     }).length;
     
@@ -57,7 +67,7 @@ describe('AdminJobCategoriesPage', () => {
     
     // Count how many rows have alwaysRequired set to true
     const alwaysRequiredCount = Array.from(rows).filter(row => {
-      const alwaysRequiredCell = row.querySelector('td:nth-child(4)'); // 4th column is alwaysRequired
+      const alwaysRequiredCell = row.querySelector(`td:nth-child(${alwaysRequiredColumnIndex + 1})`);
       return alwaysRequiredCell?.textContent?.includes('Required') || false;
     }).length;
     
