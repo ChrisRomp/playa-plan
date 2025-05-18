@@ -2,9 +2,16 @@ import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import AppRouter from './AppRouter';
-import { useAuth } from '../store/authUtils';
 import { ROUTES } from './index';
 import { ROLES } from '../types/auth';
+
+// Mock the useAuth hook
+vi.mock('../store/authUtils', () => ({
+  useAuth: vi.fn()
+}));
+
+// Import after mocking to get the mocked version
+import { useAuth } from '../store/authUtils';
 
 // Mock the page components to simplify testing
 vi.mock('../pages/HomePage.tsx', () => ({
