@@ -652,8 +652,8 @@ export const jobCategories = {
       // Add alwaysRequired field to returned data with default value of false
       // This is needed because the backend doesn't support this field yet
       const parsed = JobCategorySchema.parse({
-        ...item,
-        alwaysRequired: (item as any)?.alwaysRequired || false
+        ...(item as Record<string, unknown>),
+        alwaysRequired: (item as Record<string, unknown>)?.alwaysRequired || false
       });
       return parsed;
     });

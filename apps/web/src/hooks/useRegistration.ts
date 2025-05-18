@@ -1,7 +1,6 @@
 import { useState } from 'react';
-import { useApi } from './useApi';
 import { z } from 'zod';
-import { JobCategory } from '../lib/api';
+import { JobCategory, api } from '../lib/api';
 
 // Define types for registration data
 export interface RegistrationFormData {
@@ -43,7 +42,6 @@ export const ShiftSchema = z.object({
 export type Shift = z.infer<typeof ShiftSchema>;
 
 export function useRegistration() {
-  const api = useApi();
   const [campingOptions, setCampingOptions] = useState<CampingOption[]>([]);
   const [jobCategories, setJobCategories] = useState<JobCategory[]>([]);
   const [shifts, setShifts] = useState<Shift[]>([]);
@@ -98,11 +96,9 @@ export function useRegistration() {
       const params = new URLSearchParams();
       
       // Add camping option IDs if provided
-      if (campingOptionIds.length > 0) {
-        campingOptionIds.forEach(id => {
-          params.append('campingOptionIds', id);
-        });
-      }
+      campingOptionIds.forEach(id => {
+        params.append('campingOptionIds', id);
+      });
       
       // Add always required categories
       alwaysRequiredCategories.forEach(id => {
@@ -125,9 +121,9 @@ export function useRegistration() {
       
       const queryString = params.toString();
       const response = await api.get(`/shifts?${queryString}`);
-      const data = response.data.map((shift: unknown) => 
-        ShiftSchema.parse(shift)
-      );
+      const data = Array.isArray(response.data) 
+        ? response.data.map((shift: unknown) => ShiftSchema.parse(shift))
+        : [];
       setShifts(data);
     } catch (err) {
       setError('Failed to fetch shifts');

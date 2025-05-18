@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useRegistration, RegistrationFormData, CampingOption, Shift } from '../../hooks/useRegistration';
+import { useRegistration, RegistrationFormData, Shift } from '../../hooks/useRegistration';
 import { JobCategory } from '../../lib/api';
 
 export default function RegistrationPage() {
@@ -30,14 +30,14 @@ export default function RegistrationPage() {
   useEffect(() => {
     fetchCampingOptions();
     fetchJobCategories();
-  }, []);
+  }, [fetchCampingOptions, fetchJobCategories]);
 
   // When camping options change, fetch shifts
   useEffect(() => {
     if (formData.campingOptions.length > 0 || hasAlwaysRequiredCategories(jobCategories)) {
       fetchShifts(formData.campingOptions);
     }
-  }, [formData.campingOptions, jobCategories]);
+  }, [formData.campingOptions, jobCategories, fetchShifts]);
 
   // Check if there are any always required job categories
   const hasAlwaysRequiredCategories = (categories: JobCategory[]): boolean => {
