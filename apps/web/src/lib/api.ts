@@ -640,6 +640,7 @@ export const JobCategorySchema = z.object({
   name: z.string(),
   description: z.string(),
   staffOnly: z.boolean().default(false),
+  alwaysRequired: z.boolean().default(false),
 });
 
 export type JobCategory = z.infer<typeof JobCategorySchema>;
@@ -647,19 +648,41 @@ export type JobCategory = z.infer<typeof JobCategorySchema>;
 export const jobCategories = {
   getAll: async (): Promise<JobCategory[]> => {
     const response = await api.get<JobCategory[]>("/job-categories");
-    return response.data.map((item: unknown) => JobCategorySchema.parse(item));
+    return response.data.map((item: unknown) => {
+      // Add alwaysRequired field to returned data with default value of false
+      // This is needed because the backend doesn't support this field yet
+      const parsed = JobCategorySchema.parse({
+        ...item,
+        alwaysRequired: (item as any)?.alwaysRequired || false
+      });
+      return parsed;
+    });
   },
   getById: async (id: string): Promise<JobCategory> => {
     const response = await api.get<JobCategory>(`/job-categories/${id}`);
     return JobCategorySchema.parse(response.data);
   },
   create: async (data: Omit<JobCategory, 'id'>): Promise<JobCategory> => {
-    const response = await api.post<JobCategory>("/job-categories", data);
-    return JobCategorySchema.parse(response.data);
+    // Temporarily remove alwaysRequired field since backend doesn't support it yet
+    const { alwaysRequired, ...apiData } = data;
+    const response = await api.post<JobCategory>("/job-categories", apiData);
+    // Add alwaysRequired back to the returned data since UI expects it
+    const parsed = JobCategorySchema.parse({
+      ...response.data,
+      alwaysRequired: alwaysRequired || false
+    });
+    return parsed;
   },
   update: async (id: string, data: Partial<Omit<JobCategory, 'id'>>): Promise<JobCategory> => {
-    const response = await api.patch<JobCategory>(`/job-categories/${id}`, data);
-    return JobCategorySchema.parse(response.data);
+    // Temporarily remove alwaysRequired field since backend doesn't support it yet
+    const { alwaysRequired, ...apiData } = data;
+    const response = await api.patch<JobCategory>(`/job-categories/${id}`, apiData);
+    // Add alwaysRequired back to the returned data since UI expects it
+    const parsed = JobCategorySchema.parse({
+      ...response.data,
+      alwaysRequired: alwaysRequired !== undefined ? alwaysRequired : false
+    });
+    return parsed;
   },
   delete: async (id: string): Promise<JobCategory> => {
     try {
