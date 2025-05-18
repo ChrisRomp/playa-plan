@@ -3,6 +3,7 @@ import { INestApplication } from '@nestjs/common';
 import supertest from 'supertest';
 import { AppModule } from '../../src/app.module';
 import { PrismaService } from '../../src/common/prisma/prisma.service';
+import { DayOfWeek } from '../../src/common/enums/day-of-week.enum';
 
 describe('ShiftsController (e2e)', () => {
   let app: INestApplication;
@@ -91,11 +92,12 @@ describe('ShiftsController (e2e)', () => {
   describe('POST /shifts', () => {
     it('should create a shift (admin)', async () => {
       const createShiftDto = {
+        name: 'Test Shift',
+        description: 'Test Shift Description',
         startTime: '2023-06-01T09:00:00.000Z',
         endTime: '2023-06-01T17:00:00.000Z',
-        maxRegistrations: 10,
+        dayOfWeek: DayOfWeek.MONDAY,
         campId: campId,
-        jobId: jobId,
       };
 
       const response = await supertest(app.getHttpServer())
@@ -105,24 +107,26 @@ describe('ShiftsController (e2e)', () => {
         .expect(201);
 
       expect(response.body).toHaveProperty('id');
+      expect(response.body.name).toBe(createShiftDto.name);
+      expect(response.body.description).toBe(createShiftDto.description);
       expect(new Date(response.body.startTime).toISOString()).toBe(
         createShiftDto.startTime,
       );
       expect(new Date(response.body.endTime).toISOString()).toBe(
         createShiftDto.endTime,
       );
-      expect(response.body.maxRegistrations).toBe(createShiftDto.maxRegistrations);
+      expect(response.body.dayOfWeek).toBe(createShiftDto.dayOfWeek);
       expect(response.body.campId).toBe(createShiftDto.campId);
-      expect(response.body.jobId).toBe(createShiftDto.jobId);
     });
 
     it('should not create a shift (non-admin)', async () => {
       const createShiftDto = {
+        name: 'Test Shift',
+        description: 'Test Shift Description',
         startTime: '2023-06-01T09:00:00.000Z',
         endTime: '2023-06-01T17:00:00.000Z',
-        maxRegistrations: 10,
+        dayOfWeek: DayOfWeek.MONDAY,
         campId: campId,
-        jobId: jobId,
       };
 
       await supertest(app.getHttpServer())
@@ -148,11 +152,12 @@ describe('ShiftsController (e2e)', () => {
     it('should return a shift by id', async () => {
       // First create a shift
       const createShiftDto = {
+        name: 'Test Shift for GET',
+        description: 'Test Shift Description',
         startTime: '2023-06-02T09:00:00.000Z',
         endTime: '2023-06-02T17:00:00.000Z',
-        maxRegistrations: 15,
+        dayOfWeek: DayOfWeek.TUESDAY,
         campId: campId,
-        jobId: jobId,
       };
 
       const createResponse = await supertest(app.getHttpServer())
@@ -169,10 +174,10 @@ describe('ShiftsController (e2e)', () => {
         .expect(200);
 
       expect(response.body.id).toBe(shiftId);
+      expect(response.body.name).toBe(createShiftDto.name);
       expect(new Date(response.body.startTime).toISOString()).toBe(
         createShiftDto.startTime,
       );
-      expect(response.body.maxRegistrations).toBe(createShiftDto.maxRegistrations);
     });
 
     it('should return 404 for non-existent shift', async () => {
@@ -187,11 +192,12 @@ describe('ShiftsController (e2e)', () => {
     it('should update a shift (admin)', async () => {
       // First create a shift
       const createShiftDto = {
+        name: 'Test Shift for PATCH',
+        description: 'Test Shift Description',
         startTime: '2023-06-03T09:00:00.000Z',
         endTime: '2023-06-03T17:00:00.000Z',
-        maxRegistrations: 20,
+        dayOfWeek: DayOfWeek.WEDNESDAY,
         campId: campId,
-        jobId: jobId,
       };
 
       const createResponse = await supertest(app.getHttpServer())
@@ -203,9 +209,10 @@ describe('ShiftsController (e2e)', () => {
 
       // Then update it
       const updateShiftDto = {
+        name: 'Updated Shift',
+        description: 'Updated Description',
         startTime: '2023-06-03T10:00:00.000Z',
         endTime: '2023-06-03T18:00:00.000Z',
-        maxRegistrations: 25,
       };
 
       const response = await supertest(app.getHttpServer())
@@ -215,23 +222,25 @@ describe('ShiftsController (e2e)', () => {
         .expect(200);
 
       expect(response.body.id).toBe(shiftId);
+      expect(response.body.name).toBe(updateShiftDto.name);
+      expect(response.body.description).toBe(updateShiftDto.description);
       expect(new Date(response.body.startTime).toISOString()).toBe(
         updateShiftDto.startTime,
       );
       expect(new Date(response.body.endTime).toISOString()).toBe(
         updateShiftDto.endTime,
       );
-      expect(response.body.maxRegistrations).toBe(updateShiftDto.maxRegistrations);
     });
 
     it('should not update a shift (non-admin)', async () => {
       // First create a shift
       const createShiftDto = {
+        name: 'Test Shift for non-admin PATCH',
+        description: 'Test Shift Description',
         startTime: '2023-06-04T09:00:00.000Z',
         endTime: '2023-06-04T17:00:00.000Z',
-        maxRegistrations: 30,
+        dayOfWeek: DayOfWeek.THURSDAY,
         campId: campId,
-        jobId: jobId,
       };
 
       const createResponse = await supertest(app.getHttpServer())
@@ -243,7 +252,7 @@ describe('ShiftsController (e2e)', () => {
 
       // Then try to update it as non-admin
       const updateShiftDto = {
-        maxRegistrations: 35,
+        name: 'Unauthorized Update',
       };
 
       await supertest(app.getHttpServer())
@@ -258,11 +267,12 @@ describe('ShiftsController (e2e)', () => {
     it('should delete a shift (admin)', async () => {
       // First create a shift
       const createShiftDto = {
+        name: 'Test Shift for DELETE',
+        description: 'Test Shift Description',
         startTime: '2023-06-05T09:00:00.000Z',
         endTime: '2023-06-05T17:00:00.000Z',
-        maxRegistrations: 40,
+        dayOfWeek: DayOfWeek.FRIDAY,
         campId: campId,
-        jobId: jobId,
       };
 
       const createResponse = await supertest(app.getHttpServer())
@@ -288,11 +298,12 @@ describe('ShiftsController (e2e)', () => {
     it('should not delete a shift (non-admin)', async () => {
       // First create a shift
       const createShiftDto = {
+        name: 'Test Shift for non-admin DELETE',
+        description: 'Test Shift Description',
         startTime: '2023-06-06T09:00:00.000Z',
         endTime: '2023-06-06T17:00:00.000Z',
-        maxRegistrations: 50,
+        dayOfWeek: DayOfWeek.SATURDAY,
         campId: campId,
-        jobId: jobId,
       };
 
       const createResponse = await supertest(app.getHttpServer())

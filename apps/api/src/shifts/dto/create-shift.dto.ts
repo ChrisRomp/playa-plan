@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsDate, IsEnum, IsInt, IsNotEmpty, IsString } from 'class-validator';
+import { IsDate, IsEnum, IsNotEmpty, IsString } from 'class-validator';
 import { DayOfWeek } from '../../common/enums/day-of-week.enum';
 
 /**
@@ -15,11 +15,6 @@ export class CreateShiftDto {
   @IsNotEmpty()
   @IsString()
   description!: string;
-
-  @ApiProperty({ description: 'The maximum number of registrations allowed for this shift' })
-  @IsNotEmpty()
-  @IsInt()
-  maxParticipants!: number;
 
   @ApiProperty({ description: 'The start time of the shift' })
   @IsNotEmpty()

@@ -45,6 +45,7 @@ describe('JobsService', () => {
         description: 'Test Description',
         location: 'Test Location',
         categoryId: 'test-category-id',
+        shiftId: 'test-shift-id',
       };
 
       const mockJob = {
@@ -58,6 +59,18 @@ describe('JobsService', () => {
           description: 'Test Category Description',
           staffOnly: false,
           alwaysRequired: true,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        shift: {
+          id: 'test-shift-id',
+          name: 'Test Shift',
+          description: 'Test Shift Description',
+          startTime: new Date(),
+          endTime: new Date(),
+          maxRegistrations: 10,
+          dayOfWeek: 'MONDAY',
+          campId: 'test-camp-id',
           createdAt: new Date(),
           updatedAt: new Date(),
         },
@@ -76,9 +89,20 @@ describe('JobsService', () => {
 
       expect(result).toEqual(expectedJob);
       expect(mockPrismaService.job.create).toHaveBeenCalledWith({
-        data: createJobDto,
+        data: {
+          name: createJobDto.name,
+          description: createJobDto.description,
+          location: createJobDto.location,
+          category: {
+            connect: { id: createJobDto.categoryId }
+          },
+          shift: {
+            connect: { id: createJobDto.shiftId }
+          }
+        },
         include: {
           category: true,
+          shift: true,
         },
       });
     });
@@ -93,6 +117,7 @@ describe('JobsService', () => {
           description: 'Test Description 1',
           location: 'Test Location 1',
           categoryId: 'test-category-id-1',
+          shiftId: 'test-shift-id-1',
           createdAt: new Date(),
           updatedAt: new Date(),
           category: {
@@ -104,6 +129,18 @@ describe('JobsService', () => {
             createdAt: new Date(),
             updatedAt: new Date(),
           },
+          shift: {
+            id: 'test-shift-id-1',
+            name: 'Test Shift 1',
+            description: 'Test Shift Description 1',
+            startTime: new Date(),
+            endTime: new Date(),
+            maxRegistrations: 10,
+            dayOfWeek: 'MONDAY',
+            campId: 'test-camp-id',
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
         },
         {
           id: 'test-id-2',
@@ -111,6 +148,7 @@ describe('JobsService', () => {
           description: 'Test Description 2',
           location: 'Test Location 2',
           categoryId: 'test-category-id-2',
+          shiftId: 'test-shift-id-2',
           createdAt: new Date(),
           updatedAt: new Date(),
           category: {
@@ -119,6 +157,18 @@ describe('JobsService', () => {
             description: 'Test Category Description 2',
             staffOnly: false,
             alwaysRequired: true,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+          shift: {
+            id: 'test-shift-id-2',
+            name: 'Test Shift 2',
+            description: 'Test Shift Description 2',
+            startTime: new Date(),
+            endTime: new Date(),
+            maxRegistrations: 10,
+            dayOfWeek: 'TUESDAY',
+            campId: 'test-camp-id',
             createdAt: new Date(),
             updatedAt: new Date(),
           },
@@ -140,6 +190,7 @@ describe('JobsService', () => {
       expect(mockPrismaService.job.findMany).toHaveBeenCalledWith({
         include: {
           category: true,
+          shift: true,
         },
       });
     });
@@ -154,6 +205,7 @@ describe('JobsService', () => {
         description: 'Test Description',
         location: 'Test Location',
         categoryId: 'test-category-id',
+        shiftId: 'test-shift-id',
         createdAt: new Date(),
         updatedAt: new Date(),
         category: {
@@ -162,6 +214,18 @@ describe('JobsService', () => {
           description: 'Test Category Description',
           staffOnly: true,
           alwaysRequired: false,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        shift: {
+          id: 'test-shift-id',
+          name: 'Test Shift',
+          description: 'Test Shift Description',
+          startTime: new Date(),
+          endTime: new Date(),
+          maxRegistrations: 10,
+          dayOfWeek: 'MONDAY',
+          campId: 'test-camp-id',
           createdAt: new Date(),
           updatedAt: new Date(),
         },
@@ -183,6 +247,7 @@ describe('JobsService', () => {
         where: { id: jobId },
         include: {
           category: true,
+          shift: true,
         },
       });
     });
@@ -201,6 +266,7 @@ describe('JobsService', () => {
       const updateJobDto: UpdateJobDto = {
         name: 'Updated Job',
         description: 'Updated Description',
+        shiftId: 'updated-shift-id',
       };
 
       const mockUpdatedJob = {
@@ -209,6 +275,7 @@ describe('JobsService', () => {
         description: 'Updated Description',
         location: 'Test Location',
         categoryId: 'test-category-id',
+        shiftId: 'updated-shift-id',
         createdAt: new Date(),
         updatedAt: new Date(),
         category: {
@@ -217,6 +284,18 @@ describe('JobsService', () => {
           description: 'Test Category Description',
           staffOnly: false,
           alwaysRequired: true,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        shift: {
+          id: 'updated-shift-id',
+          name: 'Updated Shift',
+          description: 'Updated Shift Description',
+          startTime: new Date(),
+          endTime: new Date(),
+          maxRegistrations: 15,
+          dayOfWeek: 'WEDNESDAY',
+          campId: 'test-camp-id',
           createdAt: new Date(),
           updatedAt: new Date(),
         },
@@ -236,9 +315,16 @@ describe('JobsService', () => {
       expect(result).toEqual(expectedJob);
       expect(mockPrismaService.job.update).toHaveBeenCalledWith({
         where: { id: jobId },
-        data: updateJobDto,
+        data: expect.objectContaining({
+          name: updateJobDto.name,
+          description: updateJobDto.description,
+          shift: {
+            connect: { id: updateJobDto.shiftId }
+          }
+        }),
         include: {
           category: true,
+          shift: true,
         },
       });
     });
@@ -262,6 +348,7 @@ describe('JobsService', () => {
         description: 'Test Description',
         location: 'Test Location',
         categoryId: 'test-category-id',
+        shiftId: 'test-shift-id',
         createdAt: new Date(),
         updatedAt: new Date(),
         category: {
@@ -270,6 +357,18 @@ describe('JobsService', () => {
           description: 'Test Category Description',
           staffOnly: true,
           alwaysRequired: false,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        shift: {
+          id: 'test-shift-id',
+          name: 'Test Shift',
+          description: 'Test Shift Description',
+          startTime: new Date(),
+          endTime: new Date(),
+          maxRegistrations: 10,
+          dayOfWeek: 'MONDAY',
+          campId: 'test-camp-id',
           createdAt: new Date(),
           updatedAt: new Date(),
         },
@@ -291,6 +390,7 @@ describe('JobsService', () => {
         where: { id: jobId },
         include: {
           category: true,
+          shift: true,
         },
       });
     });

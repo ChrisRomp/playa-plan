@@ -20,7 +20,6 @@ export class ShiftsService {
         description: createShiftDto.description,
         startTime: createShiftDto.startTime,
         endTime: createShiftDto.endTime,
-        maxRegistrations: createShiftDto.maxParticipants,
         dayOfWeek: createShiftDto.dayOfWeek,
         camp: { connect: { id: createShiftDto.campId } },
       },
@@ -86,10 +85,6 @@ export class ShiftsService {
 
     if (updateShiftDto.endTime) {
       data.endTime = updateShiftDto.endTime;
-    }
-
-    if (updateShiftDto.maxParticipants) {
-      data.maxRegistrations = updateShiftDto.maxParticipants;
     }
 
     if (updateShiftDto.dayOfWeek) {

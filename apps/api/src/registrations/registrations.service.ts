@@ -51,7 +51,7 @@ export class RegistrationsService {
     // Determine registration status based on capacity
     const status = job.registrations.filter(
       r => r.status !== RegistrationStatus.CANCELLED
-    ).length >= job.shift.maxRegistrations
+    ).length >= job.maxRegistrations
       ? RegistrationStatus.WAITLISTED
       : RegistrationStatus.PENDING;
 

@@ -13,6 +13,7 @@ export class JobsService {
         name: createJobDto.name,
         description: createJobDto.description,
         location: createJobDto.location,
+        maxRegistrations: createJobDto.maxRegistrations || 10, // Default to 10 if not provided
         category: {
           connect: { id: createJobDto.categoryId }
         },
@@ -67,6 +68,7 @@ export class JobsService {
       if (updateJobDto.name) updateData.name = updateJobDto.name;
       if (updateJobDto.description) updateData.description = updateJobDto.description;
       if (updateJobDto.location) updateData.location = updateJobDto.location;
+      if (updateJobDto.maxRegistrations) updateData.maxRegistrations = updateJobDto.maxRegistrations;
       
       if (updateJobDto.categoryId) {
         updateData.category = { connect: { id: updateJobDto.categoryId } };

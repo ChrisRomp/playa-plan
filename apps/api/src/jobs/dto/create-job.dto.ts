@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsUUID } from 'class-validator';
+import { IsString, IsNotEmpty, IsUUID, IsInt, IsOptional } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateJobDto {
@@ -41,4 +41,13 @@ export class CreateJobDto {
   @IsUUID()
   @IsNotEmpty()
   shiftId!: string;
+
+  @ApiProperty({
+    description: 'The maximum number of registrations allowed for this job',
+    example: 10,
+    default: 10,
+  })
+  @IsInt()
+  @IsOptional()
+  maxRegistrations?: number;
 } 

@@ -3,7 +3,7 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/common/prisma/prisma.service';
-import { RegistrationStatus, UserRole } from '@prisma/client';
+import { RegistrationStatus, UserRole, DayOfWeek } from '@prisma/client';
 import { JwtService } from '@nestjs/jwt';
 
 describe('RegistrationsController (e2e)', () => {
@@ -40,27 +40,34 @@ describe('RegistrationsController (e2e)', () => {
     capacity: number;
     isActive: boolean;
   };
+  let testShift: {
+    id: string;
+    name: string;
+    description: string | null;
+    startTime: Date;
+    endTime: Date;
+    campId: string;
+    dayOfWeek: DayOfWeek;
+  };
+  let testCategory: {
+    id: string;
+    name: string;
+    description: string | null;
+  };
   let testJob: {
     id: string;
     name: string;
     description: string | null;
     location: string;
     categoryId: string;
-  };
-  let testShift: {
-    id: string;
-    startTime: Date;
-    endTime: Date;
+    shiftId: string;
     maxRegistrations: number;
-    campId: string;
-    jobId: string;
-    dayOfWeek: string;
   };
   let testRegistration: {
     id: string;
     status: RegistrationStatus;
     userId: string;
-    shiftId: string;
+    jobId: string;
   };
 
   beforeAll(async () => {
@@ -110,9 +117,9 @@ describe('RegistrationsController (e2e)', () => {
       // Then clear any payments (they have a relation to users)
       await prismaService.payment.deleteMany();
       
-      // Now clear shifts and related entities
-      await prismaService.shift.deleteMany();
+      // Now clear jobs, shifts, and related entities
       await prismaService.job.deleteMany();
+      await prismaService.shift.deleteMany();
       await prismaService.jobCategory.deleteMany();
       await prismaService.camp.deleteMany();
       
@@ -161,8 +168,20 @@ describe('RegistrationsController (e2e)', () => {
       },
     });
 
+    // Create test shift
+    testShift = await prismaService.shift.create({
+      data: {
+        name: 'Test Shift',
+        description: 'Test Shift Description',
+        startTime: new Date('2023-06-01T09:00:00Z'),
+        endTime: new Date('2023-06-01T17:00:00Z'),
+        dayOfWeek: DayOfWeek.MONDAY,
+        campId: testCamp.id,
+      },
+    });
+
     // Create test job category
-    const testCategory = await prismaService.jobCategory.create({
+    testCategory = await prismaService.jobCategory.create({
       data: {
         name: 'Test Category',
         description: 'Test Category Description',
@@ -176,18 +195,8 @@ describe('RegistrationsController (e2e)', () => {
         description: 'Test Job Description',
         location: 'Test Job Location',
         categoryId: testCategory.id,
-      },
-    });
-
-    // Create test shift
-    testShift = await prismaService.shift.create({
-      data: {
-        startTime: new Date('2023-06-01T09:00:00Z'),
-        endTime: new Date('2023-06-01T17:00:00Z'),
+        shiftId: testShift.id,
         maxRegistrations: 10,
-        campId: testCamp.id,
-        jobId: testJob.id,
-        dayOfWeek: 'MONDAY',
       },
     });
 
@@ -196,7 +205,7 @@ describe('RegistrationsController (e2e)', () => {
       data: {
         status: RegistrationStatus.PENDING,
         userId: testUser.id,
-        shiftId: testShift.id,
+        jobId: testJob.id,
       },
     });
   }
@@ -218,7 +227,7 @@ describe('RegistrationsController (e2e)', () => {
           expect(res.body.length).toBeGreaterThan(0);
           expect(res.body[0]).toHaveProperty('id');
           expect(res.body[0]).toHaveProperty('userId');
-          expect(res.body[0]).toHaveProperty('shiftId');
+          expect(res.body[0]).toHaveProperty('jobId');
         });
     });
 
@@ -234,15 +243,15 @@ describe('RegistrationsController (e2e)', () => {
         });
     });
 
-    it('should filter registrations by shiftId', () => {
+    it('should filter registrations by jobId', () => {
       return request(app.getHttpServer())
-        .get(`/registrations?shiftId=${testShift.id}`)
+        .get(`/registrations?jobId=${testJob.id}`)
         .set('Authorization', `Bearer ${adminToken}`)
         .expect(200)
         .expect((res: request.Response) => {
           expect(Array.isArray(res.body)).toBe(true);
           expect(res.body.length).toBeGreaterThan(0);
-          expect(res.body[0].shiftId).toBe(testShift.id);
+          expect(res.body[0].jobId).toBe(testJob.id);
         });
     });
   });
@@ -262,7 +271,7 @@ describe('RegistrationsController (e2e)', () => {
         .expect((res: request.Response) => {
           expect(res.body).toHaveProperty('id', testRegistration.id);
           expect(res.body).toHaveProperty('userId', testUser.id);
-          expect(res.body).toHaveProperty('shiftId', testShift.id);
+          expect(res.body).toHaveProperty('jobId', testJob.id);
         });
     });
 
@@ -280,7 +289,7 @@ describe('RegistrationsController (e2e)', () => {
         .post('/registrations')
         .send({
           userId: testUser.id,
-          shiftId: testShift.id,
+          jobId: testJob.id,
         })
         .expect(401);
     });
@@ -296,13 +305,13 @@ describe('RegistrationsController (e2e)', () => {
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
           userId: testUser.id,
-          shiftId: testShift.id,
+          jobId: testJob.id,
         })
         .expect(201)
         .expect((res: request.Response) => {
           expect(res.body).toHaveProperty('id');
           expect(res.body).toHaveProperty('userId', testUser.id);
-          expect(res.body).toHaveProperty('shiftId', testShift.id);
+          expect(res.body).toHaveProperty('jobId', testJob.id);
           expect(res.body).toHaveProperty('status');
           // Save the new registration ID for future tests
           testRegistration = res.body;

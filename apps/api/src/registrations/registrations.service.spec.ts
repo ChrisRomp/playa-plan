@@ -18,7 +18,7 @@ describe('RegistrationsService', () => {
       update: jest.fn(),
       delete: jest.fn(),
     },
-    shift: {
+    job: {
       findUnique: jest.fn(),
     },
     user: {
@@ -54,12 +54,14 @@ describe('RegistrationsService', () => {
   describe('create', () => {
     const createDto: CreateRegistrationDto = {
       userId: 'user-id',
-      shiftId: 'shift-id',
+      jobId: 'job-id',
     };
 
-    const mockShift = {
-      id: 'shift-id',
-      maxRegistrations: 10,
+    const mockJob = {
+      id: 'job-id',
+      shift: {
+        maxRegistrations: 10,
+      },
       registrations: [],
     };
 
@@ -71,21 +73,21 @@ describe('RegistrationsService', () => {
     const mockRegistration = {
       id: 'registration-id',
       userId: 'user-id',
-      shiftId: 'shift-id',
+      jobId: 'job-id',
       status: RegistrationStatus.PENDING,
     };
 
     it('should create a registration successfully', async () => {
-      mockPrismaService.shift.findUnique.mockResolvedValue(mockShift);
+      mockPrismaService.job.findUnique.mockResolvedValue(mockJob);
       mockPrismaService.user.findUnique.mockResolvedValue(mockUser);
       mockPrismaService.registration.findFirst.mockResolvedValue(null);
       mockPrismaService.registration.create.mockResolvedValue(mockRegistration);
 
       const result = await service.create(createDto);
       
-      expect(mockPrismaService.shift.findUnique).toHaveBeenCalledWith({
-        where: { id: createDto.shiftId },
-        include: { registrations: true },
+      expect(mockPrismaService.job.findUnique).toHaveBeenCalledWith({
+        where: { id: createDto.jobId },
+        include: { shift: true, registrations: true },
       });
       expect(mockPrismaService.user.findUnique).toHaveBeenCalledWith({
         where: { id: createDto.userId },
@@ -95,38 +97,41 @@ describe('RegistrationsService', () => {
       expect(result).toEqual(mockRegistration);
     });
 
-    it('should throw NotFoundException if shift does not exist', async () => {
-      mockPrismaService.shift.findUnique.mockResolvedValue(null);
+    it('should throw NotFoundException if job does not exist', async () => {
+      mockPrismaService.job.findUnique.mockResolvedValue(null);
 
       await expect(service.create(createDto)).rejects.toThrow(NotFoundException);
     });
 
     it('should throw NotFoundException if user does not exist', async () => {
-      mockPrismaService.shift.findUnique.mockResolvedValue(mockShift);
+      mockPrismaService.job.findUnique.mockResolvedValue(mockJob);
       mockPrismaService.user.findUnique.mockResolvedValue(null);
 
       await expect(service.create(createDto)).rejects.toThrow(NotFoundException);
     });
 
-    it('should throw BadRequestException if user already registered for shift', async () => {
-      mockPrismaService.shift.findUnique.mockResolvedValue(mockShift);
+    it('should throw BadRequestException if user already registered for job', async () => {
+      mockPrismaService.job.findUnique.mockResolvedValue(mockJob);
       mockPrismaService.user.findUnique.mockResolvedValue(mockUser);
       mockPrismaService.registration.findFirst.mockResolvedValue({
         id: 'existing-registration',
         userId: 'user-id',
-        shiftId: 'shift-id',
+        jobId: 'job-id',
       });
 
       await expect(service.create(createDto)).rejects.toThrow(BadRequestException);
     });
 
-    it('should set status to WAITLISTED if shift is at capacity', async () => {
-      const fullShift = {
-        ...mockShift,
+    it('should set status to WAITLISTED if job is at capacity', async () => {
+      const fullJob = {
+        ...mockJob,
+        shift: {
+          maxRegistrations: 10,
+        },
         registrations: Array(10).fill({ status: RegistrationStatus.CONFIRMED }),
       };
       
-      mockPrismaService.shift.findUnique.mockResolvedValue(fullShift);
+      mockPrismaService.job.findUnique.mockResolvedValue(fullJob);
       mockPrismaService.user.findUnique.mockResolvedValue(mockUser);
       mockPrismaService.registration.findFirst.mockResolvedValue(null);
       mockPrismaService.registration.create.mockImplementation((args) => {
@@ -146,8 +151,8 @@ describe('RegistrationsService', () => {
   describe('findAll', () => {
     it('should return an array of registrations', async () => {
       const expectedRegistrations = [
-        { id: '1', userId: 'user1', shiftId: 'shift1' },
-        { id: '2', userId: 'user2', shiftId: 'shift2' },
+        { id: '1', userId: 'user1', jobId: 'job1' },
+        { id: '2', userId: 'user2', jobId: 'job2' },
       ];
       mockPrismaService.registration.findMany.mockResolvedValue(expectedRegistrations);
 
@@ -163,8 +168,8 @@ describe('RegistrationsService', () => {
     
     it('should return registrations for a specific user', async () => {
       const expectedRegistrations = [
-        { id: '1', userId, shiftId: 'shift1' },
-        { id: '2', userId, shiftId: 'shift2' },
+        { id: '1', userId, jobId: 'job1' },
+        { id: '2', userId, jobId: 'job2' },
       ];
       
       mockPrismaService.user.findUnique.mockResolvedValue({ id: userId });
@@ -189,40 +194,40 @@ describe('RegistrationsService', () => {
     });
   });
 
-  describe('findByShift', () => {
-    const shiftId = 'shift-id';
+  describe('findByJob', () => {
+    const jobId = 'job-id';
     
-    it('should return registrations for a specific shift', async () => {
+    it('should return registrations for a specific job', async () => {
       const expectedRegistrations = [
-        { id: '1', userId: 'user1', shiftId },
-        { id: '2', userId: 'user2', shiftId },
+        { id: '1', userId: 'user1', jobId },
+        { id: '2', userId: 'user2', jobId },
       ];
       
-      mockPrismaService.shift.findUnique.mockResolvedValue({ id: shiftId });
+      mockPrismaService.job.findUnique.mockResolvedValue({ id: jobId });
       mockPrismaService.registration.findMany.mockResolvedValue(expectedRegistrations);
 
-      const result = await service.findByShift(shiftId);
+      const result = await service.findByJob(jobId);
       
-      expect(mockPrismaService.shift.findUnique).toHaveBeenCalledWith({
-        where: { id: shiftId },
+      expect(mockPrismaService.job.findUnique).toHaveBeenCalledWith({
+        where: { id: jobId },
       });
       expect(mockPrismaService.registration.findMany).toHaveBeenCalledWith({
-        where: { shiftId },
+        where: { jobId },
         include: expect.any(Object),
       });
       expect(result).toEqual(expectedRegistrations);
     });
 
-    it('should throw NotFoundException if shift does not exist', async () => {
-      mockPrismaService.shift.findUnique.mockResolvedValue(null);
+    it('should throw NotFoundException if job does not exist', async () => {
+      mockPrismaService.job.findUnique.mockResolvedValue(null);
 
-      await expect(service.findByShift(shiftId)).rejects.toThrow(NotFoundException);
+      await expect(service.findByJob(jobId)).rejects.toThrow(NotFoundException);
     });
   });
 
   describe('findOne', () => {
     const registrationId = 'registration-id';
-    const mockRegistration = { id: registrationId, userId: 'user-id', shiftId: 'shift-id' };
+    const mockRegistration = { id: registrationId, userId: 'user-id', jobId: 'job-id' };
     
     it('should return a registration by id', async () => {
       mockPrismaService.registration.findUnique.mockResolvedValue(mockRegistration);
@@ -249,7 +254,7 @@ describe('RegistrationsService', () => {
     const mockRegistration = { 
       id: registrationId, 
       userId: 'user-id', 
-      shiftId: 'shift-id',
+      jobId: 'job-id',
       status: RegistrationStatus.PENDING,
     };
     
@@ -282,7 +287,7 @@ describe('RegistrationsService', () => {
 
   describe('remove', () => {
     const registrationId = 'registration-id';
-    const mockRegistration = { id: registrationId, userId: 'user-id', shiftId: 'shift-id' };
+    const mockRegistration = { id: registrationId, userId: 'user-id', jobId: 'job-id' };
     
     it('should delete a registration successfully', async () => {
       mockPrismaService.registration.findUnique.mockResolvedValue(mockRegistration);

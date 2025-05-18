@@ -145,6 +145,7 @@ model Job {
   updatedAt      DateTime    @updatedAt
   categoryId     String
   shiftId        String
+  maxRegistrations Int
   alwaysRequired Boolean     @default(false)
   staffOnly      Boolean     @default(false)
   category       JobCategory @relation(fields: [categoryId], references: [id])
@@ -160,7 +161,6 @@ model Shift {
   description      String?
   startTime        DateTime
   endTime          DateTime
-  maxRegistrations Int
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
   campId           String

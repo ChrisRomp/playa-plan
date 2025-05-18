@@ -12,18 +12,20 @@ describe('ShiftsController', () => {
 
   const mockShift = {
     id: 'test-id',
+    name: 'Test Shift',
+    description: 'Test Description',
     startTime: new Date('2023-06-01T09:00:00Z'),
     endTime: new Date('2023-06-01T17:00:00Z'),
-    maxRegistrations: 10,
     campId: 'camp-id',
-    jobId: 1,
+    dayOfWeek: DayOfWeek.MONDAY,
     createdAt: new Date(),
     updatedAt: new Date(),
   };
   
   const mockUpdatedShift = {
     ...mockShift,
-    maxRegistrations: 15,
+    name: 'Updated Shift',
+    description: 'Updated Description',
   };
 
   beforeEach(async () => {
@@ -36,11 +38,11 @@ describe('ShiftsController', () => {
     };
 
     const mockRegistrationsService = {
-      create: jest.fn(() => Promise.resolve({ id: 'reg-id', userId: 'user-id', shiftId: 'test-id' })),
+      create: jest.fn(() => Promise.resolve({ id: 'reg-id', userId: 'user-id', jobId: 'job-id' })),
       findByUser: jest.fn(() => Promise.resolve([])),
-      findByShift: jest.fn(() => Promise.resolve([])),
-      findOne: jest.fn(() => Promise.resolve({ id: 'reg-id', userId: 'user-id', shiftId: 'test-id' })),
-      update: jest.fn(() => Promise.resolve({ id: 'reg-id', userId: 'user-id', shiftId: 'test-id', status: 'CANCELLED' })),
+      findByJob: jest.fn(() => Promise.resolve([])),
+      findOne: jest.fn(() => Promise.resolve({ id: 'reg-id', userId: 'user-id', jobId: 'job-id' })),
+      update: jest.fn(() => Promise.resolve({ id: 'reg-id', userId: 'user-id', jobId: 'job-id', status: 'CANCELLED' })),
     };
 
     const mockPrismaService = {
@@ -82,12 +84,11 @@ describe('ShiftsController', () => {
       const mockCreateShiftDto: CreateShiftDto = {
         name: 'Test Shift',
         description: 'Test Description',
-        maxParticipants: 5,
         startTime: new Date('2023-06-01T09:00:00Z'),
         endTime: new Date('2023-06-01T17:00:00Z'),
         dayOfWeek: DayOfWeek.MONDAY,
-        location: 'test-camp-id',
-        jobId: 1
+        location: 'Test Location',
+        campId: 'test-camp-id'
       };
 
       const result = await controller.create(mockCreateShiftDto);
@@ -118,7 +119,8 @@ describe('ShiftsController', () => {
   describe('update', () => {
     it('should update a shift', async () => {
       const updateShiftDto: UpdateShiftDto = {
-        maxParticipants: 15,
+        name: 'Updated Shift',
+        description: 'Updated Description'
       };
 
       const result = await controller.update('test-id', updateShiftDto);
