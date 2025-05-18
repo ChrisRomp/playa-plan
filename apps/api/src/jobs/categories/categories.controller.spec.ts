@@ -6,7 +6,6 @@ import { RolesGuard } from '../../auth/guards/roles.guard';
 
 describe('CategoriesController', () => {
   let controller: CategoriesController;
-  let service: CategoriesService;
 
   // Sample data with staffOnly field
   const mockCategories = [
@@ -64,7 +63,6 @@ describe('CategoriesController', () => {
       .compile();
 
     controller = module.get<CategoriesController>(CategoriesController);
-    service = module.get<CategoriesService>(CategoriesService);
 
     // Reset all mocks
     jest.clearAllMocks();
