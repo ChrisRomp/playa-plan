@@ -1,7 +1,6 @@
 {
     "recommendations": [
         "GitHub.copilot",
-        "ms-ossdata.vscode-postgresql",
         "rvest.vs-code-prettier-eslint",
         "dbaeumer.vscode-eslint"
     ]
