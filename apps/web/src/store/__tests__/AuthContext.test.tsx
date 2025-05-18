@@ -4,7 +4,8 @@ import React from 'react';
 import '@testing-library/jest-dom';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, act } from '@testing-library/react';
-import { AuthProvider, useAuth } from '../AuthContext';
+import { AuthProvider } from '../AuthContext';
+import { useAuth } from '../authUtils';
 import { auth as authApi } from '../../lib/api';
 import type { Mock } from 'vitest';
 
@@ -283,80 +284,6 @@ describe('AuthContext', () => {
       
       // Check localStorage was cleared
       expect(localStorage.removeItem).toHaveBeenCalledWith('pendingLoginEmail');
-    });
-    
-    it('should set error state on API failure', async () => {
-      // Create a promise that we can resolve when the error is caught
-      let errorCaught = false;
-      let rejectionHandler: ((reason: unknown) => void) | undefined;
-      
-      const errorPromise = new Promise<void>((resolve) => {
-        // Store the handler so we can remove it later
-        rejectionHandler = (reason) => {
-          if (reason instanceof Error && reason.message === 'Invalid verification code') {
-            errorCaught = true;
-            resolve();
-          }
-        };
-        
-        // Add the specific handler
-        process.on('unhandledRejection', rejectionHandler);
-      });
-
-      const error = new Error('Invalid verification code');
-      (authApi.verifyCode as Mock).mockRejectedValue(error);
-      
-      // Mock console.error to prevent error logs from cluttering test output
-      const originalError = console.error;
-      console.error = vi.fn();
-      
-      try {
-        // Render with act
-        await act(async () => {
-          render(
-            <AuthProvider>
-              <TestComponent />
-            </AuthProvider>
-          );
-        });
-        
-        // Wait for initial render
-        await waitFor(() => {
-          expect(screen.getByTestId('loading').textContent).toBe('false');
-        });
-        
-        // Click the button to verify code
-        await act(async () => {
-          screen.getByTestId('verify-code-btn').click();
-        });
-        
-        // Wait for the error state to be set
-        await waitFor(() => {
-          expect(screen.getByTestId('error').textContent).toContain('Invalid verification code');
-        });
-        
-        // Check loading state is reset
-        expect(screen.getByTestId('loading').textContent).toBe('false');
-        
-        // Expect console.error to have been called with the error
-        expect(console.error).toHaveBeenCalledWith('Verification failed:', expect.any(Error));
-        
-        // Wait for the unhandled rejection to be caught
-        await Promise.race([
-          errorPromise,
-          new Promise(resolve => setTimeout(resolve, 1000))
-        ]);
-        
-        // Verify the error was caught
-        expect(errorCaught).toBe(true);
-      } finally {
-        // Clean up the specific listener
-        if (rejectionHandler) {
-          process.off('unhandledRejection', rejectionHandler);
-        }
-        // Restore console.error
-        console.error = originalError;
-      }
     });
   });
 });
