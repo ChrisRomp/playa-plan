@@ -51,11 +51,19 @@ const AdminPage: React.FC = () => {
         </div>
         
         <div className="bg-white p-6 rounded-lg shadow-md">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Jobs</h2>
+          <p className="text-gray-600 mb-4">Create and manage jobs for the camp.</p>
+          <Link to={ROUTES.ADMIN_JOBS.path} className="text-blue-600 hover:text-blue-800 font-medium">
+            Manage Jobs &rarr;
+          </Link>
+        </div>
+        
+        <div className="bg-white p-6 rounded-lg shadow-md">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Job Shifts</h2>
           <p className="text-gray-600 mb-4">Create and manage job shifts and assignments.</p>
-          <button className="text-blue-600 hover:text-blue-800 font-medium">
-            Manage Shifts →
-          </button>
+          <Link to={ROUTES.ADMIN_SHIFTS.path} className="text-blue-600 hover:text-blue-800 font-medium">
+            Manage Shifts &rarr;
+          </Link>
         </div>
         
         <div className="bg-white p-6 rounded-lg shadow-md">

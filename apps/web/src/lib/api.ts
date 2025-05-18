@@ -645,44 +645,58 @@ export const JobCategorySchema = z.object({
 
 export type JobCategory = z.infer<typeof JobCategorySchema>;
 
+// Job Schema
+export const JobSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string(),
+  location: z.string(),
+  categoryId: z.string(),
+  category: JobCategorySchema.optional(),
+  shiftId: z.string(),
+  shift: z.lazy(() => ShiftSchema).optional(),
+});
+
+export type Job = z.infer<typeof JobSchema> & {
+  // These fields are derived from the job's category, not stored directly on the job
+  staffOnly: boolean;
+  alwaysRequired: boolean;
+};
+
+// Shift Schema
+export const ShiftSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string(),
+  startTime: z.string(),
+  endTime: z.string(),
+  maxParticipants: z.number(),
+  currentParticipants: z.number().optional(),
+  dayOfWeek: z.string(),
+  campId: z.string(),
+  jobs: z.array(z.lazy(() => JobSchema)).optional(),
+});
+
+export type Shift = z.infer<typeof ShiftSchema>;
+
 export const jobCategories = {
   getAll: async (): Promise<JobCategory[]> => {
     const response = await api.get<JobCategory[]>("/job-categories");
-    return response.data.map((item: unknown) => {
-      // Add alwaysRequired field to returned data with default value of false
-      // This is needed because the backend doesn't support this field yet
-      const parsed = JobCategorySchema.parse({
-        ...(item as Record<string, unknown>),
-        alwaysRequired: (item as Record<string, unknown>)?.alwaysRequired || false
-      });
-      return parsed;
-    });
+    return response.data.map((item: unknown) => JobCategorySchema.parse(item));
   },
   getById: async (id: string): Promise<JobCategory> => {
     const response = await api.get<JobCategory>(`/job-categories/${id}`);
     return JobCategorySchema.parse(response.data);
   },
   create: async (data: Omit<JobCategory, 'id'>): Promise<JobCategory> => {
-    // Temporarily remove alwaysRequired field since backend doesn't support it yet
-    const { alwaysRequired, ...apiData } = data;
-    const response = await api.post<JobCategory>("/job-categories", apiData);
-    // Add alwaysRequired back to the returned data since UI expects it
-    const parsed = JobCategorySchema.parse({
-      ...response.data,
-      alwaysRequired: alwaysRequired || false
-    });
-    return parsed;
+    // Send all fields including alwaysRequired to the API
+    const response = await api.post<JobCategory>("/job-categories", data);
+    return JobCategorySchema.parse(response.data);
   },
   update: async (id: string, data: Partial<Omit<JobCategory, 'id'>>): Promise<JobCategory> => {
-    // Temporarily remove alwaysRequired field since backend doesn't support it yet
-    const { alwaysRequired, ...apiData } = data;
-    const response = await api.patch<JobCategory>(`/job-categories/${id}`, apiData);
-    // Add alwaysRequired back to the returned data since UI expects it
-    const parsed = JobCategorySchema.parse({
-      ...response.data,
-      alwaysRequired: alwaysRequired !== undefined ? alwaysRequired : false
-    });
-    return parsed;
+    // Send all fields including alwaysRequired to the API
+    const response = await api.patch<JobCategory>(`/job-categories/${id}`, data);
+    return JobCategorySchema.parse(response.data);
   },
   delete: async (id: string): Promise<JobCategory> => {
     try {
@@ -694,5 +708,111 @@ export const jobCategories = {
       }
       throw new Error('Failed to delete job category.');
     }
+  },
+};
+
+export const jobs = {
+  getAll: async (): Promise<Job[]> => {
+    const response = await api.get<Job[]>("/jobs");
+    return response.data.map(item => {
+      // Derive staffOnly and alwaysRequired from the category
+      const jobWithDerivedProps = {
+        ...JobSchema.parse(item),
+        staffOnly: item.category?.staffOnly || false,
+        alwaysRequired: item.category?.alwaysRequired || false
+      };
+      return jobWithDerivedProps;
+    });
+  },
+  getById: async (id: string): Promise<Job> => {
+    const response = await api.get<Job>(`/jobs/${id}`);
+    const item = response.data;
+    // Derive staffOnly and alwaysRequired from the category
+    const jobWithDerivedProps = {
+      ...JobSchema.parse(item),
+      staffOnly: item.category?.staffOnly || false,
+      alwaysRequired: item.category?.alwaysRequired || false
+    };
+    return jobWithDerivedProps;
+  },
+  create: async (data: Omit<Job, 'id' | 'category' | 'staffOnly' | 'alwaysRequired'>): Promise<Job> => {
+    const response = await api.post<Job>("/jobs", data);
+    const item = response.data;
+    // Derive staffOnly and alwaysRequired from the category
+    const jobWithDerivedProps = {
+      ...JobSchema.parse(item),
+      staffOnly: item.category?.staffOnly || false,
+      alwaysRequired: item.category?.alwaysRequired || false
+    };
+    return jobWithDerivedProps;
+  },
+  update: async (id: string, data: Partial<Omit<Job, 'id' | 'category' | 'staffOnly' | 'alwaysRequired'>>): Promise<Job> => {
+    const response = await api.patch<Job>(`/jobs/${id}`, data);
+    const item = response.data;
+    // Derive staffOnly and alwaysRequired from the category
+    const jobWithDerivedProps = {
+      ...JobSchema.parse(item),
+      staffOnly: item.category?.staffOnly || false,
+      alwaysRequired: item.category?.alwaysRequired || false
+    };
+    return jobWithDerivedProps;
+  },
+  delete: async (id: string): Promise<Job> => {
+    try {
+      const response = await api.delete<Job>(`/jobs/${id}`);
+      const item = response.data;
+      // Derive staffOnly and alwaysRequired from the category
+      const jobWithDerivedProps = {
+        ...JobSchema.parse(item),
+        staffOnly: item.category?.staffOnly || false,
+        alwaysRequired: item.category?.alwaysRequired || false
+      };
+      return jobWithDerivedProps;
+    } catch (error) {
+      if (error && typeof error === 'object' && 'response' in error) {
+        throw error;
+      }
+      throw new Error('Failed to delete job.');
+    }
+  },
+};
+
+export const shifts = {
+  getAll: async (filters?: { dayOfWeek?: string }): Promise<Shift[]> => {
+    let url = "/shifts";
+    if (filters) {
+      const params = new URLSearchParams();
+      if (filters.dayOfWeek) params.append('dayOfWeek', filters.dayOfWeek);
+      if (params.toString()) url += `?${params.toString()}`;
+    }
+    const response = await api.get<Shift[]>(url);
+    return response.data.map(item => ShiftSchema.parse(item));
+  },
+  getById: async (id: string): Promise<Shift> => {
+    const response = await api.get<Shift>(`/shifts/${id}`);
+    return ShiftSchema.parse(response.data);
+  },
+  create: async (data: Omit<Shift, 'id' | 'jobs'>): Promise<Shift> => {
+    const response = await api.post<Shift>("/shifts", data);
+    return ShiftSchema.parse(response.data);
+  },
+  update: async (id: string, data: Partial<Omit<Shift, 'id' | 'jobs'>>): Promise<Shift> => {
+    const response = await api.patch<Shift>(`/shifts/${id}`, data);
+    return ShiftSchema.parse(response.data);
+  },
+  delete: async (id: string): Promise<Shift> => {
+    try {
+      const response = await api.delete<Shift>(`/shifts/${id}`);
+      return ShiftSchema.parse(response.data);
+    } catch (error) {
+      if (error && typeof error === 'object' && 'response' in error) {
+        throw error;
+      }
+      throw new Error('Failed to delete shift.');
+    }
+  },
+  getRegistrations: async (shiftId: string): Promise<unknown[]> => {
+    const response = await api.get(`/shifts/${shiftId}/registrations`);
+    return response.data;
   },
 };

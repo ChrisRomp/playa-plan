@@ -16,12 +16,13 @@ export class ShiftsService {
   async create(createShiftDto: CreateShiftDto): Promise<Shift> {
     return this.prisma.shift.create({
       data: {
+        name: createShiftDto.name,
+        description: createShiftDto.description,
         startTime: createShiftDto.startTime,
         endTime: createShiftDto.endTime,
         maxRegistrations: createShiftDto.maxParticipants,
         dayOfWeek: createShiftDto.dayOfWeek,
-        camp: { connect: { id: createShiftDto.location } },
-        job: { connect: { id: String(createShiftDto.jobId) } },
+        camp: { connect: { id: createShiftDto.campId } },
       },
     });
   }
@@ -31,7 +32,12 @@ export class ShiftsService {
    * @returns An array of shifts
    */
   async findAll(): Promise<Shift[]> {
-    return this.prisma.shift.findMany();
+    return this.prisma.shift.findMany({
+      include: {
+        jobs: true,
+        camp: true,
+      },
+    });
   }
 
   /**
@@ -45,8 +51,7 @@ export class ShiftsService {
       where: { id },
       include: {
         camp: true,
-        job: true,
-        registrations: true,
+        jobs: true,
       },
     });
 
@@ -67,6 +72,14 @@ export class ShiftsService {
     // Create data object for Prisma update
     const data: Prisma.ShiftUpdateInput = {};
 
+    if (updateShiftDto.name) {
+      data.name = updateShiftDto.name;
+    }
+
+    if (updateShiftDto.description) {
+      data.description = updateShiftDto.description;
+    }
+
     if (updateShiftDto.startTime) {
       data.startTime = updateShiftDto.startTime;
     }
@@ -83,12 +96,8 @@ export class ShiftsService {
       data.dayOfWeek = updateShiftDto.dayOfWeek;
     }
 
-    if (updateShiftDto.location) {
-      data.camp = { connect: { id: updateShiftDto.location } };
-    }
-
-    if (updateShiftDto.jobId) {
-      data.job = { connect: { id: String(updateShiftDto.jobId) } };
+    if (updateShiftDto.campId) {
+      data.camp = { connect: { id: updateShiftDto.campId } };
     }
 
     return this.prisma.shift.update({
@@ -96,7 +105,7 @@ export class ShiftsService {
       data,
       include: {
         camp: true,
-        job: true,
+        jobs: true,
       },
     });
   }

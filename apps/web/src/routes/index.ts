@@ -74,6 +74,18 @@ export const ROUTES = {
     requiresAuth: true,
     allowedRoles: [ROLES.ADMIN],
   },
+  ADMIN_JOBS: {
+    path: '/admin/jobs',
+    name: 'Jobs',
+    requiresAuth: true,
+    allowedRoles: [ROLES.ADMIN],
+  },
+  ADMIN_SHIFTS: {
+    path: '/admin/shifts',
+    name: 'Shifts',
+    requiresAuth: true,
+    allowedRoles: [ROLES.ADMIN],
+  },
   SHIFTS: {
     path: '/shifts',
     name: 'Shifts',

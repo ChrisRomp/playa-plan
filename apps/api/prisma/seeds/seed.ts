@@ -209,13 +209,99 @@ async function main() {
 
   console.log(`Created ${await prisma.jobCategory.count()} job categories`);
 
-  // Create jobs
+  // Create shifts first (before jobs)
+  const morningKitchenShift = await prisma.shift.create({
+    data: {
+      name: 'Morning Kitchen Shift',
+      description: 'Morning shift for kitchen duties',
+      startTime: new Date('2025-08-26T08:00:00Z'),
+      endTime: new Date('2025-08-26T12:00:00Z'),
+      maxRegistrations: 5,
+      campId: camp.id,
+      dayOfWeek: 'TUESDAY'
+    }
+  });
+
+  const afternoonKitchenShift = await prisma.shift.create({
+    data: {
+      name: 'Afternoon Kitchen Shift',
+      description: 'Afternoon shift for kitchen duties',
+      startTime: new Date('2025-08-26T13:00:00Z'),
+      endTime: new Date('2025-08-26T17:00:00Z'),
+      maxRegistrations: 5,
+      campId: camp.id,
+      dayOfWeek: 'WEDNESDAY'
+    }
+  });
+
+  const morningGreeterShift = await prisma.shift.create({
+    data: {
+      name: 'Opening Day Greeter Shift',
+      description: 'Morning shift for greeting arrivals',
+      startTime: new Date('2025-08-26T09:00:00Z'),
+      endTime: new Date('2025-08-26T13:00:00Z'),
+      maxRegistrations: 3,
+      campId: camp.id,
+      dayOfWeek: 'OPENING_SUNDAY'
+    }
+  });
+
+  const nightRangerShift = await prisma.shift.create({
+    data: {
+      name: 'Night Ranger Shift',
+      description: 'Evening security patrol',
+      startTime: new Date('2025-08-26T22:00:00Z'),
+      endTime: new Date('2025-08-27T02:00:00Z'),
+      maxRegistrations: 4,
+      campId: camp.id,
+      dayOfWeek: 'FRIDAY'
+    }
+  });
+
+  const closingSundayShift = await prisma.shift.create({
+    data: {
+      name: 'Closing Day Cleanup',
+      description: 'Help break down and clean the camp',
+      startTime: new Date('2025-09-01T10:00:00Z'),
+      endTime: new Date('2025-09-01T14:00:00Z'),
+      maxRegistrations: 6,
+      campId: camp.id,
+      dayOfWeek: 'CLOSING_SUNDAY'
+    }
+  });
+
+  const preOpeningShift = await prisma.shift.create({
+    data: {
+      name: 'Pre-Opening Setup',
+      description: 'Help set up the camp infrastructure',
+      startTime: new Date('2025-08-24T09:00:00Z'),
+      endTime: new Date('2025-08-24T17:00:00Z'),
+      maxRegistrations: 8,
+      campId: camp.id,
+      dayOfWeek: 'PRE_OPENING'
+    }
+  });
+
+  console.log(`Created ${await prisma.shift.count()} shifts`);
+
+  // Create jobs (after shifts)
   const kitchenJob = await prisma.job.create({
     data: {
       name: 'Kitchen Helper',
       description: 'Assist with meal preparation and cleanup',
       categoryId: kitchenCategory.id,
-      location: 'Main Camp Kitchen'
+      location: 'Main Camp Kitchen',
+      shiftId: morningKitchenShift.id
+    }
+  });
+
+  const afternoonKitchenJob = await prisma.job.create({
+    data: {
+      name: 'Afternoon Kitchen Helper',
+      description: 'Assist with meal preparation and cleanup during afternoon',
+      categoryId: kitchenCategory.id,
+      location: 'Main Camp Kitchen',
+      shiftId: afternoonKitchenShift.id
     }
   });
 
@@ -224,7 +310,8 @@ async function main() {
       name: 'Camp Greeter',
       description: 'Welcome new arrivals and help with orientation',
       categoryId: greeterCategory.id,
-      location: 'Main Entrance'
+      location: 'Main Entrance',
+      shiftId: morningGreeterShift.id
     }
   });
 
@@ -233,95 +320,32 @@ async function main() {
       name: 'Night Ranger',
       description: 'Patrol the camp during night hours',
       categoryId: rangerCategory.id,
-      location: 'All Camp Areas'
+      location: 'All Camp Areas',
+      shiftId: nightRangerShift.id
+    }
+  });
+
+  const sanitationJob = await prisma.job.create({
+    data: {
+      name: 'Cleanup Crew',
+      description: 'Help break down and clean the camp',
+      categoryId: sanitationCategory.id,
+      location: 'Entire Camp',
+      shiftId: closingSundayShift.id
+    }
+  });
+
+  const constructionJob = await prisma.job.create({
+    data: {
+      name: 'Setup Crew',
+      description: 'Help set up the camp infrastructure',
+      categoryId: constructionCategory.id,
+      location: 'Main Camp Area',
+      shiftId: preOpeningShift.id
     }
   });
 
   console.log(`Created ${await prisma.job.count()} jobs`);
-
-  // Create shifts
-  const morningKitchenShift = await prisma.shift.create({
-    data: {
-      startTime: new Date('2025-08-26T08:00:00Z'),
-      endTime: new Date('2025-08-26T12:00:00Z'),
-      maxRegistrations: 5,
-      campId: camp.id,
-      jobId: kitchenJob.id,
-      dayOfWeek: 'TUESDAY'
-    }
-  });
-
-  const afternoonKitchenShift = await prisma.shift.create({
-    data: {
-      startTime: new Date('2025-08-26T13:00:00Z'),
-      endTime: new Date('2025-08-26T17:00:00Z'),
-      maxRegistrations: 5,
-      campId: camp.id,
-      jobId: kitchenJob.id,
-      dayOfWeek: 'WEDNESDAY'
-    }
-  });
-
-  const morningGreeterShift = await prisma.shift.create({
-    data: {
-      startTime: new Date('2025-08-26T09:00:00Z'),
-      endTime: new Date('2025-08-26T13:00:00Z'),
-      maxRegistrations: 3,
-      campId: camp.id,
-      jobId: greeterJob.id,
-      dayOfWeek: 'OPENING_SUNDAY'
-    }
-  });
-
-  const nightRangerShift = await prisma.shift.create({
-    data: {
-      startTime: new Date('2025-08-26T22:00:00Z'),
-      endTime: new Date('2025-08-27T02:00:00Z'),
-      maxRegistrations: 4,
-      campId: camp.id,
-      jobId: rangerJob.id,
-      dayOfWeek: 'FRIDAY'
-    }
-  });
-
-  // Add additional shifts with different days
-  const closingSundayShift = await prisma.shift.create({
-    data: {
-      startTime: new Date('2025-09-01T10:00:00Z'),
-      endTime: new Date('2025-09-01T14:00:00Z'),
-      maxRegistrations: 6,
-      campId: camp.id,
-      jobId: sanitationCategory.id ? await prisma.job.create({
-        data: {
-          name: 'Cleanup Crew',
-          description: 'Help break down and clean the camp',
-          categoryId: sanitationCategory.id,
-          location: 'Entire Camp'
-        }
-      }).then(job => job.id) : kitchenJob.id,
-      dayOfWeek: 'CLOSING_SUNDAY'
-    }
-  });
-
-  const preOpeningShift = await prisma.shift.create({
-    data: {
-      startTime: new Date('2025-08-24T09:00:00Z'),
-      endTime: new Date('2025-08-24T17:00:00Z'),
-      maxRegistrations: 8,
-      campId: camp.id,
-      jobId: constructionCategory.id ? await prisma.job.create({
-        data: {
-          name: 'Setup Crew',
-          description: 'Help set up the camp infrastructure',
-          categoryId: constructionCategory.id,
-          location: 'Main Camp Area'
-        }
-      }).then(job => job.id) : kitchenJob.id,
-      dayOfWeek: 'PRE_OPENING'
-    }
-  });
-
-  console.log(`Created ${await prisma.shift.count()} shifts`);
 
   // Create a registration with payment
   const payment = await prisma.payment.create({
@@ -339,23 +363,23 @@ async function main() {
     data: {
       status: RegistrationStatus.CONFIRMED,
       userId: participantUser1.id,
-      shiftId: morningKitchenShift.id,
+      jobId: kitchenJob.id,
       paymentId: payment.id
     }
   });
 
-  console.log(`Created registration for user ${participantUser1.firstName} ${participantUser1.lastName} for ${kitchenJob.name} shift`);
+  console.log(`Created registration for user ${participantUser1.firstName} ${participantUser1.lastName} for ${kitchenJob.name} job`);
   
   // Create another registration without payment
   const pendingRegistration = await prisma.registration.create({
     data: {
       status: RegistrationStatus.PENDING,
       userId: participantUser2.id,
-      shiftId: nightRangerShift.id
+      jobId: rangerJob.id
     }
   });
 
-  console.log(`Created pending registration for user ${participantUser2.firstName} ${participantUser2.lastName} for ${rangerJob.name} shift`);
+  console.log(`Created pending registration for user ${participantUser2.firstName} ${participantUser2.lastName} for ${rangerJob.name} job`);
 
   // Create a notification
   const notification = await prisma.notification.create({

@@ -8,20 +8,38 @@ export class JobsService {
   constructor(private prisma: PrismaService) {}
 
   async create(createJobDto: CreateJobDto) {
-    return this.prisma.job.create({
-      data: createJobDto,
+    const job = await this.prisma.job.create({
+      data: {
+        name: createJobDto.name,
+        description: createJobDto.description,
+        location: createJobDto.location,
+        category: {
+          connect: { id: createJobDto.categoryId }
+        },
+        shift: {
+          connect: { id: createJobDto.shiftId }
+        }
+      },
       include: {
         category: true,
+        shift: true,
       },
     });
+
+    // Add derived properties from category
+    return this.addDerivedProperties(job);
   }
 
   async findAll() {
-    return this.prisma.job.findMany({
+    const jobs = await this.prisma.job.findMany({
       include: {
         category: true,
+        shift: true,
       },
     });
+
+    // Add derived properties from categories
+    return jobs.map(job => this.addDerivedProperties(job));
   }
 
   async findOne(id: string) {
@@ -29,6 +47,7 @@ export class JobsService {
       where: { id },
       include: {
         category: true,
+        shift: true,
       },
     });
 
@@ -36,18 +55,38 @@ export class JobsService {
       throw new NotFoundException(`Job with ID ${id} not found`);
     }
 
-    return job;
+    // Add derived properties from category
+    return this.addDerivedProperties(job);
   }
 
   async update(id: string, updateJobDto: UpdateJobDto) {
     try {
-      return await this.prisma.job.update({
+      // Create update data object
+      const updateData: any = {};
+      
+      if (updateJobDto.name) updateData.name = updateJobDto.name;
+      if (updateJobDto.description) updateData.description = updateJobDto.description;
+      if (updateJobDto.location) updateData.location = updateJobDto.location;
+      
+      if (updateJobDto.categoryId) {
+        updateData.category = { connect: { id: updateJobDto.categoryId } };
+      }
+      
+      if (updateJobDto.shiftId) {
+        updateData.shift = { connect: { id: updateJobDto.shiftId } };
+      }
+      
+      const job = await this.prisma.job.update({
         where: { id },
-        data: updateJobDto,
+        data: updateData,
         include: {
           category: true,
+          shift: true,
         },
       });
+
+      // Add derived properties from category
+      return this.addDerivedProperties(job);
     } catch (error) {
       throw new NotFoundException(`Job with ID ${id} not found`);
     }
@@ -55,11 +94,29 @@ export class JobsService {
 
   async remove(id: string) {
     try {
-      return await this.prisma.job.delete({
+      const job = await this.prisma.job.delete({
         where: { id },
+        include: {
+          category: true,
+          shift: true,
+        },
       });
+
+      // Add derived properties from category
+      return this.addDerivedProperties(job);
     } catch (error) {
       throw new NotFoundException(`Job with ID ${id} not found`);
     }
+  }
+
+  /**
+   * Add derived properties from category to a job
+   */
+  private addDerivedProperties(job: any) {
+    return {
+      ...job,
+      staffOnly: job.category?.staffOnly || false,
+      alwaysRequired: job.category?.alwaysRequired || false,
+    };
   }
 } 

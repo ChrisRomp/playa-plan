@@ -13,14 +13,17 @@ export class RegistrationsService {
    * @returns The created registration
    */
   async create(createRegistrationDto: CreateRegistrationDto): Promise<Registration> {
-    // Check if shift exists and has capacity
-    const shift = await this.prisma.shift.findUnique({
-      where: { id: createRegistrationDto.shiftId },
-      include: { registrations: true },
+    // Check if job exists and has capacity
+    const job = await this.prisma.job.findUnique({
+      where: { id: createRegistrationDto.jobId },
+      include: { 
+        shift: true,
+        registrations: true 
+      },
     });
 
-    if (!shift) {
-      throw new NotFoundException(`Shift with ID ${createRegistrationDto.shiftId} not found`);
+    if (!job) {
+      throw new NotFoundException(`Job with ID ${createRegistrationDto.jobId} not found`);
     }
 
     // Check if user exists
@@ -32,23 +35,23 @@ export class RegistrationsService {
       throw new NotFoundException(`User with ID ${createRegistrationDto.userId} not found`);
     }
 
-    // Check if user already registered for this shift
+    // Check if user already registered for this job
     const existingRegistration = await this.prisma.registration.findFirst({
       where: {
         userId: createRegistrationDto.userId,
-        shiftId: createRegistrationDto.shiftId,
+        jobId: createRegistrationDto.jobId,
         status: { notIn: [RegistrationStatus.CANCELLED] },
       },
     });
 
     if (existingRegistration) {
-      throw new BadRequestException('User already registered for this shift');
+      throw new BadRequestException('User already registered for this job');
     }
 
     // Determine registration status based on capacity
-    const status = shift.registrations.filter(
+    const status = job.registrations.filter(
       r => r.status !== RegistrationStatus.CANCELLED
-    ).length >= shift.maxRegistrations
+    ).length >= job.shift.maxRegistrations
       ? RegistrationStatus.WAITLISTED
       : RegistrationStatus.PENDING;
 
@@ -56,12 +59,12 @@ export class RegistrationsService {
     const data: {
       status: RegistrationStatus;
       user: { connect: { id: string } };
-      shift: { connect: { id: string } };
+      job: { connect: { id: string } };
       payment?: { connect: { id: string } };
     } = {
       status,
       user: { connect: { id: createRegistrationDto.userId } },
-      shift: { connect: { id: createRegistrationDto.shiftId } },
+      job: { connect: { id: createRegistrationDto.jobId } },
     };
 
     // Add payment if provided
@@ -82,10 +85,14 @@ export class RegistrationsService {
       data,
       include: {
         user: true,
-        shift: {
+        job: {
           include: {
-            job: true,
-            camp: true,
+            category: true,
+            shift: {
+              include: {
+                camp: true,
+              },
+            },
           },
         },
         payment: true,
@@ -101,10 +108,14 @@ export class RegistrationsService {
     return this.prisma.registration.findMany({
       include: {
         user: true,
-        shift: {
+        job: {
           include: {
-            job: true,
-            camp: true,
+            category: true,
+            shift: {
+              include: {
+                camp: true,
+              },
+            },
           },
         },
         payment: true,
@@ -130,10 +141,14 @@ export class RegistrationsService {
     return this.prisma.registration.findMany({
       where: { userId },
       include: {
-        shift: {
+        job: {
           include: {
-            job: true,
-            camp: true,
+            category: true,
+            shift: {
+              include: {
+                camp: true,
+              },
+            },
           },
         },
         payment: true,
@@ -142,22 +157,22 @@ export class RegistrationsService {
   }
 
   /**
-   * Get registrations for a specific shift
-   * @param shiftId - The ID of the shift
-   * @returns The shift's registrations
+   * Get registrations for a specific job
+   * @param jobId - The ID of the job
+   * @returns The job's registrations
    */
-  async findByShift(shiftId: string): Promise<Registration[]> {
-    // Check if shift exists
-    const shift = await this.prisma.shift.findUnique({
-      where: { id: shiftId },
+  async findByJob(jobId: string): Promise<Registration[]> {
+    // Check if job exists
+    const job = await this.prisma.job.findUnique({
+      where: { id: jobId },
     });
 
-    if (!shift) {
-      throw new NotFoundException(`Shift with ID ${shiftId} not found`);
+    if (!job) {
+      throw new NotFoundException(`Job with ID ${jobId} not found`);
     }
 
     return this.prisma.registration.findMany({
-      where: { shiftId },
+      where: { jobId },
       include: {
         user: true,
         payment: true,
@@ -176,10 +191,14 @@ export class RegistrationsService {
       where: { id },
       include: {
         user: true,
-        shift: {
+        job: {
           include: {
-            job: true,
-            camp: true,
+            category: true,
+            shift: {
+              include: {
+                camp: true,
+              },
+            },
           },
         },
         payment: true,
@@ -206,24 +225,24 @@ export class RegistrationsService {
 
     const data: {
       status?: RegistrationStatus;
-      shift?: { connect: { id: string } };
+      job?: { connect: { id: string } };
       payment?: { connect: { id: string } };
       [key: string]: any;
     } = { ...updateRegistrationDto };
     
     // Handle relations
-    if (updateRegistrationDto.shiftId) {
-      // Check if shift exists
-      const shift = await this.prisma.shift.findUnique({
-        where: { id: updateRegistrationDto.shiftId },
+    if (updateRegistrationDto.jobId) {
+      // Check if job exists
+      const job = await this.prisma.job.findUnique({
+        where: { id: updateRegistrationDto.jobId },
       });
 
-      if (!shift) {
-        throw new NotFoundException(`Shift with ID ${updateRegistrationDto.shiftId} not found`);
+      if (!job) {
+        throw new NotFoundException(`Job with ID ${updateRegistrationDto.jobId} not found`);
       }
 
-      data.shift = { connect: { id: updateRegistrationDto.shiftId } };
-      delete data.shiftId;
+      data.job = { connect: { id: updateRegistrationDto.jobId } };
+      delete data.jobId;
     }
     
     if (updateRegistrationDto.paymentId) {
@@ -245,10 +264,14 @@ export class RegistrationsService {
       data,
       include: {
         user: true,
-        shift: {
+        job: {
           include: {
-            job: true,
-            camp: true,
+            category: true,
+            shift: {
+              include: {
+                camp: true,
+              },
+            },
           },
         },
         payment: true,
@@ -257,9 +280,9 @@ export class RegistrationsService {
   }
 
   /**
-   * Delete a registration
-   * @param id - The ID of the registration to delete
-   * @returns The deleted registration
+   * Remove a registration
+   * @param id - The ID of the registration to remove
+   * @returns The removed registration
    * @throws NotFoundException if not found
    */
   async remove(id: string): Promise<Registration> {
@@ -268,6 +291,16 @@ export class RegistrationsService {
 
     return this.prisma.registration.delete({
       where: { id },
+      include: {
+        user: true,
+        job: {
+          include: {
+            category: true,
+            shift: true,
+          },
+        },
+        payment: true,
+      },
     });
   }
 }

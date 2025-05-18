@@ -3,7 +3,7 @@ import { IsDate, IsEnum, IsInt, IsOptional, IsString, Min } from 'class-validato
 import { DayOfWeek } from '../../common/enums/day-of-week.enum';
 
 export class UpdateShiftDto {
-  @ApiProperty({ description: 'The title of the shift', required: false })
+  @ApiProperty({ description: 'The name of the shift', required: false })
   @IsString()
   @IsOptional()
   name?: string;
@@ -37,10 +37,5 @@ export class UpdateShiftDto {
   @ApiProperty({ description: 'The ID of the camp this shift belongs to', required: false })
   @IsString()
   @IsOptional()
-  location?: string;
-
-  @ApiProperty({ description: 'The ID of the job this shift is for', required: false })
-  @IsInt()
-  @IsOptional()
-  jobId?: number;
+  campId?: string;
 } 

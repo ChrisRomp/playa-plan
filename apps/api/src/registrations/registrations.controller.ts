@@ -26,12 +26,12 @@ export class RegistrationsController {
   @ApiOperation({ summary: 'Get all registrations with optional filtering' })
   @ApiOkResponse({ description: 'Returns registrations based on filters.' })
   @ApiQuery({ name: 'userId', required: false, description: 'Filter by user ID' })
-  @ApiQuery({ name: 'shiftId', required: false, description: 'Filter by shift ID' })
-  async findAll(@Query('userId') userId?: string, @Query('shiftId') shiftId?: string) {
+  @ApiQuery({ name: 'jobId', required: false, description: 'Filter by job ID' })
+  async findAll(@Query('userId') userId?: string, @Query('jobId') jobId?: string) {
     if (userId) {
       return this.registrationsService.findByUser(userId);
-    } else if (shiftId) {
-      return this.registrationsService.findByShift(shiftId);
+    } else if (jobId) {
+      return this.registrationsService.findByJob(jobId);
     } else {
       return this.registrationsService.findAll();
     }

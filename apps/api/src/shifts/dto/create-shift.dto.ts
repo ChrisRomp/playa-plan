@@ -6,7 +6,7 @@ import { DayOfWeek } from '../../common/enums/day-of-week.enum';
  * Data Transfer Object for creating a new shift
  */
 export class CreateShiftDto {
-  @ApiProperty({ description: 'The title of the shift' })
+  @ApiProperty({ description: 'The name of the shift' })
   @IsNotEmpty()
   @IsString()
   name!: string;
@@ -36,13 +36,13 @@ export class CreateShiftDto {
   @IsEnum(DayOfWeek)
   dayOfWeek!: DayOfWeek;
 
-  @ApiProperty({ description: 'The ID of the camp this shift belongs to' })
+  @ApiProperty({ description: 'The location of the shift' })
   @IsNotEmpty()
   @IsString()
   location!: string;
 
-  @ApiProperty({ description: 'The ID of the job this shift is for' })
+  @ApiProperty({ description: 'The ID of the camp this shift belongs to' })
   @IsNotEmpty()
-  @IsInt()
-  jobId!: number;
+  @IsString()
+  campId!: string;
 }

@@ -28,4 +28,13 @@ export class UpdateCategoryDto {
   @IsBoolean()
   @IsOptional()
   staffOnly?: boolean;
+
+  @ApiProperty({
+    description: 'Whether jobs in this category are always required for registration',
+    example: false,
+    required: false,
+  })
+  @IsBoolean()
+  @IsOptional()
+  alwaysRequired?: boolean;
 } 

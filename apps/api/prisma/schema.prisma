@@ -144,27 +144,29 @@ model Job {
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
   categoryId     String
+  shiftId        String
   alwaysRequired Boolean     @default(false)
   staffOnly      Boolean     @default(false)
   category       JobCategory @relation(fields: [categoryId], references: [id])
-  shifts         Shift[]
+  shift          Shift       @relation(fields: [shiftId], references: [id])
+  registrations  Registration[]
 
   @@map("jobs")
 }
 
 model Shift {
   id               String         @id @default(uuid())
+  name             String
+  description      String?
   startTime        DateTime
   endTime          DateTime
   maxRegistrations Int
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
   campId           String
-  jobId            String
   dayOfWeek        DayOfWeek
-  registrations    Registration[]
+  jobs             Job[]
   camp             Camp           @relation(fields: [campId], references: [id])
-  job              Job            @relation(fields: [jobId], references: [id])
 
   @@map("shifts")
 }
@@ -175,10 +177,10 @@ model Registration {
   createdAt DateTime           @default(now())
   updatedAt DateTime           @updatedAt
   userId    String
-  shiftId   String
+  jobId     String
   paymentId String?            @unique
   payment   Payment?           @relation(fields: [paymentId], references: [id])
-  shift     Shift              @relation(fields: [shiftId], references: [id])
+  job       Job                @relation(fields: [jobId], references: [id])
   user      User               @relation(fields: [userId], references: [id])
 
   @@map("registrations")

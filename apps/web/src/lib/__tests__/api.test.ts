@@ -187,7 +187,7 @@ describe('jobCategories API', () => {
   });
 
   describe('getAll', () => {
-    it('should add alwaysRequired field with default false when missing from backend', async () => {
+    it('should parse job categories with schema', async () => {
       // Arrange
       (api.get as Mock).mockResolvedValueOnce({
         data: mockJobCategories
@@ -198,7 +198,7 @@ describe('jobCategories API', () => {
 
       // Assert
       expect(result).toHaveLength(2);
-      expect(result[0].alwaysRequired).toBe(false); // Should have default value
+      expect(result[0].alwaysRequired).toBe(false); // Should have default value through schema
       expect(result[1].alwaysRequired).toBe(true); // Should keep existing value
     });
 
@@ -220,15 +220,15 @@ describe('jobCategories API', () => {
       alwaysRequired: true
     };
 
-    it('should send data without alwaysRequired field to API but return data with it', async () => {
-      // Arrange - API returns data without alwaysRequired
+    it('should send data including alwaysRequired field to API', async () => {
+      // Arrange - API returns data with alwaysRequired
       (api.post as Mock).mockResolvedValueOnce({
         data: {
           id: 'cat-3',
           name: 'Security',
           description: 'Security shifts',
-          staffOnly: true
-          // alwaysRequired is intentionally missing
+          staffOnly: true,
+          alwaysRequired: true
         }
       });
 
@@ -236,37 +236,35 @@ describe('jobCategories API', () => {
       const result = await jobCategories.create(newJobCategory);
 
       // Assert
-      // Verify that alwaysRequired wasn't included in API call
+      // Verify that alwaysRequired is included in API call
       expect(api.post).toHaveBeenCalledWith('/job-categories', {
         name: 'Security',
         description: 'Security shifts',
-        staffOnly: true
-        // No alwaysRequired
+        staffOnly: true,
+        alwaysRequired: true
       });
 
-      // Verify that result has alwaysRequired added back with the user-provided value
-      // The implementation uses: alwaysRequired || false
-      // Since we passed true, the result should be true
+      // Verify the result has the correct alwaysRequired value
       expect(result.alwaysRequired).toBe(true);
     });
   });
 
   describe('update', () => {
-    it('should preserve alwaysRequired in result even if backend doesn\'t support it', async () => {
+    it('should send alwaysRequired field to API', async () => {
       // Arrange
       const updateData = {
         name: 'Updated Kitchen',
         alwaysRequired: true
       };
 
-      // Backend returns data without alwaysRequired field
+      // Backend returns data with alwaysRequired field
       (api.patch as Mock).mockResolvedValueOnce({
         data: {
           id: 'cat-1',
           name: 'Updated Kitchen',
           description: 'Kitchen shifts',
-          staffOnly: false
-          // alwaysRequired missing in response
+          staffOnly: false,
+          alwaysRequired: true
         }
       });
 
@@ -274,14 +272,13 @@ describe('jobCategories API', () => {
       const result = await jobCategories.update('cat-1', updateData);
 
       // Assert
-      // Verify alwaysRequired wasn't sent to API
+      // Verify alwaysRequired is sent to API
       expect(api.patch).toHaveBeenCalledWith('/job-categories/cat-1', { 
-        name: 'Updated Kitchen'
+        name: 'Updated Kitchen',
+        alwaysRequired: true
       });
       
-      // But it was preserved in result
-      // The implementation uses: alwaysRequired !== undefined ? alwaysRequired : false
-      // Since we passed alwaysRequired: true, the result should be true
+      // Result should have the correct alwaysRequired value
       expect(result.alwaysRequired).toBe(true);
     });
 
@@ -292,14 +289,14 @@ describe('jobCategories API', () => {
         alwaysRequired: true
       };
 
-      // Backend returns data with name updated but without alwaysRequired
+      // Backend returns data with alwaysRequired field
       (api.patch as Mock).mockResolvedValueOnce({
         data: {
           id: 'cat-2',
           name: 'Updated Greeters',
           description: 'Greet participants',
-          staffOnly: false
-          // alwaysRequired missing in response
+          staffOnly: false,
+          alwaysRequired: true
         }
       });
 
