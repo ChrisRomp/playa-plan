@@ -61,7 +61,7 @@ describe('AdminJobCategoriesPage', () => {
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'NewCat' } });
     fireEvent.change(screen.getByLabelText('Description'), { target: { value: 'Desc' } });
     // By default, staffOnly should be unchecked
-    expect(screen.getByLabelText(/Staff Only/)).not.toBeChecked();
+    expect(screen.getByLabelText(/Only visible to staff/)).not.toBeChecked();
     fireEvent.click(screen.getByText('Add Category'));
     await waitFor(() => {
       expect(createCategory).toHaveBeenCalledWith({ 
@@ -77,7 +77,7 @@ describe('AdminJobCategoriesPage', () => {
     fireEvent.click(screen.getByLabelText('Add job category'));
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'StaffCat' } });
     fireEvent.change(screen.getByLabelText('Description'), { target: { value: 'Staff Desc' } });
-    fireEvent.click(screen.getByLabelText(/Staff Only/));
+    fireEvent.click(screen.getByLabelText(/Only visible to staff/));
     fireEvent.click(screen.getByText('Add Category'));
     await waitFor(() => {
       expect(createCategory).toHaveBeenCalledWith({ 
@@ -92,7 +92,7 @@ describe('AdminJobCategoriesPage', () => {
     render(<AdminJobCategoriesPage />);
     // Open the Greeter category (staffOnly: true)
     fireEvent.click(screen.getByLabelText('Edit Greeter'));
-    expect(screen.getByLabelText(/Staff Only/)).toBeChecked();
+    expect(screen.getByLabelText(/Only visible to staff/)).toBeChecked();
   });
 
   it('should open and submit the edit category modal', async () => {
@@ -100,9 +100,9 @@ describe('AdminJobCategoriesPage', () => {
     fireEvent.click(screen.getByLabelText('Edit Kitchen'));
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Updated' } });
     // Checkbox should be unchecked by default for "Kitchen" category
-    expect(screen.getByLabelText(/Staff Only/)).not.toBeChecked();
+    expect(screen.getByLabelText(/Only visible to staff/)).not.toBeChecked();
     // Check the staffOnly checkbox
-    fireEvent.click(screen.getByLabelText(/Staff Only/));
+    fireEvent.click(screen.getByLabelText(/Only visible to staff/));
     fireEvent.click(screen.getByText('Save Changes'));
     await waitFor(() => {
       expect(updateCategory).toHaveBeenCalledWith('1', { 
