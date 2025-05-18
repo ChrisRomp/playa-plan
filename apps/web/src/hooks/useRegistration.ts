@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { z } from 'zod';
-import { JobCategory, api } from '../lib/api';
+import { JobCategory, api, jobCategories } from '../lib/api';
 
 // Define types for registration data
 export interface RegistrationFormData {
@@ -43,7 +43,7 @@ export type Shift = z.infer<typeof ShiftSchema>;
 
 export function useRegistration() {
   const [campingOptions, setCampingOptions] = useState<CampingOption[]>([]);
-  const [jobCategories, setJobCategories] = useState<JobCategory[]>([]);
+  const [categories, setCategories] = useState<JobCategory[]>([]);
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -71,8 +71,8 @@ export function useRegistration() {
     setLoading(true);
     setError(null);
     try {
-      const response = await api.get('/job-categories');
-      setJobCategories(response.data);
+      const result = await jobCategories.getAll();
+      setCategories(result);
     } catch (err) {
       setError('Failed to fetch job categories');
       console.error(err);
@@ -87,7 +87,7 @@ export function useRegistration() {
     setError(null);
     try {
       // Get always required categories
-      const alwaysRequiredCategories = jobCategories
+      const alwaysRequiredCategories = categories
         .filter(cat => cat.alwaysRequired)
         .map(cat => cat.id);
       
@@ -151,7 +151,7 @@ export function useRegistration() {
 
   return {
     campingOptions,
-    jobCategories,
+    jobCategories: categories,
     shifts,
     loading,
     error,
