@@ -213,7 +213,7 @@ export default function AdminJobCategoriesPage() {
                   onChange={handleFormChange}
                 />
                 <label htmlFor="staffOnly" className="ml-2 block text-sm text-gray-900">
-                  Staff Only (only visible to staff members)
+                  Only visible to staff
                 </label>
               </div>
               {formError && <div className="text-red-600 mb-2">{formError}</div>}
