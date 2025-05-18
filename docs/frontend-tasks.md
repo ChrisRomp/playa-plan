@@ -146,7 +146,7 @@
    - [ ] Job/category management
      - [x] Basic CRUD for job categories
      - [x] Support for "staff only" job category designation
-     - [ ] Support for "always required" job category functionality
+     - [x] Support for "always required" job category functionality
      - [ ] Job management interface for creating and editing jobs
    - [ ] Shift management
      - [ ] Create and manage job shifts by day/time

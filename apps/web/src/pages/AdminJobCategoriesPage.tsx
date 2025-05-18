@@ -7,6 +7,7 @@ interface CategoryFormState {
   name: string;
   description: string;
   staffOnly: boolean;
+  alwaysRequired: boolean;
 }
 
 export default function AdminJobCategoriesPage() {
@@ -21,14 +22,14 @@ export default function AdminJobCategoriesPage() {
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
-  const [form, setForm] = useState<CategoryFormState>({ name: '', description: '', staffOnly: false });
+  const [form, setForm] = useState<CategoryFormState>({ name: '', description: '', staffOnly: false, alwaysRequired: false });
   const [formError, setFormError] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const openAddModal = () => {
     setEditId(null);
-    setForm({ name: '', description: '', staffOnly: false });
+    setForm({ name: '', description: '', staffOnly: false, alwaysRequired: false });
     setFormError(null);
     setDeleteError(null);
     setDeleteId(null);
@@ -40,7 +41,8 @@ export default function AdminJobCategoriesPage() {
     setForm({ 
       name: category.name, 
       description: category.description,
-      staffOnly: category.staffOnly || false
+      staffOnly: category.staffOnly || false,
+      alwaysRequired: category.alwaysRequired || false
     });
     setFormError(null);
     setDeleteError(null);
@@ -119,6 +121,7 @@ export default function AdminJobCategoriesPage() {
               <th className="px-4 py-2 border-b">Name</th>
               <th className="px-4 py-2 border-b">Description</th>
               <th className="px-4 py-2 border-b">Staff Only</th>
+              <th className="px-4 py-2 border-b">Always Required</th>
               <th className="px-4 py-2 border-b">Actions</th>
             </tr>
           </thead>
@@ -137,6 +140,17 @@ export default function AdminJobCategoriesPage() {
                   ) : (
                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
                       All Users
+                    </span>
+                  )}
+                </td>
+                <td className="px-4 py-2 border-b text-center">
+                  {cat.alwaysRequired ? (
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                      Required
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                      Optional
                     </span>
                   )}
                 </td>
@@ -163,7 +177,7 @@ export default function AdminJobCategoriesPage() {
             ))}
             {categories.length === 0 && !loading && (
               <tr>
-                <td colSpan={4} className="text-center py-4 text-gray-500">No job categories found.</td>
+                <td colSpan={5} className="text-center py-4 text-gray-500">No job categories found.</td>
               </tr>
             )}
           </tbody>
@@ -214,6 +228,19 @@ export default function AdminJobCategoriesPage() {
                 />
                 <label htmlFor="staffOnly" className="ml-2 block text-sm text-gray-900">
                   Only visible to staff
+                </label>
+              </div>
+              <div className="mb-4 flex items-center">
+                <input
+                  id="alwaysRequired"
+                  name="alwaysRequired"
+                  type="checkbox"
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  checked={form.alwaysRequired}
+                  onChange={handleFormChange}
+                />
+                <label htmlFor="alwaysRequired" className="ml-2 block text-sm text-gray-900">
+                  Always required for all registrations
                 </label>
               </div>
               {formError && <div className="text-red-600 mb-2">{formError}</div>}

@@ -5,8 +5,9 @@ import { describe, it, vi, beforeEach } from 'vitest';
 import type { Mock } from 'vitest';
 
 const mockCategories = [
-  { id: '1', name: 'Kitchen', description: 'Kitchen jobs', staffOnly: false },
-  { id: '2', name: 'Greeter', description: 'Greeting jobs', staffOnly: true },
+  { id: '1', name: 'Kitchen', description: 'Kitchen jobs', staffOnly: false, alwaysRequired: false },
+  { id: '2', name: 'Greeter', description: 'Greeting jobs', staffOnly: true, alwaysRequired: false },
+  { id: '3', name: 'Teardown', description: 'Help tear down camp', staffOnly: false, alwaysRequired: true },
 ];
 
 describe('AdminJobCategoriesPage', () => {
@@ -36,79 +37,120 @@ describe('AdminJobCategoriesPage', () => {
     // Check that the categories are rendered
     expect(screen.getByText('Kitchen')).toBeInTheDocument();
     expect(screen.getByText('Greeter')).toBeInTheDocument();
-    expect(screen.getByText('All Users')).toBeInTheDocument();
+    expect(screen.getByText('Teardown')).toBeInTheDocument();
     
     // Check staffOnly status by finding the table rows and checking the staffOnly cell
     const table = screen.getByRole('table');
     const rows = table.querySelectorAll('tbody tr');
     
     // Check that we have the expected number of rows
-    expect(rows).toHaveLength(2); // 2 categories from mock data
+    expect(rows).toHaveLength(3); // 3 categories from mock data
+    
+    // Find the header indexes for reliable column selection
+    const headerRow = table.querySelector('thead tr');
+    if (!headerRow) {
+      throw new Error('Table header not found');
+    }
+    
+    const headers = Array.from(headerRow.querySelectorAll('th'));
+    const staffOnlyColumnIndex = headers.findIndex(th => th.textContent === 'Staff Only');
+    const alwaysRequiredColumnIndex = headers.findIndex(th => th.textContent === 'Always Required');
     
     // Count how many rows have staffOnly set to true
     const staffOnlyCount = Array.from(rows).filter(row => {
-      const staffOnlyCell = row.querySelector('td:nth-child(3)'); // 3rd column is staffOnly
+      const staffOnlyCell = row.querySelector(`td:nth-child(${staffOnlyColumnIndex + 1})`);
       return staffOnlyCell?.textContent?.includes('Staff Only') || false;
     }).length;
     
     // Verify that we have 1 staffOnly category (from mock data)
     expect(staffOnlyCount).toBe(1);
+    
+    // Count how many rows have alwaysRequired set to true
+    const alwaysRequiredCount = Array.from(rows).filter(row => {
+      const alwaysRequiredCell = row.querySelector(`td:nth-child(${alwaysRequiredColumnIndex + 1})`);
+      return alwaysRequiredCell?.textContent?.includes('Required') || false;
+    }).length;
+    
+    // Verify that we have 1 alwaysRequired category (from mock data)
+    expect(alwaysRequiredCount).toBe(1);
   });
 
-  it('should open and submit the add category modal', async () => {
+  it('should open and submit the add category modal with default values', async () => {
     render(<AdminJobCategoriesPage />);
     fireEvent.click(screen.getByLabelText('Add job category'));
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'NewCat' } });
     fireEvent.change(screen.getByLabelText('Description'), { target: { value: 'Desc' } });
-    // By default, staffOnly should be unchecked
+    
+    // By default, checkboxes should be unchecked
     expect(screen.getByLabelText(/Only visible to staff/)).not.toBeChecked();
+    expect(screen.getByLabelText(/Always required for all registrations/)).not.toBeChecked();
+    
     fireEvent.click(screen.getByText('Add Category'));
     await waitFor(() => {
       expect(createCategory).toHaveBeenCalledWith({ 
         name: 'NewCat', 
         description: 'Desc',
-        staffOnly: false 
+        staffOnly: false,
+        alwaysRequired: false
       });
     });
   });
 
-  it('should set staffOnly to true when checkbox is checked in add modal', async () => {
+  it('should set and submit both checkbox fields correctly in add modal', async () => {
     render(<AdminJobCategoriesPage />);
     fireEvent.click(screen.getByLabelText('Add job category'));
-    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'StaffCat' } });
-    fireEvent.change(screen.getByLabelText('Description'), { target: { value: 'Staff Desc' } });
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'SpecialCat' } });
+    fireEvent.change(screen.getByLabelText('Description'), { target: { value: 'Special Desc' } });
+    
+    // Check both checkboxes
     fireEvent.click(screen.getByLabelText(/Only visible to staff/));
+    fireEvent.click(screen.getByLabelText(/Always required for all registrations/));
+    
     fireEvent.click(screen.getByText('Add Category'));
     await waitFor(() => {
       expect(createCategory).toHaveBeenCalledWith({ 
-        name: 'StaffCat', 
-        description: 'Staff Desc',
-        staffOnly: true 
+        name: 'SpecialCat', 
+        description: 'Special Desc',
+        staffOnly: true,
+        alwaysRequired: true
       });
     });
   });
 
-  it('should open edit modal with staffOnly checked for staff-only categories', () => {
+  it('should open edit modal with correct field values based on category', () => {
     render(<AdminJobCategoriesPage />);
-    // Open the Greeter category (staffOnly: true)
+    // Open the Greeter category (staffOnly: true, alwaysRequired: false)
     fireEvent.click(screen.getByLabelText('Edit Greeter'));
     expect(screen.getByLabelText(/Only visible to staff/)).toBeChecked();
+    expect(screen.getByLabelText(/Always required for all registrations/)).not.toBeChecked();
+    
+    // Cancel and open the Teardown category (staffOnly: false, alwaysRequired: true)
+    fireEvent.click(screen.getByText('Cancel'));
+    fireEvent.click(screen.getByLabelText('Edit Teardown'));
+    expect(screen.getByLabelText(/Only visible to staff/)).not.toBeChecked();
+    expect(screen.getByLabelText(/Always required for all registrations/)).toBeChecked();
   });
 
-  it('should open and submit the edit category modal', async () => {
+  it('should open and submit the edit category modal with updates', async () => {
     render(<AdminJobCategoriesPage />);
     fireEvent.click(screen.getByLabelText('Edit Kitchen'));
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Updated' } });
-    // Checkbox should be unchecked by default for "Kitchen" category
+    
+    // Checkboxes should start unchecked for "Kitchen" category
     expect(screen.getByLabelText(/Only visible to staff/)).not.toBeChecked();
-    // Check the staffOnly checkbox
+    expect(screen.getByLabelText(/Always required for all registrations/)).not.toBeChecked();
+    
+    // Check both checkboxes
     fireEvent.click(screen.getByLabelText(/Only visible to staff/));
+    fireEvent.click(screen.getByLabelText(/Always required for all registrations/));
+    
     fireEvent.click(screen.getByText('Save Changes'));
     await waitFor(() => {
       expect(updateCategory).toHaveBeenCalledWith('1', { 
         name: 'Updated', 
         description: 'Kitchen jobs',
-        staffOnly: true 
+        staffOnly: true,
+        alwaysRequired: true
       });
     });
   });
