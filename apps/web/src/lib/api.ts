@@ -230,6 +230,84 @@ export type CoreConfig = z.infer<typeof CoreConfigSchema>;
 export type CampingOption = z.infer<typeof CampingOptionSchema>;
 export type CampingOptionField = z.infer<typeof CampingOptionFieldSchema>;
 
+// Forward declarations to break circular dependencies
+export interface IJobCategory {
+  id: string;
+  name: string;
+  description: string;
+  staffOnly?: boolean;
+  alwaysRequired?: boolean;
+}
+
+export interface IShift {
+  id: string;
+  name: string;
+  description: string;
+  startTime: string;
+  endTime: string;
+  dayOfWeek: string;
+  campId: string;
+  jobs?: IJob[];
+}
+
+export interface IJob {
+  id: string;
+  name: string;
+  description: string;
+  location: string;
+  categoryId: string;
+  category?: IJobCategory;
+  shiftId: string;
+  shift?: IShift;
+  maxRegistrations: number;
+  staffOnly?: boolean;
+  alwaysRequired?: boolean;
+}
+
+// Job Category Schema
+export const JobCategorySchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string(),
+  staffOnly: z.boolean().default(false),
+  alwaysRequired: z.boolean().default(false),
+});
+
+export type JobCategory = z.infer<typeof JobCategorySchema>;
+
+// Shift Schema
+export const ShiftSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string(),
+  startTime: z.string(),
+  endTime: z.string(),
+  dayOfWeek: z.string(),
+  campId: z.string(),
+  jobs: z.array(z.lazy(() => JobSchema)).optional(),
+});
+
+export type Shift = z.infer<typeof ShiftSchema>;
+
+// Job Schema
+export const JobSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string(),
+  location: z.string(),
+  categoryId: z.string(),
+  category: JobCategorySchema.optional(),
+  shiftId: z.string(),
+  shift: z.lazy(() => ShiftSchema).optional(),
+  maxRegistrations: z.number(),
+});
+
+export type Job = z.infer<typeof JobSchema> & {
+  // These fields are derived from the job's category, not stored directly on the job
+  staffOnly: boolean;
+  alwaysRequired: boolean;
+};
+
 // API Functions
 export const auth = {
   /**
@@ -633,51 +711,6 @@ export const campingOptions = {
     }
   },
 };
-
-// Job Category Schema
-export const JobCategorySchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  description: z.string(),
-  staffOnly: z.boolean().default(false),
-  alwaysRequired: z.boolean().default(false),
-});
-
-export type JobCategory = z.infer<typeof JobCategorySchema>;
-
-// Job Schema
-export const JobSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  description: z.string(),
-  location: z.string(),
-  categoryId: z.string(),
-  category: JobCategorySchema.optional(),
-  shiftId: z.string(),
-  shift: z.lazy(() => ShiftSchema).optional(),
-});
-
-export type Job = z.infer<typeof JobSchema> & {
-  // These fields are derived from the job's category, not stored directly on the job
-  staffOnly: boolean;
-  alwaysRequired: boolean;
-};
-
-// Shift Schema
-export const ShiftSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  description: z.string(),
-  startTime: z.string(),
-  endTime: z.string(),
-  maxParticipants: z.number(),
-  currentParticipants: z.number().optional(),
-  dayOfWeek: z.string(),
-  campId: z.string(),
-  jobs: z.array(z.lazy(() => JobSchema)).optional(),
-});
-
-export type Shift = z.infer<typeof ShiftSchema>;
 
 export const jobCategories = {
   getAll: async (): Promise<JobCategory[]> => {

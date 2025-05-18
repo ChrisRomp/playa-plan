@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useShifts } from '../hooks/useShifts';
 import { useJobs } from '../hooks/useJobs';
 import { Shift } from '../lib/api';
@@ -9,10 +9,8 @@ interface ShiftFormState {
   description: string;
   startTime: string;
   endTime: string;
-  maxParticipants: number;
   dayOfWeek: string;
-  location: string;
-  jobId: string;
+  campId: string;
 }
 
 const dayOfWeekOptions = [
@@ -50,10 +48,8 @@ export default function AdminShiftsPage() {
     description: '',
     startTime: '',
     endTime: '',
-    maxParticipants: 1,
     dayOfWeek: 'MONDAY',
-    location: '',
-    jobId: '',
+    campId: '',
   });
   const [formError, setFormError] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -62,17 +58,6 @@ export default function AdminShiftsPage() {
   const [registrations, setRegistrations] = useState<unknown[]>([]);
   const [registrationsLoading, setRegistrationsLoading] = useState(false);
 
-  // Set initial jobId when jobs are loaded
-  useEffect(() => {
-    if (jobs.length > 0 && !form.jobId) {
-      setForm(prevForm => ({
-        ...prevForm,
-        jobId: jobs[0].id,
-        location: jobs[0].location || ''
-      }));
-    }
-  }, [jobs, form.jobId]);
-
   const openAddModal = () => {
     setEditId(null);
     setForm({
@@ -80,10 +65,8 @@ export default function AdminShiftsPage() {
       description: '',
       startTime: getTodayAtTime('09:00'),
       endTime: getTodayAtTime('17:00'),
-      maxParticipants: 1,
       dayOfWeek: 'MONDAY',
-      location: jobs.length > 0 ? jobs[0].location : '',
-      jobId: jobs.length > 0 ? jobs[0].id : '',
+      campId: '',
     });
     setFormError(null);
     setDeleteError(null);
@@ -98,10 +81,8 @@ export default function AdminShiftsPage() {
       description: shift.description || '',
       startTime: formatDateForInput(shift.startTime),
       endTime: formatDateForInput(shift.endTime),
-      maxParticipants: shift.maxParticipants,
       dayOfWeek: shift.dayOfWeek,
-      location: shift.location || '',
-      jobId: shift.jobId,
+      campId: shift.campId,
     });
     setFormError(null);
     setDeleteError(null);
@@ -127,21 +108,13 @@ export default function AdminShiftsPage() {
     } else {
       setForm({ ...form, [name]: value });
     }
-
-    // Update location when jobId changes
-    if (name === 'jobId') {
-      const selectedJob = jobs.find(job => job.id === value);
-      if (selectedJob) {
-        setForm(prev => ({ ...prev, location: selectedJob.location }));
-      }
-    }
   };
 
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!form.jobId || !form.startTime || !form.endTime || form.maxParticipants < 1) {
-      setFormError('All fields are required and max participants must be at least 1.');
+    if (!form.name || !form.startTime || !form.endTime || !form.dayOfWeek || !form.campId) {
+      setFormError('All fields are required.');
       return;
     }
     
@@ -185,11 +158,6 @@ export default function AdminShiftsPage() {
     }
   };
 
-  const getJobNameById = (id: string): string => {
-    const job = jobs.find(j => j.id === id);
-    return job ? job.name : 'Unknown Job';
-  };
-
   const formatDateForDisplay = (dateString: string): string => {
     const date = new Date(dateString);
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -229,6 +197,11 @@ export default function AdminShiftsPage() {
     setRegistrationsOpen(false);
   };
 
+  const getJobsForShift = (shiftId: string): string => {
+    const shiftJobs = jobs.filter(job => job.shiftId === shiftId);
+    return shiftJobs.map(job => job.name).join(', ') || 'None';
+  };
+
   const loading = shiftsLoading || jobsLoading;
 
   return (
@@ -265,7 +238,6 @@ export default function AdminShiftsPage() {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Day</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Start Time</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">End Time</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Max Participants</th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
@@ -281,11 +253,10 @@ export default function AdminShiftsPage() {
               ) : (
                 shifts.map((shift) => (
                   <tr key={shift.id}>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{getJobNameById(shift.jobId)}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{getJobsForShift(shift.id)}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{getDayOfWeekLabel(shift.dayOfWeek)}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{formatDateForDisplay(shift.startTime)}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{formatDateForDisplay(shift.endTime)}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{shift.maxParticipants}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <button
                         className="text-indigo-600 hover:text-indigo-900 mr-4"
@@ -321,24 +292,6 @@ export default function AdminShiftsPage() {
           <div className="bg-white rounded shadow-lg p-6 w-full max-w-md">
             <h2 className="text-xl font-semibold mb-4">{editId ? 'Edit' : 'Add'} Shift</h2>
             <form onSubmit={handleFormSubmit}>
-              <div className="mb-4">
-                <label htmlFor="jobId" className="block font-medium mb-1">Job</label>
-                <select
-                  id="jobId"
-                  name="jobId"
-                  className="w-full border rounded px-3 py-2"
-                  value={form.jobId}
-                  onChange={handleFormChange}
-                  required
-                >
-                  <option value="">Select a job</option>
-                  {jobs.map((job) => (
-                    <option key={job.id} value={job.id}>
-                      {job.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
               <div className="mb-4">
                 <label htmlFor="name" className="block font-medium mb-1">Name (Optional)</label>
                 <input
@@ -400,31 +353,6 @@ export default function AdminShiftsPage() {
                   type="datetime-local"
                   className="w-full border rounded px-3 py-2"
                   value={form.endTime}
-                  onChange={handleFormChange}
-                  required
-                />
-              </div>
-              <div className="mb-4">
-                <label htmlFor="maxParticipants" className="block font-medium mb-1">Maximum Participants</label>
-                <input
-                  id="maxParticipants"
-                  name="maxParticipants"
-                  type="number"
-                  min="1"
-                  className="w-full border rounded px-3 py-2"
-                  value={form.maxParticipants}
-                  onChange={handleFormChange}
-                  required
-                />
-              </div>
-              <div className="mb-4">
-                <label htmlFor="location" className="block font-medium mb-1">Location</label>
-                <input
-                  id="location"
-                  name="location"
-                  type="text"
-                  className="w-full border rounded px-3 py-2"
-                  value={form.location}
                   onChange={handleFormChange}
                   required
                 />
