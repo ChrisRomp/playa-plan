@@ -28,34 +28,44 @@ export const api = axios.create({
 // Log API configuration for debugging
 console.log(`API client configured with baseURL: ${API_URL}`);
 
+// Storage key for JWT token
+export const JWT_TOKEN_STORAGE_KEY = 'playaplan_jwt_token';
+
+// Promise that resolves when auth initialization is complete
+export let authInitialized = Promise.resolve(false);
+
 // Function to initialize JWT token from localStorage on application startup
-export const initializeAuthFromStorage = () => {
-  try {
-    // Only try to use localStorage in browser environment
-    if (typeof window !== 'undefined' && window.localStorage) {
-      const storedToken = localStorage.getItem(JWT_TOKEN_STORAGE_KEY);
-      if (storedToken) {
-        // Set the token in the Authorization header
-        api.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
-        console.log('JWT token loaded from localStorage and set in Authorization header');
-        return true;
+export const initializeAuthFromStorage = (): Promise<boolean> => {
+  const initPromise = new Promise<boolean>((resolve) => {
+    try {
+      // Only try to use localStorage in browser environment
+      if (typeof window !== 'undefined' && window.localStorage) {
+        const storedToken = localStorage.getItem(JWT_TOKEN_STORAGE_KEY);
+        if (storedToken) {
+          // Set the token in the Authorization header
+          api.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
+          console.log('JWT token loaded from localStorage and set in Authorization header');
+          resolve(true);
+          return;
+        }
       }
+    } catch (e) {
+      console.error('Error initializing auth from storage', e);
     }
-  } catch (e) {
-    console.error('Error initializing auth from storage', e);
-  }
-  return false;
+    resolve(false);
+  });
+  
+  // Update the exported promise
+  authInitialized = initPromise;
+  return initPromise;
 };
 
 // Safely initialize auth from storage to prevent test issues
 // We use a try-catch and feature detection to avoid issues in test environments
 try {
   if (typeof window !== 'undefined' && window.localStorage) {
-    // Initialize auth from storage as a side effect
-    // But defer to next tick to avoid initialization order issues
-    setTimeout(() => {
-      initializeAuthFromStorage();
-    }, 0);
+    // Initialize auth synchronously on module load
+    initializeAuthFromStorage();
   }
 } catch {
   console.log('Unable to initialize auth from storage (likely in test environment)');
@@ -85,9 +95,6 @@ api.interceptors.request.use(
  */
 let isRefreshing = false;
 let failedQueue: { resolve: (value: unknown) => void; reject: (reason?: unknown) => void }[] = [];
-
-// Storage key for JWT token
-export const JWT_TOKEN_STORAGE_KEY = 'playaplan_jwt_token';
 
 // Function to set the JWT token in the Authorization header and localStorage
 export const setJwtToken = (token: string) => {

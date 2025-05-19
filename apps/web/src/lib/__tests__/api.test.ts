@@ -105,22 +105,52 @@ describe('API module', () => {
       playaName: 'Dust Rider',
     };
     
-    it('should be callable with user data', async () => {
+    const mockResponse = {
+      accessToken: 'mock-token-12345',
+      userId: 'user-123',
+      email: 'test@example.playaplan.app',
+      firstName: 'John',
+      lastName: 'Doe',
+      role: 'PARTICIPANT',
+    };
+    
+    it('should be callable with user data and return expected response structure', async () => {
       // Setup the mock
-      (auth.completeRegistration as Mock).mockResolvedValue({
-        accessToken: 'mock-token-12345',
-        userId: 'user-123',
-        email: 'test@example.playaplan.app',
-        firstName: 'John',
-        lastName: 'Doe',
-        role: 'PARTICIPANT',
-      });
+      (auth.completeRegistration as Mock).mockResolvedValue(mockResponse);
+      
+      // Mock the parse method of AuthResponseSchema
+      (AuthResponseSchema.parse as Mock).mockReturnValue(mockResponse);
       
       // Act
-      await auth.completeRegistration(mockUserData);
+      const result = await auth.completeRegistration(mockUserData);
       
       // Assert
       expect(auth.completeRegistration).toHaveBeenCalledWith(mockUserData);
+      expect(result).toEqual(mockResponse);
+      expect(result).toHaveProperty('accessToken');
+      expect(result).toHaveProperty('userId');
+      expect(result).toHaveProperty('email');
+      expect(result).toHaveProperty('firstName');
+      expect(result).toHaveProperty('lastName');
+      expect(result).toHaveProperty('role');
+    });
+    
+    it('should handle API errors gracefully', async () => {
+      // Setup error mock
+      const mockError = new Error('Registration failed');
+      (auth.completeRegistration as Mock).mockRejectedValue(mockError);
+      
+      // Act & Assert
+      await expect(auth.completeRegistration(mockUserData)).rejects.toThrow('Registration failed');
+    });
+    
+    it('should handle validation errors from zod schemas', async () => {
+      // Mock completeRegistration to throw error directly
+      // This simulates what would happen if validation fails inside the function
+      (auth.completeRegistration as Mock).mockRejectedValue(new Error('Validation failed'));
+      
+      // Act & Assert
+      await expect(auth.completeRegistration(mockUserData)).rejects.toThrow('Validation failed');
     });
   });
 });

@@ -4,6 +4,7 @@ import { RegisterDto } from '../dto/register.dto';
 import { LoginDto } from '../dto/login.dto';
 import { AuthResponseDto } from '../dto/auth-response.dto';
 import { LocalAuthGuard } from '../guards/local-auth.guard';
+import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { Public } from '../decorators/public.decorator';
 import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiBearerAuth } from '@nestjs/swagger';
 import { Request as ExpressRequest } from 'express';
@@ -188,6 +189,7 @@ export class AuthController {
    * @returns New authentication token
    */
   @Post('refresh')
+  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Refresh authentication token' })
   @ApiResponse({ status: HttpStatus.OK, description: 'Token refreshed successfully' })
