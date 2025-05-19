@@ -11,12 +11,11 @@ describe('ShiftsService', () => {
 
   const mockShift = {
     id: 'test-id',
-    startTime: new Date('2023-06-01T09:00:00Z'),
-    endTime: new Date('2023-06-01T17:00:00Z'),
-    maxRegistrations: 10,
+    name: 'Test Shift',
+    description: 'Test Description',
+    startTime: '09:00',
+    endTime: '17:00',
     dayOfWeek: DayOfWeek.MONDAY,
-    campId: 'camp-id',
-    jobId: 1,
     createdAt: new Date(),
     updatedAt: new Date()
   };
@@ -24,21 +23,17 @@ describe('ShiftsService', () => {
   const mockCreateShiftDto = {
     name: 'Test Shift',
     description: 'Test Description',
-    maxParticipants: 5,
-    startTime: new Date('2023-06-01T09:00:00Z'),
-    endTime: new Date('2023-06-01T17:00:00Z'),
-    dayOfWeek: DayOfWeek.MONDAY,
-    location: 'test-camp-id',
-    jobId: 1
+    startTime: '09:00',
+    endTime: '17:00',
+    dayOfWeek: DayOfWeek.MONDAY
   };
 
   const mockUpdateShiftDto = {
-    startTime: new Date('2023-07-01T10:00:00Z'),
-    endTime: new Date('2023-07-01T18:00:00Z'),
-    maxParticipants: 15,
-    dayOfWeek: DayOfWeek.TUESDAY,
-    location: 'updated-camp-id',
-    jobId: 2
+    name: 'Updated Shift',
+    description: 'Updated Description',
+    startTime: '10:00',
+    endTime: '18:00',
+    dayOfWeek: DayOfWeek.TUESDAY
   };
 
   beforeEach(async () => {
@@ -74,12 +69,12 @@ describe('ShiftsService', () => {
       expect(result).toEqual(mockShift);
       expect(prismaService.shift.create).toHaveBeenCalledWith({
         data: {
+          name: mockCreateShiftDto.name,
+          description: mockCreateShiftDto.description,
           startTime: mockCreateShiftDto.startTime,
           endTime: mockCreateShiftDto.endTime,
-          maxRegistrations: mockCreateShiftDto.maxParticipants,
           dayOfWeek: mockCreateShiftDto.dayOfWeek,
-          camp: { connect: { id: mockCreateShiftDto.location } },
-          job: { connect: { id: String(mockCreateShiftDto.jobId) } },
+          jobs: { create: [] }
         },
       });
     });
@@ -89,7 +84,11 @@ describe('ShiftsService', () => {
     it('should return an array of shifts', async () => {
       const result = await service.findAll();
       expect(result).toEqual([mockShift]);
-      expect(prismaService.shift.findMany).toHaveBeenCalled();
+      expect(prismaService.shift.findMany).toHaveBeenCalledWith({
+        include: {
+          jobs: true
+        }
+      });
     });
   });
 
@@ -100,9 +99,7 @@ describe('ShiftsService', () => {
       expect(prismaService.shift.findUnique).toHaveBeenCalledWith({
         where: { id: 'test-id' },
         include: {
-          camp: true,
-          job: true,
-          registrations: true,
+          jobs: true,
         },
       });
     });
@@ -120,16 +117,14 @@ describe('ShiftsService', () => {
       expect(prismaService.shift.update).toHaveBeenCalledWith({
         where: { id: 'test-id' },
         data: {
+          name: mockUpdateShiftDto.name,
+          description: mockUpdateShiftDto.description,
           startTime: mockUpdateShiftDto.startTime,
           endTime: mockUpdateShiftDto.endTime,
-          maxRegistrations: mockUpdateShiftDto.maxParticipants,
           dayOfWeek: mockUpdateShiftDto.dayOfWeek,
-          camp: { connect: { id: mockUpdateShiftDto.location } },
-          job: { connect: { id: String(mockUpdateShiftDto.jobId) } },
         },
         include: {
-          camp: true,
-          job: true,
+          jobs: true,
         },
       });
     });

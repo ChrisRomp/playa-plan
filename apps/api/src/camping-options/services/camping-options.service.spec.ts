@@ -18,7 +18,6 @@ describe('CampingOptionsService', () => {
     participantDues: 100.00,
     staffDues: 50.00,
     maxSignups: 10,
-    campId: 'camp-id',
     jobCategoryIds: ['category-1', 'category-2'],
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -32,7 +31,6 @@ describe('CampingOptionsService', () => {
     participantDues: 100.00,
     staffDues: 50.00,
     maxSignups: 10,
-    campId: 'camp-id',
     jobCategoryIds: ['category-1', 'category-2'],
   };
 
@@ -43,10 +41,6 @@ describe('CampingOptionsService', () => {
   };
 
   const mockPrismaService = {
-    camp: {
-      findUnique: jest.fn(),
-      findFirst: jest.fn(),
-    },
     jobCategory: {
       findMany: jest.fn(),
     },
@@ -87,7 +81,6 @@ describe('CampingOptionsService', () => {
     mockPrismaService.campingOption.delete.mockResolvedValue(mockCampingOption);
     mockPrismaService.campingOptionRegistration.count.mockResolvedValue(0);
     mockPrismaService.campingOptionField.count.mockResolvedValue(0);
-    mockPrismaService.camp.findUnique.mockResolvedValue({ id: 'camp-id', name: 'Test Camp' });
     mockPrismaService.jobCategory.findMany.mockResolvedValue([
       { id: 'category-1', name: 'Category 1' },
       { id: 'category-2', name: 'Category 2' },
@@ -106,10 +99,6 @@ describe('CampingOptionsService', () => {
     it('should create a camping option and return it', async () => {
       const result = await service.create(mockCreateCampingOptionDto);
       
-      expect(prisma.camp.findUnique).toHaveBeenCalledWith({
-        where: { id: mockCreateCampingOptionDto.campId },
-      });
-      
       expect(prisma.campingOption.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
           name: mockCreateCampingOptionDto.name,
@@ -119,54 +108,6 @@ describe('CampingOptionsService', () => {
       
       expect(result).toBeInstanceOf(CampingOption);
       expect(result.name).toEqual(mockCampingOption.name);
-    });
-
-    it('should assign the first active camp if campId is not provided', async () => {
-      const dto = { ...mockCreateCampingOptionDto };
-      delete dto.campId;
-      const firstActiveCamp = {
-        id: 'active-camp-id',
-        name: 'Active Camp',
-        description: 'A test active camp',
-        startDate: new Date('2024-01-01'),
-        endDate: new Date('2024-01-10'),
-        location: 'Test Location',
-        capacity: 100,
-        isActive: true,
-        createdAt: new Date('2023-12-01'),
-        updatedAt: new Date('2023-12-02'),
-      };
-      // Override the campingOption.create mock for this test to return the correct campId
-      const createSpy = jest.spyOn(prisma.campingOption, 'create').mockResolvedValueOnce({
-        ...mockCampingOption,
-        campId: 'active-camp-id',
-      });
-      const findFirstSpy = jest.spyOn(prisma.camp, 'findFirst').mockResolvedValueOnce(firstActiveCamp);
-      const findUniqueSpy = jest.spyOn(prisma.camp, 'findUnique').mockResolvedValueOnce(firstActiveCamp);
-      const result = await service.create(dto);
-      expect(prisma.camp.findFirst).toHaveBeenCalledWith({
-        where: { isActive: true },
-        orderBy: { createdAt: 'asc' },
-      });
-      expect(result).toBeInstanceOf(CampingOption);
-      expect(result.campId).toBe('active-camp-id');
-      // Restore the spies to avoid affecting other tests
-      findFirstSpy.mockRestore();
-      findUniqueSpy.mockRestore();
-      createSpy.mockRestore();
-    });
-
-    it('should throw NotFoundException if no active camp exists and campId is not provided', async () => {
-      const dto = { ...mockCreateCampingOptionDto };
-      delete dto.campId;
-      mockPrismaService.camp.findFirst = jest.fn().mockResolvedValueOnce(null);
-      await expect(service.create(dto)).rejects.toThrow(NotFoundException);
-    });
-
-    it('should throw NotFoundException if camp not found', async () => {
-      mockPrismaService.camp.findUnique.mockResolvedValueOnce(null);
-      
-      await expect(service.create(mockCreateCampingOptionDto)).rejects.toThrow(NotFoundException);
     });
 
     it('should throw NotFoundException if job categories not found', async () => {
@@ -195,20 +136,11 @@ describe('CampingOptionsService', () => {
       expect(result[0]).toBeInstanceOf(CampingOption);
     });
 
-    it('should respect includeDisabled parameter', async () => {
+    it('should include disabled options when includeDisabled is true', async () => {
       await service.findAll(true);
       
       expect(prisma.campingOption.findMany).toHaveBeenCalledWith({
         where: {},
-        orderBy: { name: 'asc' },
-      });
-    });
-
-    it('should filter by campId when provided', async () => {
-      await service.findAll(false, 'camp-id');
-      
-      expect(prisma.campingOption.findMany).toHaveBeenCalledWith({
-        where: { enabled: true, campId: 'camp-id' },
         orderBy: { name: 'asc' },
       });
     });

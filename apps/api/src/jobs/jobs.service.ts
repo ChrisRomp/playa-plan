@@ -2,26 +2,67 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { CreateJobDto } from './dto/create-job.dto';
 import { UpdateJobDto } from './dto/update-job.dto';
+import { Job, Prisma } from '@prisma/client';
+
+/**
+ * Type definition for job with included relations
+ */
+type JobWithRelations = Job & {
+  category?: {
+    id: string;
+    name: string;
+    description: string | null;
+    staffOnly: boolean;
+    alwaysRequired: boolean;
+  } | null;
+  shift?: {
+    id: string;
+    name: string;
+    description: string | null;
+    startTime: string;
+    endTime: string;
+    dayOfWeek: string;
+  } | null;
+};
 
 @Injectable()
 export class JobsService {
   constructor(private prisma: PrismaService) {}
 
   async create(createJobDto: CreateJobDto) {
-    return this.prisma.job.create({
-      data: createJobDto,
+    const job = await this.prisma.job.create({
+      data: {
+        name: createJobDto.name,
+        description: createJobDto.description,
+        location: createJobDto.location,
+        maxRegistrations: createJobDto.maxRegistrations || 10, // Default to 10 if not provided
+        category: {
+          connect: { id: createJobDto.categoryId }
+        },
+        shift: {
+          connect: { id: createJobDto.shiftId }
+        }
+      },
       include: {
         category: true,
+        shift: true,
       },
     });
+
+    // Add derived properties from category
+    return this.addDerivedProperties(job);
   }
 
   async findAll() {
-    return this.prisma.job.findMany({
+    const jobs = await this.prisma.job.findMany({
       include: {
         category: true,
+        shift: true,
       },
     });
+
+    // Add derived properties from categories
+    return jobs.map(job => this.addDerivedProperties(job));
   }
 
   async findOne(id: string) {
@@ -29,6 +70,7 @@ export class JobsService {
       where: { id },
       include: {
         category: true,
+        shift: true,
       },
     });
 
@@ -36,30 +78,72 @@ export class JobsService {
       throw new NotFoundException(`Job with ID ${id} not found`);
     }
 
-    return job;
+    // Add derived properties from category
+    return this.addDerivedProperties(job);
   }
 
   async update(id: string, updateJobDto: UpdateJobDto) {
     try {
-      return await this.prisma.job.update({
+      // Create update data object with proper typing
+      const updateData: Prisma.JobUpdateInput = {};
+      
+      if (updateJobDto.name) updateData.name = updateJobDto.name;
+      if (updateJobDto.description) updateData.description = updateJobDto.description;
+      if (updateJobDto.location) updateData.location = updateJobDto.location;
+      if (updateJobDto.maxRegistrations) updateData.maxRegistrations = updateJobDto.maxRegistrations;
+      
+      if (updateJobDto.categoryId) {
+        updateData.category = { connect: { id: updateJobDto.categoryId } };
+      }
+      
+      if (updateJobDto.shiftId) {
+        updateData.shift = { connect: { id: updateJobDto.shiftId } };
+      }
+      
+      const job = await this.prisma.job.update({
         where: { id },
-        data: updateJobDto,
+        data: updateData,
         include: {
           category: true,
+          shift: true,
         },
       });
-    } catch (error) {
+
+      // Add derived properties from category
+      return this.addDerivedProperties(job);
+    } catch {
       throw new NotFoundException(`Job with ID ${id} not found`);
     }
   }
 
   async remove(id: string) {
     try {
-      return await this.prisma.job.delete({
+      const job = await this.prisma.job.delete({
         where: { id },
+        include: {
+          category: true,
+          shift: true,
+        },
       });
-    } catch (error) {
+
+      // Add derived properties from category
+      return this.addDerivedProperties(job);
+    } catch {
       throw new NotFoundException(`Job with ID ${id} not found`);
     }
+  }
+
+  /**
+   * Add derived properties from category to a job
+   */
+  /**
+   * Add derived properties from category to a job
+   */
+  private addDerivedProperties(job: JobWithRelations) {
+    return {
+      ...job,
+      staffOnly: job.category?.staffOnly || false,
+      alwaysRequired: job.category?.alwaysRequired || false,
+    };
   }
 } 

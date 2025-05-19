@@ -18,7 +18,7 @@ describe('useUsers', () => {
   const mockUsers: User[] = [
     {
       id: '1',
-      email: 'test1@example.com',
+      email: 'test1@example.playaplan.app',
       firstName: 'Test',
       lastName: 'User1',
       role: 'PARTICIPANT',
@@ -28,7 +28,7 @@ describe('useUsers', () => {
     },
     {
       id: '2',
-      email: 'test2@example.com',
+      email: 'test2@example.playaplan.app',
       firstName: 'Test',
       lastName: 'User2',
       role: 'ADMIN',
@@ -99,7 +99,7 @@ describe('useUsers', () => {
 
   it('should create a new user', async () => {
     const newUserData = {
-      email: 'new@example.com',
+      email: 'new@example.playaplan.app',
       firstName: 'New',
       lastName: 'User',
       password: 'password123',
@@ -108,7 +108,7 @@ describe('useUsers', () => {
 
     const createdUser = {
       id: '3',
-      email: 'new@example.com',
+      email: 'new@example.playaplan.app',
       firstName: 'New',
       lastName: 'User',
       role: 'PARTICIPANT',
@@ -252,7 +252,7 @@ describe('useUsers', () => {
     let user = null;
     await act(async () => {
       user = await result.current.createUser({ 
-        email: 'test@example.com', 
+        email: 'test@example.playaplan.app', 
         firstName: 'Test', 
         lastName: 'User', 
         password: 'password123' 

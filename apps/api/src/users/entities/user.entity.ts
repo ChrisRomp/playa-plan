@@ -10,7 +10,7 @@ export class User {
   @ApiProperty({ description: 'Unique identifier for the user' })
   id: string = '';
 
-  @ApiProperty({ description: 'User email address', example: 'user@example.com' })
+  @ApiProperty({ description: 'User email address', example: 'user@example.playaplan.app' })
   email: string = '';
 
   @ApiProperty({ description: 'User first name', example: 'John' })

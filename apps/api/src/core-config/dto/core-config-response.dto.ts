@@ -46,7 +46,7 @@ export class CoreConfigResponseDto {
    */
   @ApiProperty({
     description: 'Camp banner URL',
-    example: 'https://example.com/banner.jpg'
+    example: 'https://example.playaplan.app/banner.jpg'
   })
   campBannerUrl!: string | null;
 
@@ -64,7 +64,7 @@ export class CoreConfigResponseDto {
    */
   @ApiProperty({
     description: 'Camp icon URL',
-    example: 'https://example.com/icon.png'
+    example: 'https://example.playaplan.app/icon.png'
   })
   campIconUrl!: string | null;
 
@@ -191,7 +191,7 @@ export class CoreConfigResponseDto {
    */
   @ApiProperty({
     description: 'SMTP host',
-    example: 'smtp.example.com'
+    example: 'smtp.example.playaplan.app'
   })
   smtpHost!: string | null;
 
@@ -233,7 +233,7 @@ export class CoreConfigResponseDto {
    */
   @ApiProperty({
     description: 'Sender email address',
-    example: 'no-reply@example.com'
+    example: 'no-reply@example.playaplan.app'
   })
   senderEmail!: string | null;
 

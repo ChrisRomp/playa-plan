@@ -3,7 +3,7 @@ import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '../../src/app.module';
 import { PrismaService } from '../../src/common/prisma/prisma.service';
-import { UserRole } from '@prisma/client';
+import { DayOfWeek, UserRole } from '@prisma/client';
 
 // Mock SendGrid
 jest.mock('@sendgrid/mail', () => ({
@@ -17,6 +17,8 @@ describe('JobsController (e2e)', () => {
   let adminToken: string;
   let userToken: string;
   let testCategoryId: string;
+  let testCampId: string;
+  let testShiftId: string;
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -29,6 +31,33 @@ describe('JobsController (e2e)', () => {
     await app.init();
 
     // Create test data
+    // Create a test camp first for shift
+    const camp = await prisma.camp.create({
+      data: {
+        name: 'Test Camp',
+        description: 'Test Camp Description',
+        startDate: new Date('2023-06-01'),
+        endDate: new Date('2023-06-07'),
+        location: 'Test Location',
+        capacity: 100,
+        isActive: true,
+      }
+    });
+    testCampId = camp.id;
+    
+    // Create a test shift needed for jobs
+    const shift = await prisma.shift.create({
+      data: {
+        name: 'Test Shift',
+        description: 'Test Shift Description',
+        startTime: '09:00',
+        endTime: '17:00',
+        dayOfWeek: DayOfWeek.MONDAY,
+        campId: testCampId,
+      }
+    });
+    testShiftId = shift.id;
+    
     // Create a test job category
     const category = await prisma.jobCategory.create({
       data: {
@@ -41,13 +70,13 @@ describe('JobsController (e2e)', () => {
 
     // Ensure test users exist
     let admin = await prisma.user.findUnique({
-      where: { email: 'admin@example.com' },
+      where: { email: 'admin@example.playaplan.app' },
     });
 
     if (!admin) {
       admin = await prisma.user.create({
         data: {
-          email: 'admin@example.com',
+          email: 'admin@example.playaplan.app',
           password: '$2b$10$EpRnTzVlqHNP0.fUbXUwSOyuiXe/QLSUG6xNekdHgTGmrpHEfIoxm', // 'admin123'
           firstName: 'Admin',
           lastName: 'User',
@@ -58,13 +87,13 @@ describe('JobsController (e2e)', () => {
     }
 
     let user = await prisma.user.findUnique({
-      where: { email: 'user@example.com' },
+      where: { email: 'user@example.playaplan.app' },
     });
 
     if (!user) {
       user = await prisma.user.create({
         data: {
-          email: 'user@example.com',
+          email: 'user@example.playaplan.app',
           password: '$2b$10$EpRnTzVlqHNP0.fUbXUwSOyuiXe/QLSUG6xNekdHgTGmrpHEfIoxm', // 'user123'
           firstName: 'Regular',
           lastName: 'User',
@@ -78,7 +107,7 @@ describe('JobsController (e2e)', () => {
     const adminResponse = await request(app.getHttpServer())
       .post('/auth/login')
       .send({
-        email: 'admin@example.com',
+        email: 'admin@example.playaplan.app',
         password: 'admin123',
       });
 
@@ -87,7 +116,7 @@ describe('JobsController (e2e)', () => {
     const userResponse = await request(app.getHttpServer())
       .post('/auth/login')
       .send({
-        email: 'user@example.com',
+        email: 'user@example.playaplan.app',
         password: 'user123',
       });
 
@@ -95,9 +124,27 @@ describe('JobsController (e2e)', () => {
   });
 
   afterAll(async () => {
-    // Cleanup: delete test category
+    // Cleanup: delete test data
+    await prisma.job.deleteMany({
+      where: { categoryId: testCategoryId },
+    }).catch(() => {
+      // Ignore errors if already deleted
+    });
+    
     await prisma.jobCategory.delete({
       where: { id: testCategoryId },
+    }).catch(() => {
+      // Ignore errors if already deleted
+    });
+    
+    await prisma.shift.delete({
+      where: { id: testShiftId },
+    }).catch(() => {
+      // Ignore errors if already deleted
+    });
+    
+    await prisma.camp.delete({
+      where: { id: testCampId },
     }).catch(() => {
       // Ignore errors if already deleted
     });
@@ -113,6 +160,8 @@ describe('JobsController (e2e)', () => {
         description: 'Test Description',
         location: 'Test Location',
         categoryId: testCategoryId,
+        shiftId: testShiftId,
+        maxRegistrations: 10,
         staffOnly: false,
         alwaysRequired: true,
       };
@@ -129,6 +178,8 @@ describe('JobsController (e2e)', () => {
       expect(response.body.location).toBe(createJobDto.location);
       expect(response.body.staffOnly).toBe(createJobDto.staffOnly);
       expect(response.body.alwaysRequired).toBe(createJobDto.alwaysRequired);
+      expect(response.body.shiftId).toBe(testShiftId);
+      expect(response.body.maxRegistrations).toBe(createJobDto.maxRegistrations);
     });
 
     it('should not create a job (non-admin)', async () => {
@@ -137,6 +188,8 @@ describe('JobsController (e2e)', () => {
         description: 'Test Description',
         location: 'Test Location',
         categoryId: testCategoryId,
+        shiftId: testShiftId,
+        maxRegistrations: 10,
         staffOnly: true,
         alwaysRequired: false,
       };
@@ -171,6 +224,8 @@ describe('JobsController (e2e)', () => {
           description: 'Test Description',
           location: 'Test Location',
           categoryId: testCategoryId,
+          shiftId: testShiftId,
+          maxRegistrations: 10,
           staffOnly: false,
           alwaysRequired: false,
         },
@@ -186,6 +241,7 @@ describe('JobsController (e2e)', () => {
 
       expect(response.body.id).toBe(jobId);
       expect(response.body.name).toBe('Test Job for GET');
+      expect(response.body.maxRegistrations).toBe(10);
     });
 
     it('should return 404 for non-existent job', async () => {
@@ -207,6 +263,8 @@ describe('JobsController (e2e)', () => {
           description: 'Test Description',
           location: 'Test Location',
           categoryId: testCategoryId,
+          shiftId: testShiftId,
+          maxRegistrations: 10,
           staffOnly: false,
           alwaysRequired: false,
         },
@@ -219,6 +277,7 @@ describe('JobsController (e2e)', () => {
         name: 'Updated Job',
         description: 'Updated Description',
         location: 'Updated Location',
+        maxRegistrations: 15,
         staffOnly: true,
         alwaysRequired: true,
       };
@@ -235,11 +294,13 @@ describe('JobsController (e2e)', () => {
       expect(response.body.location).toBe(updateJobDto.location);
       expect(response.body.staffOnly).toBe(updateJobDto.staffOnly);
       expect(response.body.alwaysRequired).toBe(updateJobDto.alwaysRequired);
+      expect(response.body.maxRegistrations).toBe(updateJobDto.maxRegistrations);
     });
 
     it('should not update a job (non-admin)', async () => {
       const updateJobDto = {
         name: 'Updated Job',
+        maxRegistrations: 20,
       };
 
       await request(app.getHttpServer())
@@ -261,6 +322,8 @@ describe('JobsController (e2e)', () => {
           description: 'Test Description',
           location: 'Test Location',
           categoryId: testCategoryId,
+          shiftId: testShiftId,
+          maxRegistrations: 10,
           staffOnly: false,
           alwaysRequired: false,
         },
@@ -289,6 +352,8 @@ describe('JobsController (e2e)', () => {
           description: 'Test Description',
           location: 'Test Location',
           categoryId: testCategoryId,
+          shiftId: testShiftId,
+          maxRegistrations: 10,
           staffOnly: false,
           alwaysRequired: false,
         },

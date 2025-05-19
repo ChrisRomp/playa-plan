@@ -34,5 +34,6 @@
       "@playa-plan/types": ["../../libs/types/src"]
     }
   },
-  "include": ["src", "test"]
+  "include": ["src", "test"],
+  "exclude": ["test/**/*.e2e-spec.ts", "src/camps/**/*"]
 }

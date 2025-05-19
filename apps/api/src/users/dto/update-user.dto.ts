@@ -9,7 +9,7 @@ import { UserRole } from '@prisma/client';
 export class UpdateUserDto {
   @ApiPropertyOptional({
     description: 'User email address',
-    example: 'user@example.com',
+    example: 'user@example.playaplan.app',
   })
   @IsEmail({}, { message: 'Please provide a valid email address' })
   @IsOptional()
@@ -107,7 +107,7 @@ export class UpdateUserDto {
 
   @ApiPropertyOptional({
     description: 'URL to user profile picture',
-    example: 'https://example.com/profile.jpg',
+    example: 'https://mycamp.playaplan.app/profile.jpg',
     maxLength: 1024,
   })
   @IsString()

@@ -37,6 +37,7 @@ export interface Job {
   title: string;
   description: string;
   categoryId: string;
+  shiftId: string;
 }
 
 export interface JobCategory {
@@ -47,7 +48,8 @@ export interface JobCategory {
 
 export interface Shift {
   id: string;
-  jobId: string;
+  name: string;
+  description?: string;
   startTime: string;
   endTime: string;
   date: string;

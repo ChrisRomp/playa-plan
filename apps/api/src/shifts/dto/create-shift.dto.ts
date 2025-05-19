@@ -1,48 +1,39 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsDate, IsEnum, IsInt, IsNotEmpty, IsString } from 'class-validator';
+import { IsEnum, IsNotEmpty, IsOptional, IsString, Matches } from 'class-validator';
 import { DayOfWeek } from '../../common/enums/day-of-week.enum';
 
 /**
  * Data Transfer Object for creating a new shift
  */
 export class CreateShiftDto {
-  @ApiProperty({ description: 'The title of the shift' })
+  @ApiProperty({ description: 'The name of the shift' })
   @IsNotEmpty()
   @IsString()
   name!: string;
 
-  @ApiProperty({ description: 'The description of the shift' })
+  @ApiProperty({ description: 'The description of the shift', required: false })
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @ApiProperty({ description: 'The start time of the shift in HH:MM format (24-hour time)', example: '09:00' })
   @IsNotEmpty()
   @IsString()
-  description!: string;
+  @Matches(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/, {
+    message: 'Start time must be in HH:MM format (24-hour time)',
+  })
+  startTime!: string;
 
-  @ApiProperty({ description: 'The maximum number of registrations allowed for this shift' })
+  @ApiProperty({ description: 'The end time of the shift in HH:MM format (24-hour time)', example: '17:00' })
   @IsNotEmpty()
-  @IsInt()
-  maxParticipants!: number;
-
-  @ApiProperty({ description: 'The start time of the shift' })
-  @IsNotEmpty()
-  @IsDate()
-  startTime!: Date;
-
-  @ApiProperty({ description: 'The end time of the shift' })
-  @IsNotEmpty()
-  @IsDate()
-  endTime!: Date;
+  @IsString()
+  @Matches(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/, {
+    message: 'End time must be in HH:MM format (24-hour time)',
+  })
+  endTime!: string;
 
   @ApiProperty({ enum: DayOfWeek, description: 'The day of the week for this shift' })
   @IsNotEmpty()
   @IsEnum(DayOfWeek)
   dayOfWeek!: DayOfWeek;
-
-  @ApiProperty({ description: 'The ID of the camp this shift belongs to' })
-  @IsNotEmpty()
-  @IsString()
-  location!: string;
-
-  @ApiProperty({ description: 'The ID of the job this shift is for' })
-  @IsNotEmpty()
-  @IsInt()
-  jobId!: number;
 }

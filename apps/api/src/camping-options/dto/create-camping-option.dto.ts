@@ -101,17 +101,7 @@ export class CreateCampingOptionDto {
   @Type(() => Number)
   maxSignups?: number = 0;
   
-  /**
-   * ID of the camp this option belongs to
-   */
-  @ApiProperty({
-    description: 'ID of the camp this option belongs to',
-    example: 'c12345-67890',
-    required: false
-  })
-  @IsUUID()
-  @IsOptional()
-  campId?: string;
+  // Camp field has been removed
   
   /**
    * Array of job category IDs required for this camping option

@@ -49,7 +49,7 @@ export default () => ({
   // Email service configuration
   email: {
     provider: process.env.EMAIL_PROVIDER || 'sendgrid', // 'sendgrid' or 'smtp'
-    defaultFrom: process.env.EMAIL_FROM || 'noreply@example.com',
+    defaultFrom: process.env.EMAIL_FROM || 'noreply@example.playaplan.app',
     sendgrid: {
       apiKey: process.env.SENDGRID_API_KEY,
     },
@@ -81,7 +81,7 @@ export default () => ({
 
   // Default admin settings
   defaults: {
-    adminEmail: process.env.DEFAULT_ADMIN_EMAIL || 'webadmin@example.com',
+    adminEmail: process.env.DEFAULT_ADMIN_EMAIL || 'webadmin@example.playaplan.app',
     adminPassword: process.env.DEFAULT_ADMIN_PASSWORD,
   },
 });

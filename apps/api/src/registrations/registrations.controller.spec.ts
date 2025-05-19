@@ -12,7 +12,7 @@ describe('RegistrationsController', () => {
     create: jest.fn(),
     findAll: jest.fn(),
     findByUser: jest.fn(),
-    findByShift: jest.fn(),
+    findByJob: jest.fn(),
     findOne: jest.fn(),
     update: jest.fn(),
     remove: jest.fn(),
@@ -44,13 +44,13 @@ describe('RegistrationsController', () => {
     it('should create a registration', async () => {
       const createDto: CreateRegistrationDto = {
         userId: 'user-id',
-        shiftId: 'shift-id',
+        jobId: 'job-id',
       };
       
       const expectedResult = {
         id: 'registration-id',
         userId: 'user-id',
-        shiftId: 'shift-id',
+        jobId: 'job-id',
         status: RegistrationStatus.PENDING,
       };
       
@@ -66,8 +66,8 @@ describe('RegistrationsController', () => {
   describe('findAll', () => {
     it('should return all registrations when no query params', async () => {
       const expectedRegistrations = [
-        { id: '1', userId: 'user1', shiftId: 'shift1' },
-        { id: '2', userId: 'user2', shiftId: 'shift2' },
+        { id: '1', userId: 'user1', jobId: 'job1' },
+        { id: '2', userId: 'user2', jobId: 'job2' },
       ];
       
       mockRegistrationsService.findAll.mockResolvedValue(expectedRegistrations);
@@ -81,8 +81,8 @@ describe('RegistrationsController', () => {
     it('should return registrations for a specific user when userId provided', async () => {
       const userId = 'user-id';
       const expectedRegistrations = [
-        { id: '1', userId, shiftId: 'shift1' },
-        { id: '2', userId, shiftId: 'shift2' },
+        { id: '1', userId, jobId: 'job1' },
+        { id: '2', userId, jobId: 'job2' },
       ];
       
       mockRegistrationsService.findByUser.mockResolvedValue(expectedRegistrations);
@@ -93,18 +93,18 @@ describe('RegistrationsController', () => {
       expect(result).toEqual(expectedRegistrations);
     });
 
-    it('should return registrations for a specific shift when shiftId provided', async () => {
-      const shiftId = 'shift-id';
+    it('should return registrations for a specific job when jobId provided', async () => {
+      const jobId = 'job-id';
       const expectedRegistrations = [
-        { id: '1', userId: 'user1', shiftId },
-        { id: '2', userId: 'user2', shiftId },
+        { id: '1', userId: 'user1', jobId },
+        { id: '2', userId: 'user2', jobId },
       ];
       
-      mockRegistrationsService.findByShift.mockResolvedValue(expectedRegistrations);
+      mockRegistrationsService.findByJob.mockResolvedValue(expectedRegistrations);
 
-      const result = await controller.findAll(undefined, shiftId);
+      const result = await controller.findAll(undefined, jobId);
       
-      expect(mockRegistrationsService.findByShift).toHaveBeenCalledWith(shiftId);
+      expect(mockRegistrationsService.findByJob).toHaveBeenCalledWith(jobId);
       expect(result).toEqual(expectedRegistrations);
     });
   });
@@ -115,7 +115,7 @@ describe('RegistrationsController', () => {
       const expectedRegistration = {
         id: registrationId,
         userId: 'user-id',
-        shiftId: 'shift-id',
+        jobId: 'job-id',
       };
       
       mockRegistrationsService.findOne.mockResolvedValue(expectedRegistration);
@@ -137,7 +137,7 @@ describe('RegistrationsController', () => {
       const expectedResult = {
         id: registrationId,
         userId: 'user-id',
-        shiftId: 'shift-id',
+        jobId: 'job-id',
         status: RegistrationStatus.CONFIRMED,
       };
       
@@ -156,7 +156,7 @@ describe('RegistrationsController', () => {
       const expectedResult = {
         id: registrationId,
         userId: 'user-id',
-        shiftId: 'shift-id',
+        jobId: 'job-id',
       };
       
       mockRegistrationsService.remove.mockResolvedValue(expectedResult);

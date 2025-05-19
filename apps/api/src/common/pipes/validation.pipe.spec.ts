@@ -54,7 +54,7 @@ describe('GlobalValidationPipe', () => {
   it('should validate and pass a valid DTO object', async () => {
     // Arrange
     const validInput = {
-      email: 'test@example.com',
+      email: 'test@example.playaplan.app',
       password: 'password123',
       name: 'Test User',
     };
@@ -64,7 +64,7 @@ describe('GlobalValidationPipe', () => {
 
     // Assert
     expect(result).toBeDefined();
-    expect(result.email).toEqual('test@example.com');
+    expect(result.email).toEqual('test@example.playaplan.app');
     expect(result.password).toEqual('password123');
     expect(result.name).toEqual('Test User');
   });
@@ -95,7 +95,7 @@ describe('GlobalValidationPipe', () => {
   it('should sanitize HTML in string fields', async () => {
     // Arrange
     const inputWithXss = {
-      email: 'test@example.com',
+      email: 'test@example.playaplan.app',
       password: 'password123',
       name: '<script>alert("XSS")</script>Test User',
     };
@@ -119,7 +119,7 @@ describe('GlobalValidationPipe', () => {
     const nestedInputWithXss = {
       parentField: 'Parent <script>alert("XSS")</script>',
       child: {
-        email: 'test@example.com',
+        email: 'test@example.playaplan.app',
         password: 'password123',
         name: '<b>Bold</b> text',
       },

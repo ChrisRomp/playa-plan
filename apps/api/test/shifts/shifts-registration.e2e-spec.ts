@@ -13,7 +13,7 @@ jest.mock('@sendgrid/mail', () => ({
   send: jest.fn().mockResolvedValue(true),
 }));
 
-describe('Shift Registrations (e2e)', () => {
+describe('Job Registrations (e2e)', () => {
   let app: INestApplication;
   let prisma: PrismaService;
   let jwtService: JwtService;
@@ -25,8 +25,8 @@ describe('Shift Registrations (e2e)', () => {
   let testUser: User;
   let testCamp: Camp;
   let testJobCategory: JobCategory;
-  let testJob: Job;
   let testShift: Shift;
+  let testJob: Job;
   let registrationId: string;
 
   beforeAll(async () => {
@@ -72,8 +72,8 @@ describe('Shift Registrations (e2e)', () => {
     try {
       // Delete in correct order to respect foreign key constraints
       await prisma.registration.deleteMany({});
-      await prisma.shift.deleteMany({});
       await prisma.job.deleteMany({});
+      await prisma.shift.deleteMany({});
       await prisma.jobCategory.deleteMany({});
       
       // Delete camping options that might reference camps
@@ -88,7 +88,7 @@ describe('Shift Registrations (e2e)', () => {
       await prisma.user.deleteMany({
         where: {
           email: {
-            in: ['registration-test-admin@example.com', 'registration-test-user@example.com', 'another-registration-test-user@example.com']
+            in: ['registration-test-admin@example.playaplan.app', 'registration-test-user@example.playaplan.app', 'another-registration-test-user@example.playaplan.app']
           }
         }
       });
@@ -101,7 +101,7 @@ describe('Shift Registrations (e2e)', () => {
     // Create test users
     testAdmin = await prisma.user.create({
       data: {
-        email: 'registration-test-admin@example.com',
+        email: 'registration-test-admin@example.playaplan.app',
         password: '$2b$10$EpRnTzVlqHNP0.fUbXUwSOyuiXe/QLSUG6xNekdHgTGmrpHEfIoxm', // 'admin123'
         firstName: 'Admin',
         lastName: 'User',
@@ -112,7 +112,7 @@ describe('Shift Registrations (e2e)', () => {
 
     testUser = await prisma.user.create({
       data: {
-        email: 'registration-test-user@example.com',
+        email: 'registration-test-user@example.playaplan.app',
         password: '$2b$10$EpRnTzVlqHNP0.fUbXUwSOyuiXe/QLSUG6xNekdHgTGmrpHEfIoxm', // 'user123'
         firstName: 'Regular',
         lastName: 'User',
@@ -142,6 +142,18 @@ describe('Shift Registrations (e2e)', () => {
       }
     });
 
+    // Create a test shift (now the job references the shift, not the other way around)
+    testShift = await prisma.shift.create({
+      data: {
+        name: "Test Registration Shift",
+        description: "Test Shift Description",
+        startTime: '09:00',
+        endTime: '17:00',
+        dayOfWeek: DayOfWeek.MONDAY,
+        campId: testCamp.id,
+      }
+    });
+    
     // Create a test job
     testJob = await prisma.job.create({
       data: {
@@ -149,82 +161,72 @@ describe('Shift Registrations (e2e)', () => {
         description: 'Test Job Description',
         location: 'Test Job Location',
         categoryId: testJobCategory.id,
-      }
-    });
-
-    // Create a test shift
-    testShift = await prisma.shift.create({
-      data: {
-        startTime: new Date('2023-06-01T09:00:00.000Z'),
-        endTime: new Date('2023-06-01T17:00:00.000Z'),
+        shiftId: testShift.id,
         maxRegistrations: 10,
-        dayOfWeek: DayOfWeek.MONDAY,
-        campId: testCamp.id,
-        jobId: testJob.id,
       }
     });
   }
 
-  describe('POST /shifts/:id/register', () => {
-    it('should register a user for a shift', async () => {
+  describe('POST /jobs/:id/register', () => {
+    it('should register a user for a job', async () => {
       const response = await supertest(app.getHttpServer())
-        .post(`/shifts/${testShift.id}/register`)
+        .post(`/jobs/${testJob.id}/register`)
         .set('Authorization', `Bearer ${userToken}`)
         .expect(201);
 
       expect(response.body).toHaveProperty('id');
-      expect(response.body.shiftId).toBe(testShift.id);
+      expect(response.body.jobId).toBe(testJob.id);
       expect(response.body.status).toBe('PENDING');
       
       // Store registration ID for later tests
       registrationId = response.body.id;
     });
 
-    it('should not allow registering for the same shift twice', async () => {
+    it('should not allow registering for the same job twice', async () => {
       await supertest(app.getHttpServer())
-        .post(`/shifts/${testShift.id}/register`)
+        .post(`/jobs/${testJob.id}/register`)
         .set('Authorization', `Bearer ${userToken}`)
         .expect(400);
     });
 
-    it('should not allow registering for a non-existent shift', async () => {
+    it('should not allow registering for a non-existent job', async () => {
       await supertest(app.getHttpServer())
-        .post(`/shifts/non-existent-id/register`)
+        .post(`/jobs/non-existent-id/register`)
         .set('Authorization', `Bearer ${userToken}`)
         .expect(404);
     });
   });
 
-  describe('GET /shifts/registrations/me', () => {
-    it('should get all shift registrations for the current user', async () => {
+  describe('GET /jobs/registrations/me', () => {
+    it('should get all job registrations for the current user', async () => {
       const response = await supertest(app.getHttpServer())
-        .get('/shifts/registrations/me')
+        .get('/jobs/registrations/me')
         .set('Authorization', `Bearer ${userToken}`)
         .expect(200);
 
       expect(Array.isArray(response.body)).toBe(true);
       expect(response.body.length).toBeGreaterThan(0);
       expect(response.body[0].id).toBe(registrationId);
-      expect(response.body[0].shiftId).toBe(testShift.id);
+      expect(response.body[0].jobId).toBe(testJob.id);
     });
   });
 
-  describe('GET /shifts/registrations/:id', () => {
+  describe('GET /jobs/registrations/:id', () => {
     it('should get a specific registration by ID', async () => {
       const response = await supertest(app.getHttpServer())
-        .get(`/shifts/registrations/${registrationId}`)
+        .get(`/jobs/registrations/${registrationId}`)
         .set('Authorization', `Bearer ${userToken}`)
         .expect(200);
 
       expect(response.body.id).toBe(registrationId);
-      expect(response.body.shiftId).toBe(testShift.id);
+      expect(response.body.jobId).toBe(testJob.id);
     });
 
     it('should not allow accessing another user\'s registration details', async () => {
       // Create another user
       const anotherUser = await prisma.user.create({
         data: {
-          email: 'another-registration-test-user@example.com',
+          email: 'another-registration-test-user@example.playaplan.app',
           password: '$2b$10$EpRnTzVlqHNP0.fUbXUwSOyuiXe/QLSUG6xNekdHgTGmrpHEfIoxm', // 'user123'
           firstName: 'Another',
           lastName: 'User',
@@ -241,29 +243,29 @@ describe('Shift Registrations (e2e)', () => {
       });
 
       await supertest(app.getHttpServer())
-        .get(`/shifts/registrations/${registrationId}`)
+        .get(`/jobs/registrations/${registrationId}`)
         .set('Authorization', `Bearer ${anotherUserToken}`)
         .expect(403);
     });
 
     it('should return 404 for non-existent registration', async () => {
       await supertest(app.getHttpServer())
-        .get('/shifts/registrations/non-existent-id')
+        .get('/jobs/registrations/non-existent-id')
         .set('Authorization', `Bearer ${userToken}`)
         .expect(404);
     });
   });
 
-  describe('DELETE /shifts/registrations/:id', () => {
-    it('should cancel a shift registration', async () => {
+  describe('DELETE /jobs/registrations/:id', () => {
+    it('should cancel a job registration', async () => {
       await supertest(app.getHttpServer())
-        .delete(`/shifts/registrations/${registrationId}`)
+        .delete(`/jobs/registrations/${registrationId}`)
         .set('Authorization', `Bearer ${userToken}`)
         .expect(200);
 
       // Verify it's been cancelled
       const response = await supertest(app.getHttpServer())
-        .get(`/shifts/registrations/${registrationId}`)
+        .get(`/jobs/registrations/${registrationId}`)
         .set('Authorization', `Bearer ${userToken}`);
 
       expect(response.body.status).toBe('CANCELLED');
@@ -271,27 +273,28 @@ describe('Shift Registrations (e2e)', () => {
 
     it('should not allow cancelling a non-existent registration', async () => {
       await supertest(app.getHttpServer())
-        .delete('/shifts/registrations/non-existent-id')
+        .delete('/jobs/registrations/non-existent-id')
         .set('Authorization', `Bearer ${userToken}`)
         .expect(404);
     });
   });
 
-  describe('GET /shifts/:id/registrations (admin only)', () => {
-    it('should get all registrations for a specific shift (admin)', async () => {
+  describe('GET /jobs/:id/registrations (admin only)', () => {
+    it('should get all registrations for a specific job (admin)', async () => {
       const response = await supertest(app.getHttpServer())
-        .get(`/shifts/${testShift.id}/registrations`)
+        .get(`/jobs/${testJob.id}/registrations`)
         .set('Authorization', `Bearer ${adminToken}`)
         .expect(200);
 
       expect(Array.isArray(response.body)).toBe(true);
+      // Even if cancelled, the registration should still show up
       expect(response.body.length).toBeGreaterThan(0);
-      expect(response.body[0].shiftId).toBe(testShift.id);
+      expect(response.body[0].jobId).toBe(testJob.id);
     });
 
-    it('should not allow non-admin users to view all registrations for a shift', async () => {
+    it('should not allow non-admin users to view all registrations for a job', async () => {
       await supertest(app.getHttpServer())
-        .get(`/shifts/${testShift.id}/registrations`)
+        .get(`/jobs/${testJob.id}/registrations`)
         .set('Authorization', `Bearer ${userToken}`)
         .expect(403);
     });

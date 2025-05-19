@@ -53,7 +53,7 @@ export class CreatePaypalPaymentDto {
 
   @ApiProperty({
     description: 'Success URL to redirect to after successful payment',
-    example: 'https://example.com/success',
+    example: 'https://mycamp.playaplan.app/success',
   })
   @IsNotEmpty()
   @IsString()
@@ -61,7 +61,7 @@ export class CreatePaypalPaymentDto {
 
   @ApiProperty({
     description: 'Cancel URL to redirect to if payment is cancelled',
-    example: 'https://example.com/cancel',
+    example: 'https://mycamp.playaplan.app/cancel',
   })
   @IsNotEmpty()
   @IsString()

@@ -18,7 +18,7 @@ describe('UserService', () => {
 
   const mockUser = {
     id: 'test-uuid',
-    email: 'test@example.com',
+    email: 'test@example.playaplan.app',
     password: 'hashed_password',
     firstName: 'Test',
     lastName: 'User',
@@ -117,12 +117,12 @@ describe('UserService', () => {
       prismaServiceMock.user.findUnique.mockResolvedValue(mockUser);
 
       // Act
-      const result = await service.findByEmail('test@example.com');
+      const result = await service.findByEmail('test@example.playaplan.app');
 
       // Assert
       expect(result).toEqual(mockUser);
       expect(prismaServiceMock.user.findUnique).toHaveBeenCalledWith({
-        where: { email: 'test@example.com' },
+        where: { email: 'test@example.playaplan.app' },
       });
     });
 
@@ -131,12 +131,12 @@ describe('UserService', () => {
       prismaServiceMock.user.findUnique.mockResolvedValue(null);
 
       // Act
-      const result = await service.findByEmail('nonexistent@example.com');
+      const result = await service.findByEmail('nonexistent@example.playaplan.app');
 
       // Assert
       expect(result).toBeNull();
       expect(prismaServiceMock.user.findUnique).toHaveBeenCalledWith({
-        where: { email: 'nonexistent@example.com' },
+        where: { email: 'nonexistent@example.playaplan.app' },
       });
     });
   });
@@ -145,7 +145,7 @@ describe('UserService', () => {
     it('should create and return a new user', async () => {
       // Arrange
       const createUserDto: CreateUserDto = {
-        email: 'new@example.com',
+        email: 'new@example.playaplan.app',
         password: 'password123',
         firstName: 'New',
         lastName: 'User',
@@ -184,7 +184,7 @@ describe('UserService', () => {
     it('should throw ConflictException if email already exists', async () => {
       // Arrange
       const createUserDto: CreateUserDto = {
-        email: 'existing@example.com',
+        email: 'existing@example.playaplan.app',
         password: 'password123',
         firstName: 'Existing',
         lastName: 'User',

@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { z } from 'zod';
-import { JobCategory, api, jobCategories } from '../lib/api';
+import { JobCategory, Job, api, jobCategories, jobs, shifts, Shift } from '../lib/api';
 
 // Define types for registration data
 export interface RegistrationFormData {
   campingOptions: string[];
   customFields: Record<string, unknown>;
-  shifts: string[];
+  jobs: string[];  // Changed from shifts to jobs
   acceptedTerms: boolean;
 }
 
@@ -25,26 +25,13 @@ export const CampingOptionSchema = z.object({
 
 export type CampingOption = z.infer<typeof CampingOptionSchema>;
 
-// Schema for shifts
-export const ShiftSchema = z.object({
-  id: z.string(),
-  jobId: z.string(),
-  jobCategoryId: z.string(),
-  jobName: z.string().optional(),
-  categoryName: z.string().optional(),
-  day: z.string(),
-  startTime: z.string(),
-  endTime: z.string(),
-  maxParticipants: z.number(),
-  currentParticipants: z.number().optional(),
-});
-
-export type Shift = z.infer<typeof ShiftSchema>;
+// Using JobSchema and ShiftSchema from api.ts instead of redefining them here
 
 export function useRegistration() {
   const [campingOptions, setCampingOptions] = useState<CampingOption[]>([]);
   const [categories, setCategories] = useState<JobCategory[]>([]);
-  const [shifts, setShifts] = useState<Shift[]>([]);
+  const [jobsList, setJobsList] = useState<Job[]>([]);
+  const [shiftsList, setShiftsList] = useState<Shift[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -81,8 +68,23 @@ export function useRegistration() {
     }
   };
 
-  // Fetch available shifts
-  const fetchShifts = async (campingOptionIds: string[] = []) => {
+  // Fetch shifts
+  const fetchShifts = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await shifts.getAll();
+      setShiftsList(result);
+    } catch (err) {
+      setError('Failed to fetch shifts');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch jobs 
+  const fetchJobs = async (campingOptionIds: string[] = []) => {
     setLoading(true);
     setError(null);
     try {
@@ -91,18 +93,13 @@ export function useRegistration() {
         .filter(cat => cat.alwaysRequired)
         .map(cat => cat.id);
       
-      // Build query to fetch shifts for selected camping options
+      // Build query to fetch jobs for selected camping options
       // and always required categories
       const params = new URLSearchParams();
       
-      // Add camping option IDs if provided
-      campingOptionIds.forEach(id => {
-        params.append('campingOptionIds', id);
-      });
-      
       // Add always required categories
       alwaysRequiredCategories.forEach(id => {
-        params.append('jobCategoryIds', id);
+        params.append('categoryIds', id);
       });
       
       // Find categories associated with the selected camping options
@@ -114,19 +111,24 @@ export function useRegistration() {
       selectedCampingOptions.forEach(option => {
         if (option.jobCategories) {
           option.jobCategories.forEach(catId => {
-            params.append('jobCategoryIds', catId);
+            params.append('categoryIds', catId);
           });
         }
       });
       
-      const queryString = params.toString();
-      const response = await api.get(`/shifts?${queryString}`);
-      const data = Array.isArray(response.data) 
-        ? response.data.map((shift: unknown) => ShiftSchema.parse(shift))
-        : [];
-      setShifts(data);
+      // Fetch all jobs and filter client-side based on required parameters
+      // This is a temporary solution until we implement proper filtering on the API
+      const allJobs = await jobs.getAll();
+      
+      // Filter jobs based on the categories we're interested in
+      const categoryIds = Array.from(params.getAll('categoryIds'));
+      const filteredJobs = categoryIds.length > 0 
+        ? allJobs.filter(job => categoryIds.includes(job.categoryId))
+        : allJobs;
+        
+      setJobsList(filteredJobs);
     } catch (err) {
-      setError('Failed to fetch shifts');
+      setError('Failed to fetch jobs');
       console.error(err);
     } finally {
       setLoading(false);
@@ -152,12 +154,14 @@ export function useRegistration() {
   return {
     campingOptions,
     jobCategories: categories,
-    shifts,
+    jobs: jobsList,
+    shifts: shiftsList,
     loading,
     error,
     fetchCampingOptions,
     fetchJobCategories,
     fetchShifts,
+    fetchJobs,
     submitRegistration,
   };
 }

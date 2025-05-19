@@ -1,26 +1,28 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useRegistration, RegistrationFormData, Shift } from '../../hooks/useRegistration';
-import { JobCategory } from '../../lib/api';
+import { useRegistration, RegistrationFormData } from '../../hooks/useRegistration';
+import { JobCategory, Job } from '../../lib/api';
 
 export default function RegistrationPage() {
   const navigate = useNavigate();
   const {
     campingOptions,
     jobCategories,
+    jobs,
     shifts,
     loading,
     error,
     fetchCampingOptions,
     fetchJobCategories,
     fetchShifts,
+    fetchJobs,
     submitRegistration,
   } = useRegistration();
 
   const [formData, setFormData] = useState<RegistrationFormData>({
     campingOptions: [],
     customFields: {},
-    shifts: [],
+    jobs: [],
     acceptedTerms: false,
   });
   const [currentStep, setCurrentStep] = useState(1);
@@ -30,14 +32,15 @@ export default function RegistrationPage() {
   useEffect(() => {
     fetchCampingOptions();
     fetchJobCategories();
-  }, [fetchCampingOptions, fetchJobCategories]);
+    fetchShifts();
+  }, [fetchCampingOptions, fetchJobCategories, fetchShifts]);
 
-  // When camping options change, fetch shifts
+  // When camping options change, fetch jobs
   useEffect(() => {
     if (formData.campingOptions.length > 0 || hasAlwaysRequiredCategories(jobCategories)) {
-      fetchShifts(formData.campingOptions);
+      fetchJobs(formData.campingOptions);
     }
-  }, [formData.campingOptions, jobCategories, fetchShifts]);
+  }, [formData.campingOptions, jobCategories, fetchJobs]);
 
   // Check if there are any always required job categories
   const hasAlwaysRequiredCategories = (categories: JobCategory[]): boolean => {
@@ -49,34 +52,47 @@ export default function RegistrationPage() {
     return jobCategories.filter(category => category.alwaysRequired);
   };
 
-  // Get shifts for always required categories
-  const getAlwaysRequiredShifts = (): Shift[] => {
-    const alwaysRequiredCategoryIds = getAlwaysRequiredCategories().map(cat => cat.id);
-    return shifts.filter(shift => alwaysRequiredCategoryIds.includes(shift.jobCategoryId));
+  // Get jobs for always required categories
+  const getAlwaysRequiredJobs = (): Job[] => {
+    // Get job categories that are always required
+    const alwaysRequiredCategoryIds = jobCategories
+      .filter(cat => cat.alwaysRequired)
+      .map(cat => cat.id);
+
+    // Return jobs from always required categories
+    return jobs.filter(job => 
+      alwaysRequiredCategoryIds.includes(job.categoryId)
+    );
   };
 
-  // Get shifts for selected camping options (excluding always required)
-  const getCampingOptionShifts = (): Shift[] => {
-    const alwaysRequiredCategoryIds = getAlwaysRequiredCategories().map(cat => cat.id);
-    return shifts.filter(shift => !alwaysRequiredCategoryIds.includes(shift.jobCategoryId));
+  // Get jobs for selected camping options (excluding always required)
+  const getCampingOptionJobs = (): Job[] => {
+    // Get jobs from non-always-required categories
+    const alwaysRequiredCategoryIds = jobCategories
+      .filter(cat => cat.alwaysRequired)
+      .map(cat => cat.id);
+
+    return jobs.filter(job => 
+      !alwaysRequiredCategoryIds.includes(job.categoryId)
+    );
   };
 
-  // Calculate total shifts required based on camping options and always required categories
-  const calculateRequiredShiftCount = (): number => {
-    // Get shift requirements from camping options
+  // Calculate total jobs required based on camping options and always required categories
+  const calculateRequiredJobCount = (): number => {
+    // Get job requirements from camping options
     const selectedOptions = campingOptions.filter(option => 
       formData.campingOptions.includes(option.id)
     );
     
-    const campingShiftsRequired = selectedOptions.reduce(
+    const campingJobsRequired = selectedOptions.reduce(
       (total, option) => total + option.shiftsRequired, 
       0
     );
     
-    // Every always required category adds at least one required shift
+    // Every always required category adds at least one required job
     const alwaysRequiredCount = getAlwaysRequiredCategories().length;
     
-    return campingShiftsRequired + alwaysRequiredCount;
+    return campingJobsRequired + alwaysRequiredCount;
   };
 
   // Validate the current step
@@ -89,27 +105,27 @@ export default function RegistrationPage() {
         errors.campingOptions = 'Please select at least one camping option';
       }
     } else if (currentStep === 2) {
-      // Validate shifts selection
-      const requiredCount = calculateRequiredShiftCount();
-      if (formData.shifts.length < requiredCount) {
-        errors.shifts = `You need to select at least ${requiredCount} shifts`;
+      // Validate jobs selection
+      const requiredCount = calculateRequiredJobCount();
+      if (formData.jobs.length < requiredCount) {
+        errors.jobs = `You need to select at least ${requiredCount} jobs`;
       }
       
-      // Ensure all always required categories have at least one shift
+      // Ensure all always required categories have at least one job
       const alwaysRequiredCategories = getAlwaysRequiredCategories();
       
       alwaysRequiredCategories.forEach(category => {
-        const categoryShifts = shifts.filter(
-          shift => shift.jobCategoryId === category.id
+        const categoryJobs = getAlwaysRequiredJobs().filter(
+          job => job.categoryId === category.id
         );
         
-        const selectedCategoryShifts = categoryShifts.filter(
-          shift => formData.shifts.includes(shift.id)
+        const selectedCategoryJobs = categoryJobs.filter(
+          job => formData.jobs.includes(job.id)
         );
         
-        if (selectedCategoryShifts.length === 0) {
+        if (selectedCategoryJobs.length === 0) {
           errors[`category_${category.id}`] = 
-            `You must select at least one ${category.name} shift`;
+            `You must select at least one ${category.name} job`;
         }
       });
     } else if (currentStep === 3) {
@@ -157,16 +173,16 @@ export default function RegistrationPage() {
     });
   };
 
-  // Handle shift selection
-  const handleShiftChange = (shiftId: string) => {
+  // Handle job selection
+  const handleJobChange = (jobId: string) => {
     setFormData(prev => {
-      const updatedShifts = prev.shifts.includes(shiftId)
-        ? prev.shifts.filter(id => id !== shiftId)
-        : [...prev.shifts, shiftId];
+      const updatedJobs = prev.jobs.includes(jobId)
+        ? prev.jobs.filter(id => id !== jobId)
+        : [...prev.jobs, jobId];
       
       return {
         ...prev,
-        shifts: updatedShifts
+        jobs: updatedJobs
       };
     });
   };
@@ -202,7 +218,7 @@ export default function RegistrationPage() {
                 <div className="ml-2">
                   <div className="font-medium">{option.name}</div>
                   <div className="text-sm text-gray-600">
-                    Dues: ${option.participantDues} | Required Shifts: {option.shiftsRequired}
+                    Dues: ${option.participantDues} | Required Jobs: {option.shiftsRequired}
                   </div>
                   {option.maxSignups > 0 && (
                     <div className="text-sm text-gray-600">
@@ -221,7 +237,7 @@ export default function RegistrationPage() {
                 <div key={option.id} className="border p-4 rounded bg-gray-100 opacity-70">
                   <div className="font-medium">{option.name} (Full)</div>
                   <div className="text-sm text-gray-600">
-                    Dues: ${option.participantDues} | Required Shifts: {option.shiftsRequired}
+                    Dues: ${option.participantDues} | Required Jobs: {option.shiftsRequired}
                   </div>
                 </div>
               ))}
@@ -236,32 +252,32 @@ export default function RegistrationPage() {
     );
   };
 
-  // Render shifts step
-  const renderShiftsStep = () => {
-    const requiredCount = calculateRequiredShiftCount();
-    const alwaysRequiredShifts = getAlwaysRequiredShifts();
-    const campingOptionShifts = getCampingOptionShifts();
+  // Render jobs step
+  const renderJobsStep = () => {
+    const requiredCount = calculateRequiredJobCount();
+    const alwaysRequiredJobs = getAlwaysRequiredJobs();
+    const campingOptionJobs = getCampingOptionJobs();
     const alwaysRequiredCategories = getAlwaysRequiredCategories();
     
     return (
       <div>
-        <h2 className="text-xl font-semibold mb-4">Select Work Shifts</h2>
+        <h2 className="text-xl font-semibold mb-4">Select Work Jobs</h2>
         <p className="mb-4">
-          You need to select at least {requiredCount} shifts to complete registration.
+          You need to select at least {requiredCount} jobs to complete registration.
         </p>
         
         {/* Always Required Job Categories Section */}
         {alwaysRequiredCategories.length > 0 && (
           <div className="mb-6">
-            <h3 className="text-lg font-medium mb-2">Required Shifts</h3>
+            <h3 className="text-lg font-medium mb-2">Required Jobs</h3>
             <p className="text-sm text-gray-700 mb-4">
-              These shifts are required for all participants regardless of camping options.
-              You must select at least one shift from each required category.
+              These jobs are required for all participants regardless of camping options.
+              You must select at least one job from each required category.
             </p>
             
             {alwaysRequiredCategories.map(category => {
-              const categoryShifts = alwaysRequiredShifts.filter(
-                shift => shift.jobCategoryId === category.id
+              const categoryJobs = alwaysRequiredJobs.filter(
+                job => job.categoryId === category.id
               );
               
               const errorKey = `category_${category.id}`;
@@ -276,30 +292,30 @@ export default function RegistrationPage() {
                   )}
                   
                   <div className="space-y-2">
-                    {categoryShifts.map(shift => (
-                      <div key={shift.id} className="border p-3 rounded">
+                    {categoryJobs.map(job => (
+                      <div key={job.id} className="border p-3 rounded">
                         <label className="flex items-start">
                           <input
                             type="checkbox"
                             className="mt-1 h-4 w-4"
-                            checked={formData.shifts.includes(shift.id)}
-                            onChange={() => handleShiftChange(shift.id)}
+                            checked={formData.jobs.includes(job.id)}
+                            onChange={() => handleJobChange(job.id)}
                           />
                           <div className="ml-2">
-                            <div>{shift.jobName || 'Unknown Job'}</div>
+                            <div>{job.name}</div>
                             <div className="text-sm text-gray-600">
-                              {shift.day} | {shift.startTime} - {shift.endTime}
+                              {getShiftInfoForJob(job)}
                             </div>
                             <div className="text-sm text-gray-600">
-                              Spots: {shift.maxParticipants - (shift.currentParticipants || 0)} of {shift.maxParticipants} available
+                              Spots: {job.maxRegistrations - (job.currentRegistrations || 0)} of {job.maxRegistrations} available
                             </div>
                           </div>
                         </label>
                       </div>
                     ))}
                     
-                    {categoryShifts.length === 0 && (
-                      <div className="text-amber-600">No shifts available for this category</div>
+                    {categoryJobs.length === 0 && (
+                      <div className="text-amber-600">No jobs available for this category</div>
                     )}
                   </div>
                 </div>
@@ -308,34 +324,34 @@ export default function RegistrationPage() {
           </div>
         )}
         
-        {/* Camping Option Shifts Section */}
-        {campingOptionShifts.length > 0 && (
+        {/* Camping Option Jobs Section */}
+        {campingOptionJobs.length > 0 && (
           <div>
-            <h3 className="text-lg font-medium mb-2">Camping Option Shifts</h3>
+            <h3 className="text-lg font-medium mb-2">Camping Option Jobs</h3>
             <p className="text-sm text-gray-700 mb-4">
-              These shifts are available based on your selected camping options.
+              These jobs are available based on your selected camping options.
             </p>
             
             <div className="space-y-2">
-              {campingOptionShifts.map(shift => (
-                <div key={shift.id} className="border p-3 rounded">
+              {campingOptionJobs.map(job => (
+                <div key={job.id} className="border p-3 rounded">
                   <label className="flex items-start">
                     <input
                       type="checkbox"
                       className="mt-1 h-4 w-4"
-                      checked={formData.shifts.includes(shift.id)}
-                      onChange={() => handleShiftChange(shift.id)}
+                      checked={formData.jobs.includes(job.id)}
+                      onChange={() => handleJobChange(job.id)}
                     />
                     <div className="ml-2">
-                      <div>{shift.jobName || 'Unknown Job'}</div>
+                      <div>{job.name}</div>
                       <div className="text-sm text-gray-600">
-                        Category: {shift.categoryName}
+                        Category: {job.category ? job.category.name : 'Unknown'}
                       </div>
                       <div className="text-sm text-gray-600">
-                        {shift.day} | {shift.startTime} - {shift.endTime}
+                        {getShiftInfoForJob(job)}
                       </div>
                       <div className="text-sm text-gray-600">
-                        Spots: {shift.maxParticipants - (shift.currentParticipants || 0)} of {shift.maxParticipants} available
+                        Spots: {job.maxRegistrations} available
                       </div>
                     </div>
                   </label>
@@ -345,8 +361,8 @@ export default function RegistrationPage() {
           </div>
         )}
         
-        {formErrors.shifts && (
-          <div className="text-red-600 mt-2">{formErrors.shifts}</div>
+        {formErrors.jobs && (
+          <div className="text-red-600 mt-2">{formErrors.jobs}</div>
         )}
       </div>
     );
@@ -371,13 +387,13 @@ export default function RegistrationPage() {
         </div>
         
         <div className="mb-6">
-          <h3 className="text-lg font-medium mb-2">Selected Shifts</h3>
+          <h3 className="text-lg font-medium mb-2">Selected Jobs</h3>
           <ul className="list-disc pl-5">
-            {formData.shifts.map(shiftId => {
-              const shift = shifts.find(s => s.id === shiftId);
-              return shift ? (
-                <li key={shiftId}>
-                  {shift.jobName} | {shift.day} | {shift.startTime} - {shift.endTime}
+            {formData.jobs.map(jobId => {
+              const job = jobs.find(j => j.id === jobId);
+              return job ? (
+                <li key={jobId}>
+                  {job.name} | {getShiftInfoForJob(job)}
                 </li>
               ) : null;
             })}
@@ -421,7 +437,7 @@ export default function RegistrationPage() {
       case 1:
         return renderCampingOptionsStep();
       case 2:
-        return renderShiftsStep();
+        return renderJobsStep();
       case 3:
         return renderTermsStep();
       default:
@@ -429,7 +445,21 @@ export default function RegistrationPage() {
     }
   };
 
-  if (loading && !shifts.length && !campingOptions.length) {
+  // Helper function to get shift info for a job
+  const getShiftInfoForJob = (job: Job): string => {
+    const shift = shifts.find(s => s.id === job.shiftId);
+    if (!shift) return 'Unknown shift';
+    
+    return `${shift.dayOfWeek} | ${formatTime(shift.startTime)} - ${formatTime(shift.endTime)}`;
+  };
+
+  // Format time string for display - extracts only the time part, ignoring the placeholder date
+  const formatTime = (timeString: string): string => {
+    const date = new Date(timeString);
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
+  if (loading && !jobs.length && !campingOptions.length) {
     return <div className="p-6">Loading registration data...</div>;
   }
 
@@ -448,7 +478,7 @@ export default function RegistrationPage() {
             <div className={`h-2 ${step <= currentStep ? 'bg-blue-500' : 'bg-gray-200'}`} />
             <div className="mt-2 text-center text-sm">
               {step === 1 && 'Camping Options'}
-              {step === 2 && 'Work Shifts'}
+              {step === 2 && 'Work Jobs'}
               {step === 3 && 'Review & Submit'}
             </div>
           </div>

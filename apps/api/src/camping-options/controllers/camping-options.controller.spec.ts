@@ -42,7 +42,6 @@ describe('CampingOptionsController', () => {
     participantDues: 100.00,
     staffDues: 50.00,
     maxSignups: 10,
-    campId: 'camp-id',
     jobCategoryIds: ['category-1', 'category-2'],
   };
 
@@ -127,7 +126,7 @@ describe('CampingOptionsController', () => {
     it('should return all camping options', async () => {
       const result = await controller.findAll();
       
-      expect(service.findAll).toHaveBeenCalledWith(false, undefined);
+      expect(service.findAll).toHaveBeenCalledWith(false);
       expect(result).toHaveLength(1);
       expect(result[0]).toEqual(expect.objectContaining(mockResponseDto));
     });
@@ -135,14 +134,10 @@ describe('CampingOptionsController', () => {
     it('should respect includeDisabled parameter', async () => {
       await controller.findAll(true);
       
-      expect(service.findAll).toHaveBeenCalledWith(true, undefined);
+      expect(service.findAll).toHaveBeenCalledWith(true);
     });
 
-    it('should respect campId parameter', async () => {
-      await controller.findAll(false, 'camp-id');
-      
-      expect(service.findAll).toHaveBeenCalledWith(false, 'camp-id');
-    });
+    // Removed test for campId parameter as the entity has been removed
   });
 
   describe('findOne', () => {

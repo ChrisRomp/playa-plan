@@ -20,7 +20,7 @@ export class AttachmentDto {
 }
 
 export class SendEmailDto {
-  @ApiProperty({ description: 'Recipient email address', example: 'user@example.com' })
+  @ApiProperty({ description: 'Recipient email address', example: 'user@example.playaplan.app' })
   @IsEmail({}, { message: 'Please provide a valid email address' })
   to = '';
 
@@ -48,7 +48,7 @@ export class SendEmailDto {
 }
 
 export class SendEmailToMultipleRecipientsDto {
-  @ApiProperty({ description: 'Recipient email addresses', example: ['user1@example.com', 'user2@example.com'] })
+  @ApiProperty({ description: 'Recipient email addresses', example: ['user1@example.playaplan.app', 'user2@example.playaplan.app'] })
   @IsArray()
   @ArrayMinSize(1)
   @IsEmail({}, { each: true, message: 'Each recipient must be a valid email address' })

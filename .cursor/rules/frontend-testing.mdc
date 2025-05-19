@@ -1,0 +1,6 @@
+---
+description: 
+globs: apps/web/**/*.test.ts
+alwaysApply: false
+---
+The frontend project is using vitest, not jest.

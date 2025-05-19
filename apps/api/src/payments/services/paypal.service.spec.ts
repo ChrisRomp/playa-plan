@@ -24,7 +24,7 @@ describe('PaypalService', () => {
         'payment.paypal.clientId': 'test-client-id',
         'payment.paypal.clientSecret': 'test-client-secret',
         'payment.paypal.mode': 'sandbox',
-        'frontend.url': 'https://example.com',
+        'frontend.url': 'https://mycamp.playaplan.app',
       };
       return config[key as keyof typeof config];
     }),
@@ -149,8 +149,8 @@ describe('PaypalService', () => {
         amount: 100,
         currency: 'USD',
         itemDescription: 'Test payment',
-        successUrl: 'https://example.com/success',
-        cancelUrl: 'https://example.com/cancel',
+        successUrl: 'https://mycamp.playaplan.app/success',
+        cancelUrl: 'https://mycamp.playaplan.app/cancel',
         registrationId: '',
       };
       
@@ -209,8 +209,8 @@ describe('PaypalService', () => {
         amount: 100,
         currency: 'USD',
         itemDescription: 'Test payment',
-        successUrl: 'https://example.com/success',
-        cancelUrl: 'https://example.com/cancel',
+        successUrl: 'https://mycamp.playaplan.app/success',
+        cancelUrl: 'https://mycamp.playaplan.app/cancel',
         registrationId: '',
       };
       
@@ -250,8 +250,8 @@ describe('PaypalService', () => {
         amount: 100,
         currency: 'USD',
         itemDescription: 'Test payment',
-        successUrl: 'https://example.com/success',
-        cancelUrl: 'https://example.com/cancel',
+        successUrl: 'https://mycamp.playaplan.app/success',
+        cancelUrl: 'https://mycamp.playaplan.app/cancel',
         registrationId: '',
       };
       

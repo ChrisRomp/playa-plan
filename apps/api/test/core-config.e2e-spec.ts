@@ -34,11 +34,11 @@ describe('CoreConfigController (e2e)', () => {
 
     // Create test admin user
     const adminUser = await prismaService.user.upsert({
-      where: { email: 'admin-test@example.com' },
+      where: { email: 'admin-test@example.playaplan.app' },
       update: { role: UserRole.ADMIN },
       create: {
         id: uuidv4(),
-        email: 'admin-test@example.com',
+        email: 'admin-test@example.playaplan.app',
         firstName: 'Admin',
         lastName: 'User',
         role: UserRole.ADMIN,
@@ -48,11 +48,11 @@ describe('CoreConfigController (e2e)', () => {
 
     // Create test regular user
     const regularUser = await prismaService.user.upsert({
-      where: { email: 'user-test@example.com' },
+      where: { email: 'user-test@example.playaplan.app' },
       update: { role: UserRole.PARTICIPANT },
       create: {
         id: uuidv4(),
-        email: 'user-test@example.com',
+        email: 'user-test@example.playaplan.app',
         firstName: 'Regular',
         lastName: 'User',
         role: UserRole.PARTICIPANT,
@@ -99,9 +99,9 @@ describe('CoreConfigController (e2e)', () => {
         campName: 'Test Camp',
         registrationYear: 2023,
         timeZone: 'America/Los_Angeles',
-        campBannerUrl: 'https://example.com/banner.jpg',
+        campBannerUrl: 'https://mycamp.playaplan.app/banner.jpg',
         campBannerAltText: 'Beautiful test camp banner',
-        campIconUrl: 'https://example.com/icon.png',
+        campIconUrl: 'https://mycamp.playaplan.app/icon.png',
         campIconAltText: 'Test camp logo',
       };
 

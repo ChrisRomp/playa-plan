@@ -14,10 +14,10 @@ class TestClass {
 describe('IsUrlOrRelativePath', () => {
   it('should pass validation for absolute URLs', async () => {
     const testCases = [
-      'https://example.com',
+      'https://mycamp.playaplan.app',
       'http://localhost:3000',
-      'https://example.com/path/to/resource',
-      'http://example.com/path?query=string#fragment'
+      'https://mycamp.playaplan.app/path/to/resource',
+      'http://mycamp.playaplan.app/path?query=string#fragment'
     ];
 
     for (const testUrl of testCases) {
