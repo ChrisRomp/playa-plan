@@ -1,8 +1,15 @@
 import { useState } from 'react';
 import { useShifts } from '../hooks/useShifts';
+import { useCamps, Camp } from '../hooks/useCamps';
 import { useJobs } from '../hooks/useJobs';
 import { Shift } from '../lib/api';
 import { isAxiosError } from 'axios';
+
+interface Job {
+  id: string;
+  name: string;
+  shiftId: string;
+}
 
 interface ShiftFormState {
   name: string;
@@ -37,6 +44,11 @@ export default function AdminShiftsPage() {
   } = useShifts();
 
   const {
+    camps,
+    loading: campsLoading,
+  } = useCamps();
+
+  const {
     jobs,
     loading: jobsLoading,
   } = useJobs();
@@ -66,7 +78,7 @@ export default function AdminShiftsPage() {
       startTime: '09:00',
       endTime: '17:00',
       dayOfWeek: 'MONDAY',
-      campId: 'default-camp-id',
+      campId: '',
     });
     setFormError(null);
     setDeleteError(null);
@@ -82,7 +94,7 @@ export default function AdminShiftsPage() {
       startTime: shift.startTime,
       endTime: shift.endTime,
       dayOfWeek: shift.dayOfWeek,
-      campId: shift.campId || 'default-camp-id',
+      campId: shift.campId || '',
     });
     setFormError(null);
     setDeleteError(null);
@@ -117,8 +129,8 @@ export default function AdminShiftsPage() {
     e.preventDefault();
     
     // Validate required fields: name, startTime, endTime, dayOfWeek (description is optional)
-    if (!form.name || !form.startTime || !form.endTime || !form.dayOfWeek) {
-      setFormError('Name, day, start time, and end time are required.');
+    if (!form.name || !form.startTime || !form.endTime || !form.dayOfWeek || !form.campId) {
+      setFormError('Name, day, start time, end time, and camp are required.');
       return;
     }
     
@@ -135,7 +147,6 @@ export default function AdminShiftsPage() {
       // Send data directly to API - no need to convert times
       const shiftData = {
         ...form,
-        campId: form.campId || 'default-camp-id',
       };
       
       if (editId) {
@@ -192,7 +203,6 @@ export default function AdminShiftsPage() {
     return timeString || '';
   };
 
-
   const getDayOfWeekLabel = (value: string): string => {
     const option = dayOfWeekOptions.find(opt => opt.value === value);
     return option ? option.label : value;
@@ -216,11 +226,13 @@ export default function AdminShiftsPage() {
   };
 
   const getJobsForShift = (shiftId: string): string => {
+    if (jobsLoading || !jobs) return 'Loading...';
+    
     const shiftJobs = jobs.filter(job => job.shiftId === shiftId);
-    return shiftJobs.map(job => job.name).join(', ') || 'None';
+    return shiftJobs.map((job: Job) => job.name).join(', ') || 'None';
   };
 
-  const loading = shiftsLoading || jobsLoading;
+  const loading = shiftsLoading || jobsLoading || campsLoading;
 
   return (
     <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">
@@ -324,7 +336,7 @@ export default function AdminShiftsPage() {
                 />
               </div>
               <div className="mb-4">
-                <label htmlFor="description" className="block font-medium mb-1">Description <span className="text-red-500">*</span></label>
+                <label htmlFor="description" className="block font-medium mb-1">Description</label>
                 <textarea
                   id="description"
                   name="description"
@@ -333,8 +345,25 @@ export default function AdminShiftsPage() {
                   onChange={handleFormChange}
                   maxLength={500}
                   rows={2}
-                  required
                 />
+              </div>
+              <div className="mb-4">
+                <label htmlFor="campId" className="block font-medium mb-1">Camp <span className="text-red-500">*</span></label>
+                <select
+                  id="campId"
+                  name="campId"
+                  className="w-full border rounded px-3 py-2"
+                  value={form.campId}
+                  onChange={handleFormChange}
+                  required
+                >
+                  <option value="">Select a camp</option>
+                  {camps.map((camp: Camp) => (
+                    <option key={camp.id} value={camp.id}>
+                      {camp.name}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div className="mb-4">
                 <label htmlFor="dayOfWeek" className="block font-medium mb-1">Day <span className="text-red-500">*</span></label>
@@ -346,6 +375,7 @@ export default function AdminShiftsPage() {
                   onChange={handleFormChange}
                   required
                 >
+                  <option value="">Select a day</option>
                   {dayOfWeekOptions.map((option) => (
                     <option key={option.value} value={option.value}>
                       {option.label}
