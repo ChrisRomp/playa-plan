@@ -32,6 +32,7 @@ export class UpdateCategoryDto {
   @ApiProperty({
     description: 'Whether jobs in this category are always required for registration',
     example: false,
+    default: false,
     required: false,
   })
   @IsBoolean()
