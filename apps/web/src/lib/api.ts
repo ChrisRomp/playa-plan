@@ -216,7 +216,7 @@ export const CampingOptionSchema = z.object({
   maxSignups: z.number(),
   createdAt: z.string(),
   updatedAt: z.string(),
-  campId: z.string(),
+  // campId field has been removed
   jobCategoryIds: z.array(z.string()),
   currentRegistrations: z.number().optional(),
   availabilityStatus: z.boolean().optional(),
@@ -254,7 +254,7 @@ export interface IShift {
    */
   endTime: string;
   dayOfWeek: string;
-  campId: string;
+  // campId field has been removed
   jobs?: IJob[];
 }
 
@@ -293,7 +293,7 @@ export const ShiftSchema: z.ZodType<IShift> = z.lazy(() =>
     startTime: z.string(),
     endTime: z.string(),
     dayOfWeek: z.string(),
-    campId: z.string(),
+    // campId field has been removed
     jobs: z.array(JobSchema).optional(),
   })
 );
@@ -570,10 +570,9 @@ export const campingOptions = {
   /**
    * Get all camping options
    * @param includeDisabled Whether to include disabled options (default: false)
-   * @param campId Optional camp ID to filter by
    * @returns A promise that resolves to an array of camping options
    */
-  getAll: async (includeDisabled = false, campId?: string): Promise<CampingOption[]> => {
+  getAll: async (includeDisabled = false): Promise<CampingOption[]> => {
     try {
       let url = '/camping-options';
       const params = new URLSearchParams();
@@ -582,9 +581,7 @@ export const campingOptions = {
         params.append('includeDisabled', 'true');
       }
       
-      if (campId) {
-        params.append('campId', campId);
-      }
+      // campId check removed
       
       if (params.toString()) {
         url += `?${params.toString()}`;

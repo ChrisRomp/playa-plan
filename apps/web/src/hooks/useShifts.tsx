@@ -16,7 +16,7 @@ export type ShiftInput = Omit<Shift, 'id' | 'jobs'> & {
    */
   endTime: string;
   dayOfWeek: string;
-  campId: string;
+  // campId field has been removed
 };
 
 interface UseShiftsResult {

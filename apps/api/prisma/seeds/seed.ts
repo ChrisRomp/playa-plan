@@ -194,67 +194,76 @@ async function main() {
 
   console.log(`Created ${await prisma.jobCategory.count()} job categories`);
 
-  // Create shifts first (before jobs)
+  // Create shifts
+  console.log('Creating shifts...');
+  
+  // Create shifts first
   const morningKitchenShift = await prisma.shift.create({
     data: {
       name: 'Morning Kitchen',
-      description: 'Morning food preparation and kitchen duty',
+      description: 'Morning kitchen shift',
       startTime: '08:00',
       endTime: '12:00',
-      dayOfWeek: 'TUESDAY'
-    }
+      dayOfWeek: 'TUESDAY',
+      jobs: { create: [] }
+    },
   });
 
   const afternoonKitchenShift = await prisma.shift.create({
     data: {
       name: 'Afternoon Kitchen',
-      description: 'Afternoon food preparation and kitchen duty',
-      startTime: '14:00',
-      endTime: '18:00',
-      dayOfWeek: 'TUESDAY'
-    }
+      description: 'Afternoon kitchen shift',
+      startTime: '12:00',
+      endTime: '16:00',
+      dayOfWeek: 'TUESDAY',
+      jobs: { create: [] }
+    },
   });
 
   const morningGreeterShift = await prisma.shift.create({
     data: {
       name: 'Morning Greeter',
-      description: 'Morning shift for greeting and welcoming',
+      description: 'Morning shift for greeting',
       startTime: '09:00',
       endTime: '13:00',
-      dayOfWeek: 'TUESDAY'
-    }
+      dayOfWeek: 'TUESDAY',
+      jobs: { create: [] }
+    },
   });
 
   const nightRangerShift = await prisma.shift.create({
     data: {
-      name: 'Night Ranger Duty',
-      description: 'Night patrol and safety monitoring',
+      name: 'Night Ranger',
+      description: 'Night patrol and safety',
       startTime: '20:00',
       endTime: '02:00',
-      dayOfWeek: 'TUESDAY'
-    }
+      dayOfWeek: 'TUESDAY',
+      jobs: { create: [] }
+    },
   });
 
   const closingSundayShift = await prisma.shift.create({
     data: {
-      name: 'Closing Sunday Cleanup',
-      description: 'Help break down and clean the camp',
+      name: 'Closing Sunday',
+      description: 'Camp tear down',
       startTime: '10:00',
       endTime: '14:00',
-      dayOfWeek: 'CLOSING_SUNDAY'
-    }
+      dayOfWeek: 'CLOSING_SUNDAY',
+      jobs: { create: [] }
+    },
   });
 
   const preOpeningShift = await prisma.shift.create({
     data: {
       name: 'Pre-Opening Setup',
-      description: 'Help set up the camp infrastructure',
-      startTime: '09:00',
-      endTime: '17:00',
-      dayOfWeek: 'PRE_OPENING'
-    }
+      description: 'Early camp setup',
+      startTime: '10:00',
+      endTime: '16:00',
+      dayOfWeek: 'PRE_OPENING',
+      jobs: { create: [] }
+    },
   });
-
+  
   console.log(`Created ${await prisma.shift.count()} shifts`);
 
   // Create jobs (after shifts)

@@ -14,12 +14,12 @@ export const useCampingOptions = () => {
   /**
    * Load all camping options
    */
-  const loadCampingOptions = useCallback(async (includeDisabled = true, campId?: string) => {
+  const loadCampingOptions = useCallback(async (includeDisabled = true) => {
     setLoading(true);
     setError(null);
     
     try {
-      const data = await campingOptions.getAll(includeDisabled, campId);
+      const data = await campingOptions.getAll(includeDisabled);
       setOptions(data);
       return data;
     } catch (err) {
@@ -55,7 +55,7 @@ export const useCampingOptions = () => {
    * Create a new camping option
    */
   const createCampingOption = useCallback(async (
-    data: Omit<CampingOption, 'id' | 'createdAt' | 'updatedAt' | 'currentRegistrations' | 'availabilityStatus' | 'fields' | 'campId'> & { campId?: string }
+    data: Omit<CampingOption, 'id' | 'createdAt' | 'updatedAt' | 'currentRegistrations' | 'availabilityStatus' | 'fields'>
   ) => {
     setLoading(true);
     setError(null);

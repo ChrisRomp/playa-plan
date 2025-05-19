@@ -83,11 +83,9 @@ export class CampingOptionsController {
   @Get()
   async findAll(
     @Query('includeDisabled') includeDisabled?: boolean | string,
-    @Query('campId') campId?: string,
   ): Promise<CampingOptionResponseDto[]> {
     const campingOptions = await this.campingOptionsService.findAll(
-      includeDisabled === true || includeDisabled === 'true', 
-      campId
+      includeDisabled === true || includeDisabled === 'true'
     );
     
     const responseDtos: CampingOptionResponseDto[] = [];

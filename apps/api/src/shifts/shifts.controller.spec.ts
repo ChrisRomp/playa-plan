@@ -86,8 +86,7 @@ describe('ShiftsController', () => {
         description: 'Test Description',
         startTime: '09:00',
         endTime: '17:00',
-        dayOfWeek: DayOfWeek.MONDAY,
-        campId: 'test-camp-id'
+        dayOfWeek: DayOfWeek.MONDAY
       };
 
       const result = await controller.create(mockCreateShiftDto);

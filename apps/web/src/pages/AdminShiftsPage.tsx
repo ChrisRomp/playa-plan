@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useShifts } from '../hooks/useShifts';
-import { useCamps, Camp } from '../hooks/useCamps';
+// useCamps hook removed
 import { useJobs } from '../hooks/useJobs';
 import { Shift } from '../lib/api';
 import { isAxiosError } from 'axios';
@@ -17,7 +17,7 @@ interface ShiftFormState {
   startTime: string;
   endTime: string;
   dayOfWeek: string;
-  campId: string;
+  // campId field has been removed
 }
 
 const dayOfWeekOptions = [
@@ -43,10 +43,7 @@ export default function AdminShiftsPage() {
     error: shiftsError,
   } = useShifts();
 
-  const {
-    camps,
-    loading: campsLoading,
-  } = useCamps();
+  // useCamps hook removed
 
   const {
     jobs,
@@ -61,7 +58,6 @@ export default function AdminShiftsPage() {
     startTime: '',
     endTime: '',
     dayOfWeek: 'MONDAY',
-    campId: '',
   });
   const [formError, setFormError] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -78,7 +74,7 @@ export default function AdminShiftsPage() {
       startTime: '09:00',
       endTime: '17:00',
       dayOfWeek: 'MONDAY',
-      campId: '',
+      // campId removed
     });
     setFormError(null);
     setDeleteError(null);
@@ -94,7 +90,7 @@ export default function AdminShiftsPage() {
       startTime: shift.startTime,
       endTime: shift.endTime,
       dayOfWeek: shift.dayOfWeek,
-      campId: shift.campId || '',
+      // campId removed
     });
     setFormError(null);
     setDeleteError(null);
@@ -129,8 +125,8 @@ export default function AdminShiftsPage() {
     e.preventDefault();
     
     // Validate required fields: name, startTime, endTime, dayOfWeek (description is optional)
-    if (!form.name || !form.startTime || !form.endTime || !form.dayOfWeek || !form.campId) {
-      setFormError('Name, day, start time, end time, and camp are required.');
+    if (!form.name || !form.startTime || !form.endTime || !form.dayOfWeek) {
+      setFormError('Name, day, start time, and end time are required.');
       return;
     }
     
@@ -232,7 +228,7 @@ export default function AdminShiftsPage() {
     return shiftJobs.map((job: Job) => job.name).join(', ') || 'None';
   };
 
-  const loading = shiftsLoading || jobsLoading || campsLoading;
+  const loading = shiftsLoading || jobsLoading;
 
   return (
     <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">
@@ -346,24 +342,6 @@ export default function AdminShiftsPage() {
                   maxLength={500}
                   rows={2}
                 />
-              </div>
-              <div className="mb-4">
-                <label htmlFor="campId" className="block font-medium mb-1">Camp <span className="text-red-500">*</span></label>
-                <select
-                  id="campId"
-                  name="campId"
-                  className="w-full border rounded px-3 py-2"
-                  value={form.campId}
-                  onChange={handleFormChange}
-                  required
-                >
-                  <option value="">Select a camp</option>
-                  {camps.map((camp: Camp) => (
-                    <option key={camp.id} value={camp.id}>
-                      {camp.name}
-                    </option>
-                  ))}
-                </select>
               </div>
               <div className="mb-4">
                 <label htmlFor="dayOfWeek" className="block font-medium mb-1">Day <span className="text-red-500">*</span></label>

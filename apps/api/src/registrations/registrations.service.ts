@@ -90,7 +90,7 @@ export class RegistrationsService {
             category: true,
             shift: {
               include: {
-                camp: true,
+                // camp references removed
               },
             },
           },
@@ -113,7 +113,7 @@ export class RegistrationsService {
             category: true,
             shift: {
               include: {
-                camp: true,
+                // camp references removed
               },
             },
           },
@@ -146,7 +146,7 @@ export class RegistrationsService {
             category: true,
             shift: {
               include: {
-                camp: true,
+                // camp references removed
               },
             },
           },
@@ -196,7 +196,7 @@ export class RegistrationsService {
             category: true,
             shift: {
               include: {
-                camp: true,
+                // camp references removed
               },
             },
           },
@@ -227,7 +227,7 @@ export class RegistrationsService {
       status?: RegistrationStatus;
       job?: { connect: { id: string } };
       payment?: { connect: { id: string } };
-      [key: string]: any;
+      [key: string]: unknown | { connect: { id: string } } | undefined;
     } = { ...updateRegistrationDto };
     
     // Handle relations
@@ -269,7 +269,7 @@ export class RegistrationsService {
             category: true,
             shift: {
               include: {
-                camp: true,
+                // camp references removed
               },
             },
           },

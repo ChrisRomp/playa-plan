@@ -11,7 +11,7 @@ interface CampingOptionFormData {
   participantDues: number;
   staffDues: number;
   maxSignups: number;
-  campId?: string;
+  // campId field has been removed
   jobCategoryIds: string[];
 }
 
@@ -119,7 +119,7 @@ const AdminCampingOptionsPage: React.FC = () => {
       participantDues: option.participantDues,
       staffDues: option.staffDues,
       maxSignups: option.maxSignups,
-      campId: option.campId,
+      // campId field removed
       jobCategoryIds: option.jobCategoryIds,
     });
     setFormErrors({});
@@ -158,13 +158,9 @@ const AdminCampingOptionsPage: React.FC = () => {
         // Update existing option
         await updateCampingOption(selectedOption.id, formData);
       } else {
-        // Create new option - use data with empty campId omitted
+        // Create new option
         const dataToSend = { ...formData };
-        
-        // Remove empty campId if it exists to let backend set it automatically
-        if (dataToSend.campId === '') {
-          delete dataToSend.campId;
-        }
+        // No need to handle campId anymore as it has been removed
         
         await createCampingOption(dataToSend);
       }

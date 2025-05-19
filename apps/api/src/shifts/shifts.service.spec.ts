@@ -16,7 +16,6 @@ describe('ShiftsService', () => {
     startTime: '09:00',
     endTime: '17:00',
     dayOfWeek: DayOfWeek.MONDAY,
-    campId: 'camp-id',
     createdAt: new Date(),
     updatedAt: new Date()
   };
@@ -26,8 +25,7 @@ describe('ShiftsService', () => {
     description: 'Test Description',
     startTime: '09:00',
     endTime: '17:00',
-    dayOfWeek: DayOfWeek.MONDAY,
-    campId: 'test-camp-id'
+    dayOfWeek: DayOfWeek.MONDAY
   };
 
   const mockUpdateShiftDto = {
@@ -35,8 +33,7 @@ describe('ShiftsService', () => {
     description: 'Updated Description',
     startTime: '10:00',
     endTime: '18:00',
-    dayOfWeek: DayOfWeek.TUESDAY,
-    campId: 'updated-camp-id'
+    dayOfWeek: DayOfWeek.TUESDAY
   };
 
   beforeEach(async () => {
@@ -77,7 +74,7 @@ describe('ShiftsService', () => {
           startTime: mockCreateShiftDto.startTime,
           endTime: mockCreateShiftDto.endTime,
           dayOfWeek: mockCreateShiftDto.dayOfWeek,
-          camp: { connect: { id: mockCreateShiftDto.campId } },
+          jobs: { create: [] }
         },
       });
     });
@@ -89,7 +86,6 @@ describe('ShiftsService', () => {
       expect(result).toEqual([mockShift]);
       expect(prismaService.shift.findMany).toHaveBeenCalledWith({
         include: {
-          camp: true,
           jobs: true
         }
       });
@@ -103,7 +99,6 @@ describe('ShiftsService', () => {
       expect(prismaService.shift.findUnique).toHaveBeenCalledWith({
         where: { id: 'test-id' },
         include: {
-          camp: true,
           jobs: true,
         },
       });
@@ -127,10 +122,8 @@ describe('ShiftsService', () => {
           startTime: mockUpdateShiftDto.startTime,
           endTime: mockUpdateShiftDto.endTime,
           dayOfWeek: mockUpdateShiftDto.dayOfWeek,
-          camp: { connect: { id: mockUpdateShiftDto.campId } },
         },
         include: {
-          camp: true,
           jobs: true,
         },
       });

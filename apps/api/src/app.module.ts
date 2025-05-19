@@ -3,7 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { PrismaModule } from './common/prisma/prisma.module';
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
-import { CampsModule } from './camps/camps.module';
+// import { CampsModule } from './camps/camps.module'; // Camp entity has been removed
 import { ShiftsModule } from './shifts/shifts.module';
 import { PaymentsModule } from './payments/payments.module';
 import { RegistrationsModule } from './registrations/registrations.module';
@@ -45,7 +45,7 @@ import validationSchema from './config/validation.schema';
     // Feature modules
     UsersModule,
     AuthModule,
-    CampsModule,
+    // CampsModule, // Removed since Camp entity has been removed
     ShiftsModule,
     PaymentsModule,
     RegistrationsModule,

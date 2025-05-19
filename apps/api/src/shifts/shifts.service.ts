@@ -21,6 +21,7 @@ export class ShiftsService {
         startTime: createShiftDto.startTime,
         endTime: createShiftDto.endTime,
         dayOfWeek: createShiftDto.dayOfWeek,
+        jobs: { create: [] } // Empty jobs array to satisfy the Prisma schema
       },
     });
   }

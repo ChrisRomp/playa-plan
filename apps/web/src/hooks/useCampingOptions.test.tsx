@@ -107,7 +107,7 @@ describe('useCampingOptions', () => {
     });
     
     // Verify the API was called
-    expect(campingOptions.getAll).toHaveBeenCalledWith(true, undefined);
+    expect(campingOptions.getAll).toHaveBeenCalledWith(true);
     
     // Verify the state was updated
     await waitFor(() => {
