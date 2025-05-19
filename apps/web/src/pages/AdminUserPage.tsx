@@ -24,6 +24,8 @@ const AdminUserPage: React.FC = () => {
   const [isCreating, setIsCreating] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [deleteUserId, setDeleteUserId] = useState<string | null>(null);
   const [formData, setFormData] = useState<CreateUserDTO | UpdateUserDTO>({
     email: '',
     firstName: '',
@@ -130,10 +132,18 @@ const AdminUserPage: React.FC = () => {
     }
   };
 
-  // Handle user deletion with confirmation
-  const handleDeleteUser = async (id: string) => {
-    if (window.confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
-      await deleteUser(id);
+  // Handle clicking the delete button - opens the confirmation modal
+  const handleDeleteClick = (id: string) => {
+    setDeleteUserId(id);
+    setIsDeleteModalOpen(true);
+  };
+
+  // Handle user deletion after confirmation
+  const handleDeleteConfirm = async () => {
+    if (deleteUserId) {
+      await deleteUser(deleteUserId);
+      setIsDeleteModalOpen(false);
+      setDeleteUserId(null);
     }
   };
 
@@ -243,13 +253,9 @@ const AdminUserPage: React.FC = () => {
                           {user.role}
                         </span>
                         <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteUser(user.id);
-                          }}
-                          className="ml-4 text-red-600 hover:text-red-900"
-                          aria-label={`Delete user ${user.firstName} ${user.lastName}`}
+                          onClick={() => handleDeleteClick(user.id)}
+                          className="text-red-600 hover:text-red-900"
+                          aria-label="Delete user"
                         >
                           Delete
                         </button>
@@ -472,6 +478,30 @@ const AdminUserPage: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* Delete confirmation modal */}
+      {isDeleteModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full">
+            <h3 className="text-lg font-semibold mb-4">Confirm Deletion</h3>
+            <p className="mb-6">Are you sure you want to delete this user? This action cannot be undone.</p>
+            <div className="flex justify-end space-x-2">
+              <button
+                className="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded"
+                onClick={() => setIsDeleteModalOpen(false)}
+              >
+                Cancel
+              </button>
+              <button
+                className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded"
+                onClick={handleDeleteConfirm}
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
