@@ -4,6 +4,7 @@ import { RegisterDto } from '../dto/register.dto';
 import { LoginDto } from '../dto/login.dto';
 import { AuthResponseDto } from '../dto/auth-response.dto';
 import { LocalAuthGuard } from '../guards/local-auth.guard';
+import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { Public } from '../decorators/public.decorator';
 import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiBearerAuth } from '@nestjs/swagger';
 import { Request as ExpressRequest } from 'express';
@@ -180,5 +181,21 @@ export class AuthController {
   @ApiResponse({ status: HttpStatus.UNAUTHORIZED, description: 'Unauthorized' })
   testAuth(): { message: string } {
     return { message: 'Authentication is working' };
+  }
+
+  /**
+   * Refresh authentication token
+   * @param req Request object with authenticated user
+   * @returns New authentication token
+   */
+  @Post('refresh')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Refresh authentication token' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Token refreshed successfully' })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, description: 'Unauthorized' })
+  async refreshToken(@Request() req: RequestWithUser): Promise<AuthResponseDto> {
+    // The user is already validated by the JWT guard
+    return this.authService.login(req.user);
   }
 }

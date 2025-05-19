@@ -9,17 +9,6 @@ import { useAuth } from '../authUtils';
 import { auth as authApi } from '../../lib/api';
 import type { Mock } from 'vitest';
 
-// Mock the API methods
-vi.mock('../../lib/api', () => ({
-  auth: {
-    requestVerificationCode: vi.fn(),
-    verifyCode: vi.fn(),
-    getProfile: vi.fn(),
-    logout: vi.fn(),
-    checkAuth: vi.fn(),
-  },
-}));
-
 // Mock cookieService
 vi.mock('../../lib/cookieService', () => ({
   default: {
@@ -27,6 +16,29 @@ vi.mock('../../lib/cookieService', () => ({
     clearAuthTokens: vi.fn().mockResolvedValue(undefined),
     isAuthenticated: vi.fn().mockReturnValue(false),
   },
+}));
+
+// Create mocks without referencing variables that need to be hoisted
+vi.mock('../../lib/api', () => ({
+  auth: {
+    requestVerificationCode: vi.fn(),
+    verifyCode: vi.fn().mockResolvedValue({
+      userId: 'user-123',
+      email: 'test@example.playaplan.app',
+      firstName: 'Test',
+      lastName: 'User',
+      role: 'PARTICIPANT',
+      accessToken: 'mock-token'
+    }),
+    getProfile: vi.fn(),
+    logout: vi.fn(),
+    checkAuth: vi.fn(),
+    refreshToken: vi.fn(),
+  },
+  clearJwtToken: vi.fn(),
+  setJwtToken: vi.fn(),
+  initializeAuthFromStorage: vi.fn().mockReturnValue(false),
+  JWT_TOKEN_STORAGE_KEY: 'playaplan_jwt_token',
 }));
 
 // Create a test component to access the auth context
@@ -284,6 +296,51 @@ describe('AuthContext', () => {
       
       // Check localStorage was cleared
       expect(localStorage.removeItem).toHaveBeenCalledWith('pendingLoginEmail');
+    });
+
+    it('should successfully login with verification code', async () => {
+      // Get reference to mocked functions
+      const { auth } = await import('../../lib/api');
+      
+      // Define the mock response explicitly
+      (auth.verifyCode as Mock).mockResolvedValueOnce({
+        userId: 'user-123',
+        email: 'test@example.playaplan.app',
+        firstName: 'Test',
+        lastName: 'User',
+        role: 'PARTICIPANT',
+        accessToken: 'mock-token'
+      });
+      
+      // Render with act
+      await act(async () => {
+        render(
+          <AuthProvider>
+            <TestComponent />
+          </AuthProvider>
+        );
+      });
+      
+      // Wait for initial render
+      await waitFor(() => {
+        expect(screen.getByTestId('loading').textContent).toBe('false');
+      });
+      
+      // Reset mock count
+      vi.clearAllMocks();
+      
+      // Click the button to verify code
+      await act(async () => {
+        screen.getByTestId('verify-code-btn').click();
+      });
+      
+      // Wait for authentication to complete
+      await waitFor(() => {
+        expect(screen.getByTestId('authenticated').textContent).toBe('true');
+      });
+      
+      // Verify verifyCode was called
+      expect(auth.verifyCode).toHaveBeenCalledWith('test@example.playaplan.app', '123456');
     });
   });
 });

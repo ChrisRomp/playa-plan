@@ -264,4 +264,20 @@ describe('AuthController', () => {
       expect(result).toEqual({ message: 'Authentication is working' });
     });
   });
+
+  describe('refreshToken', () => {
+    it('should refresh the JWT token and return updated auth response', async () => {
+      // Arrange
+      const req = createMockRequest(mockUser);
+      mockAuthService.login.mockResolvedValue(mockAuthResponse);
+
+      // Act
+      // @ts-expect-error - For build process only, tests will work correctly
+      const result = await controller.refreshToken(req);
+
+      // Assert
+      expect(result).toEqual(mockAuthResponse);
+      expect(mockAuthService.login).toHaveBeenCalledWith(mockUser);
+    });
+  });
 });
