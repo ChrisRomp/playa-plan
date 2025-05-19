@@ -181,4 +181,19 @@ export class AuthController {
   testAuth(): { message: string } {
     return { message: 'Authentication is working' };
   }
+
+  /**
+   * Refresh authentication token
+   * @param req Request object with authenticated user
+   * @returns New authentication token
+   */
+  @Post('refresh')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Refresh authentication token' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Token refreshed successfully' })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, description: 'Unauthorized' })
+  async refreshToken(@Request() req: RequestWithUser): Promise<AuthResponseDto> {
+    // The user is already validated by the JWT guard
+    return this.authService.login(req.user);
+  }
 }

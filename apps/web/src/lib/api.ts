@@ -28,6 +28,21 @@ export const api = axios.create({
 // Log API configuration for debugging
 console.log(`API client configured with baseURL: ${API_URL}`);
 
+// Function to initialize JWT token from localStorage on application startup
+export const initializeAuthFromStorage = () => {
+  const storedToken = localStorage.getItem(JWT_TOKEN_STORAGE_KEY);
+  if (storedToken) {
+    // Set the token in the Authorization header
+    api.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
+    console.log('JWT token loaded from localStorage and set in Authorization header');
+    return true;
+  }
+  return false;
+};
+
+// Initialize auth from storage when this module loads
+initializeAuthFromStorage();
+
 // Add request interceptor for debugging
 api.interceptors.request.use(
   (config) => {
@@ -53,17 +68,25 @@ api.interceptors.request.use(
 let isRefreshing = false;
 let failedQueue: { resolve: (value: unknown) => void; reject: (reason?: unknown) => void }[] = [];
 
-// Function to set the JWT token in the Authorization header
+// Storage key for JWT token
+const JWT_TOKEN_STORAGE_KEY = 'playaplan_jwt_token';
+
+// Function to set the JWT token in the Authorization header and localStorage
 export const setJwtToken = (token: string) => {
   // Add token to default headers for all future requests
   api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-  console.log('JWT token set in Authorization header');
+  
+  // Store token in localStorage for persistence across page refreshes
+  localStorage.setItem(JWT_TOKEN_STORAGE_KEY, token);
+  
+  console.log('JWT token set in Authorization header and localStorage');
 };
 
-// Function to clear the JWT token from the Authorization header
+// Function to clear the JWT token from the Authorization header and localStorage
 export const clearJwtToken = () => {
   delete api.defaults.headers.common['Authorization'];
-  console.log('JWT token cleared from Authorization header');
+  localStorage.removeItem(JWT_TOKEN_STORAGE_KEY);
+  console.log('JWT token cleared from Authorization header and localStorage');
 };
 
 // Process failed requests queue after token refresh
@@ -437,18 +460,23 @@ export const auth = {
   /**
    * Refresh the authentication token
    * 
-   * Note: This endpoint is not yet implemented in the backend.
-   * For now, we'll use a mock implementation that always returns true.
+   * This uses the /auth/refresh endpoint to get a new token
+   * while using the current token for authentication
    */
   refreshToken: async () => {
-    // Since the refresh endpoint doesn't exist yet, we'll mock it
-    // This will need to be updated once the backend implements the endpoint
     try {
-      // Try to access a protected endpoint to see if our token is still valid
-      await api.get('/auth/profile');
+      // Call the refresh endpoint to get a new token
+      const response = await api.post<AuthResponse>('/auth/refresh');
+      const parsedResponse = AuthResponseSchema.parse(response.data);
+      
+      // Store the new token
+      if (parsedResponse.accessToken) {
+        setJwtToken(parsedResponse.accessToken);
+      }
+      
       return true;
-    } catch {
-      // If we get any error, our token is likely invalid
+    } catch (error) {
+      console.error('Token refresh failed:', error);
       return false;
     }
   },

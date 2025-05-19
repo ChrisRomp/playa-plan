@@ -27,26 +27,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // Reset any previous error state
     setError(null);
     
-    // First check for client-side auth state to prevent unnecessary API calls
     const checkAuthStatus = async () => {
       setIsLoading(true);
       
-      // Check if there's any indication of authentication in client cookies
-      // This prevents making any API calls when we know the user isn't authenticated
-      if (!cookieService.isAuthenticated()) {
-        console.log('No authentication cookie found, skipping API calls');
-        setIsAuthenticated(false);
-        setUser(null);
-        setIsLoading(false);
-        return;
-      }
-      
       try {
-        // Only call the auth test endpoint if there's a client-side auth cookie
+        // Check if the JWT token exists in localStorage
+        // This is done via the API client's initializeAuthFromStorage function
+        // which is called when the module loads, but we can explicitly check here
         const isAuthValid = await auth.checkAuth();
         setIsAuthenticated(isAuthValid);
         
-        // Only fetch profile if auth test passed
+        // Only fetch profile if auth check passed
         if (isAuthValid) {
           try {
             // If authenticated, fetch the user profile from the API
@@ -62,19 +53,25 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               isEarlyRegistrationEnabled: false, // This would come from a complete profile
               hasRegisteredForCurrentYear: false // This would come from a complete profile
             });
+            
+            // Set the client-side auth state cookie for UI state
+            await cookieService.setAuthenticatedState();
           } catch (profileErr) {
             console.error('Profile fetch failed:', profileErr);
             setIsAuthenticated(false);
             setUser(null);
+            await cookieService.clearAuthTokens();
           }
         } else {
           // Auth test failed, clear user data
           setUser(null);
+          await cookieService.clearAuthTokens();
         }
       } catch (err) {
         console.error('Authentication check failed:', err);
         setIsAuthenticated(false);
         setUser(null);
+        await cookieService.clearAuthTokens();
       } finally {
         setIsLoading(false);
       }
@@ -121,8 +118,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       // Verify code with the API
       const authResponse = await auth.verifyCode(email, code);
       
-      // The JWT token is now stored by the auth.verifyCode method
-      // But we still set the authenticated state cookie for the UI
+      // The JWT token is already stored in localStorage by auth.verifyCode method
+      // via the setJwtToken function, but we also set the auth state cookie for UI
       await cookieService.setAuthenticatedState();
       setIsAuthenticated(true);
       
