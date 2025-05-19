@@ -138,28 +138,26 @@ const AdminUserPage: React.FC = () => {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">User Management</h1>
-          <p className="mt-1 text-sm text-gray-500">View and manage user accounts</p>
-        </div>
-        <div className="flex space-x-4">
-          <Link
+    <div className="container mx-auto px-4 py-8 max-w-screen-xl">
+      <div className="flex items-center mb-6">
+        <h1 className="text-2xl font-bold">User Management</h1>
+        <div className="ml-auto flex space-x-2">
+          <Link 
             to={ROUTES.ADMIN.path}
-            className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+            className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors"
+            aria-label="Back to Admin"
           >
-            Back to Admin
+            <span>Back to Admin</span>
           </Link>
           <button
-            type="button"
+            className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded"
             onClick={() => {
               resetForm();
               setIsCreating(true);
             }}
-            className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+            aria-label="Add User"
           >
-            Add User
+            <span>Add User</span>
           </button>
         </div>
       </div>

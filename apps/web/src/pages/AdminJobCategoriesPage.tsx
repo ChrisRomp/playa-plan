@@ -104,16 +104,26 @@ export default function AdminJobCategoriesPage() {
 
   return (
     <div className="max-w-3xl mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-4">Job Category Management</h1>
+      <div className="flex items-center mb-4">
+        <h1 className="text-2xl font-bold">Job Category Management</h1>
+        <div className="ml-auto flex space-x-2">
+          <button
+            onClick={() => window.location.href = '/admin'}
+            className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors"
+          >
+            Back to Admin
+          </button>
+          <button
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 focus:outline-none focus:ring"
+            onClick={openAddModal}
+            aria-label="Add job category"
+          >
+            Add Job Category
+          </button>
+        </div>
+      </div>
       {error && <div className="text-red-600 mb-2">{error}</div>}
       {deleteError && <div className="text-red-600 mb-2">{deleteError}</div>}
-      <button
-        className="mb-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 focus:outline-none focus:ring"
-        onClick={openAddModal}
-        aria-label="Add job category"
-      >
-        Add Job Category
-      </button>
       <div className="overflow-x-auto">
         <table className="min-w-full border border-gray-300 bg-white">
           <thead>

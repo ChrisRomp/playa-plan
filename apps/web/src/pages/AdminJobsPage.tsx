@@ -189,15 +189,23 @@ export default function AdminJobsPage() {
 
   return (
     <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex items-center mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Jobs</h1>
-        <button
-          className="bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700"
-          onClick={openAddModal}
-          disabled={loading}
-        >
-          Add Job
-        </button>
+        <div className="ml-auto flex space-x-2">
+          <button
+            onClick={() => window.location.href = '/admin'}
+            className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors"
+          >
+            Back to Admin
+          </button>
+          <button
+            className="bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700"
+            onClick={openAddModal}
+            disabled={loading}
+          >
+            Add Job
+          </button>
+        </div>
       </div>
       
       {(jobsError) && (
