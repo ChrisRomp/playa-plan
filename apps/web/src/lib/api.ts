@@ -30,18 +30,36 @@ console.log(`API client configured with baseURL: ${API_URL}`);
 
 // Function to initialize JWT token from localStorage on application startup
 export const initializeAuthFromStorage = () => {
-  const storedToken = localStorage.getItem(JWT_TOKEN_STORAGE_KEY);
-  if (storedToken) {
-    // Set the token in the Authorization header
-    api.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
-    console.log('JWT token loaded from localStorage and set in Authorization header');
-    return true;
+  try {
+    // Only try to use localStorage in browser environment
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const storedToken = localStorage.getItem(JWT_TOKEN_STORAGE_KEY);
+      if (storedToken) {
+        // Set the token in the Authorization header
+        api.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
+        console.log('JWT token loaded from localStorage and set in Authorization header');
+        return true;
+      }
+    }
+  } catch (e) {
+    console.error('Error initializing auth from storage', e);
   }
   return false;
 };
 
-// Initialize auth from storage when this module loads
-initializeAuthFromStorage();
+// Safely initialize auth from storage to prevent test issues
+// We use a try-catch and feature detection to avoid issues in test environments
+try {
+  if (typeof window !== 'undefined' && window.localStorage) {
+    // Initialize auth from storage as a side effect
+    // But defer to next tick to avoid initialization order issues
+    setTimeout(() => {
+      initializeAuthFromStorage();
+    }, 0);
+  }
+} catch (e) {
+  console.log('Unable to initialize auth from storage (likely in test environment)');
+}
 
 // Add request interceptor for debugging
 api.interceptors.request.use(
@@ -69,15 +87,22 @@ let isRefreshing = false;
 let failedQueue: { resolve: (value: unknown) => void; reject: (reason?: unknown) => void }[] = [];
 
 // Storage key for JWT token
-const JWT_TOKEN_STORAGE_KEY = 'playaplan_jwt_token';
+export const JWT_TOKEN_STORAGE_KEY = 'playaplan_jwt_token';
 
 // Function to set the JWT token in the Authorization header and localStorage
 export const setJwtToken = (token: string) => {
   // Add token to default headers for all future requests
   api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
   
-  // Store token in localStorage for persistence across page refreshes
-  localStorage.setItem(JWT_TOKEN_STORAGE_KEY, token);
+  try {
+    // Only try to use localStorage in browser environment
+    if (typeof window !== 'undefined' && window.localStorage) {
+      // Store token in localStorage for persistence across page refreshes
+      localStorage.setItem(JWT_TOKEN_STORAGE_KEY, token);
+    }
+  } catch (e) {
+    console.error('Error storing JWT token in localStorage', e);
+  }
   
   console.log('JWT token set in Authorization header and localStorage');
 };
@@ -85,7 +110,16 @@ export const setJwtToken = (token: string) => {
 // Function to clear the JWT token from the Authorization header and localStorage
 export const clearJwtToken = () => {
   delete api.defaults.headers.common['Authorization'];
-  localStorage.removeItem(JWT_TOKEN_STORAGE_KEY);
+  
+  try {
+    // Only try to use localStorage in browser environment
+    if (typeof window !== 'undefined' && window.localStorage) {
+      localStorage.removeItem(JWT_TOKEN_STORAGE_KEY);
+    }
+  } catch (e) {
+    console.error('Error removing JWT token from localStorage', e);
+  }
+  
   console.log('JWT token cleared from Authorization header and localStorage');
 };
 
