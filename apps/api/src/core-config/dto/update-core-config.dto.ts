@@ -280,7 +280,7 @@ export class UpdateCoreConfigDto {
    */
   @ApiProperty({
     description: 'SMTP host',
-    example: 'smtp.example.com',
+    example: 'smtp.playaplan.app',
     required: false
   })
   @IsString()

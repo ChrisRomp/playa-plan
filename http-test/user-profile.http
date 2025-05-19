@@ -1,4 +1,4 @@
-@email = testuser@playaplan.example.com
+@email = testuser@playaplan.playaplan.app
 
 ###
 # @name request_login_code
