@@ -2,6 +2,28 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { CreateJobDto } from './dto/create-job.dto';
 import { UpdateJobDto } from './dto/update-job.dto';
+import { Job, Prisma } from '@prisma/client';
+
+/**
+ * Type definition for job with included relations
+ */
+type JobWithRelations = Job & {
+  category?: {
+    id: string;
+    name: string;
+    description: string | null;
+    staffOnly: boolean;
+    alwaysRequired: boolean;
+  } | null;
+  shift?: {
+    id: string;
+    name: string;
+    description: string | null;
+    startTime: string;
+    endTime: string;
+    dayOfWeek: string;
+  } | null;
+};
 
 @Injectable()
 export class JobsService {
@@ -62,8 +84,8 @@ export class JobsService {
 
   async update(id: string, updateJobDto: UpdateJobDto) {
     try {
-      // Create update data object
-      const updateData: any = {};
+      // Create update data object with proper typing
+      const updateData: Prisma.JobUpdateInput = {};
       
       if (updateJobDto.name) updateData.name = updateJobDto.name;
       if (updateJobDto.description) updateData.description = updateJobDto.description;
@@ -89,7 +111,7 @@ export class JobsService {
 
       // Add derived properties from category
       return this.addDerivedProperties(job);
-    } catch (error) {
+    } catch {
       throw new NotFoundException(`Job with ID ${id} not found`);
     }
   }
@@ -106,7 +128,7 @@ export class JobsService {
 
       // Add derived properties from category
       return this.addDerivedProperties(job);
-    } catch (error) {
+    } catch {
       throw new NotFoundException(`Job with ID ${id} not found`);
     }
   }
@@ -114,7 +136,10 @@ export class JobsService {
   /**
    * Add derived properties from category to a job
    */
-  private addDerivedProperties(job: any) {
+  /**
+   * Add derived properties from category to a job
+   */
+  private addDerivedProperties(job: JobWithRelations) {
     return {
       ...job,
       staffOnly: job.category?.staffOnly || false,
