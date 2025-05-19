@@ -172,13 +172,12 @@ export default function AdminShiftsPage() {
   };
 
   const formatDateForDisplay = (timeString: string): string => {
-    // Convert 24-hour HH:MM format to localized time
+    // Keep time in 24-hour HH:MM format
     if (!timeString || !timeString.includes(':')) return timeString;
     
-    const [hours, minutes] = timeString.split(':').map(Number);
-    const date = new Date();
-    date.setHours(hours, minutes, 0, 0);
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    // The time is already in HH:MM format, so we can just return it
+    // This ensures consistency with the form input format
+    return timeString;
   };
 
   const formatDateForInput = (timeString: string): string => {
