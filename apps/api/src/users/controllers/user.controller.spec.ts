@@ -12,7 +12,7 @@ const mockRequest = () => {
   const req: any = {};
   req.user = {
     id: 'test-uuid',
-    email: 'test@example.com',
+    email: 'test@example.playaplan.app',
     role: UserRole.PARTICIPANT
   };
   return req;
@@ -22,7 +22,7 @@ const mockAdminRequest = () => {
   const req: any = {};
   req.user = {
     id: 'admin-uuid',
-    email: 'admin@example.com',
+    email: 'admin@example.playaplan.app',
     role: UserRole.ADMIN
   };
   return req;
@@ -34,7 +34,7 @@ describe('UserController', () => {
 
   const mockUser = {
     id: 'test-uuid',
-    email: 'test@example.com',
+    email: 'test@example.playaplan.app',
     password: 'hashed_password',
     firstName: 'Test',
     lastName: 'User',
@@ -150,7 +150,7 @@ describe('UserController', () => {
     it('should create and return a new user', async () => {
       // Arrange
       const createUserDto: CreateUserDto = {
-        email: 'new@example.com',
+        email: 'new@example.playaplan.app',
         password: 'password123',
         firstName: 'New',
         lastName: 'User',
@@ -177,7 +177,7 @@ describe('UserController', () => {
     it('should forbid non-admins from creating users with elevated privileges', async () => {
       // Arrange
       const createUserDto: CreateUserDto = {
-        email: 'new@example.com',
+        email: 'new@example.playaplan.app',
         password: 'password123',
         firstName: 'New',
         lastName: 'User',

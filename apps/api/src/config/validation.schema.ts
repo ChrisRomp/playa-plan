@@ -42,7 +42,7 @@ const validationSchema = Joi.object({
   
   // Email configuration
   EMAIL_PROVIDER: Joi.string().valid('sendgrid', 'smtp').default('sendgrid'),
-  EMAIL_FROM: Joi.string().email().default('noreply@example.com'),
+  EMAIL_FROM: Joi.string().email().default('noreply@example.playaplan.app'),
   
   // SendGrid configuration
   SENDGRID_API_KEY: Joi.string().when('EMAIL_PROVIDER', {
@@ -84,7 +84,7 @@ const validationSchema = Joi.object({
   PAYPAL_MODE: Joi.string().valid('sandbox', 'live').default('sandbox'),
   
   // Admin defaults
-  DEFAULT_ADMIN_EMAIL: Joi.string().email().default('webadmin@example.com'),
+  DEFAULT_ADMIN_EMAIL: Joi.string().email().default('webadmin@example.playaplan.app'),
   DEFAULT_ADMIN_PASSWORD: Joi.string(),
 });
 

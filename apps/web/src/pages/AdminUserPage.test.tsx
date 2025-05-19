@@ -19,7 +19,7 @@ describe('AdminUserPage', () => {
   const mockUsers = [
     {
       id: '1',
-      email: 'admin@example.com',
+      email: 'admin@example.playaplan.app',
       firstName: 'Admin',
       lastName: 'User',
       playaName: 'Playa Admin',
@@ -35,7 +35,7 @@ describe('AdminUserPage', () => {
     },
     {
       id: '2',
-      email: 'staff@example.com',
+      email: 'staff@example.playaplan.app',
       firstName: 'Staff',
       lastName: 'User',
       playaName: null,
@@ -93,12 +93,12 @@ describe('AdminUserPage', () => {
 
     // User 1
     expect(screen.getByText('Admin User (Playa Admin)')).toBeInTheDocument();
-    expect(screen.getByText('admin@example.com')).toBeInTheDocument();
+    expect(screen.getByText('admin@example.playaplan.app')).toBeInTheDocument();
     expect(screen.getByText('ADMIN')).toBeInTheDocument();
 
     // User 2
     expect(screen.getByText('Staff User')).toBeInTheDocument();
-    expect(screen.getByText('staff@example.com')).toBeInTheDocument();
+    expect(screen.getByText('staff@example.playaplan.app')).toBeInTheDocument();
     expect(screen.getByText('STAFF')).toBeInTheDocument();
   });
 

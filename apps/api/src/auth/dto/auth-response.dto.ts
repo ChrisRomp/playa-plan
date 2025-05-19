@@ -17,7 +17,7 @@ export class AuthResponseDto {
   readonly userId: string = '';
 
   @ApiProperty({
-    example: 'user@example.com',
+    example: 'user@example.playaplan.app',
     description: 'User email',
   })
   readonly email: string = '';

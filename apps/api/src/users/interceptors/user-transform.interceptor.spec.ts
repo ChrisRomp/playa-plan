@@ -22,7 +22,7 @@ describe('UserTransformInterceptor', () => {
     // Mock user from database (similar to Prisma User)
     const mockPrismaUser = {
       id: '1',
-      email: 'test@example.com',
+      email: 'test@example.playaplan.app',
       firstName: 'Test',
       lastName: 'User',
       password: 'hashedPassword123',
@@ -71,7 +71,7 @@ describe('UserTransformInterceptor', () => {
     const mockPrismaUsers = [
       {
         id: '1',
-        email: 'user1@example.com',
+        email: 'user1@example.playaplan.app',
         firstName: 'User',
         lastName: 'One',
         password: 'hashedPassword1',
@@ -87,7 +87,7 @@ describe('UserTransformInterceptor', () => {
       },
       {
         id: '2',
-        email: 'user2@example.com',
+        email: 'user2@example.playaplan.app',
         firstName: 'User',
         lastName: 'Two',
         password: 'hashedPassword2',
@@ -157,7 +157,7 @@ describe('UserTransformInterceptor', () => {
     // Create a User entity instance with sensitive data
     const userEntity = new User({
       id: '1',
-      email: 'test@example.com',
+      email: 'test@example.playaplan.app',
       firstName: 'Test',
       lastName: 'User',
       password: 'securePassword123',

@@ -22,7 +22,7 @@ describe('AuthService', () => {
   // Mock user data
   const mockUser = {
     id: 'user-id-1',
-    email: 'test@example.com',
+    email: 'test@example.playaplan.app',
     password: null, // No passwords in our system
     firstName: 'Test',
     lastName: 'User',
@@ -113,7 +113,7 @@ describe('AuthService', () => {
   describe('validateCredentials', () => {
     it('should always return null as we use email verification flow', async () => {
       // Act
-      const result = await service.validateCredentials('test@example.com');
+      const result = await service.validateCredentials('test@example.playaplan.app');
       
       // Assert
       expect(result).toBeNull();
@@ -122,7 +122,7 @@ describe('AuthService', () => {
 
   describe('register', () => {
     const registerDto: RegisterDto = {
-      email: 'new@example.com',
+      email: 'new@example.playaplan.app',
       firstName: 'New',
       lastName: 'User',
       playaName: 'NewUser',
@@ -137,7 +137,7 @@ describe('AuthService', () => {
       // Note: The real error is caught and a BadRequestException is thrown instead
       
       expect(mockPrismaService.user.findUnique).toHaveBeenCalledWith({
-        where: { email: 'new@example.com' },
+        where: { email: 'new@example.playaplan.app' },
       });
     });
 
@@ -147,7 +147,7 @@ describe('AuthService', () => {
       mockPrismaService.user.create.mockResolvedValue({
         ...mockUser,
         id: 'new-user-id',
-        email: 'new@example.com',
+        email: 'new@example.playaplan.app',
         password: null,
         firstName: 'New',
         lastName: 'User',
@@ -161,11 +161,11 @@ describe('AuthService', () => {
       // Assert
       expect(result).toBeDefined();
       expect(result.id).toBe('new-user-id');
-      expect(result.email).toBe('new@example.com');
+      expect(result.email).toBe('new@example.playaplan.app');
       
       expect(mockPrismaService.user.create).toHaveBeenCalledWith({
         data: {
-          email: 'new@example.com',
+          email: 'new@example.playaplan.app',
           firstName: 'New',
           lastName: 'User',
           playaName: 'NewUser',
@@ -175,7 +175,7 @@ describe('AuthService', () => {
       });
       
       expect(notificationsService.sendEmailVerificationEmail).toHaveBeenCalledWith(
-        'new@example.com',
+        'new@example.playaplan.app',
         'mocked-uuid-token'
       );
     });
@@ -208,12 +208,12 @@ describe('AuthService', () => {
       // Assert
       expect(result).toHaveProperty('accessToken', 'mocked-jwt-token');
       expect(result).toHaveProperty('userId', 'user-id-1');
-      expect(result).toHaveProperty('email', 'test@example.com');
+      expect(result).toHaveProperty('email', 'test@example.playaplan.app');
       expect(result).toHaveProperty('firstName', 'Test');
       expect(result).toHaveProperty('lastName', 'User');
       expect(result).toHaveProperty('role', 'PARTICIPANT');
       expect(jwtService.sign).toHaveBeenCalledWith({
-        email: 'test@example.com',
+        email: 'test@example.playaplan.app',
         sub: 'user-id-1',
         role: UserRole.PARTICIPANT,
       });
@@ -278,7 +278,7 @@ describe('AuthService', () => {
       // We won't mock Date to avoid issues with Date.now
       
       // Act
-      const result = await service.generateLoginCode('test@example.com');
+      const result = await service.generateLoginCode('test@example.playaplan.app');
       
       // Assert
       expect(result).toBe(true);
@@ -290,7 +290,7 @@ describe('AuthService', () => {
         },
       });
       expect(notificationsService.sendLoginCodeEmail).toHaveBeenCalledWith(
-        'test@example.com',
+        'test@example.playaplan.app',
         expect.any(String)
       );
       
@@ -304,7 +304,7 @@ describe('AuthService', () => {
       // Mock user creation result to be successful
       mockPrismaService.user.create.mockResolvedValue({
         ...mockUser,
-        email: 'new@example.com',
+        email: 'new@example.playaplan.app',
         loginCode: '123456',
         loginCodeExpiry: new Date(Date.now() + 900000) // 15 minutes in the future
       });
@@ -313,13 +313,13 @@ describe('AuthService', () => {
       mockNotificationsService.sendLoginCodeEmail.mockResolvedValue(true);
       
       // Act
-      const result = await service.generateLoginCode('new@example.com');
+      const result = await service.generateLoginCode('new@example.playaplan.app');
       
       // Assert
       expect(result).toBe(true);
       expect(mockPrismaService.user.create).toHaveBeenCalledWith({
         data: {
-          email: 'new@example.com',
+          email: 'new@example.playaplan.app',
           loginCode: expect.any(String),
           loginCodeExpiry: expect.any(Date),
           role: UserRole.PARTICIPANT,
@@ -329,7 +329,7 @@ describe('AuthService', () => {
         },
       });
       expect(notificationsService.sendLoginCodeEmail).toHaveBeenCalledWith(
-        'new@example.com',
+        'new@example.playaplan.app',
         expect.any(String)
       );
     });
@@ -339,7 +339,7 @@ describe('AuthService', () => {
       mockPrismaService.user.findUnique.mockRejectedValue(new Error('Database error'));
       
       // Act
-      const result = await service.generateLoginCode('test@example.com');
+      const result = await service.generateLoginCode('test@example.playaplan.app');
       
       // Assert
       expect(result).toBe(false);
@@ -395,7 +395,7 @@ describe('AuthService', () => {
       mockPrismaService.user.findFirst.mockResolvedValue(null);
 
       // Act
-      const result = await service.validateLoginCode('test@example.com', 'invalid-code');
+      const result = await service.validateLoginCode('test@example.playaplan.app', 'invalid-code');
       
       // Assert
       expect(result).toBeNull();
@@ -407,7 +407,7 @@ describe('AuthService', () => {
       mockPrismaService.user.findFirst.mockRejectedValue(new Error('Database error'));
 
       // Act
-      const result = await service.validateLoginCode('test@example.com', '123456');
+      const result = await service.validateLoginCode('test@example.playaplan.app', '123456');
       
       // Assert
       expect(result).toBeNull();

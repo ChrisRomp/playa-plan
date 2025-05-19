@@ -55,13 +55,13 @@ describe('CampingOptionsController (e2e)', () => {
 
     // Ensure test users exist
     let admin = await prisma.user.findUnique({
-      where: { email: 'admin@example.com' },
+      where: { email: 'admin@example.playaplan.app' },
     });
 
     if (!admin) {
       admin = await prisma.user.create({
         data: {
-          email: 'admin@example.com',
+          email: 'admin@example.playaplan.app',
           password: '$2b$10$EpRnTzVlqHNP0.fUbXUwSOyuiXe/QLSUG6xNekdHgTGmrpHEfIoxm', // 'admin123'
           firstName: 'Admin',
           lastName: 'User',
@@ -72,13 +72,13 @@ describe('CampingOptionsController (e2e)', () => {
     }
 
     let user = await prisma.user.findUnique({
-      where: { email: 'user@example.com' },
+      where: { email: 'user@example.playaplan.app' },
     });
 
     if (!user) {
       user = await prisma.user.create({
         data: {
-          email: 'user@example.com',
+          email: 'user@example.playaplan.app',
           password: '$2b$10$EpRnTzVlqHNP0.fUbXUwSOyuiXe/QLSUG6xNekdHgTGmrpHEfIoxm', // 'user123'
           firstName: 'Regular',
           lastName: 'User',
@@ -92,7 +92,7 @@ describe('CampingOptionsController (e2e)', () => {
     const adminResponse = await request(app.getHttpServer())
       .post('/auth/login')
       .send({
-        email: 'admin@example.com',
+        email: 'admin@example.playaplan.app',
         password: 'admin123',
       });
 
@@ -101,7 +101,7 @@ describe('CampingOptionsController (e2e)', () => {
     const userResponse = await request(app.getHttpServer())
       .post('/auth/login')
       .send({
-        email: 'user@example.com',
+        email: 'user@example.playaplan.app',
         password: 'user123',
       });
 

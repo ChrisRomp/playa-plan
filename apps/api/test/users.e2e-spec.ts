@@ -47,7 +47,7 @@ describe('UsersController (e2e)', () => {
 
   const mockUser: UserType = {
     id: 'test-uuid-e2e',
-    email: 'test-e2e@example.com',
+    email: 'test-e2e@example.playaplan.app',
     password: 'hashed_password',
     firstName: 'Test',
     lastName: 'User',
@@ -65,14 +65,14 @@ describe('UsersController (e2e)', () => {
   const mockAdmin: UserType = {
     ...mockUser,
     id: 'admin-uuid-e2e',
-    email: 'admin-e2e@example.com',
+    email: 'admin-e2e@example.playaplan.app',
     role: UserRole.ADMIN,
   };
 
   const mockStaff: UserType = {
     ...mockUser,
     id: 'staff-uuid-e2e',
-    email: 'staff-e2e@example.com',
+    email: 'staff-e2e@example.playaplan.app',
     role: UserRole.STAFF,
   };
 
@@ -411,7 +411,7 @@ describe('UsersController (e2e)', () => {
       // Arrange
       const adminToken = getAuthToken(mockAdmin);
       const createUserDto = {
-        email: 'new-e2e@example.com',
+        email: 'new-e2e@example.playaplan.app',
         password: 'password123',
         firstName: 'New',
         lastName: 'User',
@@ -462,7 +462,7 @@ describe('UsersController (e2e)', () => {
       // Arrange
       const adminToken = getAuthToken(mockAdmin);
       const createUserDto = {
-        email: 'existing@example.com',
+        email: 'existing@example.playaplan.app',
         password: 'password123',
         firstName: 'Existing',
         lastName: 'User',

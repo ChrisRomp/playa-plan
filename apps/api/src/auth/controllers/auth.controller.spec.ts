@@ -11,7 +11,7 @@ import { EmailCodeLoginDto } from '../dto/email-code-login.dto';
 // Setup mock functions for testing
 const setupMockUser = (): User => ({
   id: 'user-id-1',
-  email: 'test@example.com',
+  email: 'test@example.playaplan.app',
   password: null, // null for password since we don't want to expose it in tests
   firstName: 'Test',
   lastName: 'User',
@@ -60,7 +60,7 @@ describe('AuthController', () => {
   const mockAuthResponse = {
     accessToken: 'mock-jwt-token',
     userId: 'user-id-1',
-    email: 'test@example.com',
+    email: 'test@example.playaplan.app',
     firstName: 'Test',
     lastName: 'User',
     role: 'PARTICIPANT',
@@ -103,7 +103,7 @@ describe('AuthController', () => {
     it('should create a new user', async () => {
       // Arrange
       const registerDto: RegisterDto = {
-        email: 'new@example.com',
+        email: 'new@example.playaplan.app',
         firstName: 'New',
         lastName: 'User',
         playaName: 'NewUser',
@@ -124,7 +124,7 @@ describe('AuthController', () => {
     it('should throw if user registration fails', async () => {
       // Arrange
       const registerDto: RegisterDto = {
-        email: 'new@example.com',
+        email: 'new@example.playaplan.app',
         firstName: 'New',
         lastName: 'User',
         playaName: 'NewUser',
@@ -186,7 +186,7 @@ describe('AuthController', () => {
   describe('requestLoginCode', () => {
     it('should request a login code successfully', async () => {
       // Arrange
-      const loginEmailDto: RequestLoginCodeDto = { email: 'test@example.com' };
+      const loginEmailDto: RequestLoginCodeDto = { email: 'test@example.playaplan.app' };
       mockAuthService.generateLoginCode.mockResolvedValue(true);
 
       // Act
@@ -196,12 +196,12 @@ describe('AuthController', () => {
       expect(result).toEqual({ 
         message: 'If your email exists in our system, you will receive a login code' 
       });
-      expect(mockAuthService.generateLoginCode).toHaveBeenCalledWith('test@example.com');
+      expect(mockAuthService.generateLoginCode).toHaveBeenCalledWith('test@example.playaplan.app');
     });
 
     it('should throw BadRequestException if login code generation fails', async () => {
       // Arrange
-      const loginEmailDto: RequestLoginCodeDto = { email: 'test@example.com' };
+      const loginEmailDto: RequestLoginCodeDto = { email: 'test@example.playaplan.app' };
       mockAuthService.generateLoginCode.mockResolvedValue(false);
 
       // Act & Assert
@@ -214,7 +214,7 @@ describe('AuthController', () => {
     it('should verify login code and return JWT token with user info', async () => {
       // Arrange
       const emailCodeLoginDto: EmailCodeLoginDto = {
-        email: 'test@example.com',
+        email: 'test@example.playaplan.app',
         code: '123456',
       };
       mockAuthService.validateLoginCode.mockResolvedValue(mockUser);
@@ -225,14 +225,14 @@ describe('AuthController', () => {
 
       // Assert
       expect(result).toEqual(mockAuthResponse);
-      expect(mockAuthService.validateLoginCode).toHaveBeenCalledWith('test@example.com', '123456');
+      expect(mockAuthService.validateLoginCode).toHaveBeenCalledWith('test@example.playaplan.app', '123456');
       expect(mockAuthService.login).toHaveBeenCalledWith(mockUser);
     });
 
     it('should throw UnauthorizedException for invalid login code', async () => {
       // Arrange
       const emailCodeLoginDto: EmailCodeLoginDto = {
-        email: 'test@example.com',
+        email: 'test@example.playaplan.app',
         code: 'invalid',
       };
       mockAuthService.validateLoginCode.mockResolvedValue(null);

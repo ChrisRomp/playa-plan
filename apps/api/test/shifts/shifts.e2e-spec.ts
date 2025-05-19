@@ -27,7 +27,7 @@ describe('ShiftsController (e2e)', () => {
     const adminResponse = await supertest(app.getHttpServer())
       .post('/auth/login')
       .send({
-        email: 'admin@example.com',
+        email: 'admin@example.playaplan.app',
         password: 'admin123',
       });
 
@@ -37,7 +37,7 @@ describe('ShiftsController (e2e)', () => {
     const userResponse = await supertest(app.getHttpServer())
       .post('/auth/login')
       .send({
-        email: 'user@example.com',
+        email: 'user@example.playaplan.app',
         password: 'user123',
       });
 

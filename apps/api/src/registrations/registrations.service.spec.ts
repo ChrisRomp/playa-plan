@@ -67,7 +67,7 @@ describe('RegistrationsService', () => {
 
     const mockUser = {
       id: 'user-id',
-      email: 'test@example.com',
+      email: 'test@example.playaplan.app',
     };
 
     const mockRegistration = {

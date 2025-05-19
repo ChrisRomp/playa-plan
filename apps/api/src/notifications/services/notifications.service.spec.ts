@@ -49,12 +49,12 @@ describe('NotificationsService', () => {
     it('should send welcome email', async () => {
       mockEmailService.sendEmail.mockResolvedValueOnce(true);
 
-      const result = await service.sendWelcomeEmail('user@example.com', 'Test User');
+      const result = await service.sendWelcomeEmail('user@example.playaplan.app', 'Test User');
 
       expect(result).toBeTruthy();
       expect(mockEmailService.sendEmail).toHaveBeenCalledWith(
         expect.objectContaining({
-          to: 'user@example.com',
+          to: 'user@example.playaplan.app',
           subject: expect.stringContaining('Welcome'),
           html: expect.stringContaining('Test User'),
           text: expect.stringContaining('Test User'),
@@ -67,12 +67,12 @@ describe('NotificationsService', () => {
     it('should send password reset email with token', async () => {
       mockEmailService.sendEmail.mockResolvedValueOnce(true);
 
-      const result = await service.sendPasswordResetEmail('user@example.com', 'reset-token-123');
+      const result = await service.sendPasswordResetEmail('user@example.playaplan.app', 'reset-token-123');
 
       expect(result).toBeTruthy();
       expect(mockEmailService.sendEmail).toHaveBeenCalledWith(
         expect.objectContaining({
-          to: 'user@example.com',
+          to: 'user@example.playaplan.app',
           subject: expect.stringContaining('Reset'),
           html: expect.stringContaining('http://test.com/reset-password?token=reset-token-123'),
           text: expect.stringContaining('http://test.com/reset-password?token=reset-token-123'),
@@ -85,12 +85,12 @@ describe('NotificationsService', () => {
     it('should send email verification with token', async () => {
       mockEmailService.sendEmail.mockResolvedValueOnce(true);
 
-      const result = await service.sendEmailVerificationEmail('user@example.com', 'verify-token-123');
+      const result = await service.sendEmailVerificationEmail('user@example.playaplan.app', 'verify-token-123');
 
       expect(result).toBeTruthy();
       expect(mockEmailService.sendEmail).toHaveBeenCalledWith(
         expect.objectContaining({
-          to: 'user@example.com',
+          to: 'user@example.playaplan.app',
           subject: expect.stringContaining('Verify'),
           html: expect.stringContaining('http://test.com/verify-email?token=verify-token-123'),
           text: expect.stringContaining('http://test.com/verify-email?token=verify-token-123'),
@@ -110,12 +110,12 @@ describe('NotificationsService', () => {
         date: new Date('2023-01-15'),
       };
 
-      const result = await service.sendPaymentConfirmationEmail('user@example.com', paymentDetails);
+      const result = await service.sendPaymentConfirmationEmail('user@example.playaplan.app', paymentDetails);
 
       expect(result).toBeTruthy();
       expect(mockEmailService.sendEmail).toHaveBeenCalledWith(
         expect.objectContaining({
-          to: 'user@example.com',
+          to: 'user@example.playaplan.app',
           subject: expect.stringContaining('Payment'),
           html: expect.stringContaining('payment-123'),
           text: expect.stringContaining('payment-123'),
@@ -137,12 +137,12 @@ describe('NotificationsService', () => {
         location: 'Main Gate',
       };
 
-      const result = await service.sendShiftConfirmationEmail('user@example.com', shiftDetails);
+      const result = await service.sendShiftConfirmationEmail('user@example.playaplan.app', shiftDetails);
 
       expect(result).toBeTruthy();
       expect(mockEmailService.sendEmail).toHaveBeenCalledWith(
         expect.objectContaining({
-          to: 'user@example.com',
+          to: 'user@example.playaplan.app',
           subject: expect.stringContaining('Shift'),
           html: expect.stringContaining('Greeter'),
           text: expect.stringContaining('Greeter'),
@@ -156,7 +156,7 @@ describe('NotificationsService', () => {
       mockEmailService.sendEmail.mockRejectedValueOnce(new Error('Test error'));
 
       const result = await service.sendNotification(
-        'user@example.com',
+        'user@example.playaplan.app',
         NotificationType.WELCOME,
         { name: 'Test User' },
       );

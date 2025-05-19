@@ -15,7 +15,7 @@ describe('EmailService', () => {
 
   const mockConfigService = {
     get: jest.fn((key: string, defaultValue?: unknown) => {
-      if (key === 'email.defaultFrom') return 'test@example.com';
+      if (key === 'email.defaultFrom') return 'test@example.playaplan.app';
       if (key === 'email.provider') return 'sendgrid';
       if (key === 'email.sendgrid.apiKey') return 'test_api_key';
       return defaultValue;
@@ -56,7 +56,7 @@ describe('EmailService', () => {
       ]);
 
       const emailOptions: EmailOptions = {
-        to: 'recipient@example.com',
+        to: 'recipient@example.playaplan.app',
         subject: 'Test Email',
         html: '<p>Test content</p>',
       };
@@ -65,12 +65,12 @@ describe('EmailService', () => {
 
       expect(result).toBeTruthy();
       expect(sgMail.send).toHaveBeenCalledWith({
-        to: 'recipient@example.com',
-        from: 'test@example.com',
+        to: 'recipient@example.playaplan.app',
+        from: 'test@example.playaplan.app',
         subject: 'Test Email',
         text: '',
         html: '<p>Test content</p>',
-        replyTo: 'test@example.com',
+        replyTo: 'test@example.playaplan.app',
       });
     });
 
@@ -82,7 +82,7 @@ describe('EmailService', () => {
       ]);
 
       const emailOptions: EmailOptions = {
-        to: ['recipient1@example.com', 'recipient2@example.com'],
+        to: ['recipient1@example.playaplan.app', 'recipient2@example.playaplan.app'],
         subject: 'Test Email',
         html: '<p>Test content</p>',
       };
@@ -91,12 +91,12 @@ describe('EmailService', () => {
 
       expect(result).toBeTruthy();
       expect(sgMail.send).toHaveBeenCalledWith({
-        to: ['recipient1@example.com', 'recipient2@example.com'],
-        from: 'test@example.com',
+        to: ['recipient1@example.playaplan.app', 'recipient2@example.playaplan.app'],
+        from: 'test@example.playaplan.app',
         subject: 'Test Email',
         text: '',
         html: '<p>Test content</p>',
-        replyTo: 'test@example.com',
+        replyTo: 'test@example.playaplan.app',
       });
     });
 
@@ -108,22 +108,22 @@ describe('EmailService', () => {
       ]);
 
       const emailOptions: EmailOptions = {
-        to: 'recipient@example.com',
+        to: 'recipient@example.playaplan.app',
         subject: 'Test Email',
         html: '<p>Test content</p>',
-        from: 'custom@example.com',
+        from: 'custom@example.playaplan.app',
       };
 
       const result = await service.sendEmail(emailOptions);
 
       expect(result).toBeTruthy();
       expect(sgMail.send).toHaveBeenCalledWith({
-        to: 'recipient@example.com',
-        from: 'custom@example.com',
+        to: 'recipient@example.playaplan.app',
+        from: 'custom@example.playaplan.app',
         subject: 'Test Email',
         text: '',
         html: '<p>Test content</p>',
-        replyTo: 'custom@example.com',
+        replyTo: 'custom@example.playaplan.app',
       });
     });
 
@@ -135,22 +135,22 @@ describe('EmailService', () => {
       ]);
 
       const emailOptions: EmailOptions = {
-        to: 'recipient@example.com',
+        to: 'recipient@example.playaplan.app',
         subject: 'Test Email',
         html: '<p>Test content</p>',
-        replyTo: 'reply@example.com',
+        replyTo: 'reply@example.playaplan.app',
       };
 
       const result = await service.sendEmail(emailOptions);
 
       expect(result).toBeTruthy();
       expect(sgMail.send).toHaveBeenCalledWith({
-        to: 'recipient@example.com',
-        from: 'test@example.com',
+        to: 'recipient@example.playaplan.app',
+        from: 'test@example.playaplan.app',
         subject: 'Test Email',
         text: '',
         html: '<p>Test content</p>',
-        replyTo: 'reply@example.com',
+        replyTo: 'reply@example.playaplan.app',
       });
     });
 
@@ -162,7 +162,7 @@ describe('EmailService', () => {
       ]);
 
       const emailOptions: EmailOptions = {
-        to: 'recipient@example.com',
+        to: 'recipient@example.playaplan.app',
         subject: 'Test Email',
         html: '<p>Test content</p>',
         text: 'Test content',
@@ -172,12 +172,12 @@ describe('EmailService', () => {
 
       expect(result).toBeTruthy();
       expect(sgMail.send).toHaveBeenCalledWith({
-        to: 'recipient@example.com',
-        from: 'test@example.com',
+        to: 'recipient@example.playaplan.app',
+        from: 'test@example.playaplan.app',
         subject: 'Test Email',
         text: 'Test content',
         html: '<p>Test content</p>',
-        replyTo: 'test@example.com',
+        replyTo: 'test@example.playaplan.app',
       });
     });
 
@@ -186,7 +186,7 @@ describe('EmailService', () => {
       (sgMail.send as jest.Mock).mockRejectedValueOnce(new Error('SendGrid error'));
 
       const emailOptions: EmailOptions = {
-        to: 'recipient@example.com',
+        to: 'recipient@example.playaplan.app',
         subject: 'Test Email',
         html: '<p>Test content</p>',
       };

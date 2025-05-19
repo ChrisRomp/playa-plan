@@ -200,7 +200,7 @@ describe('UpdateUserDto', () => {
   it('should validate an email field with valid email', async () => {
     // Arrange
     const dto = plainToInstance(UpdateUserDto, {
-      email: 'valid@example.com'
+      email: 'valid@example.playaplan.app'
     });
 
     // Act

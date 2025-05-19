@@ -82,7 +82,7 @@ describe('ProtectedRoute', () => {
       isLoading: false,
       user: {
         id: '1',
-        email: 'user@example.com',
+        email: 'user@example.playaplan.app',
         name: 'Test User',
         role: ROLES.USER,
         isAuthenticated: true,
@@ -116,7 +116,7 @@ describe('ProtectedRoute', () => {
       isLoading: false,
       user: {
         id: '1',
-        email: 'user@example.com',
+        email: 'user@example.playaplan.app',
         name: 'Test User',
         role: ROLES.USER,
         isAuthenticated: true,
@@ -151,7 +151,7 @@ describe('ProtectedRoute', () => {
       isLoading: false,
       user: {
         id: '1',
-        email: 'admin@example.com',
+        email: 'admin@example.playaplan.app',
         name: 'Admin User',
         role: ROLES.ADMIN,
         isAuthenticated: true,
@@ -185,7 +185,7 @@ describe('ProtectedRoute', () => {
       isLoading: false,
       user: {
         id: '1',
-        email: 'user@example.com',
+        email: 'user@example.playaplan.app',
         name: 'Test User',
         role: ROLES.USER,
         isAuthenticated: true,

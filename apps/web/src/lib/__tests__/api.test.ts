@@ -35,7 +35,7 @@ describe('API module', () => {
     vi.clearAllMocks();
     
     // Setup localStorage mock for the email
-    (localStorage.getItem as Mock).mockReturnValue('test@example.com');
+    (localStorage.getItem as Mock).mockReturnValue('test@example.playaplan.app');
     
     // Mock the parse method of AuthResponseSchema to return the correct type
     vi.spyOn(AuthResponseSchema, 'parse').mockImplementation((data) => {
@@ -57,7 +57,7 @@ describe('API module', () => {
     const mockAuthResponse = {
       accessToken: 'mock-token-12345',
       userId: 'user-123',
-      email: 'test@example.com',
+      email: 'test@example.playaplan.app',
       firstName: 'John',
       lastName: 'Doe',
       role: 'PARTICIPANT',
@@ -77,7 +77,7 @@ describe('API module', () => {
       // Check that the correct fallback endpoint was called
       expect(api.post).toHaveBeenCalledWith('/auth/register', {
         ...mockUserData,
-        email: 'test@example.com',
+        email: 'test@example.playaplan.app',
         password: expect.any(String), // We expect some kind of password is included
       });
     });

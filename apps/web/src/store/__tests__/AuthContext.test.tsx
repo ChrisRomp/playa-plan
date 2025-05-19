@@ -49,13 +49,13 @@ const TestComponent = () => {
       <div data-testid="user">{user ? JSON.stringify(user) : 'no user'}</div>
       <button 
         data-testid="request-code-btn" 
-        onClick={() => requestVerificationCode('test@example.com')}
+        onClick={() => requestVerificationCode('test@example.playaplan.app')}
       >
         Request Code
       </button>
       <button 
         data-testid="verify-code-btn" 
-        onClick={() => verifyCode('test@example.com', '123456')}
+        onClick={() => verifyCode('test@example.playaplan.app', '123456')}
       >
         Verify Code
       </button>
@@ -169,7 +169,7 @@ describe('AuthContext', () => {
       // Check localStorage was updated
       expect(localStorage.setItem).toHaveBeenCalledWith(
         'pendingLoginEmail',
-        'test@example.com'
+        'test@example.playaplan.app'
       );
     });
     
@@ -210,7 +210,7 @@ describe('AuthContext', () => {
   describe('verifyCode', () => {
     const mockAuthResponse = {
       userId: 'user-123',
-      email: 'test@example.com',
+      email: 'test@example.playaplan.app',
       firstName: 'Test',
       lastName: 'User',
       role: 'PARTICIPANT',
@@ -280,7 +280,7 @@ describe('AuthContext', () => {
       
       // Check user state is updated
       expect(screen.getByTestId('user').textContent).toContain('Test');
-      expect(screen.getByTestId('user').textContent).toContain('test@example.com');
+      expect(screen.getByTestId('user').textContent).toContain('test@example.playaplan.app');
       
       // Check localStorage was cleared
       expect(localStorage.removeItem).toHaveBeenCalledWith('pendingLoginEmail');

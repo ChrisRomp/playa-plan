@@ -28,7 +28,7 @@ export class EmailService {
   private transporter: nodemailer.Transporter | null = null;
 
   constructor(private readonly configService: ConfigService) {
-    this.defaultFrom = this.configService.get<string>('email.defaultFrom') || 'noreply@example.com';
+    this.defaultFrom = this.configService.get<string>('email.defaultFrom') || 'noreply@example.playaplan.app';
     this.emailProvider = this.configService.get<'sendgrid' | 'smtp'>('email.provider', 'sendgrid');
 
     if (this.emailProvider === 'sendgrid') {

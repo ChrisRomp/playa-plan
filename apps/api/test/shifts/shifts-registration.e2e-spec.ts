@@ -88,7 +88,7 @@ describe('Job Registrations (e2e)', () => {
       await prisma.user.deleteMany({
         where: {
           email: {
-            in: ['registration-test-admin@example.com', 'registration-test-user@example.com', 'another-registration-test-user@example.com']
+            in: ['registration-test-admin@example.playaplan.app', 'registration-test-user@example.playaplan.app', 'another-registration-test-user@example.playaplan.app']
           }
         }
       });
@@ -101,7 +101,7 @@ describe('Job Registrations (e2e)', () => {
     // Create test users
     testAdmin = await prisma.user.create({
       data: {
-        email: 'registration-test-admin@example.com',
+        email: 'registration-test-admin@example.playaplan.app',
         password: '$2b$10$EpRnTzVlqHNP0.fUbXUwSOyuiXe/QLSUG6xNekdHgTGmrpHEfIoxm', // 'admin123'
         firstName: 'Admin',
         lastName: 'User',
@@ -112,7 +112,7 @@ describe('Job Registrations (e2e)', () => {
 
     testUser = await prisma.user.create({
       data: {
-        email: 'registration-test-user@example.com',
+        email: 'registration-test-user@example.playaplan.app',
         password: '$2b$10$EpRnTzVlqHNP0.fUbXUwSOyuiXe/QLSUG6xNekdHgTGmrpHEfIoxm', // 'user123'
         firstName: 'Regular',
         lastName: 'User',
@@ -226,7 +226,7 @@ describe('Job Registrations (e2e)', () => {
       // Create another user
       const anotherUser = await prisma.user.create({
         data: {
-          email: 'another-registration-test-user@example.com',
+          email: 'another-registration-test-user@example.playaplan.app',
           password: '$2b$10$EpRnTzVlqHNP0.fUbXUwSOyuiXe/QLSUG6xNekdHgTGmrpHEfIoxm', // 'user123'
           firstName: 'Another',
           lastName: 'User',
