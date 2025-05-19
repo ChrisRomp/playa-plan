@@ -109,12 +109,8 @@ describe('ShiftsController (e2e)', () => {
       expect(response.body).toHaveProperty('id');
       expect(response.body.name).toBe(createShiftDto.name);
       expect(response.body.description).toBe(createShiftDto.description);
-      expect(new Date(response.body.startTime).toISOString()).toBe(
-        createShiftDto.startTime,
-      );
-      expect(new Date(response.body.endTime).toISOString()).toBe(
-        createShiftDto.endTime,
-      );
+      expect(response.body.startTime).toBe(createShiftDto.startTime);
+      expect(response.body.endTime).toBe(createShiftDto.endTime);
       expect(response.body.dayOfWeek).toBe(createShiftDto.dayOfWeek);
       expect(response.body.campId).toBe(createShiftDto.campId);
     });
@@ -154,8 +150,8 @@ describe('ShiftsController (e2e)', () => {
       const createShiftDto = {
         name: 'Test Shift for GET',
         description: 'Test Shift Description',
-        startTime: '2023-06-02T09:00:00.000Z',
-        endTime: '2023-06-02T17:00:00.000Z',
+        startTime: '09:00',
+        endTime: '17:00',
         dayOfWeek: DayOfWeek.TUESDAY,
         campId: campId,
       };
@@ -194,8 +190,8 @@ describe('ShiftsController (e2e)', () => {
       const createShiftDto = {
         name: 'Test Shift for PATCH',
         description: 'Test Shift Description',
-        startTime: '2023-06-03T09:00:00.000Z',
-        endTime: '2023-06-03T17:00:00.000Z',
+        startTime: '09:00',
+        endTime: '17:00',
         dayOfWeek: DayOfWeek.WEDNESDAY,
         campId: campId,
       };
@@ -211,8 +207,8 @@ describe('ShiftsController (e2e)', () => {
       const updateShiftDto = {
         name: 'Updated Shift',
         description: 'Updated Description',
-        startTime: '2023-06-03T10:00:00.000Z',
-        endTime: '2023-06-03T18:00:00.000Z',
+        startTime: '10:00',
+        endTime: '18:00',
       };
 
       const response = await supertest(app.getHttpServer())
@@ -224,12 +220,8 @@ describe('ShiftsController (e2e)', () => {
       expect(response.body.id).toBe(shiftId);
       expect(response.body.name).toBe(updateShiftDto.name);
       expect(response.body.description).toBe(updateShiftDto.description);
-      expect(new Date(response.body.startTime).toISOString()).toBe(
-        updateShiftDto.startTime,
-      );
-      expect(new Date(response.body.endTime).toISOString()).toBe(
-        updateShiftDto.endTime,
-      );
+      expect(response.body.startTime).toBe(updateShiftDto.startTime);
+      expect(response.body.endTime).toBe(updateShiftDto.endTime);
     });
 
     it('should not update a shift (non-admin)', async () => {
@@ -237,8 +229,8 @@ describe('ShiftsController (e2e)', () => {
       const createShiftDto = {
         name: 'Test Shift for non-admin PATCH',
         description: 'Test Shift Description',
-        startTime: '2023-06-04T09:00:00.000Z',
-        endTime: '2023-06-04T17:00:00.000Z',
+        startTime: '09:00',
+        endTime: '17:00',
         dayOfWeek: DayOfWeek.THURSDAY,
         campId: campId,
       };
@@ -269,8 +261,8 @@ describe('ShiftsController (e2e)', () => {
       const createShiftDto = {
         name: 'Test Shift for DELETE',
         description: 'Test Shift Description',
-        startTime: '2023-06-05T09:00:00.000Z',
-        endTime: '2023-06-05T17:00:00.000Z',
+        startTime: '09:00',
+        endTime: '17:00',
         dayOfWeek: DayOfWeek.FRIDAY,
         campId: campId,
       };
@@ -300,8 +292,8 @@ describe('ShiftsController (e2e)', () => {
       const createShiftDto = {
         name: 'Test Shift for non-admin DELETE',
         description: 'Test Shift Description',
-        startTime: '2023-06-06T09:00:00.000Z',
-        endTime: '2023-06-06T17:00:00.000Z',
+        startTime: '09:00',
+        endTime: '17:00',
         dayOfWeek: DayOfWeek.SATURDAY,
         campId: campId,
       };

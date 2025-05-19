@@ -14,8 +14,8 @@ describe('ShiftsController', () => {
     id: 'test-id',
     name: 'Test Shift',
     description: 'Test Description',
-    startTime: new Date('2023-06-01T09:00:00Z'),
-    endTime: new Date('2023-06-01T17:00:00Z'),
+    startTime: '09:00',
+    endTime: '17:00',
     campId: 'camp-id',
     dayOfWeek: DayOfWeek.MONDAY,
     createdAt: new Date(),
@@ -84,8 +84,8 @@ describe('ShiftsController', () => {
       const mockCreateShiftDto: CreateShiftDto = {
         name: 'Test Shift',
         description: 'Test Description',
-        startTime: new Date('2023-06-01T09:00:00Z'),
-        endTime: new Date('2023-06-01T17:00:00Z'),
+        startTime: '09:00',
+        endTime: '17:00',
         dayOfWeek: DayOfWeek.MONDAY,
         campId: 'test-camp-id'
       };

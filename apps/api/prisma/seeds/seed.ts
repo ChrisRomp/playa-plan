@@ -212,11 +212,10 @@ async function main() {
   // Create shifts first (before jobs)
   const morningKitchenShift = await prisma.shift.create({
     data: {
-      name: 'Morning Kitchen Shift',
-      description: 'Morning shift for kitchen duties',
-      startTime: new Date('2025-08-26T08:00:00Z'),
-      endTime: new Date('2025-08-26T12:00:00Z'),
-      maxRegistrations: 5,
+      name: 'Morning Kitchen',
+      description: 'Morning food preparation and kitchen duty',
+      startTime: '08:00',
+      endTime: '12:00',
       campId: camp.id,
       dayOfWeek: 'TUESDAY'
     }
@@ -224,47 +223,43 @@ async function main() {
 
   const afternoonKitchenShift = await prisma.shift.create({
     data: {
-      name: 'Afternoon Kitchen Shift',
-      description: 'Afternoon shift for kitchen duties',
-      startTime: new Date('2025-08-26T13:00:00Z'),
-      endTime: new Date('2025-08-26T17:00:00Z'),
-      maxRegistrations: 5,
+      name: 'Afternoon Kitchen',
+      description: 'Afternoon food preparation and kitchen duty',
+      startTime: '14:00',
+      endTime: '18:00',
       campId: camp.id,
-      dayOfWeek: 'WEDNESDAY'
+      dayOfWeek: 'TUESDAY'
     }
   });
 
   const morningGreeterShift = await prisma.shift.create({
     data: {
-      name: 'Opening Day Greeter Shift',
-      description: 'Morning shift for greeting arrivals',
-      startTime: new Date('2025-08-26T09:00:00Z'),
-      endTime: new Date('2025-08-26T13:00:00Z'),
-      maxRegistrations: 3,
+      name: 'Morning Greeter',
+      description: 'Morning shift for greeting and welcoming',
+      startTime: '09:00',
+      endTime: '13:00',
       campId: camp.id,
-      dayOfWeek: 'OPENING_SUNDAY'
+      dayOfWeek: 'TUESDAY'
     }
   });
 
   const nightRangerShift = await prisma.shift.create({
     data: {
-      name: 'Night Ranger Shift',
-      description: 'Evening security patrol',
-      startTime: new Date('2025-08-26T22:00:00Z'),
-      endTime: new Date('2025-08-27T02:00:00Z'),
-      maxRegistrations: 4,
+      name: 'Night Ranger Duty',
+      description: 'Night patrol and safety monitoring',
+      startTime: '20:00',
+      endTime: '02:00',
       campId: camp.id,
-      dayOfWeek: 'FRIDAY'
+      dayOfWeek: 'TUESDAY'
     }
   });
 
   const closingSundayShift = await prisma.shift.create({
     data: {
-      name: 'Closing Day Cleanup',
+      name: 'Closing Sunday Cleanup',
       description: 'Help break down and clean the camp',
-      startTime: new Date('2025-09-01T10:00:00Z'),
-      endTime: new Date('2025-09-01T14:00:00Z'),
-      maxRegistrations: 6,
+      startTime: '10:00',
+      endTime: '14:00',
       campId: camp.id,
       dayOfWeek: 'CLOSING_SUNDAY'
     }
@@ -274,9 +269,8 @@ async function main() {
     data: {
       name: 'Pre-Opening Setup',
       description: 'Help set up the camp infrastructure',
-      startTime: new Date('2025-08-24T09:00:00Z'),
-      endTime: new Date('2025-08-24T17:00:00Z'),
-      maxRegistrations: 8,
+      startTime: '09:00',
+      endTime: '17:00',
       campId: camp.id,
       dayOfWeek: 'PRE_OPENING'
     }
@@ -291,7 +285,8 @@ async function main() {
       description: 'Assist with meal preparation and cleanup',
       categoryId: kitchenCategory.id,
       location: 'Main Camp Kitchen',
-      shiftId: morningKitchenShift.id
+      shiftId: morningKitchenShift.id,
+      maxRegistrations: 4
     }
   });
 
@@ -301,7 +296,8 @@ async function main() {
       description: 'Assist with meal preparation and cleanup during afternoon',
       categoryId: kitchenCategory.id,
       location: 'Main Camp Kitchen',
-      shiftId: afternoonKitchenShift.id
+      shiftId: afternoonKitchenShift.id,
+      maxRegistrations: 4
     }
   });
 
@@ -311,7 +307,8 @@ async function main() {
       description: 'Welcome new arrivals and help with orientation',
       categoryId: greeterCategory.id,
       location: 'Main Entrance',
-      shiftId: morningGreeterShift.id
+      shiftId: morningGreeterShift.id,
+      maxRegistrations: 2
     }
   });
 
@@ -321,7 +318,8 @@ async function main() {
       description: 'Patrol the camp during night hours',
       categoryId: rangerCategory.id,
       location: 'All Camp Areas',
-      shiftId: nightRangerShift.id
+      shiftId: nightRangerShift.id,
+      maxRegistrations: 3
     }
   });
 
@@ -331,7 +329,8 @@ async function main() {
       description: 'Help break down and clean the camp',
       categoryId: sanitationCategory.id,
       location: 'Entire Camp',
-      shiftId: closingSundayShift.id
+      shiftId: closingSundayShift.id,
+      maxRegistrations: 6
     }
   });
 
@@ -341,7 +340,8 @@ async function main() {
       description: 'Help set up the camp infrastructure',
       categoryId: constructionCategory.id,
       location: 'Main Camp Area',
-      shiftId: preOpeningShift.id
+      shiftId: preOpeningShift.id,
+      maxRegistrations: 8
     }
   });
 

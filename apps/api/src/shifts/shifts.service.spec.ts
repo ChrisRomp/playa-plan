@@ -13,8 +13,8 @@ describe('ShiftsService', () => {
     id: 'test-id',
     name: 'Test Shift',
     description: 'Test Description',
-    startTime: new Date('2023-06-01T09:00:00Z'),
-    endTime: new Date('2023-06-01T17:00:00Z'),
+    startTime: '09:00',
+    endTime: '17:00',
     dayOfWeek: DayOfWeek.MONDAY,
     campId: 'camp-id',
     createdAt: new Date(),
@@ -24,8 +24,8 @@ describe('ShiftsService', () => {
   const mockCreateShiftDto = {
     name: 'Test Shift',
     description: 'Test Description',
-    startTime: new Date('2023-06-01T09:00:00Z'),
-    endTime: new Date('2023-06-01T17:00:00Z'),
+    startTime: '09:00',
+    endTime: '17:00',
     dayOfWeek: DayOfWeek.MONDAY,
     campId: 'test-camp-id'
   };
@@ -33,8 +33,8 @@ describe('ShiftsService', () => {
   const mockUpdateShiftDto = {
     name: 'Updated Shift',
     description: 'Updated Description',
-    startTime: new Date('2023-07-01T10:00:00Z'),
-    endTime: new Date('2023-07-01T18:00:00Z'),
+    startTime: '10:00',
+    endTime: '18:00',
     dayOfWeek: DayOfWeek.TUESDAY,
     campId: 'updated-camp-id'
   };

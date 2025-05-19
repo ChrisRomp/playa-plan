@@ -63,8 +63,8 @@ export default function AdminShiftsPage() {
     setForm({
       name: '',
       description: '',
-      startTime: getTodayAtTime('09:00'),
-      endTime: getTodayAtTime('17:00'),
+      startTime: '09:00',
+      endTime: '17:00',
       dayOfWeek: 'MONDAY',
       campId: 'default-camp-id',
     });
@@ -79,8 +79,8 @@ export default function AdminShiftsPage() {
     setForm({
       name: shift.name || '',
       description: shift.description || '',
-      startTime: formatDateForInput(shift.startTime),
-      endTime: formatDateForInput(shift.endTime),
+      startTime: shift.startTime,
+      endTime: shift.endTime,
       dayOfWeek: shift.dayOfWeek,
       campId: shift.campId || 'default-camp-id',
     });
@@ -106,11 +106,8 @@ export default function AdminShiftsPage() {
         setForm({ ...form, [name]: numValue });
       }
     } else if (type === 'time' && (name === 'startTime' || name === 'endTime')) {
-      // For time inputs, combine with static date (January 1, 2025)
-      const [hours, minutes] = value.split(':').map(Number);
-      const staticDate = new Date(2025, 0, 1); // January 1, 2025
-      staticDate.setHours(hours, minutes, 0, 0);
-      setForm({ ...form, [name]: staticDate.toISOString() });
+      // For time inputs, store directly in HH:MM format
+      setForm({ ...form, [name]: value });
     } else {
       setForm({ ...form, [name]: value });
     }
@@ -119,22 +116,26 @@ export default function AdminShiftsPage() {
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validate required fields: name, description, startTime, endTime, dayOfWeek
-    if (!form.name || !form.description || !form.startTime || !form.endTime || !form.dayOfWeek) {
-      setFormError('Name, description, day, start time, and end time are required.');
+    // Validate required fields: name, startTime, endTime, dayOfWeek (description is optional)
+    if (!form.name || !form.startTime || !form.endTime || !form.dayOfWeek) {
+      setFormError('Name, day, start time, and end time are required.');
+      return;
+    }
+    
+    // Validate time format using regex
+    const timeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
+    if (!timeRegex.test(form.startTime) || !timeRegex.test(form.endTime)) {
+      setFormError('Times must be in HH:MM format (e.g., "09:00" or "17:30")');
       return;
     }
     
     setFormError(null);
     
     try {
-      // Ensure campId is set before submission and format dates correctly
+      // Send data directly to API - no need to convert times
       const shiftData = {
         ...form,
         campId: form.campId || 'default-camp-id',
-        // Convert ISO strings to Date objects as expected by the API
-        startTime: new Date(form.startTime).toISOString(),
-        endTime: new Date(form.endTime).toISOString(),
       };
       
       if (editId) {
@@ -176,24 +177,21 @@ export default function AdminShiftsPage() {
     }
   };
 
-  const formatDateForDisplay = (dateString: string): string => {
-    const date = new Date(dateString);
+  const formatDateForDisplay = (timeString: string): string => {
+    // Convert 24-hour HH:MM format to localized time
+    if (!timeString || !timeString.includes(':')) return timeString;
+    
+    const [hours, minutes] = timeString.split(':').map(Number);
+    const date = new Date();
+    date.setHours(hours, minutes, 0, 0);
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
-  const formatDateForInput = (dateString: string): string => {
-    const date = new Date(dateString);
-    // Extract only the time part (HH:MM)
-    return date.toTimeString().substring(0, 5);
+  const formatDateForInput = (timeString: string): string => {
+    // HH:MM format is already compatible with time input, just pass through
+    return timeString || '';
   };
 
-  const getTodayAtTime = (timeString: string): string => {
-    // Use a static date (January 1, 2025) with the specified time
-    const [hours, minutes] = timeString.split(':').map(Number);
-    const staticDate = new Date(2025, 0, 1); // January 1, 2025
-    staticDate.setHours(hours, minutes, 0, 0);
-    return staticDate.toISOString();
-  };
 
   const getDayOfWeekLabel = (value: string): string => {
     const option = dayOfWeekOptions.find(opt => opt.value === value);

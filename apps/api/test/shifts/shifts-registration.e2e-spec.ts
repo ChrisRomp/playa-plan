@@ -147,8 +147,8 @@ describe('Job Registrations (e2e)', () => {
       data: {
         name: "Test Registration Shift",
         description: "Test Shift Description",
-        startTime: new Date('2023-06-01T09:00:00.000Z'),
-        endTime: new Date('2023-06-01T17:00:00.000Z'),
+        startTime: '09:00',
+        endTime: '17:00',
         dayOfWeek: DayOfWeek.MONDAY,
         campId: testCamp.id,
       }

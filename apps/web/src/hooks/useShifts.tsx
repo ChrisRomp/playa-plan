@@ -4,15 +4,15 @@ import { shifts, Shift } from '../lib/api';
 // Define the type for shift input data
 export type ShiftInput = Omit<Shift, 'id' | 'jobs'> & {
   name: string;
-  description: string;
+  description?: string;
   /**
-   * ISO string containing a placeholder date (2025-01-01) with the actual time
-   * The date portion is not displayed to users, only the time is relevant
+   * Time string in HH:MM format (24-hour time)
+   * Examples: "09:00", "14:30", "23:45"
    */
   startTime: string;
   /**
-   * ISO string containing a placeholder date (2025-01-01) with the actual time
-   * The date portion is not displayed to users, only the time is relevant
+   * Time string in HH:MM format (24-hour time)
+   * Examples: "09:00", "14:30", "23:45"
    */
   endTime: string;
   dayOfWeek: string;

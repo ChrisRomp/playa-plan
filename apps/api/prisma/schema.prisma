@@ -159,8 +159,8 @@ model Shift {
   id               String         @id @default(uuid())
   name             String
   description      String?
-  startTime        DateTime
-  endTime          DateTime
+  startTime        String         // HH:MM format (24-hour time)
+  endTime          String         // HH:MM format (24-hour time)
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
   campId           String

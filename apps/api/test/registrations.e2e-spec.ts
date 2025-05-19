@@ -44,8 +44,8 @@ describe('RegistrationsController (e2e)', () => {
     id: string;
     name: string;
     description: string | null;
-    startTime: Date;
-    endTime: Date;
+    startTime: string;
+    endTime: string;
     campId: string;
     dayOfWeek: DayOfWeek;
   };
@@ -173,8 +173,8 @@ describe('RegistrationsController (e2e)', () => {
       data: {
         name: 'Test Shift',
         description: 'Test Shift Description',
-        startTime: new Date('2023-06-01T09:00:00Z'),
-        endTime: new Date('2023-06-01T17:00:00Z'),
+        startTime: '09:00',
+        endTime: '17:00',
         dayOfWeek: DayOfWeek.MONDAY,
         campId: testCamp.id,
       },
