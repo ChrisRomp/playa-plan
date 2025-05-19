@@ -1,15 +1,7 @@
 import { useState } from 'react';
 import { useShifts } from '../hooks/useShifts';
-// useCamps hook removed
-import { useJobs } from '../hooks/useJobs';
 import { Shift } from '../lib/api';
 import { isAxiosError } from 'axios';
-
-interface Job {
-  id: string;
-  name: string;
-  shiftId: string;
-}
 
 interface ShiftFormState {
   name: string;
@@ -45,10 +37,7 @@ export default function AdminShiftsPage() {
 
   // useCamps hook removed
 
-  const {
-    jobs,
-    loading: jobsLoading,
-  } = useJobs();
+  // Jobs are no longer needed since we removed the job column
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
@@ -62,9 +51,7 @@ export default function AdminShiftsPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
-  const [registrationsOpen, setRegistrationsOpen] = useState(false);
-  const [registrations, setRegistrations] = useState<unknown[]>([]);
-  const [registrationsLoading, setRegistrationsLoading] = useState(false);
+  // Registrations states removed as they're no longer needed
 
   const openAddModal = () => {
     setEditId(null);
@@ -204,31 +191,12 @@ export default function AdminShiftsPage() {
     return option ? option.label : value;
   };
 
-  const viewRegistrations = () => {
-    setRegistrationsOpen(true);
-    setRegistrationsLoading(true);
-    try {
-      // Mock data until API integration is implemented
-      setRegistrations([]);
-    } catch (error) {
-      console.error('Failed to fetch registrations:', error);
-    } finally {
-      setRegistrationsLoading(false);
-    }
-  };
+  // Registrations-related functions removed as they're no longer needed
 
-  const closeRegistrationsModal = () => {
-    setRegistrationsOpen(false);
-  };
+  // Sort shifts by name in ascending order
+  const sortedShifts = [...shifts].sort((a, b) => a.name.localeCompare(b.name));
 
-  const getJobsForShift = (shiftId: string): string => {
-    if (jobsLoading || !jobs) return 'Loading...';
-    
-    const shiftJobs = jobs.filter(job => job.shiftId === shiftId);
-    return shiftJobs.map((job: Job) => job.name).join(', ') || 'None';
-  };
-
-  const loading = shiftsLoading || jobsLoading;
+  const loading = shiftsLoading;
 
   return (
     <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">
@@ -260,7 +228,7 @@ export default function AdminShiftsPage() {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Job</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Day</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Start Time</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">End Time</th>
@@ -277,19 +245,14 @@ export default function AdminShiftsPage() {
                   <td colSpan={6} className="px-6 py-4 text-center">No shifts found.</td>
                 </tr>
               ) : (
-                shifts.map((shift) => (
+                sortedShifts.map((shift) => (
                   <tr key={shift.id}>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{getJobsForShift(shift.id)}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{shift.name}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{getDayOfWeekLabel(shift.dayOfWeek)}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{formatDateForDisplay(shift.startTime)}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{formatDateForDisplay(shift.endTime)}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <button
-                        className="text-indigo-600 hover:text-indigo-900 mr-4"
-                        onClick={() => viewRegistrations()}
-                      >
-                        Registrations
-                      </button>
+                      {/* Registrations button removed */}
                       <button
                         className="text-blue-600 hover:text-blue-900 mr-4"
                         onClick={() => openEditModal(shift)}
@@ -407,48 +370,7 @@ export default function AdminShiftsPage() {
         </div>
       )}
       
-      {/* Registrations Modal */}
-      {registrationsOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50" role="dialog" aria-modal="true">
-          <div className="bg-white rounded shadow-lg p-6 w-full max-w-lg">
-            <h2 className="text-xl font-semibold mb-4">Shift Registrations</h2>
-            {registrationsLoading ? (
-              <div className="text-center py-4">Loading registrations...</div>
-            ) : registrations.length === 0 ? (
-              <div className="text-center py-4">No registrations found for this shift.</div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                      <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {/* Placeholder for registration data */}
-                    <tr>
-                      <td className="px-4 py-2 text-sm text-gray-900" colSpan={3}>
-                        Registration data will be shown here
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            )}
-            <div className="flex justify-end mt-4">
-              <button
-                type="button"
-                className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
-                onClick={closeRegistrationsModal}
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Registrations Modal removed */}
     </div>
   );
 } 
