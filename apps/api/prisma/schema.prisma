@@ -41,22 +41,7 @@ model User {
   @@map("users")
 }
 
-model Camp {
-  id             String          @id @default(uuid())
-  name           String
-  description    String?
-  startDate      DateTime
-  endDate        DateTime
-  location       String
-  capacity       Int
-  isActive       Boolean         @default(true)
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-  campingOptions CampingOption[]
-  shifts         Shift[]
-
-  @@map("camps")
-}
+// Camp model has been removed
 
 model CampingOption {
   id                 String                      @id @default(uuid())
@@ -67,13 +52,10 @@ model CampingOption {
   participantDues    Float
   staffDues          Float
   maxSignups         Int                         @default(0)
-  createdAt          DateTime                    @default(now())
-  updatedAt          DateTime                    @updatedAt
-  campId             String
-  jobCategoryIds     String[]
   fields             CampingOptionField[]
   registrations      CampingOptionRegistration[]
-  camp               Camp                        @relation(fields: [campId], references: [id])
+  createdAt          DateTime                    @default(now())
+  updatedAt          DateTime                    @updatedAt
 
   @@map("camping_options")
 }
@@ -163,10 +145,8 @@ model Shift {
   endTime          String         // HH:MM format (24-hour time)
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
-  campId           String
   dayOfWeek        DayOfWeek
   jobs             Job[]
-  camp             Camp           @relation(fields: [campId], references: [id])
 
   @@map("shifts")
 }
@@ -241,6 +221,8 @@ model CoreConfig {
   smtpUser                 String?
   smtpPassword             String?
   smtpSecure               Boolean    @default(false)
+  senderEmail              String?
+  senderName               String?
   timeZone                 String     @default("UTC")
   createdAt                DateTime   @default(now())
   updatedAt                DateTime   @updatedAt

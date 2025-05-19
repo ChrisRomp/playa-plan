@@ -22,29 +22,6 @@ export class CampingOptionsService {
    */
   async create(createCampingOptionDto: CreateCampingOptionDto): Promise<CampingOption> {
     try {
-      // If campId is not provided, get the first active camp ID
-      if (!createCampingOptionDto.campId) {
-        const firstActiveCamp = await this.prisma.camp.findFirst({
-          where: { isActive: true },
-          orderBy: { createdAt: 'asc' },
-        });
-
-        if (!firstActiveCamp) {
-          throw new NotFoundException('No active camp found to associate with this camping option');
-        }
-
-        createCampingOptionDto.campId = firstActiveCamp.id;
-      }
-
-      // Verify that the camp exists
-      const camp = await this.prisma.camp.findUnique({
-        where: { id: createCampingOptionDto.campId },
-      });
-
-      if (!camp) {
-        throw new NotFoundException(`Camp with ID ${createCampingOptionDto.campId} not found`);
-      }
-
       // Validate job category IDs if provided
       if (createCampingOptionDto.jobCategoryIds && createCampingOptionDto.jobCategoryIds.length > 0) {
         const jobCategories = await this.prisma.jobCategory.findMany({
@@ -70,7 +47,6 @@ export class CampingOptionsService {
           participantDues: createCampingOptionDto.participantDues,
           staffDues: createCampingOptionDto.staffDues,
           maxSignups: createCampingOptionDto.maxSignups ?? 0,
-          camp: { connect: { id: createCampingOptionDto.campId } },
           jobCategoryIds: createCampingOptionDto.jobCategoryIds || [],
         },
       });
@@ -87,18 +63,13 @@ export class CampingOptionsService {
   /**
    * Find all camping options
    * @param includeDisabled - Whether to include disabled options (default: false)
-   * @param campId - Optional campId to filter by
    * @returns Array of camping options
    */
-  async findAll(includeDisabled = false, campId?: string): Promise<CampingOption[]> {
+  async findAll(includeDisabled = false): Promise<CampingOption[]> {
     const whereClause: Prisma.CampingOptionWhereInput = {};
     
     if (!includeDisabled) {
       whereClause.enabled = true;
-    }
-    
-    if (campId) {
-      whereClause.campId = campId;
     }
     
     const campingOptions = await this.prisma.campingOption.findMany({

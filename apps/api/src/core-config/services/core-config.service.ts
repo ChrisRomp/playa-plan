@@ -49,9 +49,8 @@ export class CoreConfigService {
       smtpUsername: config.smtpUser,
       smtpPassword: config.smtpPassword,
       smtpUseSsl: config.smtpSecure,
-      // These fields don't exist in the database schema
-      senderEmail: null,
-      senderName: null,
+      senderEmail: config.senderEmail,
+      senderName: config.senderName,
       timeZone: config.timeZone,
       createdAt: config.createdAt,
       updatedAt: config.updatedAt,
@@ -99,6 +98,8 @@ export class CoreConfigService {
           smtpUser: createCoreConfigDto.smtpUsername ?? null,
           smtpPassword: createCoreConfigDto.smtpPassword ?? null,
           smtpSecure: createCoreConfigDto.smtpUseSsl ?? false,
+          senderEmail: createCoreConfigDto.senderEmail ?? null,
+          senderName: createCoreConfigDto.senderName ?? null,
           timeZone: createCoreConfigDto.timeZone ?? 'UTC',
         },
       });
@@ -254,7 +255,8 @@ export class CoreConfigService {
       if (updateCoreConfigDto.smtpUsername !== undefined) data.smtpUser = updateCoreConfigDto.smtpUsername;
       if (updateCoreConfigDto.smtpPassword !== undefined) data.smtpPassword = updateCoreConfigDto.smtpPassword;
       if (updateCoreConfigDto.smtpUseSsl !== undefined) data.smtpSecure = updateCoreConfigDto.smtpUseSsl;
-      // These fields aren't in the Prisma schema
+      if (updateCoreConfigDto.senderEmail !== undefined) data.senderEmail = updateCoreConfigDto.senderEmail;
+      if (updateCoreConfigDto.senderName !== undefined) data.senderName = updateCoreConfigDto.senderName;
       if (updateCoreConfigDto.timeZone !== undefined) data.timeZone = updateCoreConfigDto.timeZone;
 
       // Always update the updatedAt field

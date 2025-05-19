@@ -54,10 +54,7 @@ async function main() {
     console.log('Cleaned job_categories table');
   }
   
-  if (await tableExists('camps')) {
-    await prisma.camp.deleteMany({});
-    console.log('Cleaned camps table');
-  }
+  // Camp entity has been removed
   
   if (await tableExists('users')) {
     await prisma.user.deleteMany({});
@@ -114,20 +111,8 @@ async function main() {
 
   console.log(`Created ${await prisma.user.count()} users`);
 
-  // Create a camp
-  const camp = await prisma.camp.create({
-    data: {
-      name: 'Burning Sky 2025',
-      description: 'Burning Sky at Burning Man 2025',
-      startDate: new Date('2025-08-25T00:00:00Z'),
-      endDate: new Date('2025-09-01T23:59:59Z'),
-      location: 'Black Rock Desert, NV',
-      capacity: 200,
-      isActive: true
-    }
-  });
-
-  console.log(`Created camp: ${camp.name}`);
+  // Camp entity has been removed
+  console.log('Camp entity has been removed from the schema');
 
   // Create job categories
   const kitchenCategory = await prisma.jobCategory.create({
@@ -216,7 +201,6 @@ async function main() {
       description: 'Morning food preparation and kitchen duty',
       startTime: '08:00',
       endTime: '12:00',
-      campId: camp.id,
       dayOfWeek: 'TUESDAY'
     }
   });
@@ -227,7 +211,6 @@ async function main() {
       description: 'Afternoon food preparation and kitchen duty',
       startTime: '14:00',
       endTime: '18:00',
-      campId: camp.id,
       dayOfWeek: 'TUESDAY'
     }
   });
@@ -238,7 +221,6 @@ async function main() {
       description: 'Morning shift for greeting and welcoming',
       startTime: '09:00',
       endTime: '13:00',
-      campId: camp.id,
       dayOfWeek: 'TUESDAY'
     }
   });
@@ -249,7 +231,6 @@ async function main() {
       description: 'Night patrol and safety monitoring',
       startTime: '20:00',
       endTime: '02:00',
-      campId: camp.id,
       dayOfWeek: 'TUESDAY'
     }
   });
@@ -260,7 +241,6 @@ async function main() {
       description: 'Help break down and clean the camp',
       startTime: '10:00',
       endTime: '14:00',
-      campId: camp.id,
       dayOfWeek: 'CLOSING_SUNDAY'
     }
   });
@@ -271,7 +251,6 @@ async function main() {
       description: 'Help set up the camp infrastructure',
       startTime: '09:00',
       endTime: '17:00',
-      campId: camp.id,
       dayOfWeek: 'PRE_OPENING'
     }
   });

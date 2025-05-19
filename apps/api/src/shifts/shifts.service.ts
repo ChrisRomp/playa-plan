@@ -21,7 +21,6 @@ export class ShiftsService {
         startTime: createShiftDto.startTime,
         endTime: createShiftDto.endTime,
         dayOfWeek: createShiftDto.dayOfWeek,
-        camp: { connect: { id: createShiftDto.campId } },
       },
     });
   }
@@ -34,7 +33,6 @@ export class ShiftsService {
     return this.prisma.shift.findMany({
       include: {
         jobs: true,
-        camp: true,
       },
     });
   }
@@ -49,7 +47,6 @@ export class ShiftsService {
     const shift = await this.prisma.shift.findUnique({
       where: { id },
       include: {
-        camp: true,
         jobs: true,
       },
     });
@@ -91,15 +88,12 @@ export class ShiftsService {
       data.dayOfWeek = updateShiftDto.dayOfWeek;
     }
 
-    if (updateShiftDto.campId) {
-      data.camp = { connect: { id: updateShiftDto.campId } };
-    }
+    // Camp field has been removed
 
     return this.prisma.shift.update({
       where: { id },
       data,
       include: {
-        camp: true,
         jobs: true,
       },
     });

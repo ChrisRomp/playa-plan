@@ -33,9 +33,4 @@ export class UpdateShiftDto {
   @IsEnum(DayOfWeek)
   @IsOptional()
   dayOfWeek?: DayOfWeek;
-
-  @ApiProperty({ description: 'The ID of the camp this shift belongs to', required: false })
-  @IsString()
-  @IsOptional()
-  campId?: string;
 } 

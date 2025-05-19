@@ -36,11 +36,4 @@ export class CreateShiftDto {
   @IsNotEmpty()
   @IsEnum(DayOfWeek)
   dayOfWeek!: DayOfWeek;
-
-
-
-  @ApiProperty({ description: 'The ID of the camp this shift belongs to' })
-  @IsNotEmpty()
-  @IsString()
-  campId!: string;
 }
