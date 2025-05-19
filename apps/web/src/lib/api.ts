@@ -57,7 +57,7 @@ try {
       initializeAuthFromStorage();
     }, 0);
   }
-} catch (e) {
+} catch {
   console.log('Unable to initialize auth from storage (likely in test environment)');
 }
 

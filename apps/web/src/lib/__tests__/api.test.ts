@@ -68,13 +68,10 @@ import * as apiModule from '../api';
 // Destructure the mocks for convenience
 const { 
   auth, 
-  api, 
   jobCategories, 
   setJwtToken, 
   clearJwtToken, 
-  JWT_TOKEN_STORAGE_KEY,
   AuthResponseSchema,
-  JobCategorySchema,
   initializeAuthFromStorage
 } = apiModule;
 
