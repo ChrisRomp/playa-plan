@@ -87,7 +87,6 @@ describe('ShiftsController', () => {
         startTime: new Date('2023-06-01T09:00:00Z'),
         endTime: new Date('2023-06-01T17:00:00Z'),
         dayOfWeek: DayOfWeek.MONDAY,
-        location: 'Test Location',
         campId: 'test-camp-id'
       };
 

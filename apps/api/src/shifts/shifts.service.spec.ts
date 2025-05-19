@@ -27,7 +27,6 @@ describe('ShiftsService', () => {
     startTime: new Date('2023-06-01T09:00:00Z'),
     endTime: new Date('2023-06-01T17:00:00Z'),
     dayOfWeek: DayOfWeek.MONDAY,
-    location: 'test-location',
     campId: 'test-camp-id'
   };
 

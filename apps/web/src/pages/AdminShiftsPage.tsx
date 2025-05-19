@@ -66,7 +66,7 @@ export default function AdminShiftsPage() {
       startTime: getTodayAtTime('09:00'),
       endTime: getTodayAtTime('17:00'),
       dayOfWeek: 'MONDAY',
-      campId: '',
+      campId: 'default-camp-id',
     });
     setFormError(null);
     setDeleteError(null);
@@ -82,7 +82,7 @@ export default function AdminShiftsPage() {
       startTime: formatDateForInput(shift.startTime),
       endTime: formatDateForInput(shift.endTime),
       dayOfWeek: shift.dayOfWeek,
-      campId: shift.campId,
+      campId: shift.campId || 'default-camp-id',
     });
     setFormError(null);
     setDeleteError(null);
@@ -119,24 +119,36 @@ export default function AdminShiftsPage() {
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!form.name || !form.startTime || !form.endTime || !form.dayOfWeek || !form.campId) {
-      setFormError('All fields are required.');
+    // Validate required fields: name, description, startTime, endTime, dayOfWeek
+    if (!form.name || !form.description || !form.startTime || !form.endTime || !form.dayOfWeek) {
+      setFormError('Name, description, day, start time, and end time are required.');
       return;
     }
     
     setFormError(null);
     
     try {
+      // Ensure campId is set before submission and format dates correctly
+      const shiftData = {
+        ...form,
+        campId: form.campId || 'default-camp-id',
+        // Convert ISO strings to Date objects as expected by the API
+        startTime: new Date(form.startTime).toISOString(),
+        endTime: new Date(form.endTime).toISOString(),
+      };
+      
       if (editId) {
-        await updateShift(editId, form);
+        await updateShift(editId, shiftData);
       } else {
-        await createShift(form);
+        await createShift(shiftData);
       }
       closeModal();
     } catch (error) {
       let errorMessage = 'Failed to save shift.';
       if (isAxiosError(error) && error.response?.data?.message) {
-        errorMessage = error.response.data.message;
+        errorMessage = Array.isArray(error.response.data.message) 
+          ? error.response.data.message.join(', ') 
+          : error.response.data.message;
       }
       setFormError(errorMessage);
     }
@@ -301,7 +313,7 @@ export default function AdminShiftsPage() {
             <h2 className="text-xl font-semibold mb-4">{editId ? 'Edit' : 'Add'} Shift</h2>
             <form onSubmit={handleFormSubmit}>
               <div className="mb-4">
-                <label htmlFor="name" className="block font-medium mb-1">Name (Optional)</label>
+                <label htmlFor="name" className="block font-medium mb-1">Name <span className="text-red-500">*</span></label>
                 <input
                   id="name"
                   name="name"
@@ -309,11 +321,12 @@ export default function AdminShiftsPage() {
                   className="w-full border rounded px-3 py-2"
                   value={form.name}
                   onChange={handleFormChange}
+                  required
                   maxLength={100}
                 />
               </div>
               <div className="mb-4">
-                <label htmlFor="description" className="block font-medium mb-1">Description (Optional)</label>
+                <label htmlFor="description" className="block font-medium mb-1">Description <span className="text-red-500">*</span></label>
                 <textarea
                   id="description"
                   name="description"
@@ -322,10 +335,11 @@ export default function AdminShiftsPage() {
                   onChange={handleFormChange}
                   maxLength={500}
                   rows={2}
+                  required
                 />
               </div>
               <div className="mb-4">
-                <label htmlFor="dayOfWeek" className="block font-medium mb-1">Day</label>
+                <label htmlFor="dayOfWeek" className="block font-medium mb-1">Day <span className="text-red-500">*</span></label>
                 <select
                   id="dayOfWeek"
                   name="dayOfWeek"
@@ -342,7 +356,7 @@ export default function AdminShiftsPage() {
                 </select>
               </div>
               <div className="mb-4">
-                <label htmlFor="startTime" className="block font-medium mb-1">Start Time</label>
+                <label htmlFor="startTime" className="block font-medium mb-1">Start Time <span className="text-red-500">*</span></label>
                 <input
                   id="startTime"
                   name="startTime"
@@ -354,7 +368,7 @@ export default function AdminShiftsPage() {
                 />
               </div>
               <div className="mb-4">
-                <label htmlFor="endTime" className="block font-medium mb-1">End Time</label>
+                <label htmlFor="endTime" className="block font-medium mb-1">End Time <span className="text-red-500">*</span></label>
                 <input
                   id="endTime"
                   name="endTime"
