@@ -216,8 +216,8 @@ describe('PaymentsController', () => {
         currency: 'USD',
         userId: 'user-id',
         description: 'Test payment',
-        successUrl: 'https://example.com/success',
-        cancelUrl: 'https://example.com/cancel',
+        successUrl: 'https://mycamp.playaplan.app/success',
+        cancelUrl: 'https://mycamp.playaplan.app/cancel',
       };
       const mockResponse = { 
         paymentId: 'payment-id', 
@@ -244,8 +244,8 @@ describe('PaymentsController', () => {
         currency: 'USD',
         userId: 'user-id',
         itemDescription: 'Test payment',
-        successUrl: 'https://example.com/success',
-        cancelUrl: 'https://example.com/cancel',
+        successUrl: 'https://mycamp.playaplan.app/success',
+        cancelUrl: 'https://mycamp.playaplan.app/cancel',
       };
       const mockResponse = { 
         paymentId: 'payment-id', 

@@ -107,7 +107,7 @@ export class UpdateUserDto {
 
   @ApiPropertyOptional({
     description: 'URL to user profile picture',
-    example: 'https://example.com/profile.jpg',
+    example: 'https://mycamp.playaplan.app/profile.jpg',
     maxLength: 1024,
   })
   @IsString()

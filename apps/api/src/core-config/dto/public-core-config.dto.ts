@@ -47,7 +47,7 @@ export class PublicCoreConfigDto {
    */
   @ApiProperty({
     description: 'Camp banner URL',
-    example: 'https://example.com/banner.jpg'
+    example: 'https://mycamp.playaplan.app/banner.jpg'
   })
   campBannerUrl!: string | null;
 
@@ -65,7 +65,7 @@ export class PublicCoreConfigDto {
    */
   @ApiProperty({
     description: 'Camp icon URL',
-    example: 'https://example.com/icon.png'
+    example: 'https://mycamp.playaplan.app/icon.png'
   })
   campIconUrl!: string | null;
 

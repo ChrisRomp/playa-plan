@@ -99,9 +99,9 @@ describe('CoreConfigController (e2e)', () => {
         campName: 'Test Camp',
         registrationYear: 2023,
         timeZone: 'America/Los_Angeles',
-        campBannerUrl: 'https://example.com/banner.jpg',
+        campBannerUrl: 'https://mycamp.playaplan.app/banner.jpg',
         campBannerAltText: 'Beautiful test camp banner',
-        campIconUrl: 'https://example.com/icon.png',
+        campIconUrl: 'https://mycamp.playaplan.app/icon.png',
         campIconAltText: 'Test camp logo',
       };
 

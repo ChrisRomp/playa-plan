@@ -14,7 +14,7 @@ describe('UpdateUserDto', () => {
       stateProvince: 'CA',
       country: 'United States',
       emergencyContact: 'Jane Doe, +1-555-987-6543, relationship: sister',
-      profilePicture: 'https://example.com/profile.jpg'
+      profilePicture: 'https://mycamp.playaplan.app/profile.jpg'
     });
 
     // Act

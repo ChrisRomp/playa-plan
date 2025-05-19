@@ -39,7 +39,7 @@ describe('StripeService', () => {
       const config = {
         'payment.stripe.secretKey': 'mock_secret_key',
         'payment.stripe.webhookSecret': 'mock_webhook_secret',
-        'frontend.url': 'https://example.com',
+        'frontend.url': 'https://mycamp.playaplan.app',
       };
       return config[key as keyof typeof config];
     }),
@@ -136,8 +136,8 @@ describe('StripeService', () => {
         amount: 1000,
         currency: 'usd',
         description: 'Product purchase',
-        successUrl: 'https://example.com/success',
-        cancelUrl: 'https://example.com/cancel',
+        successUrl: 'https://mycamp.playaplan.app/success',
+        cancelUrl: 'https://mycamp.playaplan.app/cancel',
         registrationId: '',
       };
       
@@ -186,8 +186,8 @@ describe('StripeService', () => {
         amount: 1000,
         currency: 'usd',
         description: 'Product purchase',
-        successUrl: 'https://example.com/success',
-        cancelUrl: 'https://example.com/cancel',
+        successUrl: 'https://mycamp.playaplan.app/success',
+        cancelUrl: 'https://mycamp.playaplan.app/cancel',
         registrationId: '',
       };
       

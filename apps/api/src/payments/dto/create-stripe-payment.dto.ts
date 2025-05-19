@@ -54,7 +54,7 @@ export class CreateStripePaymentDto {
 
   @ApiProperty({
     description: 'Success URL to redirect to after successful payment',
-    example: 'https://example.com/success',
+    example: 'https://mycamp.playaplan.app/success',
     required: false,
   })
   @IsOptional()
@@ -63,7 +63,7 @@ export class CreateStripePaymentDto {
 
   @ApiProperty({
     description: 'Cancel URL to redirect to if payment is cancelled',
-    example: 'https://example.com/cancel',
+    example: 'https://mycamp.playaplan.app/cancel',
     required: false,
   })
   @IsOptional()
