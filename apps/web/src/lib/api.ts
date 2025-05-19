@@ -217,7 +217,7 @@ export const CampingOptionSchema = z.object({
   createdAt: z.string(),
   updatedAt: z.string(),
   // campId field has been removed
-  jobCategoryIds: z.array(z.string()),
+  jobCategoryIds: z.array(z.string()).default([]),
   currentRegistrations: z.number().optional(),
   availabilityStatus: z.boolean().optional(),
   fields: z.array(CampingOptionFieldSchema).optional(),

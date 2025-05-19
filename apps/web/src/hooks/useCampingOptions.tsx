@@ -61,7 +61,12 @@ export const useCampingOptions = () => {
     setError(null);
     
     try {
-      const newOption = await campingOptions.create(data);
+      // Ensure jobCategoryIds is present with at least an empty array
+      const dataWithDefaults = {
+        ...data,
+        jobCategoryIds: data.jobCategoryIds || []
+      };
+      const newOption = await campingOptions.create(dataWithDefaults);
       setOptions(prev => [...prev, newOption]);
       setSelectedOption(newOption);
       return newOption;
@@ -82,7 +87,14 @@ export const useCampingOptions = () => {
     setError(null);
     
     try {
-      const updatedOption = await campingOptions.update(id, data);
+      // Ensure jobCategoryIds is at least an empty array if it's being updated
+      const dataWithDefaults = {
+        ...data,
+        // Only add the default if jobCategoryIds is actually included in the update
+        ...(data.jobCategoryIds !== undefined ? { jobCategoryIds: data.jobCategoryIds || [] } : {})
+      };
+
+      const updatedOption = await campingOptions.update(id, dataWithDefaults);
       setOptions(prev => prev.map(option => option.id === id ? updatedOption : option));
       
       if (selectedOption?.id === id) {
