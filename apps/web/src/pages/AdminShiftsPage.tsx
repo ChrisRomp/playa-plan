@@ -199,28 +199,27 @@ export default function AdminShiftsPage() {
 
   return (
     <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex items-center mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Shifts</h1>
-        <button
-          className="bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700"
-          onClick={openAddModal}
-          disabled={loading}
-        >
-          Add Shift
-        </button>
+        <div className="ml-auto flex space-x-2">
+          <button
+            onClick={() => window.location.href = '/admin'}
+            className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors"
+          >
+            Back to Admin
+          </button>
+          <button
+            className="bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700"
+            onClick={openAddModal}
+            disabled={loading}
+          >
+            Add Shift
+          </button>
+        </div>
       </div>
       
-      {(shiftsError) && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-          {shiftsError}
-        </div>
-      )}
-      
-      {deleteError && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-          {deleteError}
-        </div>
-      )}
+      {shiftsError && <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4" role="alert">{shiftsError}</div>}
+      {deleteError && <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4" role="alert">{deleteError}</div>}
       
       <div className="bg-white shadow-md rounded-lg overflow-hidden">
         <div className="overflow-x-auto">

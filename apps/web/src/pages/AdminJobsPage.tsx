@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useJobs } from '../hooks/useJobs';
 import { useJobCategories } from '../hooks/useJobCategories';
 import { useShifts } from '../hooks/useShifts';
@@ -47,8 +47,108 @@ export default function AdminJobsPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filteredJobs, setFilteredJobs] = useState<Job[]>([]);
+  const [sortColumn, setSortColumn] = useState<'name' | 'category' | 'shift' | 'maxRegistrations'>('name');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  
+  const formatTime = useCallback((timeString: string): string => {
+    try {
+      // Check if timeString is already a time string in HH:MM format
+      if (/^\d{2}:\d{2}$/.test(timeString)) {
+        return timeString;
+      }
+      
+      const date = new Date(timeString);
+      // Check if date is valid
+      if (isNaN(date.getTime())) {
+        return timeString;
+      }
+      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    } catch {
+      // Return the original string if parsing fails
+      return timeString;
+    }
+  }, []);
+  
+  const getFriendlyDayName = useCallback((day: string): string => {
+    if (!day) return '';
+    
+    const dayMap: Record<string, string> = {
+      // Standard days
+      MONDAY: 'Monday',
+      TUESDAY: 'Tuesday',
+      WEDNESDAY: 'Wednesday',
+      THURSDAY: 'Thursday',
+      FRIDAY: 'Friday',
+      SATURDAY: 'Saturday',
+      SUNDAY: 'Sunday',
+      // Special event days from schema
+      PRE_OPENING: 'Pre-Opening',
+      OPENING_SUNDAY: 'Opening Sunday',
+      CLOSING_SUNDAY: 'Closing Sunday',
+      POST_EVENT: 'Post-Event',
+      // Handle lowercase versions too
+      monday: 'Monday',
+      tuesday: 'Tuesday',
+      wednesday: 'Wednesday',
+      thursday: 'Thursday',
+      friday: 'Friday',
+      saturday: 'Saturday',
+      sunday: 'Sunday',
+      pre_opening: 'Pre-Opening',
+      opening_sunday: 'Opening Sunday',
+      closing_sunday: 'Closing Sunday',
+      post_event: 'Post-Event'
+    };
+    return dayMap[day] || day; // Return mapped value or original if not found
+  }, []);
+  
+  const getCategoryNameById = useCallback((id: string): string => {
+    const category = categories.find(cat => cat.id === id);
+    return category ? category.name : '';
+  }, [categories]);
+  
+  const getCategoryById = useCallback((id: string) => {
+    return categories.find(cat => cat.id === id);
+  }, [categories]);
+  
+  const getShiftNameById = useCallback((id: string): string => {
+    const shift = shifts.find(s => s.id === id);
+    return shift ? shift.name : '';
+  }, [shifts]);
+  
+  const getShiftDetails = useCallback((job: Job): string => {
+    let dayName = '';
+    let startTime = '';
+    let endTime = '';
+    
+    // Handle the case where shift details are in the shift property
+    if (job.shift) {
+      dayName = getFriendlyDayName(job.shift.dayOfWeek);
+      startTime = formatTime(job.shift.startTime);
+      endTime = formatTime(job.shift.endTime);
+    } else {
+      // Handle case where shift data is directly on the job
+      const shift = shifts.find(s => s.id === job.shiftId);
+      if (shift) {
+        dayName = getFriendlyDayName(shift.dayOfWeek);
+        startTime = formatTime(shift.startTime);
+        endTime = formatTime(shift.endTime);
+      }
+    }
+    
+    if (!dayName || !startTime || !endTime) {
+      return getShiftNameById(job.shiftId);
+    }
+    
+    return `${dayName}, ${startTime} - ${endTime}`;
+  }, [shifts, getFriendlyDayName, formatTime, getShiftNameById]);
 
-  // Set initial categoryId when categories are loaded
+  const handleSearchChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchTerm(event.target.value);
+  }, []);
+
   useEffect(() => {
     if (categories.length > 0 && !form.categoryId) {
       setForm(prevForm => ({
@@ -58,7 +158,72 @@ export default function AdminJobsPage() {
     }
   }, [categories, form.categoryId]);
 
-  // Set initial shiftId when shifts are loaded
+  // Handle column header clicks for sorting
+  const handleSortClick = useCallback((column: 'name' | 'category' | 'shift' | 'maxRegistrations') => {
+    setSortDirection(prevDirection => {
+      // If clicking the same column, toggle direction
+      if (sortColumn === column) {
+        return prevDirection === 'asc' ? 'desc' : 'asc';
+      }
+      // Default to ascending for a new column
+      return 'asc';
+    });
+    setSortColumn(column);
+  }, [sortColumn]);
+
+  // Filter and sort jobs
+  useEffect(() => {
+    // Create a sorted copy of the jobs array
+    const sortedJobs = [...jobs].sort((a, b) => {
+      let comparison = 0;
+      
+      // Sort based on the selected column
+      switch (sortColumn) {
+        case 'name':
+          comparison = a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+          break;
+        case 'category':
+          comparison = getCategoryNameById(a.categoryId).localeCompare(
+            getCategoryNameById(b.categoryId),
+            undefined,
+            { sensitivity: 'base' }
+          );
+          break;
+        case 'shift':
+          // Sort by the display value of the shift
+          comparison = getShiftDetails(a).localeCompare(
+            getShiftDetails(b),
+            undefined,
+            { sensitivity: 'base' }
+          );
+          break;
+        case 'maxRegistrations':
+          comparison = a.maxRegistrations - b.maxRegistrations;
+          break;
+        default:
+          comparison = a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+      }
+      
+      // Reverse the result if sorting in descending order
+      return sortDirection === 'asc' ? comparison : -comparison;
+    });
+    
+    // Apply filter if search term exists
+    if (searchTerm.trim() === '') {
+      setFilteredJobs(sortedJobs);
+    } else {
+      const lowercaseSearchTerm = searchTerm.toLowerCase();
+      setFilteredJobs(
+        sortedJobs.filter(
+          (job) =>
+            job.name.toLowerCase().includes(lowercaseSearchTerm) ||
+            getCategoryNameById(job.categoryId).toLowerCase().includes(lowercaseSearchTerm) ||
+            getShiftNameById(job.shiftId).toLowerCase().includes(lowercaseSearchTerm)
+        )
+      );
+    }
+  }, [searchTerm, jobs, getCategoryNameById, getShiftNameById, sortColumn, sortDirection, getShiftDetails]);
+
   useEffect(() => {
     if (shifts.length > 0 && !form.shiftId) {
       setForm(prevForm => ({
@@ -161,43 +326,44 @@ export default function AdminJobsPage() {
     }
   };
 
-  const getCategoryNameById = (id: string): string => {
-    const category = categories.find(cat => cat.id === id);
-    return category ? category.name : 'Unknown Category';
-  };
-
-  const getCategoryById = (id: string) => {
-    return categories.find(cat => cat.id === id);
-  };
-
-  const getShiftNameById = (id: string): string => {
-    const shift = shifts.find(s => s.id === id);
-    return shift ? `${shift.dayOfWeek} (${formatTime(shift.startTime)} - ${formatTime(shift.endTime)})` : 'Unknown Shift';
-  };
-
-  const formatTime = (timeString: string): string => {
-    try {
-      const date = new Date(timeString);
-      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    } catch {
-      // Return the original string if parsing fails
-      return timeString;
-    }
-  };
-
   const loading = jobsLoading || categoriesLoading || shiftsLoading;
 
   return (
     <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex items-center mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Jobs</h1>
-        <button
-          className="bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700"
-          onClick={openAddModal}
-          disabled={loading}
-        >
-          Add Job
-        </button>
+        <div className="ml-auto flex space-x-2">
+          <div className="flex items-center">
+            <div className="relative mr-2">
+              <input
+                type="text"
+                className="w-64 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Search jobs..."
+                value={searchTerm}
+                onChange={handleSearchChange}
+                aria-label="Search jobs"
+              />
+              <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500">
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </span>
+            </div>
+            <button
+              onClick={() => window.location.href = '/admin'}
+              className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors"
+            >
+              Back to Admin
+            </button>
+            <button
+              className="bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 ml-2"
+              onClick={openAddModal}
+              disabled={loading}
+            >
+              Add Job
+            </button>
+          </div>
+        </div>
       </div>
       
       {(jobsError) && (
@@ -217,41 +383,83 @@ export default function AdminJobsPage() {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Location</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Shift</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Max Registrations</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Staff Only</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Always Required</th>
+                <th 
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:bg-gray-100"
+                  onClick={() => handleSortClick('name')}
+                  aria-sort={sortColumn === 'name' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}
+                >
+                  <div className="flex items-center">
+                    <span>Name</span>
+                    {sortColumn === 'name' && (
+                      <span className="ml-1">
+                        {sortDirection === 'asc' ? '↑' : '↓'}
+                      </span>
+                    )}
+                  </div>
+                </th>
+                <th 
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:bg-gray-100"
+                  onClick={() => handleSortClick('category')}
+                  aria-sort={sortColumn === 'category' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}
+                >
+                  <div className="flex items-center">
+                    <span>Category</span>
+                    {sortColumn === 'category' && (
+                      <span className="ml-1">
+                        {sortDirection === 'asc' ? '↑' : '↓'}
+                      </span>
+                    )}
+                  </div>
+                </th>
+                <th 
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:bg-gray-100"
+                  onClick={() => handleSortClick('shift')}
+                  aria-sort={sortColumn === 'shift' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}
+                >
+                  <div className="flex items-center">
+                    <span>Shift</span>
+                    {sortColumn === 'shift' && (
+                      <span className="ml-1">
+                        {sortDirection === 'asc' ? '↑' : '↓'}
+                      </span>
+                    )}
+                  </div>
+                </th>
+                <th 
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:bg-gray-100"
+                  onClick={() => handleSortClick('maxRegistrations')}
+                  aria-sort={sortColumn === 'maxRegistrations' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}
+                >
+                  <div className="flex items-center">
+                    <span>Max</span>
+                    {sortColumn === 'maxRegistrations' && (
+                      <span className="ml-1">
+                        {sortDirection === 'asc' ? '↑' : '↓'}
+                      </span>
+                    )}
+                  </div>
+                </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {loading ? (
                 <tr>
-                  <td colSpan={9} className="px-6 py-4 text-center">Loading...</td>
+                  <td colSpan={5} className="px-6 py-4 text-center">Loading...</td>
                 </tr>
-              ) : jobs.length === 0 ? (
+              ) : filteredJobs.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-6 py-4 text-center">No jobs found.</td>
+                  <td colSpan={5} className="px-6 py-4 text-center">No jobs found.</td>
                 </tr>
               ) : (
-                jobs.map((job) => (
+                filteredJobs.map((job) => (
                   <tr key={job.id}>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{job.name}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{job.description}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{job.location}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{getCategoryNameById(job.categoryId)}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{getShiftNameById(job.shiftId)}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {getShiftDetails(job)}
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{job.maxRegistrations}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      <span className="italic text-gray-400">(from category)</span> {job.staffOnly ? 'Yes' : 'No'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      <span className="italic text-gray-400">(from category)</span> {job.alwaysRequired ? 'Yes' : 'No'}
-                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <button
                         className="text-blue-600 hover:text-blue-900 mr-4"

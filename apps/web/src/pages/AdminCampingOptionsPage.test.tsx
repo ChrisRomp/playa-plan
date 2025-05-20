@@ -217,7 +217,7 @@ describe('AdminCampingOptionsPage', () => {
     renderWithRouter(<AdminCampingOptionsPage />);
     
     // Click the add button - be more specific with role
-    const addButton = screen.getByRole('button', { name: 'Add Camping Option' });
+    const addButton = screen.getByRole('button', { name: 'Add Option' });
     fireEvent.click(addButton);
     
     // Check that the modal title is displayed using a more specific selector (h3 element)

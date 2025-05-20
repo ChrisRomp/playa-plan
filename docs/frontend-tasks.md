@@ -148,10 +148,8 @@
      - [x] Support for "staff only" job category designation
      - [x] Support for "always required" job category functionality
      - [ ] Job management interface for creating and editing jobs
-   - [ ] Shift management
-     - [ ] Create and manage job shifts by day/time
-     - [ ] Set max participants per shift
-     - [ ] Assign shifts to job categories
+   - [x] Shift management
+     - [x] Create and manage job shifts
    - [ ] Payment management (including manual payments)
    - [ ] Refund processing
      - [ ] Interface for admins to initiate refunds
