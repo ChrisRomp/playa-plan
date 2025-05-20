@@ -13,7 +13,7 @@
    - [ ] Form
    - [x] Card (used in layout components)
    - [x] Modal (via UI components)
-   - [ ] DataTable (with sorting/filtering/grouping)
+   - [x] DataTable (with sorting/filtering/grouping)
    - [x] Notification (via UI components)
    - [x] AccessibleImage (via header/banner implementation)
    - [x] RichTextContent (sanitization in MainContent)
