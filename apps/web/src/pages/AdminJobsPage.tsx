@@ -49,6 +49,8 @@ export default function AdminJobsPage() {
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filteredJobs, setFilteredJobs] = useState<Job[]>([]);
+  const [sortColumn, setSortColumn] = useState<'name' | 'category' | 'shift' | 'maxRegistrations'>('name');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   
   const formatTime = useCallback((timeString: string): string => {
     try {
@@ -156,12 +158,57 @@ export default function AdminJobsPage() {
     }
   }, [categories, form.categoryId]);
 
+  // Handle column header clicks for sorting
+  const handleSortClick = useCallback((column: 'name' | 'category' | 'shift' | 'maxRegistrations') => {
+    setSortDirection(prevDirection => {
+      // If clicking the same column, toggle direction
+      if (sortColumn === column) {
+        return prevDirection === 'asc' ? 'desc' : 'asc';
+      }
+      // Default to ascending for a new column
+      return 'asc';
+    });
+    setSortColumn(column);
+  }, [sortColumn]);
+
+  // Filter and sort jobs
   useEffect(() => {
     // Create a sorted copy of the jobs array
-    const sortedJobs = [...jobs].sort((a, b) => 
-      a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
-    );
+    const sortedJobs = [...jobs].sort((a, b) => {
+      let comparison = 0;
+      
+      // Sort based on the selected column
+      switch (sortColumn) {
+        case 'name':
+          comparison = a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+          break;
+        case 'category':
+          comparison = getCategoryNameById(a.categoryId).localeCompare(
+            getCategoryNameById(b.categoryId),
+            undefined,
+            { sensitivity: 'base' }
+          );
+          break;
+        case 'shift':
+          // Sort by the display value of the shift
+          comparison = getShiftDetails(a).localeCompare(
+            getShiftDetails(b),
+            undefined,
+            { sensitivity: 'base' }
+          );
+          break;
+        case 'maxRegistrations':
+          comparison = a.maxRegistrations - b.maxRegistrations;
+          break;
+        default:
+          comparison = a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+      }
+      
+      // Reverse the result if sorting in descending order
+      return sortDirection === 'asc' ? comparison : -comparison;
+    });
     
+    // Apply filter if search term exists
     if (searchTerm.trim() === '') {
       setFilteredJobs(sortedJobs);
     } else {
@@ -175,7 +222,7 @@ export default function AdminJobsPage() {
         )
       );
     }
-  }, [searchTerm, jobs, getCategoryNameById, getShiftNameById]);
+  }, [searchTerm, jobs, getCategoryNameById, getShiftNameById, sortColumn, sortDirection, getShiftDetails]);
 
   useEffect(() => {
     if (shifts.length > 0 && !form.shiftId) {
@@ -336,10 +383,62 @@ export default function AdminJobsPage() {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Shift</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Max</th>
+                <th 
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:bg-gray-100"
+                  onClick={() => handleSortClick('name')}
+                  aria-sort={sortColumn === 'name' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}
+                >
+                  <div className="flex items-center">
+                    <span>Name</span>
+                    {sortColumn === 'name' && (
+                      <span className="ml-1">
+                        {sortDirection === 'asc' ? '↑' : '↓'}
+                      </span>
+                    )}
+                  </div>
+                </th>
+                <th 
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:bg-gray-100"
+                  onClick={() => handleSortClick('category')}
+                  aria-sort={sortColumn === 'category' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}
+                >
+                  <div className="flex items-center">
+                    <span>Category</span>
+                    {sortColumn === 'category' && (
+                      <span className="ml-1">
+                        {sortDirection === 'asc' ? '↑' : '↓'}
+                      </span>
+                    )}
+                  </div>
+                </th>
+                <th 
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:bg-gray-100"
+                  onClick={() => handleSortClick('shift')}
+                  aria-sort={sortColumn === 'shift' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}
+                >
+                  <div className="flex items-center">
+                    <span>Shift</span>
+                    {sortColumn === 'shift' && (
+                      <span className="ml-1">
+                        {sortDirection === 'asc' ? '↑' : '↓'}
+                      </span>
+                    )}
+                  </div>
+                </th>
+                <th 
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:bg-gray-100"
+                  onClick={() => handleSortClick('maxRegistrations')}
+                  aria-sort={sortColumn === 'maxRegistrations' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}
+                >
+                  <div className="flex items-center">
+                    <span>Max</span>
+                    {sortColumn === 'maxRegistrations' && (
+                      <span className="ml-1">
+                        {sortDirection === 'asc' ? '↑' : '↓'}
+                      </span>
+                    )}
+                  </div>
+                </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
