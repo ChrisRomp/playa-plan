@@ -133,7 +133,8 @@ const AdminUserPage: React.FC = () => {
   };
 
   // Handle clicking the delete button - opens the confirmation modal
-  const handleDeleteClick = (id: string) => {
+  const handleDeleteClick = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent triggering the row click event
     setDeleteUserId(id);
     setIsDeleteModalOpen(true);
   };
@@ -253,9 +254,9 @@ const AdminUserPage: React.FC = () => {
                           {user.role}
                         </span>
                         <button
-                          onClick={() => handleDeleteClick(user.id)}
+                          onClick={(e) => handleDeleteClick(user.id, e)}
                           className="text-red-600 hover:text-red-900"
-                          aria-label="Delete user"
+                          aria-label={`Delete user ${user.firstName} ${user.lastName}`}
                         >
                           Delete
                         </button>
