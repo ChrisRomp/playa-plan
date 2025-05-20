@@ -76,7 +76,7 @@ describe('UserDashboard', () => {
 
   it('shows registration button when registration is open', () => {
     renderWithContext();
-    const registerButton = screen.getByRole('link', { name: /register now/i });
+    const registerButton = screen.getByRole('link', { name: /begin registration process/i });
     expect(registerButton).toBeInTheDocument();
     expect(registerButton).toHaveAttribute('href', '/registration');
   });
@@ -118,7 +118,7 @@ describe('UserDashboard', () => {
     };
     
     renderWithContext(earlyUser, earlyConfig);
-    const registerButton = screen.getByRole('link', { name: /register now/i });
+    const registerButton = screen.getByRole('link', { name: /begin registration process/i });
     expect(registerButton).toBeInTheDocument();
     expect(registerButton).toHaveAttribute('href', '/registration');
   });
