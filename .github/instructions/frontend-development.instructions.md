@@ -1,3 +1,6 @@
+---
+applyTo: 'apps/web/**/*'
+---
 ## Technology Choices (Simple Stack)
 
 Keeping simplicity in mind, we'll use:

@@ -95,7 +95,8 @@
      - [ ] Require explicit acceptance with checkbox or similar control
      - [ ] Store acceptance with registration record
    - [ ] Work shift selection based on camping options
-   - [ ] Alternative handling when shifts are full
+   - [ ] Payment for registration depending on camping options selected, accounting for different staff pricing that applies to admin or staff users
+   - [?] Alternative handling when shifts are full
 
 4. [ ] Payment processing
    - [ ] Stripe integration

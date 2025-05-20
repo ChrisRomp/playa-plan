@@ -2,6 +2,8 @@
 
 ## Top-level planned project structure
 
+Note: This may have drifted. Refer to the file structures in the project as primary, use this only to fill in any gaps.
+
 ```text
 playaplan/
 ├── apps/
