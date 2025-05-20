@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import UserDashboard from './UserDashboard';
 import { AuthContext } from '../../store/authUtils';
-import { ConfigContext } from '../../store/ConfigContext';
+import { ConfigContext } from '../../store/ConfigContextDefinition';
 import { User, CampConfig } from '../../types';
 
 describe('UserDashboard', () => {
