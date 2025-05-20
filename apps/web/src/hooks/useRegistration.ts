@@ -14,6 +14,7 @@ export interface RegistrationFormData {
 export const CampingOptionSchema = z.object({
   id: z.string(),
   name: z.string(),
+  description: z.string().optional(),
   enabled: z.boolean(),
   shiftsRequired: z.number(),
   jobCategories: z.array(z.string()).optional(),

@@ -83,20 +83,20 @@
    - [ ] Email change process with verification
    - [x] Profile editing
 
-3. [ ] Camp registration system
-   - [ ] Registration flow with profile confirmation
-   - [ ] Camping option selection with capacity indicators
-   - [ ] Dynamic custom fields based on camping option
-     - [ ] Implement field validation based on type (min/max values, string lengths)
-     - [ ] Show appropriate input types (numeric, date, text, etc.)
-     - [ ] Support conditional field display based on selected camping options
-   - [ ] Terms acceptance functionality
-     - [ ] Display camp terms from core configuration
-     - [ ] Require explicit acceptance with checkbox or similar control
-     - [ ] Store acceptance with registration record
-   - [ ] Work shift selection based on camping options
-   - [ ] Payment for registration depending on camping options selected, accounting for different staff pricing that applies to admin or staff users
-   - [?] Alternative handling when shifts are full
+3. [x] Camp registration system
+   - [x] Registration flow with profile confirmation
+   - [x] Camping option selection with capacity indicators
+   - [x] Dynamic custom fields based on camping option
+     - [x] Implement field validation based on type (min/max values, string lengths)
+     - [x] Show appropriate input types (numeric, date, text, etc.)
+     - [x] Support conditional field display based on selected camping options
+   - [x] Terms acceptance functionality
+     - [x] Display camp terms from core configuration
+     - [x] Require explicit acceptance with checkbox or similar control
+     - [x] Store acceptance with registration record
+   - [x] Work shift selection based on camping options
+   - [x] Payment for registration depending on camping options selected, accounting for different staff pricing that applies to admin or staff users
+   - [x] Alternative handling when shifts are full
 
 4. [ ] Payment processing
    - [ ] Stripe integration

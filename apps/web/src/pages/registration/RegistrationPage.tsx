@@ -1,32 +1,57 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useRegistration, RegistrationFormData } from '../../hooks/useRegistration';
-import { JobCategory, Job } from '../../lib/api';
+import { useCampingOptions } from '../../hooks/useCampingOptions';
+import { AuthContext } from '../../store/authUtils';
+import { JobCategory, Job, CampingOptionField } from '../../lib/api';
+import { User } from '../../types';
 
+/**
+ * RegistrationPage component for user camp registration
+ * Implements a multi-step registration flow:
+ * 1. Profile confirmation
+ * 2. Camping option selection
+ * 3. Custom fields based on camping option
+ * 4. Job/shift selection
+ * 5. Terms acceptance
+ * 6. Payment and confirmation
+ */
 export default function RegistrationPage() {
   const navigate = useNavigate();
+  const { user, isLoading: authLoading } = useContext(AuthContext);
   const {
     campingOptions,
     jobCategories,
     jobs,
     shifts,
-    loading,
-    error,
+    loading: registrationLoading,
+    error: registrationError,
     fetchCampingOptions,
     fetchJobCategories,
     fetchShifts,
     fetchJobs,
     submitRegistration,
   } = useRegistration();
+  
+  const {
+    loadCampingOptionFields
+  } = useCampingOptions();
 
+  // Form state
   const [formData, setFormData] = useState<RegistrationFormData>({
     campingOptions: [],
     customFields: {},
     jobs: [],
     acceptedTerms: false,
   });
+  
+  // Multi-step form control
   const [currentStep, setCurrentStep] = useState(1);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [profileConfirmed, setProfileConfirmed] = useState(false);
+  
+  // Track loaded custom fields for selected camping options
+  const [customFieldsByOption, setCustomFieldsByOption] = useState<Record<string, CampingOptionField[]>>({});
 
   // Fetch initial data on component mount
   useEffect(() => {
@@ -35,12 +60,22 @@ export default function RegistrationPage() {
     fetchShifts();
   }, [fetchCampingOptions, fetchJobCategories, fetchShifts]);
 
-  // When camping options change, fetch jobs
+  // When camping options change, fetch jobs and custom fields
   useEffect(() => {
     if (formData.campingOptions.length > 0 || hasAlwaysRequiredCategories(jobCategories)) {
       fetchJobs(formData.campingOptions);
+      
+      // Load custom fields for all selected camping options
+      formData.campingOptions.forEach(optionId => {
+        loadCampingOptionFields(optionId).then(fields => {
+          setCustomFieldsByOption(prev => ({
+            ...prev,
+            [optionId]: fields
+          }));
+        });
+      });
     }
-  }, [formData.campingOptions, jobCategories, fetchJobs]);
+  }, [formData.campingOptions, jobCategories, fetchJobs, loadCampingOptionFields]);
 
   // Check if there are any always required job categories
   const hasAlwaysRequiredCategories = (categories: JobCategory[]): boolean => {
@@ -95,16 +130,73 @@ export default function RegistrationPage() {
     return campingJobsRequired + alwaysRequiredCount;
   };
 
+  // Get all custom fields for selected camping options
+  const getAllCustomFields = (): CampingOptionField[] => {
+    const allFields: CampingOptionField[] = [];
+    
+    formData.campingOptions.forEach(optionId => {
+      if (customFieldsByOption[optionId]) {
+        allFields.push(...customFieldsByOption[optionId]);
+      }
+    });
+    
+    return allFields;
+  };
+
   // Validate the current step
   const validateStep = (): boolean => {
     const errors: Record<string, string> = {};
     
     if (currentStep === 1) {
+      // Validate profile confirmation
+      if (!profileConfirmed) {
+        errors.profile = 'You must confirm your profile information to continue';
+      }
+    }
+    else if (currentStep === 2) {
       // Validate camping options selection
       if (formData.campingOptions.length === 0) {
         errors.campingOptions = 'Please select at least one camping option';
       }
-    } else if (currentStep === 2) {
+    } 
+    else if (currentStep === 3) {
+      // Validate custom fields
+      const customFields = getAllCustomFields();
+      
+      customFields.forEach(field => {
+        const value = formData.customFields[field.id];
+        
+        if (field.required && (value === undefined || value === '')) {
+          errors[`field_${field.id}`] = `${field.displayName} is required`;
+        }
+        
+        if (value !== undefined && value !== '') {
+          // Type-specific validations
+          switch (field.dataType) {
+            case 'STRING':
+            case 'MULTILINE_STRING': {
+              if (typeof value === 'string' && field.maxLength && value.length > field.maxLength) {
+                errors[`field_${field.id}`] = `${field.displayName} must be less than ${field.maxLength} characters`;
+              }
+              break;
+            }
+            
+            case 'INTEGER':
+            case 'NUMBER': {
+              const numValue = Number(value);
+              if (field.minValue !== null && numValue < field.minValue!) {
+                errors[`field_${field.id}`] = `${field.displayName} must be at least ${field.minValue}`;
+              }
+              if (field.maxValue !== null && numValue > field.maxValue!) {
+                errors[`field_${field.id}`] = `${field.displayName} must be at most ${field.maxValue}`;
+              }
+              break;
+            }
+          }
+        }
+      });
+    }
+    else if (currentStep === 4) {
       // Validate jobs selection
       const requiredCount = calculateRequiredJobCount();
       if (formData.jobs.length < requiredCount) {
@@ -128,7 +220,8 @@ export default function RegistrationPage() {
             `You must select at least one ${category.name} job`;
         }
       });
-    } else if (currentStep === 3) {
+    } 
+    else if (currentStep === 5) {
       // Validate terms acceptance
       if (!formData.acceptedTerms) {
         errors.acceptedTerms = 'You must accept the terms to continue';
@@ -147,7 +240,7 @@ export default function RegistrationPage() {
       return;
     }
     
-    if (currentStep < 3) {
+    if (currentStep < 5) {
       setCurrentStep(currentStep + 1);
     } else {
       try {
@@ -155,6 +248,7 @@ export default function RegistrationPage() {
         navigate('/dashboard'); // Redirect to dashboard after successful registration
       } catch (err) {
         console.error('Registration failed:', err);
+        setFormErrors({ submit: 'Registration submission failed. Please try again.' });
       }
     }
   };
@@ -187,6 +281,110 @@ export default function RegistrationPage() {
     });
   };
 
+  // Handle custom field input changes
+  const handleCustomFieldChange = (fieldId: string, value: unknown) => {
+    setFormData(prev => ({
+      ...prev,
+      customFields: {
+        ...prev.customFields,
+        [fieldId]: value
+      }
+    }));
+  };
+
+  // Render profile confirmation step
+  const renderProfileConfirmationStep = () => {
+    if (!user) {
+      return (
+        <div className="text-red-600 mb-4">
+          User profile information not available. Please try logging in again.
+        </div>
+      );
+    }
+
+    return (
+      <div>
+        <h2 className="text-xl font-semibold mb-4">Confirm Your Profile Information</h2>
+        <p className="mb-4">
+          Please review your profile information before proceeding with registration.
+        </p>
+        
+        <div className="bg-gray-50 p-4 rounded-md mb-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Name</label>
+              <div className="mt-1">{user.firstName} {user.lastName}</div>
+            </div>
+            
+            {user.playaName && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Playa Name</label>
+                <div className="mt-1">{user.playaName}</div>
+              </div>
+            )}
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Email</label>
+              <div className="mt-1">{user.email}</div>
+            </div>
+            
+            {user.phone && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Phone</label>
+                <div className="mt-1">{user.phone}</div>
+              </div>
+            )}
+            
+            {(user.city || user.stateProvince || user.country) && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Location</label>
+                <div className="mt-1">
+                  {[user.city, user.stateProvince, user.country].filter(Boolean).join(', ')}
+                </div>
+              </div>
+            )}
+            
+            {user.emergencyContact && (
+              <div className="col-span-2">
+                <label className="block text-sm font-medium text-gray-700">Emergency Contact</label>
+                <div className="mt-1 whitespace-pre-line">{user.emergencyContact}</div>
+              </div>
+            )}
+          </div>
+        </div>
+        
+        <div className="flex items-center mb-4">
+          <input
+            type="checkbox"
+            id="confirmProfile"
+            className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+            checked={profileConfirmed}
+            onChange={() => setProfileConfirmed(!profileConfirmed)}
+          />
+          <label htmlFor="confirmProfile" className="ml-2 text-sm text-gray-900">
+            I confirm that my profile information is correct and up to date
+          </label>
+        </div>
+        
+        {!profileConfirmed && (
+          <div className="mb-4">
+            <p className="text-sm text-amber-600">
+              If your information is not correct, please 
+              <a href="/profile" className="text-blue-600 hover:text-blue-800 px-1">
+                update your profile
+              </a>
+              before continuing with registration.
+            </p>
+          </div>
+        )}
+        
+        {formErrors.profile && (
+          <div className="text-red-600 mt-2">{formErrors.profile}</div>
+        )}
+      </div>
+    );
+  };
+
   // Render camping options step
   const renderCampingOptionsStep = () => {
     const availableOptions = campingOptions.filter(option => 
@@ -217,12 +415,26 @@ export default function RegistrationPage() {
                 />
                 <div className="ml-2">
                   <div className="font-medium">{option.name}</div>
+                  <div className="text-sm text-gray-600">{option.description}</div>
                   <div className="text-sm text-gray-600">
                     Dues: ${option.participantDues} | Required Jobs: {option.shiftsRequired}
                   </div>
                   {option.maxSignups > 0 && (
                     <div className="text-sm text-gray-600">
-                      Availability: {option.maxSignups - (option.currentSignups || 0)} of {option.maxSignups} remaining
+                      <div className="flex items-center mt-1">
+                        <span className="mr-2">Availability: </span>
+                        <div className="w-full max-w-xs bg-gray-200 rounded-full h-2">
+                          <div 
+                            className="bg-blue-600 h-2 rounded-full" 
+                            style={{ 
+                              width: `${Math.min(100, ((option.currentSignups || 0) / option.maxSignups) * 100)}%` 
+                            }}
+                          />
+                        </div>
+                        <span className="ml-2 text-xs">
+                          {option.maxSignups - (option.currentSignups || 0)} of {option.maxSignups} remaining
+                        </span>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -236,6 +448,7 @@ export default function RegistrationPage() {
               {fullOptions.map(option => (
                 <div key={option.id} className="border p-4 rounded bg-gray-100 opacity-70">
                   <div className="font-medium">{option.name} (Full)</div>
+                  <div className="text-sm text-gray-600">{option.description}</div>
                   <div className="text-sm text-gray-600">
                     Dues: ${option.participantDues} | Required Jobs: {option.shiftsRequired}
                   </div>
@@ -248,6 +461,118 @@ export default function RegistrationPage() {
         {formErrors.campingOptions && (
           <div className="text-red-600 mt-2">{formErrors.campingOptions}</div>
         )}
+      </div>
+    );
+  };
+
+  // Render custom fields step
+  const renderCustomFieldsStep = () => {
+    const allCustomFields = getAllCustomFields();
+    
+    if (allCustomFields.length === 0) {
+      return (
+        <div>
+          <h2 className="text-xl font-semibold mb-4">Additional Information</h2>
+          <p>No additional information is required for your selected camping options.</p>
+        </div>
+      );
+    }
+    
+    return (
+      <div>
+        <h2 className="text-xl font-semibold mb-4">Additional Information</h2>
+        <p className="mb-4">
+          Please provide the following information for your selected camping options.
+        </p>
+        
+        <div className="space-y-6">
+          {allCustomFields.map(field => {
+            const fieldId = field.id;
+            const value = formData.customFields[fieldId] || '';
+            const error = formErrors[`field_${fieldId}`];
+            
+            return (
+              <div key={fieldId} className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  {field.displayName}
+                  {field.required && <span className="text-red-600 ml-1">*</span>}
+                </label>
+                
+                {field.description && (
+                  <p className="text-xs text-gray-500">{field.description}</p>
+                )}
+                
+                {/* Render appropriate input based on field type */}
+                {field.dataType === 'STRING' && (
+                  <input
+                    type="text"
+                    value={value as string}
+                    onChange={(e) => handleCustomFieldChange(fieldId, e.target.value)}
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    maxLength={field.maxLength || undefined}
+                  />
+                )}
+                
+                {field.dataType === 'MULTILINE_STRING' && (
+                  <textarea
+                    value={value as string}
+                    onChange={(e) => handleCustomFieldChange(fieldId, e.target.value)}
+                    rows={3}
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    maxLength={field.maxLength || undefined}
+                  />
+                )}
+                
+                {field.dataType === 'INTEGER' && (
+                  <input
+                    type="number"
+                    step="1"
+                    value={value as string}
+                    onChange={(e) => handleCustomFieldChange(fieldId, parseInt(e.target.value, 10) || '')}
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    min={field.minValue !== null ? field.minValue : undefined}
+                    max={field.maxValue !== null ? field.maxValue : undefined}
+                  />
+                )}
+                
+                {field.dataType === 'NUMBER' && (
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={value as string}
+                    onChange={(e) => handleCustomFieldChange(fieldId, parseFloat(e.target.value) || '')}
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    min={field.minValue !== null ? field.minValue : undefined}
+                    max={field.maxValue !== null ? field.maxValue : undefined}
+                  />
+                )}
+                
+                {field.dataType === 'BOOLEAN' && (
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(value)}
+                      onChange={(e) => handleCustomFieldChange(fieldId, e.target.checked)}
+                      className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                    />
+                    <span className="ml-2 text-sm text-gray-900">Yes</span>
+                  </div>
+                )}
+                
+                {field.dataType === 'DATE' && (
+                  <input
+                    type="date"
+                    value={value as string}
+                    onChange={(e) => handleCustomFieldChange(fieldId, e.target.value)}
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                  />
+                )}
+                
+                {error && <p className="text-sm text-red-600">{error}</p>}
+              </div>
+            );
+          })}
+        </div>
       </div>
     );
   };
@@ -380,7 +705,9 @@ export default function RegistrationPage() {
             {formData.campingOptions.map(optionId => {
               const option = campingOptions.find(o => o.id === optionId);
               return option ? (
-                <li key={optionId}>{option.name} - ${option.participantDues}</li>
+                <li key={optionId}>
+                  {option.name} - ${user && user.role === 'staff' ? option.staffDues : option.participantDues}
+                </li>
               ) : null;
             })}
           </ul>
@@ -435,10 +762,14 @@ export default function RegistrationPage() {
   const renderCurrentStep = () => {
     switch (currentStep) {
       case 1:
-        return renderCampingOptionsStep();
+        return renderProfileConfirmationStep();
       case 2:
-        return renderJobsStep();
+        return renderCampingOptionsStep();
       case 3:
+        return renderCustomFieldsStep();
+      case 4:
+        return renderJobsStep();
+      case 5:
         return renderTermsStep();
       default:
         return null;
@@ -459,12 +790,40 @@ export default function RegistrationPage() {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
-  if (loading && !jobs.length && !campingOptions.length) {
+  // Calculate total cost for registration
+  const calculateTotalCost = (): number => {
+    const isStaffOrAdmin = user && (user.role === 'staff' || user.role === 'admin');
+    
+    return formData.campingOptions.reduce((total, optionId) => {
+      const option = campingOptions.find(o => o.id === optionId);
+      if (option) {
+        // Apply staff pricing for staff and admin users
+        return total + (isStaffOrAdmin ? option.staffDues : option.participantDues);
+      }
+      return total;
+    }, 0);
+  };
+
+  if (authLoading || registrationLoading && !jobs.length && !campingOptions.length) {
     return <div className="p-6">Loading registration data...</div>;
   }
 
-  if (error) {
-    return <div className="p-6 text-red-600">{error}</div>;
+  if (registrationError) {
+    return <div className="p-6 text-red-600">{registrationError}</div>;
+  }
+
+  if (!user) {
+    return (
+      <div className="p-6">
+        <p className="text-red-600">You must be logged in to register.</p>
+        <button 
+          onClick={() => navigate('/login')}
+          className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+        >
+          Go to Login
+        </button>
+      </div>
+    )
   }
 
   return (
@@ -473,13 +832,15 @@ export default function RegistrationPage() {
       
       {/* Step Progress Indicator */}
       <div className="flex mb-8">
-        {[1, 2, 3].map(step => (
+        {[1, 2, 3, 4, 5].map(step => (
           <div key={step} className="flex-1">
             <div className={`h-2 ${step <= currentStep ? 'bg-blue-500' : 'bg-gray-200'}`} />
             <div className="mt-2 text-center text-sm">
-              {step === 1 && 'Camping Options'}
-              {step === 2 && 'Work Jobs'}
-              {step === 3 && 'Review & Submit'}
+              {step === 1 && 'Profile'}
+              {step === 2 && 'Camping'}
+              {step === 3 && 'Details'}
+              {step === 4 && 'Jobs'}
+              {step === 5 && 'Review'}
             </div>
           </div>
         ))}
@@ -487,6 +848,12 @@ export default function RegistrationPage() {
       
       <form onSubmit={handleSubmit}>
         {renderCurrentStep()}
+        
+        {formErrors.submit && (
+          <div className="text-red-600 mt-4 p-2 bg-red-50 border border-red-200 rounded">
+            {formErrors.submit}
+          </div>
+        )}
         
         <div className="mt-8 flex justify-between">
           {currentStep > 1 && (
@@ -501,11 +868,21 @@ export default function RegistrationPage() {
           
           <button
             type="submit"
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            className={`px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 ${
+              (currentStep === 1 && !profileConfirmed) ? 'opacity-50 cursor-not-allowed' : ''
+            }`}
+            disabled={currentStep === 1 && !profileConfirmed}
           >
-            {currentStep < 3 ? 'Continue' : 'Complete Registration'}
+            {currentStep < 5 ? 'Continue' : 'Complete Registration'}
           </button>
         </div>
+        
+        {/* Payment amount display */}
+        {currentStep === 5 && (
+          <div className="mt-4 text-right">
+            <div className="font-bold">Total: ${calculateTotalCost().toFixed(2)}</div>
+          </div>
+        )}
       </form>
     </div>
   );

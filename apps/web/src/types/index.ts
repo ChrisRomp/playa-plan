@@ -8,6 +8,15 @@ export interface User {
   isAuthenticated: boolean;
   isEarlyRegistrationEnabled: boolean;
   hasRegisteredForCurrentYear: boolean;
+  // Additional fields from backend user profile
+  firstName?: string;
+  lastName?: string;
+  playaName?: string;
+  phone?: string;
+  city?: string;
+  stateProvince?: string;
+  country?: string;
+  emergencyContact?: string;
 }
 
 export interface CampConfig {
