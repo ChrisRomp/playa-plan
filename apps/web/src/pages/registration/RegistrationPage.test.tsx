@@ -57,12 +57,14 @@ describe('RegistrationPage', () => {
       name: 'Kitchen',
       description: 'Kitchen duties',
       alwaysRequired: true,
+      staffOnly: false,
     },
     {
       id: 'cat2',
       name: 'Cleaning',
       description: 'Cleaning duties',
       alwaysRequired: false,
+      staffOnly: false,
     },
   ];
 
@@ -74,9 +76,16 @@ describe('RegistrationPage', () => {
       description: 'Cooking meals',
       categoryId: 'cat1',
       shiftId: 'shift1',
-      category: { id: 'cat1', name: 'Kitchen' },
+      category: { 
+        id: 'cat1', 
+        name: 'Kitchen',
+        description: 'Kitchen duties',
+        staffOnly: false,
+        alwaysRequired: true 
+      },
       maxRegistrations: 5,
       currentRegistrations: 2,
+      location: 'Kitchen Area',
     },
     {
       id: 'job2',
@@ -84,9 +93,16 @@ describe('RegistrationPage', () => {
       description: 'Cleaning common areas',
       categoryId: 'cat2',
       shiftId: 'shift2',
-      category: { id: 'cat2', name: 'Cleaning' },
+      category: { 
+        id: 'cat2', 
+        name: 'Cleaning',
+        description: 'Cleaning duties',
+        staffOnly: false,
+        alwaysRequired: false
+      },
       maxRegistrations: 10,
       currentRegistrations: 3,
+      location: 'Common Areas',
     },
   ];
 
@@ -94,12 +110,16 @@ describe('RegistrationPage', () => {
   const mockShifts = [
     {
       id: 'shift1',
+      name: 'Morning Shift',
+      description: 'Morning work period',
       dayOfWeek: 'MONDAY',
       startTime: '2025-05-20T09:00:00Z',
       endTime: '2025-05-20T12:00:00Z',
     },
     {
       id: 'shift2',
+      name: 'Afternoon Shift',
+      description: 'Afternoon work period',
       dayOfWeek: 'TUESDAY',
       startTime: '2025-05-21T13:00:00Z',
       endTime: '2025-05-21T17:00:00Z',
@@ -112,18 +132,26 @@ describe('RegistrationPage', () => {
       id: 'field1',
       displayName: 'Arrival Date',
       description: 'When do you plan to arrive?',
-      dataType: 'DATE',
+      dataType: 'DATE' as const,
       required: true,
       campingOptionId: 'option1',
+      createdAt: '2025-05-01T00:00:00Z',
+      updatedAt: '2025-05-01T00:00:00Z',
+      minValue: null,
+      maxValue: null,
     },
     {
       id: 'field2',
       displayName: 'Special Needs',
       description: 'Any special requirements?',
-      dataType: 'STRING',
+      dataType: 'STRING' as const,
       required: false,
       maxLength: 200,
       campingOptionId: 'option1',
+      createdAt: '2025-05-01T00:00:00Z',
+      updatedAt: '2025-05-01T00:00:00Z',
+      minValue: null,
+      maxValue: null,
     },
   ];
 
