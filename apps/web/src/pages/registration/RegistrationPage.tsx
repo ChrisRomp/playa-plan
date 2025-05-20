@@ -4,7 +4,6 @@ import { useRegistration, RegistrationFormData } from '../../hooks/useRegistrati
 import { useCampingOptions } from '../../hooks/useCampingOptions';
 import { AuthContext } from '../../store/authUtils';
 import { JobCategory, Job, CampingOptionField } from '../../lib/api';
-import { User } from '../../types';
 
 /**
  * RegistrationPage component for user camp registration
