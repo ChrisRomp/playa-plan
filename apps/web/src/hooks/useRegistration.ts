@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { JobCategory, Job, api, jobCategories, jobs, shifts, Shift, CampingOption, CampingOptionSchema } from '../lib/api';
+import { JobCategory, Job, api, jobCategories, jobs, shifts, Shift, CampingOption } from '../lib/api';
 
 // Define types for registration data
 export interface RegistrationFormData {
@@ -25,10 +25,7 @@ export function useRegistration() {
     setError(null);
     try {
       const response = await api.get('/camping-options');
-      const data = response.data.map((option: unknown) => 
-        CampingOptionSchema.parse(option)
-      );
-      setCampingOptions(data);
+      setCampingOptions(response.data);
     } catch (err) {
       setError('Failed to fetch camping options');
       console.error(err);
