@@ -690,7 +690,15 @@ export default function RegistrationPage() {
                     type="number"
                     step="1"
                     value={value as string}
-                    onChange={(e) => handleCustomFieldChange(fieldId, parseInt(e.target.value, 10) || '')}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === '') {
+                        handleCustomFieldChange(fieldId, '');
+                      } else {
+                        const parsed = parseInt(val, 10);
+                        handleCustomFieldChange(fieldId, isNaN(parsed) ? '' : parsed);
+                      }
+                    }}
                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                     min={field.minValue !== null ? field.minValue : undefined}
                     max={field.maxValue !== null ? field.maxValue : undefined}
@@ -702,7 +710,15 @@ export default function RegistrationPage() {
                     type="number"
                     step="0.01"
                     value={value as string}
-                    onChange={(e) => handleCustomFieldChange(fieldId, parseFloat(e.target.value) || '')}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === '') {
+                        handleCustomFieldChange(fieldId, '');
+                      } else {
+                        const parsed = parseFloat(val);
+                        handleCustomFieldChange(fieldId, isNaN(parsed) ? '' : parsed);
+                      }
+                    }}
                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                     min={field.minValue !== null ? field.minValue : undefined}
                     max={field.maxValue !== null ? field.maxValue : undefined}
