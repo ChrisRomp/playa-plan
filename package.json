@@ -13,6 +13,8 @@
         "format": "prettier --write \"apps/**/*.{ts,tsx}\" \"libs/**/*.{ts,tsx}\"",
         "lint": "eslint . --config eslint.config.cjs --ext .js,.jsx,.ts,.tsx --report-unused-disable-directives --max-warnings 0",
         "test": "npm run test --workspaces --if-present",
+        "test:api": "npm run test --workspace=api",
+        "test:web": "npm run test --workspace=web",
         "test:watch": "npm run test:watch --workspaces --if-present",
         "test:coverage": "npm run test:coverage --workspaces --if-present",
         "clean": "rimraf node_modules **/dist **/node_modules"
