@@ -88,7 +88,6 @@ export interface RegistrationJob {
 export interface Job {
   id: string;
   name: string;
-  description?: string;
   location: string;
   categoryId: string;
   shiftId: string;

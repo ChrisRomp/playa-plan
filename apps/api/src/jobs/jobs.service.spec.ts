@@ -42,7 +42,6 @@ describe('JobsService', () => {
     it('should create a job', async () => {
       const createJobDto: CreateJobDto = {
         name: 'Test Job',
-        description: 'Test Description',
         location: 'Test Location',
         categoryId: 'test-category-id',
         shiftId: 'test-shift-id',
@@ -91,7 +90,6 @@ describe('JobsService', () => {
       expect(mockPrismaService.job.create).toHaveBeenCalledWith({
         data: {
           name: createJobDto.name,
-          description: createJobDto.description,
           location: createJobDto.location,
           maxRegistrations: 10,
           category: {
@@ -115,7 +113,6 @@ describe('JobsService', () => {
         {
           id: 'test-id-1',
           name: 'Test Job 1',
-          description: 'Test Description 1',
           location: 'Test Location 1',
           categoryId: 'test-category-id-1',
           shiftId: 'test-shift-id-1',
@@ -146,7 +143,6 @@ describe('JobsService', () => {
         {
           id: 'test-id-2',
           name: 'Test Job 2',
-          description: 'Test Description 2',
           location: 'Test Location 2',
           categoryId: 'test-category-id-2',
           shiftId: 'test-shift-id-2',
@@ -203,7 +199,6 @@ describe('JobsService', () => {
       const mockJob = {
         id: jobId,
         name: 'Test Job',
-        description: 'Test Description',
         location: 'Test Location',
         categoryId: 'test-category-id',
         shiftId: 'test-shift-id',
@@ -266,14 +261,12 @@ describe('JobsService', () => {
       const jobId = 'test-id';
       const updateJobDto: UpdateJobDto = {
         name: 'Updated Job',
-        description: 'Updated Description',
         shiftId: 'updated-shift-id',
       };
 
       const mockUpdatedJob = {
         id: jobId,
         name: 'Updated Job',
-        description: 'Updated Description',
         location: 'Test Location',
         categoryId: 'test-category-id',
         shiftId: 'updated-shift-id',
@@ -318,7 +311,6 @@ describe('JobsService', () => {
         where: { id: jobId },
         data: expect.objectContaining({
           name: updateJobDto.name,
-          description: updateJobDto.description,
           shift: {
             connect: { id: updateJobDto.shiftId }
           }
@@ -346,7 +338,6 @@ describe('JobsService', () => {
       const mockJob = {
         id: jobId,
         name: 'Test Job',
-        description: 'Test Description',
         location: 'Test Location',
         categoryId: 'test-category-id',
         shiftId: 'test-shift-id',

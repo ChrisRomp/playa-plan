@@ -114,7 +114,7 @@ const DashboardPage: React.FC = () => {
                           <div className="flex items-center justify-between">
                             <div>
                               <h5 className="font-medium text-gray-900">{registrationJob.job?.name}</h5>
-                              <p className="text-sm text-gray-600">{registrationJob.job?.description}</p>
+                              <p className="text-sm text-gray-600">{registrationJob.job?.category?.description}</p>
                               <p className="text-sm text-gray-500">
                                 {registrationJob.job?.location && `Location: ${registrationJob.job.location}`}
                               </p>

@@ -17,7 +17,6 @@ describe('JobsController (e2e)', () => {
   let adminToken: string;
   let userToken: string;
   let testCategoryId: string;
-  let testCampId: string;
   let testShiftId: string;
 
   beforeAll(async () => {
@@ -31,20 +30,6 @@ describe('JobsController (e2e)', () => {
     await app.init();
 
     // Create test data
-    // Create a test camp first for shift
-    const camp = await prisma.camp.create({
-      data: {
-        name: 'Test Camp',
-        description: 'Test Camp Description',
-        startDate: new Date('2023-06-01'),
-        endDate: new Date('2023-06-07'),
-        location: 'Test Location',
-        capacity: 100,
-        isActive: true,
-      }
-    });
-    testCampId = camp.id;
-    
     // Create a test shift needed for jobs
     const shift = await prisma.shift.create({
       data: {
@@ -53,7 +38,6 @@ describe('JobsController (e2e)', () => {
         startTime: '09:00',
         endTime: '17:00',
         dayOfWeek: DayOfWeek.MONDAY,
-        campId: testCampId,
       }
     });
     testShiftId = shift.id;
@@ -143,12 +127,6 @@ describe('JobsController (e2e)', () => {
       // Ignore errors if already deleted
     });
     
-    await prisma.camp.delete({
-      where: { id: testCampId },
-    }).catch(() => {
-      // Ignore errors if already deleted
-    });
-    
     await prisma.$disconnect();
     await app.close();
   });
@@ -157,13 +135,10 @@ describe('JobsController (e2e)', () => {
     it('should create a job (admin)', async () => {
       const createJobDto = {
         name: 'Test Job',
-        description: 'Test Description',
         location: 'Test Location',
         categoryId: testCategoryId,
         shiftId: testShiftId,
         maxRegistrations: 10,
-        staffOnly: false,
-        alwaysRequired: true,
       };
 
       const response = await request(app.getHttpServer())
@@ -174,10 +149,7 @@ describe('JobsController (e2e)', () => {
 
       expect(response.body).toHaveProperty('id');
       expect(response.body.name).toBe(createJobDto.name);
-      expect(response.body.description).toBe(createJobDto.description);
       expect(response.body.location).toBe(createJobDto.location);
-      expect(response.body.staffOnly).toBe(createJobDto.staffOnly);
-      expect(response.body.alwaysRequired).toBe(createJobDto.alwaysRequired);
       expect(response.body.shiftId).toBe(testShiftId);
       expect(response.body.maxRegistrations).toBe(createJobDto.maxRegistrations);
     });
@@ -185,13 +157,10 @@ describe('JobsController (e2e)', () => {
     it('should not create a job (non-admin)', async () => {
       const createJobDto = {
         name: 'Test Job',
-        description: 'Test Description',
         location: 'Test Location',
         categoryId: testCategoryId,
         shiftId: testShiftId,
         maxRegistrations: 10,
-        staffOnly: true,
-        alwaysRequired: false,
       };
 
       await request(app.getHttpServer())
@@ -221,13 +190,10 @@ describe('JobsController (e2e)', () => {
       const job = await prisma.job.create({
         data: {
           name: 'Test Job for GET',
-          description: 'Test Description',
           location: 'Test Location',
           categoryId: testCategoryId,
           shiftId: testShiftId,
           maxRegistrations: 10,
-          staffOnly: false,
-          alwaysRequired: false,
         },
       });
       jobId = job.id;
@@ -260,13 +226,10 @@ describe('JobsController (e2e)', () => {
       const job = await prisma.job.create({
         data: {
           name: 'Test Job for PATCH',
-          description: 'Test Description',
           location: 'Test Location',
           categoryId: testCategoryId,
           shiftId: testShiftId,
           maxRegistrations: 10,
-          staffOnly: false,
-          alwaysRequired: false,
         },
       });
       jobId = job.id;
@@ -275,11 +238,8 @@ describe('JobsController (e2e)', () => {
     it('should update a job (admin)', async () => {
       const updateJobDto = {
         name: 'Updated Job',
-        description: 'Updated Description',
         location: 'Updated Location',
         maxRegistrations: 15,
-        staffOnly: true,
-        alwaysRequired: true,
       };
 
       const response = await request(app.getHttpServer())
@@ -290,10 +250,7 @@ describe('JobsController (e2e)', () => {
 
       expect(response.body.id).toBe(jobId);
       expect(response.body.name).toBe(updateJobDto.name);
-      expect(response.body.description).toBe(updateJobDto.description);
       expect(response.body.location).toBe(updateJobDto.location);
-      expect(response.body.staffOnly).toBe(updateJobDto.staffOnly);
-      expect(response.body.alwaysRequired).toBe(updateJobDto.alwaysRequired);
       expect(response.body.maxRegistrations).toBe(updateJobDto.maxRegistrations);
     });
 
@@ -319,13 +276,10 @@ describe('JobsController (e2e)', () => {
       const job = await prisma.job.create({
         data: {
           name: 'Test Job for DELETE',
-          description: 'Test Description',
           location: 'Test Location',
           categoryId: testCategoryId,
           shiftId: testShiftId,
           maxRegistrations: 10,
-          staffOnly: false,
-          alwaysRequired: false,
         },
       });
       jobId = job.id;
@@ -349,13 +303,10 @@ describe('JobsController (e2e)', () => {
       const job = await prisma.job.create({
         data: {
           name: 'Test Job for DELETE (non-admin)',
-          description: 'Test Description',
           location: 'Test Location',
           categoryId: testCategoryId,
           shiftId: testShiftId,
           maxRegistrations: 10,
-          staffOnly: false,
-          alwaysRequired: false,
         },
       });
 

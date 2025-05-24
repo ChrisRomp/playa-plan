@@ -331,7 +331,6 @@ export interface IShift {
 export interface IJob {
   id: string;
   name: string;
-  description: string;
   location: string;
   categoryId: string;
   category?: IJobCategory;
@@ -375,7 +374,6 @@ export const JobSchema: z.ZodType<IJob> = z.lazy(() =>
   z.object({
     id: z.string(),
     name: z.string(),
-    description: z.string(),
     location: z.string(),
     categoryId: z.string(),
     category: JobCategorySchema.optional(),

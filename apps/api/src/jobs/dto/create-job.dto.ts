@@ -11,14 +11,6 @@ export class CreateJobDto {
   name!: string;
 
   @ApiProperty({
-    description: 'The description of the job',
-    example: 'Assist in meal preparation and cleanup',
-  })
-  @IsString()
-  @IsNotEmpty()
-  description!: string;
-
-  @ApiProperty({
     description: 'The location of the job',
     example: 'Main Kitchen',
   })

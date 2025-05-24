@@ -268,7 +268,6 @@ async function main() {
   await prisma.job.create({
     data: {
       name: 'Teardown Team 1',
-      description: 'Help break down airport/camp, mooping, leaving no trace',
       categoryId: teardownCategory.id,
       location: 'Entire Camp',
       shiftId: closingSunday1.id,
@@ -279,7 +278,6 @@ async function main() {
   await prisma.job.create({
     data: {
       name: 'Teardown Team 2',
-      description: 'Help break down airport/camp, mooping, leaving no trace',
       categoryId: teardownCategory.id,
       location: 'Entire Camp',
       shiftId: closingSunday2.id,
@@ -291,7 +289,6 @@ async function main() {
   await prisma.job.create({
     data: {
       name: 'Art Car Driver - Wednesday AM',
-      description: 'Drive the Skyvan art car to ferry skydivers and fireflies',
       categoryId: artCarCategory.id,
       location: 'Between Camp and Airport',
       shiftId: wednesdayAM.id,
@@ -302,7 +299,6 @@ async function main() {
   await prisma.job.create({
     data: {
       name: 'Art Car Driver - Wednesday PM',
-      description: 'Drive the Skyvan art car to ferry skydivers and fireflies',
       categoryId: artCarCategory.id,
       location: 'Between Camp and Airport',
       shiftId: wednesdayPM.id,
@@ -313,7 +309,6 @@ async function main() {
   await prisma.job.create({
     data: {
       name: 'Art Car Driver - Thursday AM',
-      description: 'Drive the Skyvan art car to ferry skydivers and fireflies',
       categoryId: artCarCategory.id,
       location: 'Between Camp and Airport',
       shiftId: thursdayAM.id,
@@ -324,7 +319,6 @@ async function main() {
   await prisma.job.create({
     data: {
       name: 'Art Car Driver - Thursday PM',
-      description: 'Drive the Skyvan art car to ferry skydivers and fireflies',
       categoryId: artCarCategory.id,
       location: 'Between Camp and Airport',
       shiftId: thursdayPM.id,
@@ -335,7 +329,6 @@ async function main() {
   await prisma.job.create({
     data: {
       name: 'Art Car Driver - Friday AM',
-      description: 'Drive the Skyvan art car to ferry skydivers and fireflies',
       categoryId: artCarCategory.id,
       location: 'Between Camp and Airport',
       shiftId: fridayAM.id,
@@ -346,7 +339,6 @@ async function main() {
   await prisma.job.create({
     data: {
       name: 'Art Car Driver - Friday PM',
-      description: 'Drive the Skyvan art car to ferry skydivers and fireflies',
       categoryId: artCarCategory.id,
       location: 'Between Camp and Airport',
       shiftId: fridayPM.id,
@@ -357,7 +349,6 @@ async function main() {
   await prisma.job.create({
     data: {
       name: 'Art Car Driver - Saturday AM',
-      description: 'Drive the Skyvan art car to ferry skydivers and fireflies',
       categoryId: artCarCategory.id,
       location: 'Between Camp and Airport',
       shiftId: saturdayAM.id,
@@ -368,7 +359,6 @@ async function main() {
   await prisma.job.create({
     data: {
       name: 'Art Car Driver - Saturday PM',
-      description: 'Drive the Skyvan art car to ferry skydivers and fireflies',
       categoryId: artCarCategory.id,
       location: 'Between Camp and Airport',
       shiftId: saturdayPM.id,
@@ -380,7 +370,6 @@ async function main() {
   await prisma.job.create({
     data: {
       name: 'Manifest Assistant - Wednesday AM',
-      description: 'Check in jumpers and fireflies, keep loads turning',
       categoryId: manifestAssistantCategory.id,
       location: 'Manifest',
       shiftId: wednesdayAM.id,
@@ -391,7 +380,6 @@ async function main() {
   await prisma.job.create({
     data: {
       name: 'Manifest Assistant - Wednesday PM',
-      description: 'Check in jumpers and fireflies, keep loads turning',
       categoryId: manifestAssistantCategory.id,
       location: 'Manifest',
       shiftId: wednesdayPM.id,
@@ -402,7 +390,6 @@ async function main() {
   await prisma.job.create({
     data: {
       name: 'Manifest Assistant - Thursday AM',
-      description: 'Check in jumpers and fireflies, keep loads turning',
       categoryId: manifestAssistantCategory.id,
       location: 'Manifest',
       shiftId: thursdayAM.id,
@@ -413,7 +400,6 @@ async function main() {
   await prisma.job.create({
     data: {
       name: 'Manifest Assistant - Thursday PM',
-      description: 'Check in jumpers and fireflies, keep loads turning',
       categoryId: manifestAssistantCategory.id,
       location: 'Manifest',
       shiftId: thursdayPM.id,
@@ -424,7 +410,6 @@ async function main() {
   await prisma.job.create({
     data: {
       name: 'Manifest Assistant - Friday AM',
-      description: 'Check in jumpers and fireflies, keep loads turning',
       categoryId: manifestAssistantCategory.id,
       location: 'Manifest',
       shiftId: fridayAM.id,
@@ -435,7 +420,6 @@ async function main() {
   await prisma.job.create({
     data: {
       name: 'Manifest Assistant - Friday PM',
-      description: 'Check in jumpers and fireflies, keep loads turning',
       categoryId: manifestAssistantCategory.id,
       location: 'Manifest',
       shiftId: fridayPM.id,
@@ -446,7 +430,6 @@ async function main() {
   await prisma.job.create({
     data: {
       name: 'Manifest Assistant - Saturday AM',
-      description: 'Check in jumpers and fireflies, keep loads turning',
       categoryId: manifestAssistantCategory.id,
       location: 'Manifest',
       shiftId: saturdayAM.id,
@@ -457,7 +440,6 @@ async function main() {
   await prisma.job.create({
     data: {
       name: 'Manifest Assistant - Saturday PM',
-      description: 'Check in jumpers and fireflies, keep loads turning',
       categoryId: manifestAssistantCategory.id,
       location: 'Manifest',
       shiftId: saturdayPM.id,
@@ -469,7 +451,6 @@ async function main() {
   await prisma.job.create({
     data: {
       name: 'Firefly Greeter - Wednesday AM',
-      description: 'Brief, gear, load, and unload fireflies at the airport',
       categoryId: fireflyGreeterCategory.id,
       location: 'Airport',
       shiftId: wednesdayAM.id,
@@ -480,7 +461,6 @@ async function main() {
   await prisma.job.create({
     data: {
       name: 'Firefly Greeter - Wednesday PM',
-      description: 'Brief, gear, load, and unload fireflies at the airport',
       categoryId: fireflyGreeterCategory.id,
       location: 'Airport',
       shiftId: wednesdayPM.id,
@@ -491,7 +471,6 @@ async function main() {
   await prisma.job.create({
     data: {
       name: 'Firefly Greeter - Thursday AM',
-      description: 'Brief, gear, load, and unload fireflies at the airport',
       categoryId: fireflyGreeterCategory.id,
       location: 'Airport',
       shiftId: thursdayAM.id,
@@ -502,7 +481,6 @@ async function main() {
   await prisma.job.create({
     data: {
       name: 'Firefly Greeter - Thursday PM',
-      description: 'Brief, gear, load, and unload fireflies at the airport',
       categoryId: fireflyGreeterCategory.id,
       location: 'Airport',
       shiftId: thursdayPM.id,
@@ -513,7 +491,6 @@ async function main() {
   await prisma.job.create({
     data: {
       name: 'Firefly Greeter - Friday AM',
-      description: 'Brief, gear, load, and unload fireflies at the airport',
       categoryId: fireflyGreeterCategory.id,
       location: 'Airport',
       shiftId: fridayAM.id,
@@ -524,7 +501,6 @@ async function main() {
   await prisma.job.create({
     data: {
       name: 'Firefly Greeter - Friday PM',
-      description: 'Brief, gear, load, and unload fireflies at the airport',
       categoryId: fireflyGreeterCategory.id,
       location: 'Airport',
       shiftId: fridayPM.id,
@@ -535,7 +511,6 @@ async function main() {
   await prisma.job.create({
     data: {
       name: 'Firefly Greeter - Saturday AM',
-      description: 'Brief, gear, load, and unload fireflies at the airport',
       categoryId: fireflyGreeterCategory.id,
       location: 'Airport',
       shiftId: saturdayAM.id,
@@ -546,7 +521,6 @@ async function main() {
   await prisma.job.create({
     data: {
       name: 'Firefly Greeter - Saturday PM',
-      description: 'Brief, gear, load, and unload fireflies at the airport',
       categoryId: fireflyGreeterCategory.id,
       location: 'Airport',
       shiftId: saturdayPM.id,
@@ -558,7 +532,6 @@ async function main() {
   await prisma.job.create({
     data: {
       name: 'Landing Area - Wednesday AM',
-      description: 'Station at windsock to observe landings and provide radio support',
       categoryId: landingAreaCategory.id,
       location: 'Landing Area',
       shiftId: wednesdayAM.id,
@@ -569,7 +542,6 @@ async function main() {
   await prisma.job.create({
     data: {
       name: 'Landing Area - Wednesday PM',
-      description: 'Station at windsock to observe landings and provide radio support',
       categoryId: landingAreaCategory.id,
       location: 'Landing Area',
       shiftId: wednesdayPM.id,
@@ -580,7 +552,6 @@ async function main() {
   await prisma.job.create({
     data: {
       name: 'Landing Area - Thursday AM',
-      description: 'Station at windsock to observe landings and provide radio support',
       categoryId: landingAreaCategory.id,
       location: 'Landing Area',
       shiftId: thursdayAM.id,
@@ -591,7 +562,6 @@ async function main() {
   await prisma.job.create({
     data: {
       name: 'Landing Area - Thursday PM',
-      description: 'Station at windsock to observe landings and provide radio support',
       categoryId: landingAreaCategory.id,
       location: 'Landing Area',
       shiftId: thursdayPM.id,
@@ -602,7 +572,6 @@ async function main() {
   await prisma.job.create({
     data: {
       name: 'Landing Area - Friday AM',
-      description: 'Station at windsock to observe landings and provide radio support',
       categoryId: landingAreaCategory.id,
       location: 'Landing Area',
       shiftId: fridayAM.id,
@@ -613,7 +582,6 @@ async function main() {
   await prisma.job.create({
     data: {
       name: 'Landing Area - Friday PM',
-      description: 'Station at windsock to observe landings and provide radio support',
       categoryId: landingAreaCategory.id,
       location: 'Landing Area',
       shiftId: fridayPM.id,
@@ -624,7 +592,6 @@ async function main() {
   await prisma.job.create({
     data: {
       name: 'Landing Area - Saturday AM',
-      description: 'Station at windsock to observe landings and provide radio support',
       categoryId: landingAreaCategory.id,
       location: 'Landing Area',
       shiftId: saturdayAM.id,
@@ -635,7 +602,6 @@ async function main() {
   await prisma.job.create({
     data: {
       name: 'Landing Area - Saturday PM',
-      description: 'Station at windsock to observe landings and provide radio support',
       categoryId: landingAreaCategory.id,
       location: 'Landing Area',
       shiftId: saturdayPM.id,
