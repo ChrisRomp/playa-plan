@@ -1002,7 +1002,7 @@ export default function RegistrationPage() {
             <div className={`h-2 ${step <= currentStep ? 'bg-blue-500' : 'bg-gray-200'}`} />
             <div className="mt-2 text-center text-sm">
               {step === 1 && 'Profile'}
-              {step === 2 && 'Camping'}
+              {step === 2 && 'Options'}
               {step === 3 && 'Details'}
               {step === 4 && 'Jobs'}
               {step === 5 && 'Review'}
