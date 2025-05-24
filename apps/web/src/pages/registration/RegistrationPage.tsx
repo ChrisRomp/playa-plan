@@ -646,9 +646,6 @@ export default function RegistrationPage() {
     return (
       <div>
         <h2 className="text-xl font-semibold mb-4">Additional Information</h2>
-        <p className="mb-4">
-          Please provide the following information for your selected camping options.
-        </p>
         
         <div className="space-y-6">
           {allCustomFields.map(field => {
