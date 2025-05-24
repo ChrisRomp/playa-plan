@@ -28,19 +28,24 @@ async function main() {
     console.log('Cleaned payments table');
   }
   
+  if (await tableExists('registration_jobs')) {
+    await prisma.registrationJob.deleteMany({});
+    console.log('Cleaned registration_jobs table');
+  }
+  
   if (await tableExists('registrations')) {
     await prisma.registration.deleteMany({});
     console.log('Cleaned registrations table');
   }
   
-  if (await tableExists('shifts')) {
-    await prisma.shift.deleteMany({});
-    console.log('Cleaned shifts table');
-  }
-  
   if (await tableExists('jobs')) {
     await prisma.job.deleteMany({});
     console.log('Cleaned jobs table');
+  }
+  
+  if (await tableExists('shifts')) {
+    await prisma.shift.deleteMany({});
+    console.log('Cleaned shifts table');
   }
   
   if (await tableExists('job_categories')) {
@@ -53,6 +58,11 @@ async function main() {
   if (await tableExists('users')) {
     await prisma.user.deleteMany({});
     console.log('Cleaned users table');
+  }
+  
+  if (await tableExists('core_config')) {
+    await prisma.coreConfig.deleteMany({});
+    console.log('Cleaned core_config table');
   }
   
   console.log('Successfully completed data cleanup');
@@ -201,6 +211,31 @@ async function main() {
   });
 
   console.log(`Created ${await prisma.job.count()} jobs`);
+
+  // Create core configuration
+  console.log('Creating core configuration...');
+  await prisma.coreConfig.create({
+    data: {
+      campName: 'Playa Plan',
+      campDescription: 'A Burning Man camp planning tool.',
+      homePageBlurb: 'Please log in and configure your camp settings.',
+      registrationYear: 2025,
+      earlyRegistrationOpen: false,
+      registrationOpen: false,
+      registrationTerms: 'By registering, you agree to follow our camp principles and contribute to our community.',
+      allowDeferredDuesPayment: false,
+      stripeEnabled: false,
+      paypalEnabled: false,
+      smtpHost: 'localhost',
+      smtpPort: 587,
+      smtpSecure: false,
+      senderEmail: 'camp@example.playaplan.app',
+      senderName: 'Playa Plan',
+      timeZone: 'America/Los_Angeles',
+    },
+  });
+
+  console.log('Created core configuration');
 
   console.log('Seed completed successfully!');
 }
