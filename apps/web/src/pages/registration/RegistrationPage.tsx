@@ -1017,7 +1017,7 @@ export default function RegistrationPage() {
               {step === 1 && 'Profile'}
               {step === 2 && 'Options'}
               {step === 3 && 'Details'}
-              {step === 4 && 'Jobs'}
+              {step === 4 && 'Shifts'}
               {step === 5 && 'Review'}
             </div>
           </div>
