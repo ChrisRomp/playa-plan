@@ -446,4 +446,56 @@ export class RegistrationsService {
 
     return result;
   }
+
+  /**
+   * Get the current user's complete camp registration
+   * @param userId - The ID of the user
+   * @returns The user's complete camp registration data
+   */
+  async getMyCampRegistration(userId: string) {
+    // Get camping option registrations for the user
+    const campingOptionRegistrations = await this.prisma.campingOptionRegistration.findMany({
+      where: { userId },
+      include: {
+        campingOption: {
+          include: {
+            fields: true,
+          },
+        },
+      },
+    });
+
+    // Get custom field values for the user
+    const customFieldValues = await this.prisma.campingOptionFieldValue.findMany({
+      where: { 
+        registration: {
+          userId
+        }
+      },
+      include: {
+        field: true,
+      },
+    });
+
+    // Get job registrations for the user
+    const jobRegistrations = await this.prisma.registration.findMany({
+      where: { userId },
+      include: {
+        job: {
+          include: {
+            category: true,
+            shift: true,
+          },
+        },
+        payment: true,
+      },
+    });
+
+    return {
+      campingOptions: campingOptionRegistrations,
+      customFieldValues,
+      jobRegistrations,
+      hasRegistration: campingOptionRegistrations.length > 0 || jobRegistrations.length > 0,
+    };
+  }
 }

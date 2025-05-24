@@ -81,6 +81,13 @@ export class RegistrationsController {
     return this.registrationsService.createCampRegistration(req.user.id, createCampRegistrationDto);
   }
 
+  @Get('camp/me')
+  @ApiOperation({ summary: 'Get my complete camp registration' })
+  @ApiOkResponse({ description: 'Returns the user\'s complete camp registration including camping options and custom fields.' })
+  async getMyCampRegistration(@Request() req: AuthRequest) {
+    return this.registrationsService.getMyCampRegistration(req.user.id);
+  }
+
   @Get('test/admin')
   @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'Admin test endpoint for smoke testing' })

@@ -970,4 +970,29 @@ export const registrations = {
       throw error;
     }
   },
+
+  /**
+   * Get the complete camp registration for the current user
+   * @returns A promise that resolves to the user's complete camp registration
+   */
+  getMyCampRegistration: async (): Promise<{
+    campingOptions: CampingOptionRegistration[];
+    customFieldValues: Array<{
+      id: string;
+      value: string;
+      fieldId: string;
+      registrationId: string;
+      field: CampingOptionField;
+    }>;
+    jobRegistrations: Registration[];
+    hasRegistration: boolean;
+  }> => {
+    try {
+      const response = await api.get('/registrations/camp/me');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching camp registration:', error);
+      throw error;
+    }
+  },
 };
