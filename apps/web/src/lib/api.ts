@@ -217,6 +217,12 @@ export const UserSchema = z.object({
   stateProvince: z.string().max(50).nullable().optional(),
   country: z.string().max(50).nullable().optional(),
   emergencyContact: z.string().max(1024).nullable().optional(),
+  // User permission fields
+  allowRegistration: z.boolean().optional(),
+  allowEarlyRegistration: z.boolean().optional(),
+  allowDeferredDuesPayment: z.boolean().optional(),
+  allowNoJob: z.boolean().optional(),
+  internalNotes: z.string().nullable().optional(),
 });
 
 export const AuthResponseSchema = z.object({
@@ -383,6 +389,34 @@ export const JobSchema: z.ZodType<IJob> = z.lazy(() =>
 );
 
 export type Job = z.infer<typeof JobSchema>;
+
+// Registration interface
+export interface Registration {
+  id: string;
+  userId: string;
+  jobId: string;
+  status: 'PENDING' | 'COMPLETE' | 'WAITLISTED' | 'CANCELLED';
+  createdAt: string;
+  updatedAt: string;
+  user?: User;
+  job?: Job;
+  payment?: {
+    id: string;
+    amount: number;
+    status: string;
+    createdAt: string;
+  };
+}
+
+// Camping Option Registration interface
+export interface CampingOptionRegistration {
+  id: string;
+  userId: string;
+  campingOptionId: string;
+  createdAt: string;
+  updatedAt: string;
+  campingOption?: CampingOption;
+}
 
 // API Functions
 export const auth = {
@@ -925,5 +959,46 @@ export const shifts = {
   getRegistrations: async (shiftId: string): Promise<unknown[]> => {
     const response = await api.get(`/shifts/${shiftId}/registrations`);
     return response.data;
+  },
+};
+
+export const registrations = {
+  /**
+   * Get all job registrations for the current user
+   * @returns A promise that resolves to an array of user job registrations
+   */
+  getMyRegistrations: async (): Promise<Registration[]> => {
+    try {
+      const response = await api.get<Registration[]>('/jobs/registrations/me');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching user registrations:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Get the complete camp registration for the current user
+   * @returns A promise that resolves to the user's complete camp registration
+   */
+  getMyCampRegistration: async (): Promise<{
+    campingOptions: CampingOptionRegistration[];
+    customFieldValues: Array<{
+      id: string;
+      value: string;
+      fieldId: string;
+      registrationId: string;
+      field: CampingOptionField;
+    }>;
+    jobRegistrations: Registration[];
+    hasRegistration: boolean;
+  }> => {
+    try {
+      const response = await api.get('/registrations/camp/me');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching camp registration:', error);
+      throw error;
+    }
   },
 };

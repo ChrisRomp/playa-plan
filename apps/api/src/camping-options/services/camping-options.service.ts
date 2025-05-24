@@ -2,7 +2,7 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { CreateCampingOptionDto, UpdateCampingOptionDto } from '../dto';
 import { CampingOption } from '../entities/camping-option.entity';
-import { Prisma, FieldType } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 
 /**
  * Service for managing camping options
@@ -49,20 +49,31 @@ export class CampingOptionsService {
           maxSignups: createCampingOptionDto.maxSignups ?? 0,
           // Set up job categories if provided
           ...(createCampingOptionDto.jobCategoryIds?.length ? {
-            fields: {
-              createMany: {
-                data: createCampingOptionDto.jobCategoryIds.map(id => ({
-                  displayName: `Job Category ${id}`,
-                  dataType: FieldType.STRING,
-                  required: false
-                }))
-              }
+            jobCategories: {
+              create: createCampingOptionDto.jobCategoryIds.map(categoryId => ({
+                jobCategory: {
+                  connect: { id: categoryId }
+                }
+              }))
             }
           } : {})
         },
+        include: {
+          jobCategories: {
+            include: {
+              jobCategory: true
+            }
+          }
+        }
       });
 
-      return new CampingOption(campingOption);
+      // Extract job category IDs from the response
+      const jobCategoryIds = campingOption.jobCategories?.map(jc => jc.jobCategory.id) || [];
+      
+      return new CampingOption({
+        ...campingOption,
+        jobCategoryIds
+      });
     } catch (error) {
       if (error instanceof NotFoundException || error instanceof BadRequestException) {
         throw error;
@@ -88,9 +99,22 @@ export class CampingOptionsService {
       orderBy: {
         name: 'asc',
       },
+      include: {
+        jobCategories: {
+          include: {
+            jobCategory: true
+          }
+        }
+      }
     });
 
-    return campingOptions.map(option => new CampingOption(option));
+    return campingOptions.map(option => {
+      const jobCategoryIds = option.jobCategories?.map(jc => jc.jobCategory.id) || [];
+      return new CampingOption({
+        ...option,
+        jobCategoryIds
+      });
+    });
   }
 
   /**
@@ -101,13 +125,25 @@ export class CampingOptionsService {
   async findOne(id: string): Promise<CampingOption> {
     const campingOption = await this.prisma.campingOption.findUnique({
       where: { id },
+      include: {
+        jobCategories: {
+          include: {
+            jobCategory: true
+          }
+        }
+      }
     });
 
     if (!campingOption) {
       throw new NotFoundException(`Camping option with ID ${id} not found`);
     }
 
-    return new CampingOption(campingOption);
+    const jobCategoryIds = campingOption.jobCategories?.map(jc => jc.jobCategory.id) || [];
+    
+    return new CampingOption({
+      ...campingOption,
+      jobCategoryIds
+    });
   }
 
   /**
@@ -181,23 +217,43 @@ export class CampingOptionsService {
       }
 
       // Handle job categories if provided
-      if (updateCampingOptionDto.jobCategoryIds) {
-        // Implementation to update job categories would go here
-        // For now, just note that we received the job category IDs
-        console.log(`Received job category IDs: ${updateCampingOptionDto.jobCategoryIds.join(', ')}`);
+      if (updateCampingOptionDto.jobCategoryIds !== undefined) {
+        // Delete existing job category relationships
+        await this.prisma.campingOptionJobCategory.deleteMany({
+          where: { campingOptionId: id }
+        });
+        
+        // Create new job category relationships if any provided
+        if (updateCampingOptionDto.jobCategoryIds.length > 0) {
+          await this.prisma.campingOptionJobCategory.createMany({
+            data: updateCampingOptionDto.jobCategoryIds.map(categoryId => ({
+              campingOptionId: id,
+              jobCategoryId: categoryId
+            }))
+          });
+        }
       }
 
-      // If no fields to update, return current entity
-      if (Object.keys(updateData).length === 0) {
-        return this.findOne(id);
-      }
-
+      // Update the camping option itself if there are fields to update
       const updated = await this.prisma.campingOption.update({
         where: { id },
         data: updateData,
+        include: {
+          jobCategories: {
+            include: {
+              jobCategory: true
+            }
+          }
+        }
       });
 
-      return new CampingOption(updated);
+      // Extract job category IDs from the response
+      const jobCategoryIds = updated.jobCategories?.map(jc => jc.jobCategory.id) || [];
+      
+      return new CampingOption({
+        ...updated,
+        jobCategoryIds
+      });
     } catch (error) {
       if (error instanceof NotFoundException || error instanceof BadRequestException) {
         throw error;

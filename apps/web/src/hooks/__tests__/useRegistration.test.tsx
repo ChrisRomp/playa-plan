@@ -28,22 +28,26 @@ describe('useRegistration', () => {
     {
       id: 'camp-1',
       name: 'Regular Camp',
+      description: 'Regular camping option',
       enabled: true,
-      shiftsRequired: 2,
-      jobCategories: ['job-cat-1', 'job-cat-2'],
+      workShiftsRequired: 2,
+      jobCategoryIds: ['job-cat-1', 'job-cat-2'],
       participantDues: 100,
       staffDues: 50,
       maxSignups: 50,
+      currentRegistrations: 20,
     },
     {
       id: 'camp-2',
       name: 'Special Camp',
+      description: 'Special camping option',
       enabled: true,
-      shiftsRequired: 3,
-      jobCategories: ['job-cat-3'],
+      workShiftsRequired: 3,
+      jobCategoryIds: ['job-cat-3'],
       participantDues: 150,
       staffDues: 75,
       maxSignups: 30,
+      currentRegistrations: 15,
     },
   ];
 
@@ -266,7 +270,7 @@ describe('useRegistration', () => {
       response = await result.current.submitRegistration(mockRegistrationData);
     });
     
-    expect(apiModule.api.post).toHaveBeenCalledWith('/registrations', mockRegistrationData);
+    expect(apiModule.api.post).toHaveBeenCalledWith('/registrations/camp', mockRegistrationData);
     expect(response).toEqual({ success: true, registrationId: 'reg-123' });
   });
 }); 

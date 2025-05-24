@@ -17,6 +17,8 @@ import AdminJobCategoriesPage from '../pages/AdminJobCategoriesPage.tsx';
 import AdminJobsPage from '../pages/AdminJobsPage.tsx';
 import AdminShiftsPage from '../pages/AdminShiftsPage.tsx';
 import ShiftsPage from '../pages/ShiftsPage.tsx';
+import RegistrationPage from '../pages/registration/RegistrationPage.tsx';
+import RegistrationProtectedRoute from './RegistrationProtectedRoute.tsx';
 import NotFoundPage from '../pages/NotFoundPage.tsx';
 import { ROLES } from '../types/auth.ts';
 
@@ -38,6 +40,11 @@ const AppRouter: React.FC = () => {
         <Route path={ROUTES.DASHBOARD.path} element={<DashboardPage />} />
         <Route path={ROUTES.PROFILE.path} element={<ProfilePage />} />
         <Route path={ROUTES.SHIFTS.path} element={<ShiftsPage />} />
+      </Route>
+
+      {/* Registration route with specialized protection */}
+      <Route element={<RegistrationProtectedRoute />}>
+        <Route path={ROUTES.REGISTRATION.path} element={<RegistrationPage />} />
       </Route>
       
       {/* Protected routes that require specific roles */}

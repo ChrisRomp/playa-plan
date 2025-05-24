@@ -38,6 +38,11 @@ export const ROUTES = {
     name: 'Profile',
     requiresAuth: true,
   },
+  REGISTRATION: {
+    path: '/registration',
+    name: 'Registration',
+    requiresAuth: true,
+  },
   ADMIN: {
     path: '/admin',
     name: 'Admin',

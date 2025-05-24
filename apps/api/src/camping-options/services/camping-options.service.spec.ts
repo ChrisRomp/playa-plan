@@ -18,9 +18,24 @@ describe('CampingOptionsService', () => {
     participantDues: 100.00,
     staffDues: 50.00,
     maxSignups: 10,
-    jobCategoryIds: ['category-1', 'category-2'],
     createdAt: new Date(),
     updatedAt: new Date(),
+    jobCategories: [
+      {
+        id: 'rel-1',
+        campingOptionId: 'test-id',
+        jobCategoryId: 'category-1',
+        createdAt: new Date(),
+        jobCategory: { id: 'category-1', name: 'Category 1' }
+      },
+      {
+        id: 'rel-2',
+        campingOptionId: 'test-id',
+        jobCategoryId: 'category-2',
+        createdAt: new Date(),
+        jobCategory: { id: 'category-2', name: 'Category 2' }
+      }
+    ]
   };
 
   const mockCreateCampingOptionDto: CreateCampingOptionDto = {
@@ -50,6 +65,10 @@ describe('CampingOptionsService', () => {
       findUnique: jest.fn(),
       update: jest.fn(),
       delete: jest.fn(),
+    },
+    campingOptionJobCategory: {
+      deleteMany: jest.fn(),
+      createMany: jest.fn(),
     },
     campingOptionRegistration: {
       count: jest.fn(),
@@ -103,7 +122,22 @@ describe('CampingOptionsService', () => {
         data: expect.objectContaining({
           name: mockCreateCampingOptionDto.name,
           description: mockCreateCampingOptionDto.description,
+          jobCategories: expect.objectContaining({
+            create: expect.arrayContaining([
+              expect.objectContaining({
+                jobCategory: { connect: { id: 'category-1' } }
+              }),
+              expect.objectContaining({
+                jobCategory: { connect: { id: 'category-2' } }
+              })
+            ])
+          })
         }),
+        include: expect.objectContaining({
+          jobCategories: expect.objectContaining({
+            include: { jobCategory: true }
+          })
+        })
       });
       
       expect(result).toBeInstanceOf(CampingOption);
@@ -130,6 +164,13 @@ describe('CampingOptionsService', () => {
       expect(prisma.campingOption.findMany).toHaveBeenCalledWith({
         where: { enabled: true },
         orderBy: { name: 'asc' },
+        include: {
+          jobCategories: {
+            include: {
+              jobCategory: true
+            }
+          }
+        }
       });
       
       expect(result).toHaveLength(1);
@@ -142,6 +183,13 @@ describe('CampingOptionsService', () => {
       expect(prisma.campingOption.findMany).toHaveBeenCalledWith({
         where: {},
         orderBy: { name: 'asc' },
+        include: {
+          jobCategories: {
+            include: {
+              jobCategory: true
+            }
+          }
+        }
       });
     });
   });
@@ -152,6 +200,13 @@ describe('CampingOptionsService', () => {
       
       expect(prisma.campingOption.findUnique).toHaveBeenCalledWith({
         where: { id: 'test-id' },
+        include: {
+          jobCategories: {
+            include: {
+              jobCategory: true
+            }
+          }
+        }
       });
       
       expect(result).toBeInstanceOf(CampingOption);
@@ -192,6 +247,13 @@ describe('CampingOptionsService', () => {
       
       expect(prisma.campingOption.findUnique).toHaveBeenCalledWith({
         where: { id: 'test-id' },
+        include: {
+          jobCategories: {
+            include: {
+              jobCategory: true
+            }
+          }
+        }
       });
       
       expect(prisma.campingOption.update).toHaveBeenCalledWith({
@@ -201,6 +263,13 @@ describe('CampingOptionsService', () => {
           description: mockUpdateCampingOptionDto.description,
           enabled: mockUpdateCampingOptionDto.enabled,
         }),
+        include: {
+          jobCategories: {
+            include: {
+              jobCategory: true
+            }
+          }
+        }
       });
       
       expect(result).toBeInstanceOf(CampingOption);
@@ -219,6 +288,13 @@ describe('CampingOptionsService', () => {
       
       expect(prisma.campingOption.findUnique).toHaveBeenCalledWith({
         where: { id: 'test-id' },
+        include: {
+          jobCategories: {
+            include: {
+              jobCategory: true
+            }
+          }
+        }
       });
       
       expect(prisma.campingOptionRegistration.count).toHaveBeenCalledWith({

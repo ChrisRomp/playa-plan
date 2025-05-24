@@ -44,18 +44,19 @@ model User {
 // Camp model has been removed
 
 model CampingOption {
-  id                 String                      @id @default(uuid())
+  id                 String                           @id @default(uuid())
   name               String
   description        String?
-  enabled            Boolean                     @default(true)
-  workShiftsRequired Int                         @default(0)
+  enabled            Boolean                          @default(true)
+  workShiftsRequired Int                              @default(0)
   participantDues    Float
   staffDues          Float
-  maxSignups         Int                         @default(0)
+  maxSignups         Int                              @default(0)
   fields             CampingOptionField[]
   registrations      CampingOptionRegistration[]
-  createdAt          DateTime                    @default(now())
-  updatedAt          DateTime                    @updatedAt
+  jobCategories      CampingOptionJobCategory[]
+  createdAt          DateTime                         @default(now())
+  updatedAt          DateTime                         @updatedAt
 
   @@map("camping_options")
 }
@@ -104,16 +105,29 @@ model CampingOptionRegistration {
   @@map("camping_option_registrations")
 }
 
+model CampingOptionJobCategory {
+  id              String        @id @default(uuid())
+  campingOptionId String
+  jobCategoryId   String
+  createdAt       DateTime      @default(now())
+  campingOption   CampingOption @relation(fields: [campingOptionId], references: [id], onDelete: Cascade)
+  jobCategory     JobCategory   @relation(fields: [jobCategoryId], references: [id], onDelete: Cascade)
+
+  @@unique([campingOptionId, jobCategoryId])
+  @@map("camping_option_job_categories")
+}
+
 model JobCategory {
-  id             String   @id @default(uuid())
-  name           String   @unique
+  id             String                     @id @default(uuid())
+  name           String                     @unique
   description    String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-  alwaysRequired Boolean  @default(false)
+  createdAt      DateTime                   @default(now())
+  updatedAt      DateTime                   @updatedAt
+  alwaysRequired Boolean                    @default(false)
   location       String?
-  staffOnly      Boolean  @default(false)
+  staffOnly      Boolean                    @default(false)
   jobs           Job[]
+  campingOptions CampingOptionJobCategory[]
 
   @@map("job_categories")
 }

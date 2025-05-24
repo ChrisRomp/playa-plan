@@ -1,3 +1,6 @@
+---
+applyTo: 'apps/web/**/*'
+---
 ## Technology Choices (Simple Stack)
 
 Keeping simplicity in mind, we'll use:
@@ -10,8 +13,8 @@ Keeping simplicity in mind, we'll use:
 - **Data Fetching:** Native fetch API initially (with clear upgrade path to TanStack Query when complexity grows)
 - **Validation:** Zod (for type safety and shared validation with backend)
 - **Testing:** 
-  - Unit Tests: Vitest (integrates seamlessly with Vite)
-  - E2E Tests: Playwright (cross-browser, modern API, accessibility checks recommended)
+  - Unit Tests: Vitest (integrates seamlessly with Vite) `npm run test`
+  - E2E Tests: Playwright (cross-browser, modern API, accessibility checks recommended) `npm run test:e2e`
 
 ## Development
 

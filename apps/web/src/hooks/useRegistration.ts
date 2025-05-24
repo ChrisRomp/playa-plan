@@ -1,6 +1,5 @@
-import { useState } from 'react';
-import { z } from 'zod';
-import { JobCategory, Job, api, jobCategories, jobs, shifts, Shift } from '../lib/api';
+import { useState, useCallback } from 'react';
+import { JobCategory, Job, api, jobCategories, jobs, shifts, Shift, CampingOption } from '../lib/api';
 
 // Define types for registration data
 export interface RegistrationFormData {
@@ -9,21 +8,6 @@ export interface RegistrationFormData {
   jobs: string[];  // Changed from shifts to jobs
   acceptedTerms: boolean;
 }
-
-// Schema for camping options
-export const CampingOptionSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  enabled: z.boolean(),
-  shiftsRequired: z.number(),
-  jobCategories: z.array(z.string()).optional(),
-  participantDues: z.number(),
-  staffDues: z.number(),
-  maxSignups: z.number(),
-  currentSignups: z.number().optional(),
-});
-
-export type CampingOption = z.infer<typeof CampingOptionSchema>;
 
 // Using JobSchema and ShiftSchema from api.ts instead of redefining them here
 
@@ -36,25 +20,22 @@ export function useRegistration() {
   const [error, setError] = useState<string | null>(null);
 
   // Fetch camping options
-  const fetchCampingOptions = async () => {
+  const fetchCampingOptions = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const response = await api.get('/camping-options');
-      const data = response.data.map((option: unknown) => 
-        CampingOptionSchema.parse(option)
-      );
-      setCampingOptions(data);
+      setCampingOptions(response.data);
     } catch (err) {
       setError('Failed to fetch camping options');
       console.error(err);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   // Fetch job categories
-  const fetchJobCategories = async () => {
+  const fetchJobCategories = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -66,10 +47,10 @@ export function useRegistration() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   // Fetch shifts
-  const fetchShifts = async () => {
+  const fetchShifts = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -81,10 +62,10 @@ export function useRegistration() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   // Fetch jobs 
-  const fetchJobs = async (campingOptionIds: string[] = []) => {
+  const fetchJobs = useCallback(async (campingOptionIds: string[] = []) => {
     setLoading(true);
     setError(null);
     try {
@@ -109,8 +90,8 @@ export function useRegistration() {
       
       // Add job categories from selected camping options
       selectedCampingOptions.forEach(option => {
-        if (option.jobCategories) {
-          option.jobCategories.forEach(catId => {
+        if (option.jobCategoryIds) {
+          option.jobCategoryIds.forEach((catId: string) => {
             params.append('categoryIds', catId);
           });
         }
@@ -133,14 +114,14 @@ export function useRegistration() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [categories, campingOptions]);
 
   // Submit registration
   const submitRegistration = async (formData: RegistrationFormData) => {
     setLoading(true);
     setError(null);
     try {
-      const response = await api.post('/registrations', formData);
+      const response = await api.post('/registrations/camp', formData);
       return response.data;
     } catch (err) {
       setError('Failed to submit registration');
