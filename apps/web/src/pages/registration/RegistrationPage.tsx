@@ -157,7 +157,7 @@ export default function RegistrationPage() {
     );
     
     const campingJobsRequired = selectedOptions.reduce(
-      (total, option) => total + option.shiftsRequired, 
+      (total, option) => total + option.workShiftsRequired, 
       0
     );
     
@@ -553,11 +553,11 @@ export default function RegistrationPage() {
   // Render camping options step
   const renderCampingOptionsStep = () => {
     const availableOptions = campingOptions.filter(option => 
-      option.enabled && (option.maxSignups === 0 || (option.currentSignups || 0) < option.maxSignups)
+      option.enabled && (option.maxSignups === 0 || (option.currentRegistrations || 0) < option.maxSignups)
     );
     
     const fullOptions = campingOptions.filter(option => 
-      option.enabled && option.maxSignups > 0 && (option.currentSignups || 0) >= option.maxSignups
+      option.enabled && option.maxSignups > 0 && (option.currentRegistrations || 0) >= option.maxSignups
     );
     
     return (
@@ -582,7 +582,7 @@ export default function RegistrationPage() {
                   <div className="font-medium">{option.name}</div>
                   <div className="text-sm text-gray-600">{option.description}</div>
                   <div className="text-sm text-gray-600">
-                    Dues: ${option.participantDues} | Required Jobs: {option.shiftsRequired}
+                    Dues: ${option.participantDues} | Work Shifts: {option.workShiftsRequired}
                   </div>
                   {option.maxSignups > 0 && (
                     <div className="text-sm text-gray-600">
@@ -592,12 +592,12 @@ export default function RegistrationPage() {
                           <div 
                             className="bg-blue-600 h-2 rounded-full" 
                             style={{ 
-                              width: `${Math.min(100, ((option.currentSignups || 0) / option.maxSignups) * 100)}%` 
+                              width: `${Math.min(100, ((option.currentRegistrations || 0) / option.maxSignups) * 100)}%` 
                             }}
                           />
                         </div>
                         <span className="ml-2 text-xs">
-                          {option.maxSignups - (option.currentSignups || 0)} of {option.maxSignups} remaining
+                          {option.maxSignups - (option.currentRegistrations || 0)} of {option.maxSignups} remaining
                         </span>
                       </div>
                     </div>
@@ -615,7 +615,7 @@ export default function RegistrationPage() {
                   <div className="font-medium">{option.name} (Full)</div>
                   <div className="text-sm text-gray-600">{option.description}</div>
                   <div className="text-sm text-gray-600">
-                    Dues: ${option.participantDues} | Required Jobs: {option.shiftsRequired}
+                    Dues: ${option.participantDues} | Work Shifts: {option.workShiftsRequired}
                   </div>
                 </div>
               ))}

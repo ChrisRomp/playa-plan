@@ -1,6 +1,5 @@
 import { useState, useCallback } from 'react';
-import { z } from 'zod';
-import { JobCategory, Job, api, jobCategories, jobs, shifts, Shift } from '../lib/api';
+import { JobCategory, Job, api, jobCategories, jobs, shifts, Shift, CampingOption, CampingOptionSchema } from '../lib/api';
 
 // Define types for registration data
 export interface RegistrationFormData {
@@ -9,22 +8,6 @@ export interface RegistrationFormData {
   jobs: string[];  // Changed from shifts to jobs
   acceptedTerms: boolean;
 }
-
-// Schema for camping options
-export const CampingOptionSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  description: z.string().optional(),
-  enabled: z.boolean(),
-  shiftsRequired: z.number().default(0),
-  jobCategories: z.array(z.string()).optional(),
-  participantDues: z.number().default(0),
-  staffDues: z.number().default(0),
-  maxSignups: z.number().default(0),
-  currentSignups: z.number().optional(),
-});
-
-export type CampingOption = z.infer<typeof CampingOptionSchema>;
 
 // Using JobSchema and ShiftSchema from api.ts instead of redefining them here
 
@@ -110,8 +93,8 @@ export function useRegistration() {
       
       // Add job categories from selected camping options
       selectedCampingOptions.forEach(option => {
-        if (option.jobCategories) {
-          option.jobCategories.forEach(catId => {
+        if (option.jobCategoryIds) {
+          option.jobCategoryIds.forEach((catId: string) => {
             params.append('categoryIds', catId);
           });
         }
