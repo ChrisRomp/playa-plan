@@ -217,6 +217,12 @@ export const UserSchema = z.object({
   stateProvince: z.string().max(50).nullable().optional(),
   country: z.string().max(50).nullable().optional(),
   emergencyContact: z.string().max(1024).nullable().optional(),
+  // User permission fields
+  allowRegistration: z.boolean().optional(),
+  allowEarlyRegistration: z.boolean().optional(),
+  allowDeferredDuesPayment: z.boolean().optional(),
+  allowNoJob: z.boolean().optional(),
+  internalNotes: z.string().nullable().optional(),
 });
 
 export const AuthResponseSchema = z.object({

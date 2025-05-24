@@ -3,9 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { useRegistration, RegistrationFormData } from '../../hooks/useRegistration';
 import { useCampingOptions } from '../../hooks/useCampingOptions';
 import { useProfile } from '../../hooks/useProfile';
+import { useCampRegistration } from '../../hooks/useCampRegistration';
+import { useConfig } from '../../store/ConfigContext';
 import { AuthContext } from '../../store/authUtils';
 import { JobCategory, Job, CampingOptionField } from '../../lib/api';
 import { getFriendlyDayName, formatTime } from '../../utils/shiftUtils';
+import { canUserRegister, getRegistrationStatusMessage } from '../../utils/registrationUtils';
+import { PATHS } from '../../routes';
 
 /**
  * RegistrationPage component for user camp registration
@@ -20,7 +24,9 @@ import { getFriendlyDayName, formatTime } from '../../utils/shiftUtils';
 export default function RegistrationPage() {
   const navigate = useNavigate();
   const { user, isLoading: authLoading } = useContext(AuthContext);
+  const { config } = useConfig();
   const { profile, updateProfile, error: profileError } = useProfile();
+  const { campRegistration, loading: campRegistrationLoading } = useCampRegistration();
   const {
     campingOptions,
     jobCategories,
@@ -83,6 +89,19 @@ export default function RegistrationPage() {
   
   // Track loaded custom fields for selected camping options
   const [customFieldsByOption, setCustomFieldsByOption] = useState<Record<string, CampingOptionField[]>>({});
+
+  // Check if user can register and redirect if not
+  useEffect(() => {
+    if (!authLoading && !campRegistrationLoading && config && user) {
+      const hasExistingRegistration = campRegistration?.hasRegistration || false;
+      
+      if (!canUserRegister(config, user, hasExistingRegistration)) {
+        // User can't register, redirect to dashboard
+        navigate(PATHS.DASHBOARD);
+        return;
+      }
+    }
+  }, [authLoading, campRegistrationLoading, config, user, campRegistration, navigate]);
 
   // Fetch initial data on component mount
   useEffect(() => {
@@ -990,8 +1009,16 @@ export default function RegistrationPage() {
     }, 0);
   };
 
-  if (authLoading || registrationLoading && !jobs.length && !campingOptions.length) {
-    return <div className="p-6">Loading registration data...</div>;
+  // Show loading state while checking registration status
+  if (authLoading || campRegistrationLoading || (registrationLoading && !jobs.length && !campingOptions.length)) {
+    return (
+      <div className="max-w-4xl mx-auto p-6">
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          <span className="ml-3 text-lg text-gray-600">Loading registration...</span>
+        </div>
+      </div>
+    );
   }
 
   if (registrationError) {
@@ -1009,7 +1036,29 @@ export default function RegistrationPage() {
           Go to Login
         </button>
       </div>
-    )
+    );
+  }
+
+  // Show message if user can't register
+  if (config && user && campRegistration !== null) {
+    const hasExistingRegistration = campRegistration?.hasRegistration || false;
+    
+    if (!canUserRegister(config, user, hasExistingRegistration)) {
+      return (
+        <div className="max-w-4xl mx-auto p-6">
+          <div className="bg-yellow-50 border border-yellow-400 rounded-lg p-6 text-center">
+            <h2 className="text-xl font-semibold text-yellow-800 mb-2">Registration Not Available</h2>
+            <p className="text-yellow-700 mb-4">{getRegistrationStatusMessage(config, user, hasExistingRegistration)}</p>
+            <button 
+              onClick={() => navigate(PATHS.DASHBOARD)}
+              className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
+            >
+              Go to Dashboard
+            </button>
+          </div>
+        </div>
+      );
+    }
   }
 
   return (

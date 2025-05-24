@@ -339,28 +339,22 @@ export class RegistrationsService {
       throw new BadRequestException('One or more jobs not found');
     }
 
-    // Check for existing registrations to avoid duplicates
+    // Check if user already has any registration for the current year
+    // Since the system is designed for one registration year at a time, 
+    // any existing registration means they're already registered
+    const existingCampingRegistrations = await this.prisma.campingOptionRegistration.findMany({
+      where: { userId },
+    });
+
     const existingJobRegistrations = await this.prisma.registration.findMany({
       where: {
         userId,
-        jobId: { in: createCampRegistrationDto.jobs },
         status: { notIn: [RegistrationStatus.CANCELLED] },
       },
     });
 
-    if (existingJobRegistrations.length > 0) {
-      throw new BadRequestException('User already registered for one or more of these jobs');
-    }
-
-    const existingCampingRegistrations = await this.prisma.campingOptionRegistration.findMany({
-      where: {
-        userId,
-        campingOptionId: { in: createCampRegistrationDto.campingOptions },
-      },
-    });
-
-    if (existingCampingRegistrations.length > 0) {
-      throw new BadRequestException('User already registered for one or more of these camping options');
+    if (existingCampingRegistrations.length > 0 || existingJobRegistrations.length > 0) {
+      throw new BadRequestException('User is already registered for this year. Only one registration per year is allowed.');
     }
 
     // Use a transaction to ensure all operations succeed or fail together
