@@ -17,7 +17,7 @@ const UserDashboard: React.FC = () => {
   if (!user || !config) return null;
 
   const isRegistrationOpen = isRegistrationAccessible(config, user);
-  const registrationStatusMessage = getRegistrationStatusMessage(config, user);
+  const registrationStatusMessage = getRegistrationStatusMessage(config, user, user.hasRegisteredForCurrentYear);
   
   return (
     <div className="max-w-5xl mx-auto">

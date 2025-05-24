@@ -6,11 +6,15 @@ import { AuthContext } from '../../store/authUtils';
 import * as useRegistrationModule from '../../hooks/useRegistration';
 import * as useCampingOptionsModule from '../../hooks/useCampingOptions';
 import * as useProfileModule from '../../hooks/useProfile';
+import * as useCampRegistrationModule from '../../hooks/useCampRegistration';
+import * as useConfigModule from '../../store/ConfigContext';
 
 // Mock modules
 vi.mock('../../hooks/useRegistration');
 vi.mock('../../hooks/useCampingOptions');
 vi.mock('../../hooks/useProfile');
+vi.mock('../../hooks/useCampRegistration');
+vi.mock('../../store/ConfigContext');
 
 describe('RegistrationPage', () => {
   // Mock user
@@ -52,22 +56,28 @@ describe('RegistrationPage', () => {
       name: 'Standard Camping',
       description: 'Basic camping option',
       enabled: true,
-      shiftsRequired: 2,
+      workShiftsRequired: 2,
       participantDues: 100,
       staffDues: 50,
       maxSignups: 10,
-      currentSignups: 5,
+      currentRegistrations: 5,
+      createdAt: '2025-05-01T00:00:00Z',
+      updatedAt: '2025-05-01T00:00:00Z',
+      jobCategoryIds: ['cat1', 'cat2'],
     },
     {
       id: 'option2',
       name: 'Premium Camping',
       description: 'Premium camping with extras',
       enabled: true,
-      shiftsRequired: 3,
+      workShiftsRequired: 3,
       participantDues: 200,
       staffDues: 100,
       maxSignups: 5,
-      currentSignups: 3,
+      currentRegistrations: 3,
+      createdAt: '2025-05-01T00:00:00Z',
+      updatedAt: '2025-05-01T00:00:00Z',
+      jobCategoryIds: ['cat1'],
     },
   ];
 
@@ -218,6 +228,34 @@ describe('RegistrationPage', () => {
       isLoading: false,
       error: null,
       isProfileComplete: true,
+    });
+
+    // Mock useCampRegistration hook
+    vi.spyOn(useCampRegistrationModule, 'useCampRegistration').mockReturnValue({
+      campRegistration: {
+        campingOptions: [],
+        customFieldValues: [],
+        jobRegistrations: [],
+        hasRegistration: false,
+      },
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    // Mock useConfig hook
+    vi.spyOn(useConfigModule, 'useConfig').mockReturnValue({
+      config: {
+        name: 'Test Camp',
+        description: 'Test Description',
+        homePageBlurb: 'Welcome!',
+        registrationOpen: true,
+        earlyRegistrationOpen: false,
+        currentYear: 2025,
+      },
+      isLoading: false,
+      error: null,
+      refreshConfig: vi.fn(),
     });
   });
 

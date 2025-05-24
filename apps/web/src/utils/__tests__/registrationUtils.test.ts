@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isRegistrationAccessible, getRegistrationStatusMessage } from '../registrationUtils';
+import { isRegistrationAccessible, getRegistrationStatusMessage, canUserRegister } from '../registrationUtils';
 import { User, CampConfig } from '../../types';
 
 describe('registrationUtils', () => {
@@ -33,7 +33,7 @@ describe('registrationUtils', () => {
     });
 
     it('should return true when early registration is open and user is enabled', () => {
-      const config = { ...mockConfig, earlyRegistrationOpen: true };
+      const config = { ...mockConfig, registrationOpen: true, earlyRegistrationOpen: true };
       const user = { ...mockUser, isEarlyRegistrationEnabled: true };
       expect(isRegistrationAccessible(config, user)).toBe(true);
     });
@@ -50,32 +50,45 @@ describe('registrationUtils', () => {
 
   describe('getRegistrationStatusMessage', () => {
     it('should return config unavailable message when config is null', () => {
-      const message = getRegistrationStatusMessage(null, mockUser);
-      expect(message).toBe('Registration configuration not available.');
+      const message = getRegistrationStatusMessage(null, mockUser, false);
+      expect(message).toBe('Configuration not available. Please try again later.');
     });
 
-    it('should return registration open message when registration is open', () => {
+    it('should return already registered message when user has existing registration', () => {
       const config = { ...mockConfig, registrationOpen: true };
-      const message = getRegistrationStatusMessage(config, mockUser);
-      expect(message).toBe('Registration for Test Camp 2025 is now open!');
+      const message = getRegistrationStatusMessage(config, mockUser, true);
+      expect(message).toBe('You are already registered for 2025. You can view your registration details on the dashboard.');
     });
 
-    it('should return early registration message when user is enabled for early registration', () => {
-      const config = { ...mockConfig, earlyRegistrationOpen: true };
-      const user = { ...mockUser, isEarlyRegistrationEnabled: true };
-      const message = getRegistrationStatusMessage(config, user);
-      expect(message).toBe('Early registration for Test Camp 2025 is available to you!');
+    it('should return registration not available when neither is open', () => {
+      const message = getRegistrationStatusMessage(mockConfig, mockUser, false);
+      expect(message).toBe('Registration for 2025 is not currently available.');
+    });
+  });
+
+  describe('canUserRegister', () => {
+    it('should prevent registration when user already has registration', () => {
+      const config = { ...mockConfig, registrationOpen: true };
+      const hasExistingRegistration = true;
+      
+      const result = canUserRegister(config, mockUser, hasExistingRegistration);
+      expect(result).toBe(false);
     });
 
-    it('should return early registration not available message when user is not enabled', () => {
-      const config = { ...mockConfig, earlyRegistrationOpen: true };
-      const message = getRegistrationStatusMessage(config, mockUser);
-      expect(message).toBe('Registration is not currently open. Early registration is available for selected members only.');
+    it('should allow registration when registration is open and user has no existing registration', () => {
+      const config = { ...mockConfig, registrationOpen: true };
+      const hasExistingRegistration = false;
+      
+      const result = canUserRegister(config, mockUser, hasExistingRegistration);
+      expect(result).toBe(true);
     });
 
-    it('should return registration not open message when neither is open', () => {
-      const message = getRegistrationStatusMessage(mockConfig, mockUser);
-      expect(message).toBe('Registration is not currently open.');
+    it('should prevent registration when registration is closed', () => {
+      const config = { ...mockConfig, registrationOpen: false };
+      const hasExistingRegistration = false;
+      
+      const result = canUserRegister(config, mockUser, hasExistingRegistration);
+      expect(result).toBe(false);
     });
   });
 }); 
