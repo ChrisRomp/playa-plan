@@ -131,7 +131,7 @@ describe('UserDashboard', () => {
     
     const detailsLink = screen.getByRole('link', { name: /view\/edit registration details/i });
     expect(detailsLink).toBeInTheDocument();
-    expect(detailsLink).toHaveAttribute('href', '/registration/details');
+    expect(detailsLink).toHaveAttribute('href', '/registration');
   });
 
   it('shows work shift section for registered users', () => {

@@ -3,6 +3,7 @@ import { AuthContext } from '../../store/authUtils';
 import { useConfig } from '../../store/ConfigContext';
 import { Tent, Calendar } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { isRegistrationAccessible, getRegistrationStatusMessage } from '../../utils/registrationUtils';
 
 /**
  * UserDashboard component displays personalized content for authenticated users
@@ -15,8 +16,8 @@ const UserDashboard: React.FC = () => {
   // Guard clause against missing context data
   if (!user || !config) return null;
 
-  const isRegistrationOpen = config.registrationOpen || 
-    (config.earlyRegistrationOpen && user.isEarlyRegistrationEnabled);
+  const isRegistrationOpen = isRegistrationAccessible(config, user);
+  const registrationStatusMessage = getRegistrationStatusMessage(config, user);
   
   return (
     <div className="max-w-5xl mx-auto">
@@ -53,15 +54,26 @@ const UserDashboard: React.FC = () => {
           )}
           
           {isRegistrationOpen && !user.hasRegisteredForCurrentYear && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6" role="region" aria-label="Registration Information">
-              <h4 className="text-lg font-medium text-blue-800 mb-2">Ready to join us?</h4>
-              <p className="text-blue-700 mb-4">
-                Registration for {config.name} {config.currentYear} is now open! Secure your spot today.
-              </p>
-              <Link to="/registration" className="inline-flex items-center bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors" aria-label="Begin registration process">
-                <Tent className="mr-2" size={18} aria-hidden="true" />
-                Register Now
-              </Link>
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-lg p-6 mb-6 shadow-md" role="region" aria-label="Registration Information">
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <h4 className="text-xl font-bold text-blue-800 mb-2">Ready to join us?</h4>
+                  <p className="text-blue-700 mb-4">
+                    {registrationStatusMessage}
+                  </p>
+                  <Link 
+                    to="/registration" 
+                    className="inline-flex items-center bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors shadow-md font-medium" 
+                    aria-label="Begin registration process"
+                  >
+                    <Tent className="mr-2" size={20} aria-hidden="true" />
+                    Start Registration
+                  </Link>
+                </div>
+                <div className="hidden md:block ml-6">
+                  <Tent size={64} className="text-blue-200" aria-hidden="true" />
+                </div>
+              </div>
             </div>
           )}
           
@@ -88,7 +100,7 @@ const UserDashboard: React.FC = () => {
                 </div>
               </div>
               
-              <Link to="/registration/details" className="text-blue-600 hover:text-blue-800 font-medium transition-colors">
+              <Link to="/registration" className="text-blue-600 hover:text-blue-800 font-medium transition-colors">
                 View/Edit Registration Details
               </Link>
             </div>

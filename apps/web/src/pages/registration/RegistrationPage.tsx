@@ -61,20 +61,27 @@ export default function RegistrationPage() {
 
   // When camping options change, fetch jobs and custom fields
   useEffect(() => {
-    if (formData.campingOptions.length > 0 || hasAlwaysRequiredCategories(jobCategories)) {
+    // Only fetch jobs if we have job categories loaded and either have selected camping options 
+    // or there are always required categories
+    if (jobCategories.length > 0 && (formData.campingOptions.length > 0 || hasAlwaysRequiredCategories(jobCategories))) {
       fetchJobs(formData.campingOptions);
-      
-      // Load custom fields for all selected camping options
-      formData.campingOptions.forEach(optionId => {
+    }
+  }, [formData.campingOptions, jobCategories, fetchJobs]);
+
+  // Load custom fields for selected camping options
+  useEffect(() => {
+    formData.campingOptions.forEach(optionId => {
+      // Only load if we don't already have fields for this option
+      if (!customFieldsByOption[optionId]) {
         loadCampingOptionFields(optionId).then(fields => {
           setCustomFieldsByOption(prev => ({
             ...prev,
             [optionId]: fields
           }));
         });
-      });
-    }
-  }, [formData.campingOptions, jobCategories, fetchJobs, loadCampingOptionFields]);
+      }
+    });
+  }, [formData.campingOptions, customFieldsByOption, loadCampingOptionFields]);
 
   // Check if there are any always required job categories
   const hasAlwaysRequiredCategories = (categories: JobCategory[]): boolean => {

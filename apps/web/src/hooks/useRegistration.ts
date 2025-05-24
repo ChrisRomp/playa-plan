@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { z } from 'zod';
 import { JobCategory, Job, api, jobCategories, jobs, shifts, Shift } from '../lib/api';
 
@@ -16,11 +16,11 @@ export const CampingOptionSchema = z.object({
   name: z.string(),
   description: z.string().optional(),
   enabled: z.boolean(),
-  shiftsRequired: z.number(),
+  shiftsRequired: z.number().default(0),
   jobCategories: z.array(z.string()).optional(),
-  participantDues: z.number(),
-  staffDues: z.number(),
-  maxSignups: z.number(),
+  participantDues: z.number().default(0),
+  staffDues: z.number().default(0),
+  maxSignups: z.number().default(0),
   currentSignups: z.number().optional(),
 });
 
@@ -37,7 +37,7 @@ export function useRegistration() {
   const [error, setError] = useState<string | null>(null);
 
   // Fetch camping options
-  const fetchCampingOptions = async () => {
+  const fetchCampingOptions = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -52,10 +52,10 @@ export function useRegistration() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   // Fetch job categories
-  const fetchJobCategories = async () => {
+  const fetchJobCategories = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -67,10 +67,10 @@ export function useRegistration() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   // Fetch shifts
-  const fetchShifts = async () => {
+  const fetchShifts = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -82,10 +82,10 @@ export function useRegistration() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   // Fetch jobs 
-  const fetchJobs = async (campingOptionIds: string[] = []) => {
+  const fetchJobs = useCallback(async (campingOptionIds: string[] = []) => {
     setLoading(true);
     setError(null);
     try {
@@ -134,7 +134,7 @@ export function useRegistration() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [categories, campingOptions]);
 
   // Submit registration
   const submitRegistration = async (formData: RegistrationFormData) => {
