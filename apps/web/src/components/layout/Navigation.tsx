@@ -2,7 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../store/authUtils';
 import { useConfig } from '../../store/ConfigContextDefinition';
-import { LogOut, User, Tent, Calendar, FileText, Settings } from 'lucide-react';
+import { LogOut, User, Tent, FileText, Settings } from 'lucide-react';
 import { PATHS } from '../../routes';
 import { isRegistrationAccessible } from '../../utils/registrationUtils';
 
@@ -59,14 +59,7 @@ const Navigation: React.FC<NavigationProps> = ({
             </Link>
           )}
           
-          <Link
-            to={PATHS.SHIFTS}
-            className={linkClass}
-            onClick={() => closeMenu?.()}
-          >
-            <Calendar size={18} />
-            <span>Shifts</span>
-          </Link>
+
           
           {user && (user.role === 'staff' || user.role === 'admin') && (
             <Link

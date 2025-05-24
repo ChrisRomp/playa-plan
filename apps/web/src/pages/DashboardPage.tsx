@@ -2,15 +2,18 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../store/authUtils';
 import { useProfile } from '../hooks/useProfile';
+import { useUserRegistrations } from '../hooks/useUserRegistrations';
+import { getFriendlyDayName, formatTime } from '../utils/shiftUtils';
 import { PATHS } from '../routes';
 
 /**
  * Dashboard page component
- * Displays user dashboard with activities and options
+ * Displays user dashboard with current registrations and work shifts
  */
 const DashboardPage: React.FC = () => {
   const { user } = useAuth();
-  const { profile, isProfileComplete } = useProfile(); // Destructure profile
+  const { profile, isProfileComplete } = useProfile();
+  const { registrations, loading, error } = useUserRegistrations();
   
   return (
     <div className="max-w-4xl mx-auto">
@@ -26,7 +29,11 @@ const DashboardPage: React.FC = () => {
             </div>
             <div className="ml-3">
               <p className="text-sm text-amber-700">
-                Please complete your profile to access all features.
+                Please{' '}
+                <Link to={PATHS.PROFILE} className="underline hover:text-amber-800">
+                  complete your profile
+                </Link>
+                {' '}to access all features.
               </p>
             </div>
           </div>
@@ -43,30 +50,79 @@ const DashboardPage: React.FC = () => {
             !
           </h2>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="bg-gray-50 p-4 rounded-md">
-              <h3 className="font-medium text-gray-900 mb-2">My Shifts</h3>
-              <p className="text-gray-600 mb-3">View and manage your shift assignments</p>
-              <Link to={PATHS.SHIFTS} className="text-blue-600 hover:text-blue-800 font-medium">
-                Go to Shifts →
-              </Link>
-            </div>
+          {/* Current Registrations Section */}
+          <div className="mb-8">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Current Registrations</h3>
             
-            <div className="bg-gray-50 p-4 rounded-md">
-              <h3 className="font-medium text-gray-900 mb-2">My Profile</h3>
-              <p className="text-gray-600 mb-3">Review and update your profile information</p>
-              <Link to={PATHS.PROFILE} className="text-blue-600 hover:text-blue-800 font-medium">
-                Edit Profile →
-              </Link>
-            </div>
+            {loading && (
+              <div className="flex items-center justify-center py-4">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                <span className="ml-2 text-gray-600">Loading registrations...</span>
+              </div>
+            )}
             
-            {user?.role === 'admin' && (
-              <div className="bg-gray-50 p-4 rounded-md">
-                <h3 className="font-medium text-gray-900 mb-2">Admin Panel</h3>
-                <p className="text-gray-600 mb-3">Access administrator controls</p>
-                <Link to={PATHS.ADMIN} className="text-blue-600 hover:text-blue-800 font-medium">
-                  Go to Admin →
+            {error && (
+              <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+                <p>{error}</p>
+              </div>
+            )}
+            
+            {!loading && !error && registrations.length === 0 && (
+              <div className="bg-gray-50 p-6 rounded-lg text-center">
+                <p className="text-gray-600 mb-4">You haven't registered for any shifts yet.</p>
+                <Link 
+                  to={PATHS.REGISTRATION} 
+                  className="inline-block bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
+                >
+                  Start Registration
                 </Link>
+              </div>
+            )}
+            
+            {!loading && !error && registrations.length > 0 && (
+              <div className="space-y-4">
+                {registrations.map((registration) => (
+                  <div key={registration.id} className="border border-gray-200 rounded-lg p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="font-medium text-gray-900">{registration.job?.name}</h4>
+                        <p className="text-sm text-gray-600">{registration.job?.description}</p>
+                        <p className="text-sm text-gray-500">
+                          {registration.job?.location && `Location: ${registration.job.location}`}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                          registration.status === 'COMPLETE' ? 'bg-green-100 text-green-800' :
+                          registration.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' :
+                          registration.status === 'WAITLISTED' ? 'bg-orange-100 text-orange-800' :
+                          'bg-gray-100 text-gray-800'
+                        }`}>
+                          {registration.status}
+                        </span>
+                      </div>
+                    </div>
+                    
+                    {registration.job?.shift && (
+                      <div className="mt-3 pt-3 border-t border-gray-100">
+                        <h5 className="font-medium text-sm text-gray-700 mb-2">Shift Details</h5>
+                        <div className="text-sm text-gray-600">
+                          <p>
+                            <strong>Day:</strong> {getFriendlyDayName(registration.job.shift.dayOfWeek)}
+                          </p>
+                          <p>
+                            <strong>Time:</strong> {formatTime(registration.job.shift.startTime)} - {formatTime(registration.job.shift.endTime)}
+                          </p>
+                          {registration.job.shift.description && (
+                            <p>
+                              <strong>Description:</strong> {registration.job.shift.description}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
             )}
           </div>
