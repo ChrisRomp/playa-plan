@@ -60,7 +60,7 @@ const DashboardPage: React.FC = () => {
           
           {/* Current Registration Section */}
           <div className="mb-8">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Current Registration ({currentYear})</h3>
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Current Registration {currentYear}</h3>
             
             {registrationsLoading && (
               <div className="flex items-center justify-center py-4">

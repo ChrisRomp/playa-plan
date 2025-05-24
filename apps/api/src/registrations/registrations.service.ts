@@ -440,23 +440,218 @@ export class RegistrationsService {
   }
 
   /**
-   * Create a camp registration (legacy method - may need updating)
+   * Create a comprehensive camp registration
    * @param userId - The ID of the user
    * @param createCampRegistrationDto - The camp registration data
+   * @returns The created registrations and camping option registrations
    */
   async createCampRegistration(userId: string, createCampRegistrationDto: CreateCampRegistrationDto) {
-    // This method may need to be updated based on the camping options structure
-    // For now, keeping the original implementation but it might need revision
-    throw new BadRequestException('This method needs to be updated for the new registration structure');
+    // Check if user exists
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new NotFoundException(`User with ID ${userId} not found`);
+    }
+
+    // Validate that terms have been accepted
+    if (!createCampRegistrationDto.acceptedTerms) {
+      throw new BadRequestException('Terms and conditions must be accepted');
+    }
+
+    // Get current year for job registration
+    const currentYear = new Date().getFullYear();
+
+    let jobRegistration = null;
+    const campingOptionRegistrations: Array<{
+      id: string;
+      userId: string;
+      campingOptionId: string;
+      createdAt: Date;
+      updatedAt: Date;
+      campingOption: {
+        id: string;
+        name: string;
+        description: string | null;
+        enabled: boolean;
+        workShiftsRequired: number;
+        participantDues: number;
+        staffDues: number;
+        maxSignups: number;
+        createdAt: Date;
+        updatedAt: Date;
+        fields: Array<{
+          id: string;
+          displayName: string;
+          description: string | null;
+          dataType: string;
+          required: boolean;
+          maxLength: number | null;
+          minValue: number | null;
+          maxValue: number | null;
+          createdAt: Date;
+          updatedAt: Date;
+          campingOptionId: string;
+        }>;
+      };
+    }> = [];
+
+    // Create job registration if jobs are provided
+    if (createCampRegistrationDto.jobs && createCampRegistrationDto.jobs.length > 0) {
+      // Check if user already has a registration for this year
+      const existingRegistration = await this.prisma.registration.findUnique({
+        where: {
+          userId_year: {
+            userId,
+            year: currentYear,
+          },
+        },
+      });
+
+      if (existingRegistration) {
+        throw new ConflictException(`User already has a registration for ${currentYear}`);
+      }
+
+      // Create the job registration
+      jobRegistration = await this.create({
+        userId,
+        year: currentYear,
+        jobIds: createCampRegistrationDto.jobs,
+      });
+    }
+
+    // Create camping option registrations
+    if (createCampRegistrationDto.campingOptions && createCampRegistrationDto.campingOptions.length > 0) {
+      for (const campingOptionId of createCampRegistrationDto.campingOptions) {
+        // Check if camping option exists
+        const campingOption = await this.prisma.campingOption.findUnique({
+          where: { id: campingOptionId },
+          include: { fields: true },
+        });
+
+        if (!campingOption) {
+          throw new NotFoundException(`Camping option with ID ${campingOptionId} not found`);
+        }
+
+        // Check if user already has this camping option registered
+        const existingCampingRegistration = await this.prisma.campingOptionRegistration.findFirst({
+          where: {
+            userId,
+            campingOptionId,
+          },
+        });
+
+        if (existingCampingRegistration) {
+          throw new ConflictException(`User already registered for camping option: ${campingOption.name}`);
+        }
+
+        // Create the camping option registration
+        const campingRegistration = await this.prisma.campingOptionRegistration.create({
+          data: {
+            userId,
+            campingOptionId,
+          },
+          include: {
+            campingOption: {
+              include: { fields: true },
+            },
+          },
+        });
+
+        // Create custom field values if provided
+        if (createCampRegistrationDto.customFields && campingOption.fields.length > 0) {
+          for (const field of campingOption.fields) {
+            const fieldValue = createCampRegistrationDto.customFields[field.id];
+            if (fieldValue !== undefined) {
+              await this.prisma.campingOptionFieldValue.create({
+                data: {
+                  fieldId: field.id,
+                  registrationId: campingRegistration.id,
+                  value: String(fieldValue),
+                },
+              });
+            }
+          }
+        }
+
+        campingOptionRegistrations.push(campingRegistration);
+      }
+    }
+
+    return {
+      jobRegistration,
+      campingOptionRegistrations,
+      message: 'Camp registration completed successfully',
+    };
   }
 
   /**
-   * Get user's camp registration (legacy method - may need updating)
+   * Get user's camp registration
    * @param userId - The ID of the user
+   * @returns The user's camping option registrations and custom field values
    */
   async getMyCampRegistration(userId: string) {
-    // This method may need to be updated based on the camping options structure
-    // For now, keeping the original implementation but it might need revision
-    throw new BadRequestException('This method needs to be updated for the new registration structure');
+    // Check if user exists
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new NotFoundException(`User with ID ${userId} not found`);
+    }
+
+    // Get camping option registrations for the user
+    const campingOptionRegistrations = await this.prisma.campingOptionRegistration.findMany({
+      where: { userId },
+      include: {
+        campingOption: {
+          include: {
+            fields: true,
+          },
+        },
+        fieldValues: {
+          include: {
+            field: true,
+          },
+        },
+      },
+    });
+
+    // Get user's job registrations (all years)
+    const jobRegistrations = await this.prisma.registration.findMany({
+      where: { userId },
+      include: {
+        jobs: {
+          include: {
+            job: {
+              include: {
+                category: true,
+                shift: true,
+              },
+            },
+          },
+        },
+        payments: true,
+      },
+    });
+
+    // Flatten custom field values from all camping option registrations
+    const customFieldValues = campingOptionRegistrations.flatMap(reg => 
+      reg.fieldValues.map(fv => ({
+        id: fv.id,
+        value: fv.value,
+        fieldId: fv.fieldId,
+        registrationId: fv.registrationId,
+        field: fv.field,
+      }))
+    );
+
+    return {
+      campingOptions: campingOptionRegistrations,
+      customFieldValues,
+      jobRegistrations,
+      hasRegistration: campingOptionRegistrations.length > 0 || jobRegistrations.length > 0,
+    };
   }
 }
