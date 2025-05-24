@@ -5,6 +5,7 @@ import { useCampingOptions } from '../../hooks/useCampingOptions';
 import { useProfile } from '../../hooks/useProfile';
 import { AuthContext } from '../../store/authUtils';
 import { JobCategory, Job, CampingOptionField } from '../../lib/api';
+import { getFriendlyDayName, formatTime } from '../../utils/shiftUtils';
 
 /**
  * RegistrationPage component for user camp registration
@@ -242,7 +243,7 @@ export default function RegistrationPage() {
       // Validate jobs selection
       const requiredCount = calculateRequiredJobCount();
       if (formData.jobs.length < requiredCount) {
-        errors.jobs = `You need to select at least ${requiredCount} jobs`;
+        errors.jobs = `You need to select at least ${requiredCount} shifts`;
       }
       
       // Ensure all always required categories have at least one job
@@ -259,7 +260,7 @@ export default function RegistrationPage() {
         
         if (selectedCategoryJobs.length === 0) {
           errors[`category_${category.id}`] = 
-            `You must select at least one ${category.name} job`;
+            `You must select at least one ${category.name} shift`;
         }
       });
     } 
@@ -762,20 +763,70 @@ export default function RegistrationPage() {
     const campingOptionJobs = getCampingOptionJobs();
     const alwaysRequiredCategories = getAlwaysRequiredCategories();
     
+    // Calculate required shifts for camping options
+    const selectedOptions = campingOptions.filter(option => 
+      formData.campingOptions.includes(option.id)
+    );
+    const campingShiftsRequired = selectedOptions.reduce(
+      (total, option) => total + option.workShiftsRequired, 
+      0
+    );
+    
     return (
       <div>
-        <h2 className="text-xl font-semibold mb-4">Select Work Jobs</h2>
+        <h2 className="text-xl font-semibold mb-4">Select Work Shifts</h2>
         <p className="mb-4">
-          You need to select at least {requiredCount} jobs to complete registration.
+          You need to select at least {requiredCount} shifts to complete registration.
         </p>
+        
+        {/* Camp Shifts Section */}
+        {campingOptionJobs.length > 0 && (
+          <div className="mb-6">
+            <h3 className="text-lg font-medium mb-2">
+              Camp Shifts{campingShiftsRequired > 0 ? `: ${campingShiftsRequired} required` : ''}
+            </h3>
+            <p className="text-sm text-gray-700 mb-4">
+              Please select a work shift for camp.
+            </p>
+            
+            <div className="space-y-2">
+              {campingOptionJobs.map(job => (
+                <div key={job.id} className="border p-3 rounded">
+                  <label className="flex items-start">
+                    <input
+                      type="checkbox"
+                      className="mt-1 h-4 w-4"
+                      checked={formData.jobs.includes(job.id)}
+                      onChange={() => handleJobChange(job.id)}
+                    />
+                    <div className="ml-2">
+                      <div>{job.name}</div>
+                      <div className="text-sm text-gray-600">
+                        Category: {job.category ? job.category.name : 'Unknown'}
+                      </div>
+                      <div className="text-sm text-gray-600">
+                        {getShiftInfoForJob(job)}
+                      </div>
+                      <div className="text-sm text-gray-600">
+                        Spots: {job.maxRegistrations} available
+                      </div>
+                    </div>
+                  </label>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
         
         {/* Always Required Job Categories Section */}
         {alwaysRequiredCategories.length > 0 && (
           <div className="mb-6">
-            <h3 className="text-lg font-medium mb-2">Required Jobs</h3>
+            <h3 className="text-lg font-medium mb-2">
+              Additional Shifts{alwaysRequiredCategories.length > 0 ? `: ${alwaysRequiredCategories.length} required` : ''}
+            </h3>
             <p className="text-sm text-gray-700 mb-4">
-              These jobs are required for all participants regardless of camping options.
-              You must select at least one job from each required category.
+              These shifts are required for all participants regardless of camping options.
+              You must select at least one shift from each required category.
             </p>
             
             {alwaysRequiredCategories.map(category => {
@@ -818,49 +869,12 @@ export default function RegistrationPage() {
                     ))}
                     
                     {categoryJobs.length === 0 && (
-                      <div className="text-amber-600">No jobs available for this category</div>
+                      <div className="text-amber-600">No shifts available for this category</div>
                     )}
                   </div>
                 </div>
               );
             })}
-          </div>
-        )}
-        
-        {/* Camping Option Jobs Section */}
-        {campingOptionJobs.length > 0 && (
-          <div>
-            <h3 className="text-lg font-medium mb-2">Camping Option Jobs</h3>
-            <p className="text-sm text-gray-700 mb-4">
-              These jobs are available based on your selected camping options.
-            </p>
-            
-            <div className="space-y-2">
-              {campingOptionJobs.map(job => (
-                <div key={job.id} className="border p-3 rounded">
-                  <label className="flex items-start">
-                    <input
-                      type="checkbox"
-                      className="mt-1 h-4 w-4"
-                      checked={formData.jobs.includes(job.id)}
-                      onChange={() => handleJobChange(job.id)}
-                    />
-                    <div className="ml-2">
-                      <div>{job.name}</div>
-                      <div className="text-sm text-gray-600">
-                        Category: {job.category ? job.category.name : 'Unknown'}
-                      </div>
-                      <div className="text-sm text-gray-600">
-                        {getShiftInfoForJob(job)}
-                      </div>
-                      <div className="text-sm text-gray-600">
-                        Spots: {job.maxRegistrations} available
-                      </div>
-                    </div>
-                  </label>
-                </div>
-              ))}
-            </div>
           </div>
         )}
         
@@ -892,7 +906,7 @@ export default function RegistrationPage() {
         </div>
         
         <div className="mb-6">
-          <h3 className="text-lg font-medium mb-2">Selected Jobs</h3>
+          <h3 className="text-lg font-medium mb-2">Selected Shifts</h3>
           <ul className="list-disc pl-5">
             {formData.jobs.map(jobId => {
               const job = jobs.find(j => j.id === jobId);
@@ -959,13 +973,7 @@ export default function RegistrationPage() {
     const shift = shifts.find(s => s.id === job.shiftId);
     if (!shift) return 'Unknown shift';
     
-    return `${shift.dayOfWeek} | ${formatTime(shift.startTime)} - ${formatTime(shift.endTime)}`;
-  };
-
-  // Format time string for display - extracts only the time part, ignoring the placeholder date
-  const formatTime = (timeString: string): string => {
-    const date = new Date(timeString);
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return `${getFriendlyDayName(shift.dayOfWeek)} | ${formatTime(shift.startTime)} - ${formatTime(shift.endTime)}`;
   };
 
   // Calculate total cost for registration
