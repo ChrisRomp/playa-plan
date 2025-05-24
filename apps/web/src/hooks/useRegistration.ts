@@ -121,7 +121,7 @@ export function useRegistration() {
     setLoading(true);
     setError(null);
     try {
-      const response = await api.post('/registrations', formData);
+      const response = await api.post('/registrations/camp', formData);
       return response.data;
     } catch (err) {
       setError('Failed to submit registration');

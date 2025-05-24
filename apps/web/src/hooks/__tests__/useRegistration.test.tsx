@@ -270,7 +270,7 @@ describe('useRegistration', () => {
       response = await result.current.submitRegistration(mockRegistrationData);
     });
     
-    expect(apiModule.api.post).toHaveBeenCalledWith('/registrations', mockRegistrationData);
+    expect(apiModule.api.post).toHaveBeenCalledWith('/registrations/camp', mockRegistrationData);
     expect(response).toEqual({ success: true, registrationId: 'reg-123' });
   });
 }); 

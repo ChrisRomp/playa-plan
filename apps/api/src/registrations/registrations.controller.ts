@@ -1,11 +1,22 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Query, Request } from '@nestjs/common';
 import { RegistrationsService } from './registrations.service';
-import { CreateRegistrationDto, UpdateRegistrationDto } from './dto';
+import { CreateRegistrationDto, CreateCampRegistrationDto, UpdateRegistrationDto } from './dto';
 import { ApiBearerAuth, ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from '@prisma/client';
+
+/**
+ * Type definition for authenticated request
+ */
+interface AuthRequest extends Request {
+  user: {
+    id: string;
+    email: string;
+    role: UserRole;
+  };
+}
 
 @ApiTags('registrations')
 @Controller('registrations')
@@ -58,6 +69,16 @@ export class RegistrationsController {
   @ApiOkResponse({ description: 'The registration has been successfully deleted.' })
   async remove(@Param('id') id: string) {
     return this.registrationsService.remove(id);
+  }
+
+  @Post('camp')
+  @ApiOperation({ summary: 'Create a comprehensive camp registration' })
+  @ApiCreatedResponse({ description: 'The camp registration has been successfully created.' })
+  async createCampRegistration(
+    @Body() createCampRegistrationDto: CreateCampRegistrationDto,
+    @Request() req: AuthRequest
+  ) {
+    return this.registrationsService.createCampRegistration(req.user.id, createCampRegistrationDto);
   }
 
   @Get('test/admin')
