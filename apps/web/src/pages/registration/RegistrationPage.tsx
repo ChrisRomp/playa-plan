@@ -2,6 +2,7 @@ import { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useRegistration, RegistrationFormData } from '../../hooks/useRegistration';
 import { useCampingOptions } from '../../hooks/useCampingOptions';
+import { useProfile } from '../../hooks/useProfile';
 import { AuthContext } from '../../store/authUtils';
 import { JobCategory, Job, CampingOptionField } from '../../lib/api';
 
@@ -18,6 +19,7 @@ import { JobCategory, Job, CampingOptionField } from '../../lib/api';
 export default function RegistrationPage() {
   const navigate = useNavigate();
   const { user, isLoading: authLoading } = useContext(AuthContext);
+  const { profile, updateProfile, error: profileError } = useProfile();
   const {
     campingOptions,
     jobCategories,
@@ -47,7 +49,36 @@ export default function RegistrationPage() {
   // Multi-step form control
   const [currentStep, setCurrentStep] = useState(1);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
-  const [profileConfirmed, setProfileConfirmed] = useState(false);
+  
+  // Profile form state
+  const [profileFormData, setProfileFormData] = useState({
+    firstName: profile?.firstName || '',
+    lastName: profile?.lastName || '',
+    email: profile?.email || '',
+    phone: profile?.phone || '',
+    city: profile?.city || '',
+    stateProvince: profile?.stateProvince || '',
+    country: profile?.country || '',
+    playaName: profile?.playaName || '',
+    emergencyContact: profile?.emergencyContact || '',
+  });
+  
+  // Update profile form data when profile changes
+  useEffect(() => {
+    if (profile) {
+      setProfileFormData({
+        firstName: profile.firstName || '',
+        lastName: profile.lastName || '',
+        email: profile.email || '',
+        phone: profile.phone || '',
+        city: profile.city || '',
+        stateProvince: profile.stateProvince || '',
+        country: profile.country || '',
+        playaName: profile.playaName || '',
+        emergencyContact: profile.emergencyContact || '',
+      });
+    }
+  }, [profile]);
   
   // Track loaded custom fields for selected camping options
   const [customFieldsByOption, setCustomFieldsByOption] = useState<Record<string, CampingOptionField[]>>({});
@@ -154,9 +185,14 @@ export default function RegistrationPage() {
     const errors: Record<string, string> = {};
     
     if (currentStep === 1) {
-      // Validate profile confirmation
-      if (!profileConfirmed) {
-        errors.profile = 'You must confirm your profile information to continue';
+      // Validate profile form fields
+      const requiredFields = ['firstName', 'lastName', 'phone', 'emergencyContact'];
+      const missingFields = requiredFields.filter(field => !profileFormData[field as keyof typeof profileFormData]);
+      
+      if (missingFields.length > 0) {
+        missingFields.forEach(field => {
+          errors[field] = `${field.charAt(0).toUpperCase() + field.slice(1)} is required`;
+        });
       }
     }
     else if (currentStep === 2) {
@@ -247,6 +283,13 @@ export default function RegistrationPage() {
     }
     
     if (currentStep < 5) {
+      // Save profile data if we're on step 1
+      if (currentStep === 1) {
+        const profileSaved = await handleProfileFormSubmit();
+        if (!profileSaved) {
+          return; // Don't proceed if profile save failed
+        }
+      }
       setCurrentStep(currentStep + 1);
     } else {
       try {
@@ -298,95 +341,211 @@ export default function RegistrationPage() {
     }));
   };
 
-  // Render profile confirmation step
-  const renderProfileConfirmationStep = () => {
-    if (!user) {
-      return (
-        <div className="text-red-600 mb-4">
-          User profile information not available. Please try logging in again.
-        </div>
-      );
-    }
+  const handleProfileFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setProfileFormData(prev => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
 
+  const handleProfileFormSubmit = async (): Promise<boolean> => {
+    try {
+      await updateProfile({
+        firstName: profileFormData.firstName,
+        lastName: profileFormData.lastName,
+        phone: profileFormData.phone,
+        city: profileFormData.city,
+        stateProvince: profileFormData.stateProvince,
+        country: profileFormData.country,
+        playaName: profileFormData.playaName,
+        emergencyContact: profileFormData.emergencyContact,
+      });
+      return true;
+    } catch (err) {
+      console.error('Error updating profile:', err);
+      return false;
+    }
+  };
+
+  // Render profile confirmation step
+  const renderProfileFormStep = () => {
     return (
       <div>
-        <h2 className="text-xl font-semibold mb-4">Confirm Your Profile Information</h2>
-        <p className="mb-4">
-          Please review your profile information before proceeding with registration.
+        <h2 className="text-xl font-semibold mb-4">Your Profile Information</h2>
+        <p className="mb-4 text-gray-700">
+          Please complete or verify your profile information before proceeding with registration.
         </p>
         
-        <div className="bg-gray-50 p-4 rounded-md mb-4">
+        {profileError && (
+          <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+            {profileError}
+          </div>
+        )}
+        
+        <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Name</label>
-              <div className="mt-1">{user.firstName} {user.lastName}</div>
+            <div className="space-y-2">
+              <label htmlFor="firstName" className="block text-sm font-medium text-gray-700">
+                First Name*
+              </label>
+              <input
+                type="text"
+                id="firstName"
+                name="firstName"
+                value={profileFormData.firstName}
+                onChange={handleProfileFormChange}
+                required
+                maxLength={50}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+              />
+              {formErrors.firstName && (
+                <div className="text-red-600 text-sm">{formErrors.firstName}</div>
+              )}
             </div>
             
-            {user.playaName && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Playa Name</label>
-                <div className="mt-1">{user.playaName}</div>
-              </div>
+            <div className="space-y-2">
+              <label htmlFor="lastName" className="block text-sm font-medium text-gray-700">
+                Last Name*
+              </label>
+              <input
+                type="text"
+                id="lastName"
+                name="lastName"
+                value={profileFormData.lastName}
+                onChange={handleProfileFormChange}
+                required
+                maxLength={50}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+              />
+              {formErrors.lastName && (
+                <div className="text-red-600 text-sm">{formErrors.lastName}</div>
+              )}
+            </div>
+          </div>
+          
+          <div className="space-y-2">
+            <label htmlFor="playaName" className="block text-sm font-medium text-gray-700">
+              Playa Name
+            </label>
+            <input
+              type="text"
+              id="playaName"
+              name="playaName"
+              value={profileFormData.playaName}
+              onChange={handleProfileFormChange}
+              maxLength={50}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+            />
+            <p className="text-xs text-gray-500">If you have one</p>
+          </div>
+          
+          <div className="space-y-2">
+            <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+              Email*
+            </label>
+            <input
+              type="email"
+              id="email"
+              name="email"
+              value={profileFormData.email}
+              onChange={handleProfileFormChange}
+              required
+              disabled
+              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-50"
+            />
+            <p className="text-xs text-gray-500">Email cannot be changed</p>
+          </div>
+          
+          <div className="space-y-2">
+            <label htmlFor="phone" className="block text-sm font-medium text-gray-700">
+              Phone Number*
+            </label>
+            <input
+              type="tel"
+              id="phone"
+              name="phone"
+              value={profileFormData.phone}
+              onChange={handleProfileFormChange}
+              required
+              maxLength={50}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+            />
+            {formErrors.phone && (
+              <div className="text-red-600 text-sm">{formErrors.phone}</div>
             )}
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Email</label>
-              <div className="mt-1">{user.email}</div>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <label htmlFor="city" className="block text-sm font-medium text-gray-700">
+                City
+              </label>
+              <input
+                type="text"
+                id="city"
+                name="city"
+                value={profileFormData.city}
+                onChange={handleProfileFormChange}
+                maxLength={50}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+              />
             </div>
             
-            {user.phone && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Phone</label>
-                <div className="mt-1">{user.phone}</div>
-              </div>
-            )}
+            <div className="space-y-2">
+              <label htmlFor="stateProvince" className="block text-sm font-medium text-gray-700">
+                State/Province
+              </label>
+              <input
+                type="text"
+                id="stateProvince"
+                name="stateProvince"
+                value={profileFormData.stateProvince}
+                onChange={handleProfileFormChange}
+                maxLength={50}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+              />
+            </div>
+          </div>
             
-            {(user.city || user.stateProvince || user.country) && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Location</label>
-                <div className="mt-1">
-                  {[user.city, user.stateProvince, user.country].filter(Boolean).join(', ')}
-                </div>
-              </div>
-            )}
-            
-            {user.emergencyContact && (
-              <div className="col-span-2">
-                <label className="block text-sm font-medium text-gray-700">Emergency Contact</label>
-                <div className="mt-1 whitespace-pre-line">{user.emergencyContact}</div>
-              </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <label htmlFor="country" className="block text-sm font-medium text-gray-700">
+                Country
+              </label>
+              <input
+                type="text"
+                id="country"
+                name="country"
+                value={profileFormData.country}
+                onChange={handleProfileFormChange}
+                maxLength={50}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+              />
+            </div>
+          </div>
+          
+          <div className="space-y-2 mt-4">
+            <label htmlFor="emergencyContact" className="block text-sm font-medium text-gray-700">
+              Emergency Contact(s)*
+            </label>
+            <textarea
+              id="emergencyContact"
+              name="emergencyContact"
+              value={profileFormData.emergencyContact}
+              onChange={handleProfileFormChange}
+              required
+              placeholder="Example: Jane Doe, (555) 123-4567, Sister"
+              rows={3}
+              maxLength={1024}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+            />
+            <p className="text-xs text-gray-500">Please include name, phone number, and relationship to you</p>
+            {formErrors.emergencyContact && (
+              <div className="text-red-600 text-sm">{formErrors.emergencyContact}</div>
             )}
           </div>
         </div>
-        
-        <div className="flex items-center mb-4">
-          <input
-            type="checkbox"
-            id="confirmProfile"
-            className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-            checked={profileConfirmed}
-            onChange={() => setProfileConfirmed(!profileConfirmed)}
-          />
-          <label htmlFor="confirmProfile" className="ml-2 text-sm text-gray-900">
-            I confirm that my profile information is correct and up to date
-          </label>
-        </div>
-        
-        {!profileConfirmed && (
-          <div className="mb-4">
-            <p className="text-sm text-amber-600">
-              If your information is not correct, please 
-              <a href="/profile" className="text-blue-600 hover:text-blue-800 px-1">
-                update your profile
-              </a>
-              before continuing with registration.
-            </p>
-          </div>
-        )}
-        
-        {formErrors.profile && (
-          <div className="text-red-600 mt-2">{formErrors.profile}</div>
-        )}
       </div>
     );
   };
@@ -768,7 +927,7 @@ export default function RegistrationPage() {
   const renderCurrentStep = () => {
     switch (currentStep) {
       case 1:
-        return renderProfileConfirmationStep();
+        return renderProfileFormStep();
       case 2:
         return renderCampingOptionsStep();
       case 3:
@@ -874,10 +1033,7 @@ export default function RegistrationPage() {
           
           <button
             type="submit"
-            className={`px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 ${
-              (currentStep === 1 && !profileConfirmed) ? 'opacity-50 cursor-not-allowed' : ''
-            }`}
-            disabled={currentStep === 1 && !profileConfirmed}
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
           >
             {currentStep < 5 ? 'Continue' : 'Complete Registration'}
           </button>

@@ -5,10 +5,12 @@ import RegistrationPage from './RegistrationPage';
 import { AuthContext } from '../../store/authUtils';
 import * as useRegistrationModule from '../../hooks/useRegistration';
 import * as useCampingOptionsModule from '../../hooks/useCampingOptions';
+import * as useProfileModule from '../../hooks/useProfile';
 
 // Mock modules
 vi.mock('../../hooks/useRegistration');
 vi.mock('../../hooks/useCampingOptions');
+vi.mock('../../hooks/useProfile');
 
 describe('RegistrationPage', () => {
   // Mock user
@@ -22,6 +24,25 @@ describe('RegistrationPage', () => {
     isAuthenticated: true,
     isEarlyRegistrationEnabled: false,
     hasRegisteredForCurrentYear: false,
+  };
+
+  // Mock profile
+  const mockProfile = {
+    id: '123',
+    email: 'test@example.com',
+    firstName: 'Test',
+    lastName: 'User',
+    playaName: '',
+    phone: '',
+    city: '',
+    stateProvince: '',
+    country: '',
+    emergencyContact: '',
+    role: 'PARTICIPANT' as const,
+    isEmailVerified: true,
+    createdAt: '2025-05-01T00:00:00Z',
+    updatedAt: '2025-05-01T00:00:00Z',
+    isProfileComplete: true,
   };
 
   // Mock camping options
@@ -189,6 +210,15 @@ describe('RegistrationPage', () => {
       updateCampingOptionField: vi.fn(),
       deleteCampingOptionField: vi.fn(),
     });
+
+    // Mock useProfile hook
+    vi.spyOn(useProfileModule, 'useProfile').mockReturnValue({
+      profile: mockProfile,
+      updateProfile: vi.fn().mockResolvedValue({}),
+      isLoading: false,
+      error: null,
+      isProfileComplete: true,
+    });
   });
 
   // Helper function to render component with context
@@ -212,13 +242,16 @@ describe('RegistrationPage', () => {
     );
   };
 
-  it('renders the registration page with profile confirmation step when authenticated', () => {
+  it('renders the registration page with profile form step when authenticated', () => {
     renderWithAuth();
     
-    // Check that profile confirmation step is shown
-    expect(screen.getByText('Confirm Your Profile Information')).toBeInTheDocument();
-    expect(screen.getByText('Test User')).toBeInTheDocument();
-    expect(screen.getByText('test@example.com')).toBeInTheDocument();
+    // Check that profile form step is shown
+    expect(screen.getByText('Your Profile Information')).toBeInTheDocument();
+    expect(screen.getByLabelText('First Name*')).toBeInTheDocument();
+    expect(screen.getByLabelText('Last Name*')).toBeInTheDocument();
+    expect(screen.getByLabelText('Email*')).toBeInTheDocument();
+    expect(screen.getByLabelText('Phone Number*')).toBeInTheDocument();
+    expect(screen.getByLabelText('Emergency Contact(s)*')).toBeInTheDocument();
   });
 
   it('shows login message when not authenticated', () => {
@@ -228,12 +261,19 @@ describe('RegistrationPage', () => {
     expect(screen.getByText('Go to Login')).toBeInTheDocument();
   });
 
-  it('allows navigating to camping options step after confirming profile', async () => {
+  it('allows navigating to camping options step after filling profile form', async () => {
     renderWithAuth();
     
-    // Confirm profile
-    const checkbox = screen.getByLabelText('I confirm that my profile information is correct and up to date');
-    fireEvent.click(checkbox);
+    // Fill required profile fields
+    const firstNameInput = screen.getByLabelText('First Name*');
+    const lastNameInput = screen.getByLabelText('Last Name*');
+    const phoneInput = screen.getByLabelText('Phone Number*');
+    const emergencyContactInput = screen.getByLabelText('Emergency Contact(s)*');
+    
+    fireEvent.change(firstNameInput, { target: { value: 'Test' } });
+    fireEvent.change(lastNameInput, { target: { value: 'User' } });
+    fireEvent.change(phoneInput, { target: { value: '555-1234' } });
+    fireEvent.change(emergencyContactInput, { target: { value: 'Emergency Contact' } });
     
     // Click continue
     const continueButton = screen.getByText('Continue');
@@ -249,19 +289,18 @@ describe('RegistrationPage', () => {
     expect(screen.getByText('Premium Camping')).toBeInTheDocument();
   });
 
-  it('disables the continue button when profile is not confirmed', () => {
+  it('allows continuing when profile form has required fields filled', () => {
     renderWithAuth();
     
-    // Continue button should be disabled
+    // Continue button should be enabled (no longer disabled by default)
     const continueButton = screen.getByText('Continue');
-    expect(continueButton).toBeDisabled();
-    
-    // When we check the confirmation box
-    const checkbox = screen.getByLabelText('I confirm that my profile information is correct and up to date');
-    fireEvent.click(checkbox);
-    
-    // Button should now be enabled
     expect(continueButton).not.toBeDisabled();
+    
+    // Verify required fields are present
+    expect(screen.getByLabelText('First Name*')).toBeInTheDocument();
+    expect(screen.getByLabelText('Last Name*')).toBeInTheDocument();
+    expect(screen.getByLabelText('Phone Number*')).toBeInTheDocument();
+    expect(screen.getByLabelText('Emergency Contact(s)*')).toBeInTheDocument();
   });
 
   // Add more tests as needed for other steps in the registration flow
