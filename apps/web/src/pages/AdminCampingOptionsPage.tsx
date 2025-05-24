@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCampingOptions } from '../hooks/useCampingOptions';
+import { useJobCategories } from '../hooks/useJobCategories';
 import { CampingOption } from '../lib/api';
 
 interface CampingOptionFormData {
@@ -29,6 +30,12 @@ const AdminCampingOptionsPage: React.FC = () => {
     updateCampingOption,
     deleteCampingOption 
   } = useCampingOptions();
+  
+  const {
+    categories: jobCategories,
+    loading: categoriesLoading,
+    error: categoriesError
+  } = useJobCategories();
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedOption, setSelectedOption] = useState<CampingOption | null>(null);
@@ -92,6 +99,19 @@ const AdminCampingOptionsPage: React.FC = () => {
     } else {
       setFormData(prev => ({ ...prev, [name]: value }));
     }
+  };
+
+  const handleJobCategoryChange = (categoryId: string, isSelected: boolean) => {
+    setFormData(prev => {
+      const updatedCategoryIds = isSelected
+        ? [...prev.jobCategoryIds, categoryId]
+        : prev.jobCategoryIds.filter(id => id !== categoryId);
+      
+      return {
+        ...prev,
+        jobCategoryIds: updatedCategoryIds
+      };
+    });
   };
 
   const handleAddOption = () => {
@@ -447,12 +467,61 @@ const AdminCampingOptionsPage: React.FC = () => {
                   {formErrors.maxSignups && <p className="text-red-500 text-xs mt-1">{formErrors.maxSignups}</p>}
                 </div>
                 
-                {/* Job Category IDs (simplified for now) */}
+                {/* Job Category Selection */}
                 <div className="col-span-2">
-                  <p className="text-sm font-medium text-gray-700 mb-1">Job Categories</p>
-                  <p className="text-xs text-gray-500 mb-2">
-                    Job category selection will be implemented in a future iteration.
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Job Categories
+                  </label>
+                  <p className="text-xs text-gray-500 mb-3">
+                    Select which job categories are available for this camping option during registration.
                   </p>
+                  
+                  {categoriesError && (
+                    <div className="text-red-600 text-sm mb-2">
+                      Error loading job categories: {categoriesError}
+                    </div>
+                  )}
+                  
+                  {categoriesLoading ? (
+                    <div className="text-gray-500 text-sm">Loading job categories...</div>
+                  ) : (
+                    <div className="space-y-2 max-h-40 overflow-y-auto border border-gray-200 rounded p-3">
+                      {jobCategories.length === 0 ? (
+                        <div className="text-gray-500 text-sm">
+                          No job categories available. Create job categories first.
+                        </div>
+                      ) : (
+                        jobCategories.map(category => (
+                          <label key={category.id} className="flex items-start space-x-2">
+                            <input
+                              type="checkbox"
+                              checked={formData.jobCategoryIds.includes(category.id)}
+                              onChange={(e) => handleJobCategoryChange(category.id, e.target.checked)}
+                              className="mt-0.5 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                            />
+                            <div className="flex-1">
+                              <div className="text-sm font-medium text-gray-700">
+                                {category.name}
+                                {category.staffOnly && (
+                                  <span className="ml-1 text-xs bg-blue-100 text-blue-800 px-1 rounded">
+                                    Staff Only
+                                  </span>
+                                )}
+                                {category.alwaysRequired && (
+                                  <span className="ml-1 text-xs bg-yellow-100 text-yellow-800 px-1 rounded">
+                                    Always Required
+                                  </span>
+                                )}
+                              </div>
+                              {category.description && (
+                                <div className="text-xs text-gray-500">{category.description}</div>
+                              )}
+                            </div>
+                          </label>
+                        ))
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
               
