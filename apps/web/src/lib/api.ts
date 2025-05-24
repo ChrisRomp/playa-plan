@@ -394,18 +394,30 @@ export type Job = z.infer<typeof JobSchema>;
 export interface Registration {
   id: string;
   userId: string;
-  jobId: string;
-  status: 'PENDING' | 'COMPLETE' | 'WAITLISTED' | 'CANCELLED';
+  year: number;
+  status: 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'WAITLISTED';
   createdAt: string;
   updatedAt: string;
   user?: User;
-  job?: Job;
-  payment?: {
+  jobs: Array<{
+    id: string;
+    registrationId: string;
+    jobId: string;
+    createdAt: string;
+    job: Job;
+  }>;
+  payments: Array<{
     id: string;
     amount: number;
-    status: string;
+    currency: string;
+    status: 'PENDING' | 'COMPLETED' | 'FAILED' | 'REFUNDED';
+    provider: 'STRIPE' | 'PAYPAL';
+    providerRefId?: string;
     createdAt: string;
-  };
+    updatedAt: string;
+    userId: string;
+    registrationId?: string;
+  }>;
 }
 
 // Camping Option Registration interface
@@ -964,15 +976,30 @@ export const shifts = {
 
 export const registrations = {
   /**
-   * Get all job registrations for the current user
-   * @returns A promise that resolves to an array of user job registrations
+   * Get all registrations for the current user
+   * @returns A promise that resolves to an array of user registrations
    */
   getMyRegistrations: async (): Promise<Registration[]> => {
     try {
-      const response = await api.get<Registration[]>('/jobs/registrations/me');
+      const response = await api.get<Registration[]>('/registrations/me');
       return response.data;
     } catch (error) {
       console.error('Error fetching user registrations:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Get the current user's registration for a specific year
+   * @param year The year to get registration for
+   * @returns A promise that resolves to the user's registration for that year
+   */
+  getMyRegistrationForYear: async (year: number): Promise<Registration | null> => {
+    try {
+      const response = await api.get<Registration>(`/registrations/me?year=${year}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching user registration for year:', error);
       throw error;
     }
   },

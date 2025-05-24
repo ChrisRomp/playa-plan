@@ -63,27 +63,49 @@ export interface CampConfig {
   currentYear: number;
 }
 
+export type RegistrationStatus = 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'WAITLISTED';
+
 export interface Registration {
   id: string;
   userId: string;
   year: number;
-  status: 'pending' | 'approved' | 'rejected';
-  arrivalDate?: string;
-  departureDate?: string;
+  status: RegistrationStatus;
+  createdAt: string;
+  updatedAt: string;
+  user?: User;
+  jobs: RegistrationJob[];
+  payments: Payment[];
+}
+
+export interface RegistrationJob {
+  id: string;
+  registrationId: string;
+  jobId: string;
+  createdAt: string;
+  job: Job;
 }
 
 export interface Job {
   id: string;
-  title: string;
-  description: string;
+  name: string;
+  description?: string;
+  location: string;
   categoryId: string;
   shiftId: string;
+  maxRegistrations: number;
+  alwaysRequired: boolean;
+  staffOnly: boolean;
+  category?: JobCategory;
+  shift?: Shift;
 }
 
 export interface JobCategory {
   id: string;
   name: string;
-  description: string;
+  description?: string;
+  alwaysRequired: boolean;
+  location?: string;
+  staffOnly: boolean;
 }
 
 export interface Shift {
@@ -92,6 +114,21 @@ export interface Shift {
   description?: string;
   startTime: string;
   endTime: string;
-  date: string;
-  assignedUserId?: string;
+  dayOfWeek: string;
+}
+
+export type PaymentStatus = 'PENDING' | 'COMPLETED' | 'FAILED' | 'REFUNDED';
+export type PaymentProvider = 'STRIPE' | 'PAYPAL';
+
+export interface Payment {
+  id: string;
+  amount: number;
+  currency: string;
+  status: PaymentStatus;
+  provider: PaymentProvider;
+  providerRefId?: string;
+  createdAt: string;
+  updatedAt: string;
+  userId: string;
+  registrationId?: string;
 }

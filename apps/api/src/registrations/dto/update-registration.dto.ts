@@ -1,4 +1,4 @@
-import { IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
+import { IsEnum, IsOptional, IsInt, Min } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { RegistrationStatus } from '@prisma/client';
 
@@ -17,22 +17,12 @@ export class UpdateRegistrationDto {
   status?: RegistrationStatus;
 
   @ApiProperty({
-    description: 'ID of the job being registered for',
-    example: '7c8d0d55-e0a3-4cf0-a620-2412acd4361d',
+    description: 'Year of the registration',
+    example: 2024,
     required: false,
   })
   @IsOptional()
-  @IsString()
-  @IsUUID()
-  jobId?: string;
-
-  @ApiProperty({
-    description: 'ID of the payment associated with this registration',
-    example: '9c8d0d55-e0a3-4cf0-a620-2412acd4361e',
-    required: false,
-  })
-  @IsOptional()
-  @IsString()
-  @IsUUID()
-  paymentId?: string;
+  @IsInt()
+  @Min(2020)
+  year?: number;
 }

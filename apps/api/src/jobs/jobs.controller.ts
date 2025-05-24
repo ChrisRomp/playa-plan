@@ -72,10 +72,12 @@ export class JobsController {
   @ApiCreatedResponse({ description: 'User has been successfully registered for the job.' })
   async register(@Param('id') jobId: string, @Req() req: RequestWithUser) {
     const userId = req.user.id;
+    const currentYear = new Date().getFullYear(); // You might want to get this from config instead
     
     return this.registrationsService.create({
       userId,
-      jobId,
+      year: currentYear,
+      jobIds: [jobId],
     });
   }
 

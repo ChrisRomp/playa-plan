@@ -133,20 +133,20 @@ model JobCategory {
 }
 
 model Job {
-  id             String      @id @default(uuid())
-  name           String
-  description    String?
-  location       String
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
-  categoryId     String
-  shiftId        String
+  id               String            @id @default(uuid())
+  name             String
+  description      String?
+  location         String
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  categoryId       String
+  shiftId          String
   maxRegistrations Int
-  alwaysRequired Boolean     @default(false)
-  staffOnly      Boolean     @default(false)
-  category       JobCategory @relation(fields: [categoryId], references: [id])
-  shift          Shift       @relation(fields: [shiftId], references: [id])
-  registrations  Registration[]
+  alwaysRequired   Boolean           @default(false)
+  staffOnly        Boolean           @default(false)
+  category         JobCategory       @relation(fields: [categoryId], references: [id])
+  shift            Shift             @relation(fields: [shiftId], references: [id])
+  registrations    RegistrationJob[]
 
   @@map("jobs")
 }
@@ -168,30 +168,43 @@ model Shift {
 model Registration {
   id        String             @id @default(uuid())
   status    RegistrationStatus @default(PENDING)
+  year      Int
   createdAt DateTime           @default(now())
   updatedAt DateTime           @updatedAt
   userId    String
-  jobId     String
-  paymentId String?            @unique
-  payment   Payment?           @relation(fields: [paymentId], references: [id])
-  job       Job                @relation(fields: [jobId], references: [id])
   user      User               @relation(fields: [userId], references: [id])
+  jobs      RegistrationJob[]
+  payments  Payment[]
 
+  @@unique([userId, year])
   @@map("registrations")
 }
 
+model RegistrationJob {
+  id             String       @id @default(uuid())
+  registrationId String
+  jobId          String
+  createdAt      DateTime     @default(now())
+  registration   Registration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  job            Job          @relation(fields: [jobId], references: [id])
+
+  @@unique([registrationId, jobId])
+  @@map("registration_jobs")
+}
+
 model Payment {
-  id            String          @id @default(uuid())
-  amount        Float
-  currency      String          @default("USD")
-  status        PaymentStatus   @default(PENDING)
-  provider      PaymentProvider
-  providerRefId String?
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
-  userId        String
-  user          User            @relation(fields: [userId], references: [id])
-  registration  Registration?
+  id             String          @id @default(uuid())
+  amount         Float
+  currency       String          @default("USD")
+  status         PaymentStatus   @default(PENDING)
+  provider       PaymentProvider
+  providerRefId  String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  userId         String
+  registrationId String?
+  user           User            @relation(fields: [userId], references: [id])
+  registration   Registration?   @relation(fields: [registrationId], references: [id])
 
   @@map("payments")
 }
