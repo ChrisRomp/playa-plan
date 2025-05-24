@@ -84,7 +84,7 @@ const DashboardPage: React.FC = () => {
                 {/* Camping Options Section */}
                 {campRegistration.campingOptions.length > 0 && (
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <h4 className="font-medium text-blue-900 mb-3">Selected Camping Options</h4>
+                    <h4 className="font-medium text-blue-900 mb-3">Camping</h4>
                     <div className="space-y-2">
                       {campRegistration.campingOptions.map((campingOptionReg) => (
                         <div key={campingOptionReg.id} className="bg-white rounded p-3 border border-blue-100">
