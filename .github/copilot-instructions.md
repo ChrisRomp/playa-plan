@@ -8,6 +8,11 @@ Repository: https://github.com/ChrisRomp/playa-plan
 
 - When working from a checklist document, keep the checklist up to date by checking off items as you progress. Commit changes to git after each checked item. Do not bypass signing commits.
 
+## Development Environment
+
+- Node.js version 22 or higher is required
+- For setting up the development environment, refer to [Copilot Setup Documentation](../docs/copilot-setup.md)
+
 ## Development instructions
 
 - Use clear, easily-readable code whereever possible.
