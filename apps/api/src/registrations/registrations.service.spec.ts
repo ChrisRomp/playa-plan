@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { RegistrationsService } from './registrations.service';
 import { PrismaService } from '../common/prisma/prisma.service';
-import { BadRequestException, NotFoundException, ConflictException } from '@nestjs/common';
+import { NotFoundException, ConflictException } from '@nestjs/common';
 import { RegistrationStatus } from '@prisma/client';
 import { CreateRegistrationDto } from './dto';
 
@@ -154,11 +154,9 @@ describe('RegistrationsService', () => {
       mockPrismaService.job.findUnique
         .mockResolvedValueOnce(fullJob)
         .mockResolvedValueOnce(mockJobs[1]);
-      mockPrismaService.registration.create.mockImplementation((args) => {
-        return Promise.resolve({
-          ...mockRegistration,
-          status: RegistrationStatus.WAITLISTED,
-        });
+      mockPrismaService.registration.create.mockResolvedValue({
+        ...mockRegistration,
+        status: RegistrationStatus.WAITLISTED,
       });
 
       const result = await service.create(createDto);

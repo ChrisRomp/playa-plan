@@ -847,7 +847,7 @@ export const campingOptions = {
       });
       return response.data.map(field => CampingOptionFieldSchema.parse(field));
     } catch (error) {
-      console.error(`Error reordering fields for camping option with ID ${campingOptionId}:`, error);
+      console.error('Error reordering fields for camping option with ID:', campingOptionId, error);
       throw error;
     }
   }

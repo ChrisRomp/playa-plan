@@ -1,4 +1,4 @@
-import { useState, useEffect, useContext } from 'react';
+import { useState, useEffect, useContext, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useRegistration, RegistrationFormData } from '../../hooks/useRegistration';
 import { useCampingOptions } from '../../hooks/useCampingOptions';
@@ -90,6 +90,11 @@ export default function RegistrationPage() {
     }
   }, [profile]);
 
+  // Get always required categories
+  const getAlwaysRequiredCategories = useCallback((): JobCategory[] => {
+    return jobCategories.filter(category => category.alwaysRequired);
+  }, [jobCategories]);
+
   // Auto-expand categories with selected jobs or errors when on shifts step
   useEffect(() => {
     if (currentStep === 4) {
@@ -127,7 +132,7 @@ export default function RegistrationPage() {
       
       setExpandedCategories(categoriesToExpand);
     }
-  }, [currentStep, formData.jobs, formErrors, jobs, jobCategories]);
+  }, [currentStep, formData.jobs, formErrors, jobs, jobCategories, getAlwaysRequiredCategories]);
   
   // Track loaded custom fields for selected camping options
   const [customFieldsByOption, setCustomFieldsByOption] = useState<Record<string, CampingOptionField[]>>({});
@@ -179,11 +184,6 @@ export default function RegistrationPage() {
   // Check if there are any always required job categories
   const hasAlwaysRequiredCategories = (categories: JobCategory[]): boolean => {
     return categories.some(category => category.alwaysRequired);
-  };
-
-  // Get always required categories
-  const getAlwaysRequiredCategories = (): JobCategory[] => {
-    return jobCategories.filter(category => category.alwaysRequired);
   };
 
   // Get jobs for always required categories

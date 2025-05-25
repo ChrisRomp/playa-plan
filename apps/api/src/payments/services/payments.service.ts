@@ -30,20 +30,6 @@ interface PayPalLink {
   href: string;
 }
 
-// Interface for PayPal order data
-interface PayPalOrder {
-  id: string;
-  links: PayPalLink[];
-}
-
-// Interface for Stripe webhook event
-interface StripeWebhookEvent {
-  type: string;
-  data: {
-    object: StripeSession | StripePaymentIntent;
-  };
-}
-
 // Interface for Prisma where clause
 interface PaymentWhereClause {
   userId?: string;
@@ -497,7 +483,8 @@ export class PaymentsService {
    * Process a PayPal webhook event
    * Not yet implemented - would be similar to Stripe webhook handling
    */
-  async handlePaypalWebhook(payload: Record<string, unknown>): Promise<{ received: boolean; type: string }> {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async handlePaypalWebhook(_payload: Record<string, unknown>): Promise<{ received: boolean; type: string }> {
     // Implementation would be similar to Stripe webhook handling
     // PayPal webhooks have their own format and verification methods
     this.logger.log('PayPal webhook received, but handling not yet implemented');
