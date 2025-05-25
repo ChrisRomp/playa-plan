@@ -243,6 +243,28 @@ async function main() {
 
   console.log(`Created ${await prisma.campingOption.count()} camping options`);
 
+  // Associate job categories with camping options
+  console.log('Creating camping option job category associations...');
+  
+  // Associate all job categories except teardown with the skydiving camping option
+  await prisma.campingOptionJobCategory.createMany({
+    data: [
+      { campingOptionId: skydivingCampingOption.id, jobCategoryId: dayBossCategory.id },
+      { campingOptionId: skydivingCampingOption.id, jobCategoryId: artCarDriverCategory.id },
+      { campingOptionId: skydivingCampingOption.id, jobCategoryId: artCarCaptainCategory.id },
+      { campingOptionId: skydivingCampingOption.id, jobCategoryId: artCarMaintenanceCategory.id },
+      { campingOptionId: skydivingCampingOption.id, jobCategoryId: dzManagerCategory.id },
+      { campingOptionId: skydivingCampingOption.id, jobCategoryId: fireflyGreeterCategory.id },
+      { campingOptionId: skydivingCampingOption.id, jobCategoryId: landingAreaCategory.id },
+      { campingOptionId: skydivingCampingOption.id, jobCategoryId: manifestAssistantCategory.id },
+      { campingOptionId: skydivingCampingOption.id, jobCategoryId: manifestManagerCategory.id },
+      { campingOptionId: skydivingCampingOption.id, jobCategoryId: airportManagerCategory.id }
+      // Note: teardownCategory is intentionally excluded
+    ]
+  });
+
+  console.log(`Created ${await prisma.campingOptionJobCategory.count()} camping option job category associations`);
+
   // Create shifts
   console.log('Creating shifts...');
 
