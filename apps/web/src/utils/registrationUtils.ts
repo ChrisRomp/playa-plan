@@ -87,7 +87,7 @@ export function getRegistrationStatusMessage(
   const isEarlyRegistrationOpen = 'earlyRegistrationOpen' in config && config.earlyRegistrationOpen;
   
   if (!isRegistrationOpen && !isEarlyRegistrationOpen) {
-    return `Registration for ${year} is not currently available.`;
+    return `Registration for ${year} is not currently open.`;
   }
   
   if (isEarlyRegistrationOpen && !isRegistrationOpen) {
@@ -97,11 +97,12 @@ export function getRegistrationStatusMessage(
     );
     
     if (isEarlyEligible) {
-      return `Early registration for ${year} is now open!`;
+      return `Early registration for ${year} is open!`;
     } else {
-      return `Early registration is available for selected members only.`;
+      // Show the same default message as when registration is closed
+      return `Registration for ${year} is not currently open.`;
     }
   }
   
-  return `Registration for ${year} is now open!`;
+  return `Registration for ${year} is open!`;
 } 

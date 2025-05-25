@@ -130,11 +130,11 @@ describe('DashboardPage Registration Status', () => {
 
       render(<DashboardPageWrapper />);
 
-      expect(screen.getByText('Registration for 2025 is not currently available.')).toBeInTheDocument();
+      expect(screen.getByText('Registration for 2025 is not currently open.')).toBeInTheDocument();
       expect(screen.queryByText('Start Registration')).not.toBeInTheDocument();
     });
 
-    it('should show early registration message when only early registration is open but user is not eligible', () => {
+    it('should show default registration closed message when only early registration is open but user is not eligible', () => {
       // Setup: Early registration is open but user is not eligible
       const earlyOnlyConfig = {
         name: 'Test Camp',
@@ -169,7 +169,7 @@ describe('DashboardPage Registration Status', () => {
 
       render(<DashboardPageWrapper />);
 
-      expect(screen.getByText('Early registration is available for selected members only.')).toBeInTheDocument();
+      expect(screen.getByText('Registration for 2025 is not currently open.')).toBeInTheDocument();
       expect(screen.queryByText('Start Registration')).not.toBeInTheDocument();
     });
 
@@ -208,7 +208,7 @@ describe('DashboardPage Registration Status', () => {
 
       render(<DashboardPageWrapper />);
 
-      expect(screen.getByText('Early registration for 2025 is now open!')).toBeInTheDocument();
+      expect(screen.getByText('Early registration for 2025 is open!')).toBeInTheDocument();
       expect(screen.getByText('Start Registration')).toBeInTheDocument();
     });
 
@@ -232,7 +232,7 @@ describe('DashboardPage Registration Status', () => {
 
       render(<DashboardPageWrapper />);
 
-      expect(screen.getByText('Registration for 2025 is now open!')).toBeInTheDocument();
+      expect(screen.getByText('Registration for 2025 is open!')).toBeInTheDocument();
       expect(screen.getByText('Start Registration')).toBeInTheDocument();
     });
   });

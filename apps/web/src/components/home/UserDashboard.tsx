@@ -44,9 +44,6 @@ const UserDashboard: React.FC = () => {
                 <div className="ml-3">
                   <p className="text-sm text-yellow-700">
                     Registration is not currently open.
-                    {config.earlyRegistrationOpen && !user.isEarlyRegistrationEnabled && (
-                      " Early registration is available for selected members only."
-                    )}
                   </p>
                 </div>
               </div>

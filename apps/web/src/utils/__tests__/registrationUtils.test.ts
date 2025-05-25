@@ -62,7 +62,7 @@ describe('registrationUtils', () => {
 
     it('should return registration not available when neither is open', () => {
       const message = getRegistrationStatusMessage(mockConfig, mockUser, false);
-      expect(message).toBe('Registration for 2025 is not currently available.');
+      expect(message).toBe('Registration for 2025 is not currently open.');
     });
   });
 

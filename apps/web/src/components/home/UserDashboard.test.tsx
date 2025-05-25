@@ -102,7 +102,7 @@ describe('UserDashboard', () => {
     
     renderWithContext(mockUser, earlyConfig);
     expect(screen.getByText(/Registration is not currently open./)).toBeInTheDocument();
-    expect(screen.getByText(/Early registration is available for selected members only./)).toBeInTheDocument();
+    expect(screen.queryByText(/Early registration is available for selected members only./)).not.toBeInTheDocument();
   });
 
   it('shows register button for early eligible users', () => {

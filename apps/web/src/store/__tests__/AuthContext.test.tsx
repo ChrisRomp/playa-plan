@@ -30,7 +30,14 @@ vi.mock('../../lib/api', () => ({
       role: 'PARTICIPANT',
       accessToken: 'mock-token'
     }),
-    getProfile: vi.fn(),
+    getProfile: vi.fn().mockResolvedValue({
+      id: 'user-123',
+      email: 'test@example.playaplan.app',
+      firstName: 'Test',
+      lastName: 'User',
+      role: 'PARTICIPANT',
+      allowEarlyRegistration: false,
+    }),
     logout: vi.fn(),
     checkAuth: vi.fn(),
     refreshToken: vi.fn(),
@@ -234,6 +241,14 @@ describe('AuthContext', () => {
       (authApi.verifyCode as Mock).mockImplementation(
         () => new Promise(resolve => setTimeout(() => resolve(mockAuthResponse), 100))
       );
+      (authApi.getProfile as Mock).mockResolvedValue({
+        id: 'user-123',
+        email: 'test@example.playaplan.app',
+        firstName: 'Test',
+        lastName: 'User',
+        role: 'PARTICIPANT',
+        allowEarlyRegistration: false,
+      });
       
       // Render with act
       await act(async () => {
@@ -265,6 +280,14 @@ describe('AuthContext', () => {
     
     it('should update user state and authentication on success', async () => {
       (authApi.verifyCode as Mock).mockResolvedValue(mockAuthResponse);
+      (authApi.getProfile as Mock).mockResolvedValue({
+        id: 'user-123',
+        email: 'test@example.playaplan.app',
+        firstName: 'Test',
+        lastName: 'User',
+        role: 'PARTICIPANT',
+        allowEarlyRegistration: false,
+      });
       
       // Render with act
       await act(async () => {
@@ -310,6 +333,14 @@ describe('AuthContext', () => {
         lastName: 'User',
         role: 'PARTICIPANT',
         accessToken: 'mock-token'
+      });
+      (auth.getProfile as Mock).mockResolvedValue({
+        id: 'user-123',
+        email: 'test@example.playaplan.app',
+        firstName: 'Test',
+        lastName: 'User',
+        role: 'PARTICIPANT',
+        allowEarlyRegistration: false,
       });
       
       // Render with act
