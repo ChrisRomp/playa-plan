@@ -14,6 +14,7 @@ vi.mock('@stripe/stripe-js');
 vi.mock('../api', () => ({
   api: {
     post: vi.fn(),
+    get: vi.fn(),
   },
 }));
 
@@ -180,22 +181,52 @@ describe('Stripe Service', () => {
   });
 
   describe('handleStripeSuccess', () => {
-    it('should handle successful payment', async () => {
+    it('should handle successful payment verification', async () => {
       const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
       const sessionId = 'cs_test_123';
+      
+      const mockVerificationResponse = {
+        data: {
+          sessionId: 'cs_test_123',
+          paymentStatus: 'COMPLETED',
+          registrationId: 'reg_456',
+          registrationStatus: 'CONFIRMED',
+          paymentId: 'pay_789',
+        },
+      };
 
-      await handleStripeSuccess(sessionId);
+      const mockApiGet = vi.mocked(api.get);
+      mockApiGet.mockResolvedValue(mockVerificationResponse);
 
-      expect(consoleSpy).toHaveBeenCalledWith('Payment completed successfully:', sessionId);
+      const result = await handleStripeSuccess(sessionId);
+
+      expect(api.get).toHaveBeenCalledWith('/payments/stripe/session/cs_test_123/verify');
+      expect(consoleSpy).toHaveBeenCalledWith('Verifying payment session:', sessionId);
+      expect(consoleSpy).toHaveBeenCalledWith('Payment verification result:', mockVerificationResponse.data);
+      expect(result).toEqual({
+        paymentStatus: 'COMPLETED',
+        registrationId: 'reg_456',
+        registrationStatus: 'CONFIRMED',
+        paymentId: 'pay_789',
+      });
+      
       consoleSpy.mockRestore();
     });
 
-    it('should return resolved promise', async () => {
+    it('should handle API error during verification', async () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       const sessionId = 'cs_test_123';
       
-      const result = await handleStripeSuccess(sessionId);
+      const apiError = new Error('Verification failed');
+      const mockApiGet = vi.mocked(api.get);
+      mockApiGet.mockRejectedValue(apiError);
+
+      await expect(handleStripeSuccess(sessionId)).rejects.toThrow('Failed to verify payment session');
       
-      expect(result).toBeUndefined();
+      expect(api.get).toHaveBeenCalledWith('/payments/stripe/session/cs_test_123/verify');
+      expect(consoleSpy).toHaveBeenCalledWith('Failed to verify payment session:', apiError);
+      
+      consoleSpy.mockRestore();
     });
   });
 

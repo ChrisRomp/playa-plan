@@ -30,9 +30,6 @@ describe('PaymentSuccessPage', () => {
     const { useNavigate, useSearchParams } = await import('react-router-dom');
     vi.mocked(useNavigate).mockReturnValue(mockNavigate);
     vi.mocked(useSearchParams).mockReturnValue([mockSearchParams, vi.fn()]);
-    
-    // Setup stripe mock
-    vi.mocked(handleStripeSuccess).mockResolvedValue();
   });
 
   const renderComponent = () => {
@@ -45,6 +42,8 @@ describe('PaymentSuccessPage', () => {
 
   it('should show loading state initially', () => {
     vi.mocked(mockSearchParams.get).mockReturnValue('session_123');
+    vi.mocked(handleStripeSuccess).mockImplementation(() => new Promise(() => {})); // Never resolves
+    
     renderComponent();
 
     expect(screen.getByText('Processing your payment...')).toBeInTheDocument();
@@ -63,16 +62,42 @@ describe('PaymentSuccessPage', () => {
     });
   });
 
-  it('should show success message when payment is processed', async () => {
+  it('should show success message when payment is completed', async () => {
     vi.mocked(mockSearchParams.get).mockReturnValue('session_123');
+    vi.mocked(handleStripeSuccess).mockResolvedValue({
+      paymentStatus: 'COMPLETED',
+      registrationId: 'reg_123',
+      registrationStatus: 'CONFIRMED',
+      paymentId: 'pay_123'
+    });
+    
     renderComponent();
 
     await waitFor(() => {
       expect(screen.getByText('Payment Successful!')).toBeInTheDocument();
-      expect(screen.getByText('Your payment has been processed successfully. Your registration is now confirmed.')).toBeInTheDocument();
+      expect(screen.getByText('Your payment has been processed successfully.')).toBeInTheDocument();
+      expect(screen.getByText('Your registration is now confirmed!')).toBeInTheDocument();
     });
 
     expect(handleStripeSuccess).toHaveBeenCalledWith('session_123');
+  });
+
+  it('should show processing message when payment is still pending', async () => {
+    vi.mocked(mockSearchParams.get).mockReturnValue('session_123');
+    vi.mocked(handleStripeSuccess).mockResolvedValue({
+      paymentStatus: 'PENDING',
+      registrationId: 'reg_123',
+      registrationStatus: 'PENDING',
+      paymentId: 'pay_123'
+    });
+    
+    renderComponent();
+
+    await waitFor(() => {
+      expect(screen.getByText('Payment Processing')).toBeInTheDocument();
+      expect(screen.getByText('Your payment is being processed.')).toBeInTheDocument();
+      expect(screen.getByText('Current status: PENDING')).toBeInTheDocument();
+    });
   });
 
   it('should show error when payment processing fails', async () => {
@@ -88,8 +113,15 @@ describe('PaymentSuccessPage', () => {
     });
   });
 
-  it('should navigate to dashboard when "View Dashboard" is clicked', async () => {
+  it('should navigate to dashboard when "View Dashboard" is clicked from success state', async () => {
     vi.mocked(mockSearchParams.get).mockReturnValue('session_123');
+    vi.mocked(handleStripeSuccess).mockResolvedValue({
+      paymentStatus: 'COMPLETED',
+      registrationId: 'reg_123',
+      registrationStatus: 'CONFIRMED',
+      paymentId: 'pay_123'
+    });
+    
     renderComponent();
 
     await waitFor(() => {
@@ -104,6 +136,13 @@ describe('PaymentSuccessPage', () => {
 
   it('should navigate to registration when "View Registration Details" is clicked', async () => {
     vi.mocked(mockSearchParams.get).mockReturnValue('session_123');
+    vi.mocked(handleStripeSuccess).mockResolvedValue({
+      paymentStatus: 'COMPLETED',
+      registrationId: 'reg_123',
+      registrationStatus: 'CONFIRMED',
+      paymentId: 'pay_123'
+    });
+    
     renderComponent();
 
     await waitFor(() => {
@@ -113,7 +152,7 @@ describe('PaymentSuccessPage', () => {
     const registrationButton = screen.getByText('View Registration Details');
     fireEvent.click(registrationButton);
 
-    expect(mockNavigate).toHaveBeenCalledWith('/registration');
+    expect(mockNavigate).toHaveBeenCalledWith('/registration/reg_123');
   });
 
   it('should navigate to dashboard from error state', async () => {
@@ -132,6 +171,13 @@ describe('PaymentSuccessPage', () => {
 
   it('should display success UI elements correctly', async () => {
     vi.mocked(mockSearchParams.get).mockReturnValue('session_123');
+    vi.mocked(handleStripeSuccess).mockResolvedValue({
+      paymentStatus: 'COMPLETED',
+      registrationId: 'reg_123',
+      registrationStatus: 'CONFIRMED',
+      paymentId: 'pay_123'
+    });
+    
     renderComponent();
 
     await waitFor(() => {
@@ -143,6 +189,30 @@ describe('PaymentSuccessPage', () => {
     expect(successIcon).toBeInTheDocument();
 
     // Check for action buttons
+    expect(screen.getByText('View Dashboard')).toBeInTheDocument();
+    expect(screen.getByText('View Registration Details')).toBeInTheDocument();
+  });
+
+  it('should display processing UI elements correctly', async () => {
+    vi.mocked(mockSearchParams.get).mockReturnValue('session_123');
+    vi.mocked(handleStripeSuccess).mockResolvedValue({
+      paymentStatus: 'PENDING',
+      registrationId: 'reg_123',
+      registrationStatus: 'PENDING',
+      paymentId: 'pay_123'
+    });
+    
+    renderComponent();
+
+    await waitFor(() => {
+      expect(screen.getByText('Payment Processing')).toBeInTheDocument();
+    });
+
+    // Check for warning icon (AlertCircleIcon) - it's an SVG element
+    const warningIcon = document.querySelector('svg.lucide-alert-circle');
+    expect(warningIcon).toBeInTheDocument();
+
+    // Check for dashboard button (registration button should still be there if registrationId exists)
     expect(screen.getByText('View Dashboard')).toBeInTheDocument();
     expect(screen.getByText('View Registration Details')).toBeInTheDocument();
   });
@@ -177,6 +247,13 @@ describe('PaymentSuccessPage', () => {
 
   it('should have proper button styling and accessibility', async () => {
     vi.mocked(mockSearchParams.get).mockReturnValue('session_123');
+    vi.mocked(handleStripeSuccess).mockResolvedValue({
+      paymentStatus: 'COMPLETED',
+      registrationId: 'reg_123',
+      registrationStatus: 'CONFIRMED',
+      paymentId: 'pay_123'
+    });
+    
     renderComponent();
 
     await waitFor(() => {
@@ -193,5 +270,39 @@ describe('PaymentSuccessPage', () => {
     // Check that buttons are accessible
     expect(dashboardButton).toBeVisible();
     expect(registrationButton).toBeVisible();
+  });
+
+  it('should handle registration without confirmed status', async () => {
+    vi.mocked(mockSearchParams.get).mockReturnValue('session_123');
+    vi.mocked(handleStripeSuccess).mockResolvedValue({
+      paymentStatus: 'COMPLETED',
+      registrationId: 'reg_123',
+      registrationStatus: 'PENDING',
+      paymentId: 'pay_123'
+    });
+    
+    renderComponent();
+
+    await waitFor(() => {
+      expect(screen.getByText('Payment Successful!')).toBeInTheDocument();
+      expect(screen.getByText('Your registration is being processed and will be confirmed shortly.')).toBeInTheDocument();
+    });
+  });
+
+  it('should not show registration button when no registration ID is provided', async () => {
+    vi.mocked(mockSearchParams.get).mockReturnValue('session_123');
+    vi.mocked(handleStripeSuccess).mockResolvedValue({
+      paymentStatus: 'COMPLETED',
+      paymentId: 'pay_123'
+    });
+    
+    renderComponent();
+
+    await waitFor(() => {
+      expect(screen.getByText('Payment Successful!')).toBeInTheDocument();
+    });
+
+    expect(screen.getByText('View Dashboard')).toBeInTheDocument();
+    expect(screen.queryByText('View Registration Details')).not.toBeInTheDocument();
   });
 }); 

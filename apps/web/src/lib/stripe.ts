@@ -56,11 +56,30 @@ export const redirectToStripeCheckout = async (
 /**
  * Handle successful payment return from Stripe
  */
-export const handleStripeSuccess = (sessionId: string): Promise<void> => {
-  // In a real implementation, you might want to verify the payment status
-  // For now, we'll just log the session ID
-  console.log('Payment completed successfully:', sessionId);
-  return Promise.resolve();
+export const handleStripeSuccess = async (sessionId: string): Promise<{
+  paymentStatus: string;
+  registrationId?: string;
+  registrationStatus?: string;
+  paymentId?: string;
+}> => {
+  try {
+    console.log('Verifying payment session:', sessionId);
+    
+    const response = await api.get(`/payments/stripe/session/${sessionId}/verify`);
+    const result = response.data;
+    
+    console.log('Payment verification result:', result);
+    
+    return {
+      paymentStatus: result.paymentStatus,
+      registrationId: result.registrationId,
+      registrationStatus: result.registrationStatus,
+      paymentId: result.paymentId,
+    };
+  } catch (error) {
+    console.error('Failed to verify payment session:', error);
+    throw new Error('Failed to verify payment session');
+  }
 };
 
 /**

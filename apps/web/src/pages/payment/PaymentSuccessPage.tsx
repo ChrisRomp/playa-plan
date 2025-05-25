@@ -1,7 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { CheckCircleIcon } from 'lucide-react';
+import { CheckCircleIcon, AlertCircleIcon } from 'lucide-react';
 import { handleStripeSuccess } from '../../lib/stripe';
+
+interface PaymentVerificationResult {
+  paymentStatus: string;
+  registrationId?: string;
+  registrationStatus?: string;
+  paymentId?: string;
+}
 
 /**
  * PaymentSuccessPage component
@@ -12,6 +19,7 @@ const PaymentSuccessPage: React.FC = () => {
   const navigate = useNavigate();
   const [isProcessing, setIsProcessing] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [verificationResult, setVerificationResult] = useState<PaymentVerificationResult | null>(null);
 
   useEffect(() => {
     const sessionId = searchParams.get('session_id');
@@ -24,7 +32,8 @@ const PaymentSuccessPage: React.FC = () => {
 
     // Handle the successful payment
     handleStripeSuccess(sessionId)
-      .then(() => {
+      .then((result) => {
+        setVerificationResult(result);
         setIsProcessing(false);
       })
       .catch((err) => {
@@ -39,7 +48,11 @@ const PaymentSuccessPage: React.FC = () => {
   };
 
   const handleGoToRegistration = () => {
-    navigate('/registration');
+    if (verificationResult?.registrationId) {
+      navigate(`/registration/${verificationResult.registrationId}`);
+    } else {
+      navigate('/registration');
+    }
   };
 
   if (isProcessing) {
@@ -58,6 +71,7 @@ const PaymentSuccessPage: React.FC = () => {
       <div className="min-h-screen flex items-center justify-center">
         <div className="max-w-md mx-auto text-center">
           <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+            <AlertCircleIcon className="w-16 h-16 text-red-600 mx-auto mb-4" />
             <h1 className="text-2xl font-semibold text-red-800 mb-2">Payment Error</h1>
             <p className="text-red-600 mb-4">{error}</p>
             <button
@@ -72,15 +86,49 @@ const PaymentSuccessPage: React.FC = () => {
     );
   }
 
+  const isPaymentCompleted = verificationResult?.paymentStatus === 'COMPLETED';
+  const isRegistrationConfirmed = verificationResult?.registrationStatus === 'CONFIRMED';
+
   return (
     <div className="min-h-screen flex items-center justify-center">
       <div className="max-w-md mx-auto text-center">
-        <div className="bg-green-50 border border-green-200 rounded-lg p-8">
-          <CheckCircleIcon className="w-16 h-16 text-green-600 mx-auto mb-4" />
-          <h1 className="text-2xl font-semibold text-green-800 mb-2">Payment Successful!</h1>
-          <p className="text-green-600 mb-6">
-            Your payment has been processed successfully. Your registration is now confirmed.
-          </p>
+        <div className={`border rounded-lg p-8 ${
+          isPaymentCompleted ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'
+        }`}>
+          {isPaymentCompleted ? (
+            <CheckCircleIcon className="w-16 h-16 text-green-600 mx-auto mb-4" />
+          ) : (
+            <AlertCircleIcon className="w-16 h-16 text-yellow-600 mx-auto mb-4" />
+          )}
+          
+          <h1 className={`text-2xl font-semibold mb-2 ${
+            isPaymentCompleted ? 'text-green-800' : 'text-yellow-800'
+          }`}>
+            {isPaymentCompleted ? 'Payment Successful!' : 'Payment Processing'}
+          </h1>
+          
+          <div className={`mb-6 ${
+            isPaymentCompleted ? 'text-green-600' : 'text-yellow-600'
+          }`}>
+            {isPaymentCompleted ? (
+              <div>
+                <p className="mb-2">Your payment has been processed successfully.</p>
+                {isRegistrationConfirmed ? (
+                  <p className="font-medium">Your registration is now confirmed!</p>
+                ) : (
+                  <p>Your registration is being processed and will be confirmed shortly.</p>
+                )}
+              </div>
+            ) : (
+              <div>
+                <p className="mb-2">Your payment is being processed.</p>
+                <p>Current status: {verificationResult?.paymentStatus}</p>
+                {verificationResult?.registrationStatus && (
+                  <p>Registration status: {verificationResult.registrationStatus}</p>
+                )}
+              </div>
+            )}
+          </div>
           
           <div className="space-y-3">
             <button
@@ -89,13 +137,26 @@ const PaymentSuccessPage: React.FC = () => {
             >
               View Dashboard
             </button>
-            <button
-              onClick={handleGoToRegistration}
-              className="w-full bg-gray-200 text-gray-800 px-6 py-3 rounded-lg hover:bg-gray-300 transition-colors font-medium"
-            >
-              View Registration Details
-            </button>
+            {verificationResult?.registrationId && (
+              <button
+                onClick={handleGoToRegistration}
+                className="w-full bg-gray-200 text-gray-800 px-6 py-3 rounded-lg hover:bg-gray-300 transition-colors font-medium"
+              >
+                View Registration Details
+              </button>
+            )}
           </div>
+          
+          {/* Debug info for development */}
+          {process.env.NODE_ENV === 'development' && verificationResult && (
+            <div className="mt-6 p-3 bg-gray-100 rounded text-xs text-left">
+              <p><strong>Debug Info:</strong></p>
+              <p>Payment ID: {verificationResult.paymentId}</p>
+              <p>Payment Status: {verificationResult.paymentStatus}</p>
+              <p>Registration ID: {verificationResult.registrationId}</p>
+              <p>Registration Status: {verificationResult.registrationStatus}</p>
+            </div>
+          )}
         </div>
       </div>
     </div>

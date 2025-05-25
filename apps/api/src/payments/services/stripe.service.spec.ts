@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { StripeService } from './stripe.service';
 import { ConfigService } from '@nestjs/config';
 import { Logger } from '@nestjs/common';
+import { CoreConfigService } from '../../core-config/services/core-config.service';
 
 // Create a mock Stripe instance with the necessary functions
 const mockStripeInstance = {
@@ -44,6 +45,14 @@ describe('StripeService', () => {
       return config[key as keyof typeof config];
     }),
   };
+
+  const mockCoreConfigService = {
+    findCurrent: jest.fn().mockResolvedValue({
+      stripeEnabled: true,
+      stripeApiKey: 'sk_test_mock_key',
+      stripeWebhookSecret: 'whsec_mock_secret',
+    }),
+  };
   
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -54,6 +63,10 @@ describe('StripeService', () => {
         {
           provide: ConfigService,
           useValue: mockConfigService,
+        },
+        {
+          provide: CoreConfigService,
+          useValue: mockCoreConfigService,
         },
       ],
     }).compile();
@@ -123,8 +136,7 @@ describe('StripeService', () => {
       await expect(service.createPaymentIntent(paymentData)).rejects.toThrow('Stripe API error');
       
       expect(loggerSpy.error).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to create payment intent'),
-        expect.any(String),
+        'Failed to create payment intent: Stripe API error'
       );
     });
   });
@@ -198,8 +210,7 @@ describe('StripeService', () => {
       await expect(service.createCheckoutSession(mockSessionData)).rejects.toThrow('Stripe API error');
       
       expect(loggerSpy.error).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to create checkout session'),
-        expect.any(String),
+        'Failed to create checkout session: Stripe API error'
       );
     });
   });
@@ -238,8 +249,7 @@ describe('StripeService', () => {
       await expect(service.createRefund(paymentIntentId)).rejects.toThrow('Stripe API error');
       
       expect(loggerSpy.error).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to process refund'),
-        expect.any(String),
+        'Failed to process refund: Stripe API error'
       );
     });
   });
@@ -266,8 +276,7 @@ describe('StripeService', () => {
       await expect(service.getPaymentIntent(paymentIntentId)).rejects.toThrow('Stripe API error');
       
       expect(loggerSpy.error).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to retrieve payment intent'),
-        expect.any(String),
+        'Failed to retrieve payment intent: Stripe API error'
       );
     });
   });
@@ -285,7 +294,7 @@ describe('StripeService', () => {
       expect(mockStripeInstance.webhooks.constructEvent).toHaveBeenCalledWith(
         mockPayload,
         mockSignature,
-        'mock_webhook_secret',
+        'whsec_mock_secret',
       );
       
       expect(result).toEqual(mockEvent);
@@ -303,8 +312,7 @@ describe('StripeService', () => {
       await expect(service.constructEventFromWebhook(mockPayload, mockSignature)).rejects.toThrow('Invalid signature');
       
       expect(loggerSpy.error).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to verify webhook'),
-        expect.any(String),
+        'Failed to verify webhook: Invalid signature'
       );
     });
   });

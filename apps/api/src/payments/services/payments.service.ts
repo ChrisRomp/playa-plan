@@ -362,7 +362,12 @@ export class PaymentsService {
   }
 
   /**
-   * Process a webhook event from Stripe
+   * Process a webhook event from Stripe (OPTIONAL - webhooks are no longer required)
+   * 
+   * Note: This method is kept for backwards compatibility and for users who prefer webhook-based
+   * payment processing. The recommended approach is to use session verification instead,
+   * which eliminates the need for webhook configuration.
+   * 
    * @param payload - Raw request payload
    * @param signature - Stripe signature header
    * @returns Processing result
@@ -575,6 +580,86 @@ export class PaymentsService {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(`Failed to process refund: ${errorMessage}`, error instanceof Error ? error.stack : undefined);
       throw error;
+    }
+  }
+
+  /**
+   * Verify a Stripe checkout session and return payment/registration status
+   * This method checks the actual Stripe session status and updates our records accordingly
+   * @param sessionId - Stripe checkout session ID
+   * @returns Session verification result with payment and registration info
+   */
+  async verifyStripeSession(sessionId: string): Promise<{
+    sessionId: string;
+    paymentStatus: PaymentStatus;
+    registrationId?: string;
+    registrationStatus?: string;
+    paymentId?: string;
+  }> {
+    try {
+      // Find payment with this session ID
+      const payment = await this.prisma.payment.findFirst({
+        where: { providerRefId: sessionId },
+        include: { registration: true },
+      }) as PaymentWithRelations;
+      
+      if (!payment) {
+        throw new NotFoundException(`Payment not found for Stripe session ${sessionId}`);
+      }
+
+      // Get the actual session status from Stripe
+      const stripeSession = await this.stripeService.getCheckoutSession(sessionId);
+      
+      // Determine the payment status based on Stripe session
+      let updatedPaymentStatus = payment.status;
+      let updatedRegistrationStatus = payment.registration?.status;
+      
+      if (stripeSession.payment_status === 'paid' && payment.status !== PaymentStatus.COMPLETED) {
+        // Payment was successful, update our records
+        this.logger.log(`Updating payment ${payment.id} status to COMPLETED based on Stripe session verification`);
+        
+        await this.update(payment.id, {
+          status: PaymentStatus.COMPLETED,
+        });
+        
+        updatedPaymentStatus = PaymentStatus.COMPLETED;
+        
+        // If there's a registration, update its status to confirmed
+        if (payment.registration) {
+          await this.prisma.registration.update({
+            where: { id: payment.registration.id },
+            data: { status: 'CONFIRMED' },
+          });
+          updatedRegistrationStatus = 'CONFIRMED';
+        }
+      } else if (stripeSession.payment_status === 'unpaid' && payment.status === PaymentStatus.PENDING) {
+        // Payment is still pending or failed
+        if (stripeSession.status === 'expired') {
+          this.logger.log(`Updating payment ${payment.id} status to FAILED based on expired Stripe session`);
+          
+          await this.update(payment.id, {
+            status: PaymentStatus.FAILED,
+            notes: 'Checkout session expired',
+          });
+          
+          updatedPaymentStatus = PaymentStatus.FAILED;
+        }
+      }
+      
+      return {
+        sessionId,
+        paymentStatus: updatedPaymentStatus,
+        registrationId: payment.registration?.id,
+        registrationStatus: updatedRegistrationStatus,
+        paymentId: payment.id,
+      };
+    } catch (error: unknown) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Failed to verify Stripe session: ${errorMessage}`, error instanceof Error ? error.stack : undefined);
+      throw new BadRequestException('Failed to verify Stripe session');
     }
   }
 } 

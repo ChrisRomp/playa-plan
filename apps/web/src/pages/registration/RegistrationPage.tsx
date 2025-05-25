@@ -435,10 +435,7 @@ export default function RegistrationPage() {
       }
       setCurrentStep(currentStep + 1);
     } else if (currentStep === 5) {
-      // Terms step - move to payment step
-      setCurrentStep(6);
-    } else {
-      // Payment step - create registration
+      // Terms step - create registration and move to payment step
       try {
         const result = await submitRegistration(formData);
         if (result?.id) {
@@ -451,8 +448,10 @@ export default function RegistrationPage() {
         if (!needsPayment) {
           // No payment needed, redirect to dashboard
           navigate('/dashboard');
+        } else {
+          // Payment needed, move to payment step
+          setCurrentStep(6);
         }
-        // If payment is needed, the PaymentButton component will handle the redirect to Stripe
       } catch (err) {
         console.error('Registration failed:', err);
         setFormErrors({ submit: 'Registration submission failed. Please try again.' });
@@ -1225,13 +1224,25 @@ export default function RegistrationPage() {
             
             <button
               type="button"
-              onClick={() => {
+              onClick={async () => {
                 // Complete registration without payment
-                navigate('/dashboard');
+                try {
+                  // If registration doesn't exist yet, create it
+                  if (!registrationId) {
+                    const result = await submitRegistration(formData);
+                    if (result?.id) {
+                      setRegistrationId(result.id);
+                    }
+                  }
+                  navigate('/dashboard');
+                } catch (err) {
+                  console.error('Registration completion failed:', err);
+                  setFormErrors(prev => ({ ...prev, payment: 'Failed to complete registration. Please try again.' }));
+                }
               }}
               className="w-full bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium"
             >
-              Complete Registration
+              {totalCost === 0 ? 'Complete Registration' : 'Pay Dues Later'}
             </button>
           </div>
         )}
@@ -1397,12 +1408,15 @@ export default function RegistrationPage() {
             </button>
           )}
           
-          <button
-            type="submit"
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-          >
-            {currentStep < 5 ? 'Continue' : currentStep === 5 ? 'Review & Pay' : 'Complete Registration'}
-          </button>
+          {/* Only show form submit button if not on payment step, or if on payment step but no payment needed */}
+          {currentStep !== 6 && (
+            <button
+              type="submit"
+              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            >
+              {currentStep < 5 ? 'Continue' : currentStep === 5 ? 'Review & Pay' : 'Complete Registration'}
+            </button>
+          )}
         </div>
         
         {/* Payment amount display */}
