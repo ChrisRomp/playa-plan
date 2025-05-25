@@ -50,8 +50,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               email: userProfile.email,
               role: mapApiRoleToClientRole(userProfile.role),
               isAuthenticated: true,
-              isEarlyRegistrationEnabled: false, // This would come from a complete profile
-              hasRegisteredForCurrentYear: false // This would come from a complete profile
+              isEarlyRegistrationEnabled: userProfile.allowEarlyRegistration || false,
+              hasRegisteredForCurrentYear: false // This would come from registration data
             });
             
             // Set the client-side auth state cookie for UI state
@@ -123,15 +123,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       await cookieService.setAuthenticatedState();
       setIsAuthenticated(true);
       
-      // Extract user info from auth response
+      // Get the full user profile after successful authentication
+      const userProfile = await auth.getProfile();
+      
+      // Extract user info from profile response
       setUser({
         id: authResponse.userId,
         email: authResponse.email,
         name: `${authResponse.firstName} ${authResponse.lastName}`,
         role: mapApiRoleToClientRole(authResponse.role),
         isAuthenticated: true,
-        // These would come from the complete user profile
-        isEarlyRegistrationEnabled: false,
+        isEarlyRegistrationEnabled: userProfile.allowEarlyRegistration || false,
         hasRegisteredForCurrentYear: false
       });
       

@@ -96,6 +96,15 @@ export class CampingOptionField {
   maxValue!: number | null;
   
   /**
+   * Display order of the field
+   */
+  @ApiProperty({
+    description: 'Display order of the field (lower numbers appear first)',
+    example: 1
+  })
+  order!: number;
+  
+  /**
    * ID of the camping option this field belongs to
    */
   @ApiProperty({

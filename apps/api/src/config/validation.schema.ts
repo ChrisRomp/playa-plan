@@ -83,6 +83,10 @@ const validationSchema = Joi.object({
   PAYPAL_CLIENT_SECRET: Joi.string(),
   PAYPAL_MODE: Joi.string().valid('sandbox', 'live').default('sandbox'),
   
+  // Throttling configuration
+  THROTTLE_TTL: Joi.number().default(60),
+  THROTTLE_LIMIT: Joi.number().default(300),
+  
   // Admin defaults
   DEFAULT_ADMIN_EMAIL: Joi.string().email().default('webadmin@example.playaplan.app'),
   DEFAULT_ADMIN_PASSWORD: Joi.string(),

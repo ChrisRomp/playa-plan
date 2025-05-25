@@ -2,20 +2,35 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../store/authUtils';
 import { useProfile } from '../hooks/useProfile';
+import { useUserRegistrations } from '../hooks/useUserRegistrations';
+import { useCampRegistration } from '../hooks/useCampRegistration';
+import { useConfig } from '../store/ConfigContextDefinition';
+import { getFriendlyDayName, formatTime } from '../utils/shiftUtils';
+import { isRegistrationAccessible, getRegistrationStatusMessage } from '../utils/registrationUtils';
 import { PATHS } from '../routes';
 
 /**
  * Dashboard page component
- * Displays user dashboard with activities and options
+ * Displays user dashboard with current registrations and work shifts
  */
 const DashboardPage: React.FC = () => {
   const { user } = useAuth();
-  const { profile, isProfileComplete } = useProfile(); // Destructure profile
+  const { profile, isProfileComplete } = useProfile();
+  const { config } = useConfig();
+  const { registrations, loading: registrationsLoading, error: registrationsError } = useUserRegistrations();
+  const { campRegistration, loading: campLoading, error: campError } = useCampRegistration();
+  
+  // Get current year registration
+  const currentYear = config?.currentYear || new Date().getFullYear();
+  const currentRegistration = registrations?.find(reg => reg.year === currentYear);
+  
+  // Check registration access status
+  const hasCurrentRegistration = !!currentRegistration;
+  const canAccessRegistration = isRegistrationAccessible(config, user);
+  const registrationStatusMessage = getRegistrationStatusMessage(config, user, hasCurrentRegistration);
   
   return (
     <div className="max-w-4xl mx-auto">
-      <h1 className="text-2xl font-bold mb-6">Dashboard</h1>
-      
       {!isProfileComplete && (
         <div className="bg-amber-100 border-l-4 border-amber-500 p-4 mb-6">
           <div className="flex">
@@ -26,7 +41,11 @@ const DashboardPage: React.FC = () => {
             </div>
             <div className="ml-3">
               <p className="text-sm text-amber-700">
-                Please complete your profile to access all features.
+                Please{' '}
+                <Link to={PATHS.PROFILE} className="underline hover:text-amber-800">
+                  complete your profile
+                </Link>
+                {' '}to access all features.
               </p>
             </div>
           </div>
@@ -43,30 +62,180 @@ const DashboardPage: React.FC = () => {
             !
           </h2>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="bg-gray-50 p-4 rounded-md">
-              <h3 className="font-medium text-gray-900 mb-2">My Shifts</h3>
-              <p className="text-gray-600 mb-3">View and manage your shift assignments</p>
-              <Link to={PATHS.SHIFTS} className="text-blue-600 hover:text-blue-800 font-medium">
-                Go to Shifts →
-              </Link>
-            </div>
+          {/* Current Registration Section */}
+          <div className="mb-8">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Current Registration {currentYear}</h3>
             
-            <div className="bg-gray-50 p-4 rounded-md">
-              <h3 className="font-medium text-gray-900 mb-2">My Profile</h3>
-              <p className="text-gray-600 mb-3">Review and update your profile information</p>
-              <Link to={PATHS.PROFILE} className="text-blue-600 hover:text-blue-800 font-medium">
-                Edit Profile →
-              </Link>
-            </div>
+            {registrationsLoading && (
+              <div className="flex items-center justify-center py-4">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                <span className="ml-2 text-gray-600">Loading registration...</span>
+              </div>
+            )}
             
-            {user?.role === 'admin' && (
-              <div className="bg-gray-50 p-4 rounded-md">
-                <h3 className="font-medium text-gray-900 mb-2">Admin Panel</h3>
-                <p className="text-gray-600 mb-3">Access administrator controls</p>
-                <Link to={PATHS.ADMIN} className="text-blue-600 hover:text-blue-800 font-medium">
-                  Go to Admin →
-                </Link>
+            {registrationsError && (
+              <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+                <p>{registrationsError}</p>
+              </div>
+            )}
+            
+            {!registrationsLoading && !registrationsError && !currentRegistration && (
+              <div className="bg-gray-50 p-6 rounded-lg text-center">
+                <p className="text-gray-600 mb-4">{registrationStatusMessage}</p>
+                {canAccessRegistration && (
+                  <Link 
+                    to={PATHS.REGISTRATION} 
+                    className="inline-block bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
+                  >
+                    Start Registration
+                  </Link>
+                )}
+              </div>
+            )}
+            
+            {!registrationsLoading && !registrationsError && currentRegistration && (
+              <div className="space-y-6">
+                {/* Registration Status */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-medium text-blue-900">Registration Status</h4>
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                      currentRegistration.status === 'CONFIRMED' ? 'bg-green-100 text-green-800' :
+                      currentRegistration.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' :
+                      currentRegistration.status === 'WAITLISTED' ? 'bg-orange-100 text-orange-800' :
+                      'bg-gray-100 text-gray-800'
+                    }`}>
+                      {currentRegistration.status}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Work Shifts Section */}
+                {currentRegistration.jobs.length > 0 && (
+                  <div>
+                    <h4 className="font-medium text-gray-900 mb-3">Work Shifts</h4>
+                    <div className="space-y-4">
+                      {currentRegistration.jobs.map((registrationJob) => (
+                        <div key={registrationJob.id} className="border border-gray-200 rounded-lg p-4">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <h5 className="font-medium text-gray-900">{registrationJob.job?.name}</h5>
+                              <p className="text-sm text-gray-600">{registrationJob.job?.category?.description}</p>
+                              <p className="text-sm text-gray-500">
+                                {registrationJob.job?.location && `Location: ${registrationJob.job.location}`}
+                              </p>
+                            </div>
+                          </div>
+                          
+                          {registrationJob.job?.shift && (
+                            <div className="mt-3 pt-3 border-t border-gray-100">
+                              <h6 className="font-medium text-sm text-gray-700 mb-2">Shift Details</h6>
+                              <div className="text-sm text-gray-600">
+                                <p>
+                                  <strong>Day:</strong> {getFriendlyDayName(registrationJob.job.shift.dayOfWeek)}
+                                </p>
+                                <p>
+                                  <strong>Time:</strong> {formatTime(registrationJob.job.shift.startTime)} - {formatTime(registrationJob.job.shift.endTime)}
+                                </p>
+                                {registrationJob.job.shift.description && (
+                                  <p>
+                                    <strong>Description:</strong> {registrationJob.job.shift.description}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Payments Section */}
+                {currentRegistration.payments.length > 0 && (
+                  <div>
+                    <h4 className="font-medium text-gray-900 mb-3">Payments</h4>
+                    <div className="space-y-2">
+                      {currentRegistration.payments.map((payment) => (
+                        <div key={payment.id} className="flex items-center justify-between border border-gray-200 rounded-lg p-3">
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">
+                              ${payment.amount.toFixed(2)} {payment.currency}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              {new Date(payment.createdAt).toLocaleDateString()}
+                            </p>
+                          </div>
+                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                            payment.status === 'COMPLETED' ? 'bg-green-100 text-green-800' :
+                            payment.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' :
+                            payment.status === 'FAILED' ? 'bg-red-100 text-red-800' :
+                            'bg-gray-100 text-gray-800'
+                          }`}>
+                            {payment.status}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Camping Options Section */}
+          <div className="mb-8">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Camping</h3>
+            
+            {campLoading && (
+              <div className="flex items-center justify-center py-4">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                <span className="ml-2 text-gray-600">Loading camping options...</span>
+              </div>
+            )}
+            
+            {campError && (
+              <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+                <p>{campError}</p>
+              </div>
+            )}
+            
+            {!campLoading && !campError && (!campRegistration?.campingOptions || campRegistration.campingOptions.length === 0) && (
+              <div className="bg-gray-50 p-6 rounded-lg text-center">
+                <p className="text-gray-600">No camping options selected.</p>
+              </div>
+            )}
+            
+            {!campLoading && !campError && campRegistration?.campingOptions && campRegistration.campingOptions.length > 0 && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="space-y-2">
+                  {campRegistration.campingOptions.map((campingOptionReg) => (
+                    <div key={campingOptionReg.id} className="bg-white rounded p-3 border border-blue-100">
+                      <h5 className="font-medium text-gray-900">{campingOptionReg.campingOption?.name}</h5>
+                      {campingOptionReg.campingOption?.description && (
+                        <p className="text-sm text-gray-600 mt-1">{campingOptionReg.campingOption.description}</p>
+                      )}
+                      
+                      {/* Custom field values for this camping option */}
+                      {campRegistration.customFieldValues.some(fv => 
+                        campingOptionReg.campingOption?.fields?.some(f => f.id === fv.fieldId)
+                      ) && (
+                        <div className="mt-2 pt-2 border-t border-gray-100">
+                          <h6 className="text-xs font-medium text-gray-700 mb-1">Additional Information:</h6>
+                          <div className="space-y-1">
+                            {campRegistration.customFieldValues
+                              .filter(fv => campingOptionReg.campingOption?.fields?.some(f => f.id === fv.fieldId))
+                              .map((fieldValue) => (
+                                <div key={fieldValue.id} className="text-xs text-gray-600">
+                                  <span className="font-medium">{fieldValue.field.displayName}:</span> {fieldValue.value}
+                                </div>
+                              ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>

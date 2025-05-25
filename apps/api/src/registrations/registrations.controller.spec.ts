@@ -44,14 +44,17 @@ describe('RegistrationsController', () => {
     it('should create a registration', async () => {
       const createDto: CreateRegistrationDto = {
         userId: 'user-id',
-        jobId: 'job-id',
+        year: 2024,
+        jobIds: ['job-id-1', 'job-id-2'],
       };
       
       const expectedResult = {
         id: 'registration-id',
         userId: 'user-id',
-        jobId: 'job-id',
+        year: 2024,
         status: RegistrationStatus.PENDING,
+        jobs: [],
+        payments: [],
       };
       
       mockRegistrationsService.create.mockResolvedValue(expectedResult);

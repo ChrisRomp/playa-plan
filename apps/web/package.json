@@ -1,8 +1,11 @@
 {
-  "name": "vite-react-typescript-starter",
+  "name": "web",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
   "type": "module",
+  "description": "PlayaPlan web frontend",
+  "author": "Chris Romp",
+  "license": "MIT",
   "scripts": {
     "dev": "vite",
     "build": "vite build",

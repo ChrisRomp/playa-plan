@@ -1,16 +1,23 @@
-import React from 'react';
-import { useAuth } from '../../store/AuthContext';
+import React, { useContext } from 'react';
+import { AuthContext } from '../../store/authUtils';
 import { useConfig } from '../../store/ConfigContext';
 import { Tent, Calendar } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { isRegistrationAccessible, getRegistrationStatusMessage } from '../../utils/registrationUtils';
 
+/**
+ * UserDashboard component displays personalized content for authenticated users
+ * It shows registration status, camp information, and work shift details
+ */
 const UserDashboard: React.FC = () => {
-  const { user } = useAuth();
+  const { user } = useContext(AuthContext);
   const { config } = useConfig();
   
+  // Guard clause against missing context data
   if (!user || !config) return null;
 
-  const isRegistrationOpen = config.registrationOpen || 
-    (config.earlyRegistrationOpen && user.isEarlyRegistrationEnabled);
+  const isRegistrationOpen = isRegistrationAccessible(config, user);
+  const registrationStatusMessage = getRegistrationStatusMessage(config, user, user.hasRegisteredForCurrentYear);
   
   return (
     <div className="max-w-5xl mx-auto">
@@ -23,23 +30,20 @@ const UserDashboard: React.FC = () => {
         />
         
         {/* Registration Status */}
-        <div className="mt-8 border-t pt-6">
-          <h3 className="text-xl font-semibold mb-4">Your {config.currentYear} Registration</h3>
+        <section aria-labelledby="registration-status" className="mt-8 border-t pt-6">
+          <h3 id="registration-status" className="text-xl font-semibold mb-4">Your {config.currentYear} Registration</h3>
           
           {!isRegistrationOpen && !user.hasRegisteredForCurrentYear && (
-            <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6">
+            <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6" role="alert" aria-live="polite">
               <div className="flex">
                 <div className="flex-shrink-0">
-                  <svg className="h-5 w-5 text-yellow-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                  <svg className="h-5 w-5 text-yellow-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                     <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                   </svg>
                 </div>
                 <div className="ml-3">
                   <p className="text-sm text-yellow-700">
                     Registration is not currently open.
-                    {config.earlyRegistrationOpen && !user.isEarlyRegistrationEnabled && (
-                      " Early registration is available for selected members only."
-                    )}
                   </p>
                 </div>
               </div>
@@ -47,15 +51,26 @@ const UserDashboard: React.FC = () => {
           )}
           
           {isRegistrationOpen && !user.hasRegisteredForCurrentYear && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6">
-              <h4 className="text-lg font-medium text-blue-800 mb-2">Ready to join us?</h4>
-              <p className="text-blue-700 mb-4">
-                Registration for {config.name} {config.currentYear} is now open! Secure your spot today.
-              </p>
-              <button className="inline-flex items-center bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors">
-                <Tent className="mr-2" size={18} />
-                Register Now
-              </button>
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-lg p-6 mb-6 shadow-md" role="region" aria-label="Registration Information">
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <h4 className="text-xl font-bold text-blue-800 mb-2">Ready to join us?</h4>
+                  <p className="text-blue-700 mb-4">
+                    {registrationStatusMessage}
+                  </p>
+                  <Link 
+                    to="/registration" 
+                    className="inline-flex items-center bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors shadow-md font-medium" 
+                    aria-label="Begin registration process"
+                  >
+                    <Tent className="mr-2" size={20} aria-hidden="true" />
+                    Start Registration
+                  </Link>
+                </div>
+                <div className="hidden md:block ml-6">
+                  <Tent size={64} className="text-blue-200" aria-hidden="true" />
+                </div>
+              </div>
             </div>
           )}
           
@@ -82,15 +97,15 @@ const UserDashboard: React.FC = () => {
                 </div>
               </div>
               
-              <button className="text-blue-600 hover:text-blue-800 font-medium transition-colors">
+              <Link to="/registration" className="text-blue-600 hover:text-blue-800 font-medium transition-colors">
                 View/Edit Registration Details
-              </button>
+              </Link>
             </div>
           )}
           
           {/* Work Shifts Section */}
-          <div className="mt-8">
-            <h3 className="text-xl font-semibold mb-4">Work Shifts</h3>
+          <section aria-labelledby="work-shifts" className="mt-8">
+            <h3 id="work-shifts" className="text-xl font-semibold mb-4">Work Shifts</h3>
             
             {!user.hasRegisteredForCurrentYear ? (
               <p className="text-gray-600 italic">
@@ -104,17 +119,17 @@ const UserDashboard: React.FC = () => {
                   </div>
                   
                   <div className="p-6 text-center">
-                    <Calendar className="h-12 w-12 mx-auto text-gray-400 mb-2" />
+                    <Calendar className="h-12 w-12 mx-auto text-gray-400 mb-2" aria-hidden="true" />
                     <p className="text-gray-600 mb-4">You haven't signed up for any shifts yet</p>
-                    <button className="inline-flex items-center bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors">
+                    <Link to="/shifts" className="inline-flex items-center bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors">
                       Sign Up for Shifts
-                    </button>
+                    </Link>
                   </div>
                 </div>
               </div>
             )}
-          </div>
-        </div>
+          </section>
+        </section>
       </div>
     </div>
   );

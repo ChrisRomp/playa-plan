@@ -105,6 +105,20 @@ export class CreateCampingOptionFieldDto {
   maxValue?: number;
   
   /**
+   * Display order of the field
+   */
+  @ApiProperty({
+    description: 'Display order of the field (lower numbers appear first)',
+    example: 1,
+    required: false,
+  })
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  @Type(() => Number)
+  order?: number;
+  
+  /**
    * ID of the camping option this field belongs to
    */
   @ApiProperty({

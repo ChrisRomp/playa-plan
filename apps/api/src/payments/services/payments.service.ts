@@ -10,6 +10,45 @@ type PaymentWithRelations = Payment & {
   registration?: Registration | null;
 };
 
+// Interface for Stripe session data
+interface StripeSession {
+  id: string;
+  url?: string | null;
+}
+
+// Interface for Stripe payment intent data
+interface StripePaymentIntent {
+  id: string;
+  last_payment_error?: {
+    message?: string;
+  };
+}
+
+// Interface for PayPal link object
+interface PayPalLink {
+  rel: string;
+  href: string;
+}
+
+// Interface for Prisma where clause
+interface PaymentWhereClause {
+  userId?: string;
+  status?: PaymentStatus;
+}
+
+// Interface for refund result
+export interface RefundResult {
+  paymentId: string;
+  refundAmount: number;
+  providerRefundId: string;
+  success: boolean;
+}
+
+// Interface for provider refund response
+interface ProviderRefund {
+  id: string;
+}
+
 /**
  * Service for managing payments
  */
@@ -66,8 +105,9 @@ export class PaymentsService {
           user: { connect: { id: createPaymentDto.userId } },
         },
       });
-    } catch (error: any) {
-      this.logger.error(`Failed to create payment record: ${error.message}`, error.stack);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Failed to create payment record: ${errorMessage}`, error instanceof Error ? error.stack : undefined);
       throw error;
     }
   }
@@ -81,7 +121,7 @@ export class PaymentsService {
    * @returns Paginated list of payments
    */
   async findAll(skip = 0, take = 10, userId?: string, status?: PaymentStatus): Promise<{ payments: Payment[]; total: number }> {
-    const where: any = {};
+    const where: PaymentWhereClause = {};
     
     if (userId) {
       where.userId = userId;
@@ -158,8 +198,9 @@ export class PaymentsService {
         where: { id },
         data: updatePaymentDto,
       });
-    } catch (error: any) {
-      this.logger.error(`Failed to update payment ${id}: ${error.message}`, error.stack);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Failed to update payment ${id}: ${errorMessage}`, error instanceof Error ? error.stack : undefined);
       throw error;
     }
   }
@@ -177,6 +218,7 @@ export class PaymentsService {
     // Check if registration exists
     const registration = await this.prisma.registration.findUnique({
       where: { id: registrationId },
+      include: { payments: true },
     });
     
     if (!registration) {
@@ -188,28 +230,22 @@ export class PaymentsService {
       throw new BadRequestException('Registration does not belong to the same user as the payment');
     }
     
-    // Check if registration already has a payment
-    if (registration.paymentId) {
-      throw new BadRequestException(`Registration already has a payment (ID: ${registration.paymentId})`);
+    // Check if payment is already linked to this registration
+    if (payment.registrationId === registrationId) {
+      throw new BadRequestException(`Payment is already linked to registration ${registrationId}`);
     }
     
     try {
-      const [updatedPayment] = await this.prisma.$transaction([
-        // Update payment
-        this.prisma.payment.update({
-          where: { id: paymentId },
-          data: { registration: { connect: { id: registrationId } } },
-        }),
-        // Update registration
-        this.prisma.registration.update({
-          where: { id: registrationId },
-          data: { payment: { connect: { id: paymentId } } },
-        }),
-      ]);
+      // Update payment to link it to the registration
+      const updatedPayment = await this.prisma.payment.update({
+        where: { id: paymentId },
+        data: { registrationId },
+      });
       
       return updatedPayment;
-    } catch (error: any) {
-      this.logger.error(`Failed to link payment to registration: ${error.message}`, error.stack);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Failed to link payment to registration: ${errorMessage}`, error instanceof Error ? error.stack : undefined);
       throw error;
     }
   }
@@ -279,8 +315,9 @@ export class PaymentsService {
         paymentId: payment.id,
         url: session.url || undefined,
       };
-    } catch (error: any) {
-      this.logger.error(`Failed to initiate Stripe payment: ${error.message}`, error.stack);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Failed to initiate Stripe payment: ${errorMessage}`, error instanceof Error ? error.stack : undefined);
       throw error;
     }
   }
@@ -296,7 +333,11 @@ export class PaymentsService {
       const order = await this.paypalService.createOrder(data);
       
       // Find approval URL
-      const approvalUrl = order.links.find((link: any) => link.rel === 'approve').href;
+      const approvalUrl = order.links.find((link: PayPalLink) => link.rel === 'approve')?.href;
+      
+      if (!approvalUrl) {
+        throw new BadRequestException('PayPal order missing approval URL');
+      }
       
       // Create payment record
       const payment = await this.create({
@@ -313,8 +354,9 @@ export class PaymentsService {
         orderId: order.id,
         approvalUrl,
       };
-    } catch (error: any) {
-      this.logger.error(`Failed to initiate PayPal payment: ${error.message}`, error.stack);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Failed to initiate PayPal payment: ${errorMessage}`, error instanceof Error ? error.stack : undefined);
       throw error;
     }
   }
@@ -333,13 +375,13 @@ export class PaymentsService {
       // Handle different event types
       switch (event.type) {
         case 'checkout.session.completed':
-          await this.handleStripeCheckoutCompleted(event.data.object);
+          await this.handleStripeCheckoutCompleted(event.data.object as StripeSession);
           break;
         case 'payment_intent.succeeded':
-          await this.handleStripePaymentSucceeded(event.data.object);
+          await this.handleStripePaymentSucceeded(event.data.object as StripePaymentIntent);
           break;
         case 'payment_intent.payment_failed':
-          await this.handleStripePaymentFailed(event.data.object);
+          await this.handleStripePaymentFailed(event.data.object as StripePaymentIntent);
           break;
         default:
           // Ignore unknown events
@@ -347,8 +389,9 @@ export class PaymentsService {
       }
       
       return { received: true, type: event.type };
-    } catch (error: any) {
-      this.logger.error(`Stripe webhook processing error: ${error.message}`, error.stack);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Stripe webhook processing error: ${errorMessage}`, error instanceof Error ? error.stack : undefined);
       throw error;
     }
   }
@@ -357,7 +400,7 @@ export class PaymentsService {
    * Handle Stripe checkout.session.completed event
    * @param session - Checkout session data
    */
-  private async handleStripeCheckoutCompleted(session: any): Promise<void> {
+  private async handleStripeCheckoutCompleted(session: StripeSession): Promise<void> {
     // Find payment with this session ID
     const payment = await this.prisma.payment.findFirst({
       where: { providerRefId: session.id },
@@ -387,7 +430,7 @@ export class PaymentsService {
    * Handle Stripe payment_intent.succeeded event
    * @param paymentIntent - Payment intent data
    */
-  private async handleStripePaymentSucceeded(paymentIntent: any): Promise<void> {
+  private async handleStripePaymentSucceeded(paymentIntent: StripePaymentIntent): Promise<void> {
     // Find payment with this payment intent ID
     const payment = await this.prisma.payment.findFirst({
       where: { providerRefId: paymentIntent.id },
@@ -417,7 +460,7 @@ export class PaymentsService {
    * Handle Stripe payment_intent.payment_failed event
    * @param paymentIntent - Payment intent data
    */
-  private async handleStripePaymentFailed(paymentIntent: any): Promise<void> {
+  private async handleStripePaymentFailed(paymentIntent: StripePaymentIntent): Promise<void> {
     // Find payment with this payment intent ID
     const payment = await this.prisma.payment.findFirst({
       where: { providerRefId: paymentIntent.id },
@@ -440,7 +483,8 @@ export class PaymentsService {
    * Process a PayPal webhook event
    * Not yet implemented - would be similar to Stripe webhook handling
    */
-  async handlePaypalWebhook(payload: any): Promise<{ received: boolean; type: string }> {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async handlePaypalWebhook(_payload: Record<string, unknown>): Promise<{ received: boolean; type: string }> {
     // Implementation would be similar to Stripe webhook handling
     // PayPal webhooks have their own format and verification methods
     this.logger.log('PayPal webhook received, but handling not yet implemented');
@@ -453,7 +497,7 @@ export class PaymentsService {
    * @param data - Refund data
    * @returns Refund processing result
    */
-  async processRefund(data: CreateRefundDto): Promise<any> {
+  async processRefund(data: CreateRefundDto): Promise<RefundResult> {
     // Check if payment exists
     const payment = await this.findOne(data.paymentId);
     
@@ -475,7 +519,7 @@ export class PaymentsService {
       }
       
       // Process refund with payment provider
-      let providerRefund: any;
+      let providerRefund: ProviderRefund;
       
       if (payment.provider === PaymentProvider.STRIPE) {
         if (!payment.providerRefId) {
@@ -527,8 +571,9 @@ export class PaymentsService {
         providerRefundId: providerRefund.id,
         success: true,
       };
-    } catch (error: any) {
-      this.logger.error(`Failed to process refund: ${error.message}`, error.stack);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Failed to process refund: ${errorMessage}`, error instanceof Error ? error.stack : undefined);
       throw error;
     }
   }

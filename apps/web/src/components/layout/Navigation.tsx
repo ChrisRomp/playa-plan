@@ -1,8 +1,10 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../store/authUtils';
-import { LogOut, User, Tent, Calendar, FileText, Settings } from 'lucide-react';
+import { useConfig } from '../../store/ConfigContextDefinition';
+import { LogOut, User, Tent, FileText, Settings } from 'lucide-react';
 import { PATHS } from '../../routes';
+import { isRegistrationAccessible } from '../../utils/registrationUtils';
 
 interface NavigationProps {
   isScrolled: boolean;
@@ -16,6 +18,8 @@ const Navigation: React.FC<NavigationProps> = ({
   closeMenu
 }) => {
   const { user, logout, isAuthenticated } = useAuth();
+  const { config } = useConfig();
+  const canAccessRegistration = isRegistrationAccessible(config, user);
   
   const textColorClass = isScrolled || isMobile ? 'text-amber-900' : 'text-white';
   const hoverClass = isScrolled || isMobile ? 'hover:text-amber-600' : 'hover:text-amber-200';
@@ -44,23 +48,18 @@ const Navigation: React.FC<NavigationProps> = ({
             <span>Profile</span>
           </Link>
           
-          <Link
-            to={PATHS.DASHBOARD}
-            className={linkClass}
-            onClick={() => closeMenu?.()}
-          >
-            <Tent size={18} />
-            <span>Registration</span>
-          </Link>
+          {canAccessRegistration && (
+            <Link
+              to={PATHS.REGISTRATION}
+              className={linkClass}
+              onClick={() => closeMenu?.()}
+            >
+              <Tent size={18} />
+              <span>Registration</span>
+            </Link>
+          )}
           
-          <Link
-            to={PATHS.SHIFTS}
-            className={linkClass}
-            onClick={() => closeMenu?.()}
-          >
-            <Calendar size={18} />
-            <span>Shifts</span>
-          </Link>
+
           
           {user && (user.role === 'staff' || user.role === 'admin') && (
             <Link

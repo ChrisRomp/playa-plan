@@ -2,7 +2,7 @@
   "name": "api",
   "version": "0.1.0",
   "description": "PlayaPlan API service",
-  "author": "",
+  "author": "Chris Romp",
   "private": true,
   "license": "MIT",
   "scripts": {

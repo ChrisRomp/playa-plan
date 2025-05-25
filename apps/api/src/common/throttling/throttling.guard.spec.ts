@@ -1,10 +1,9 @@
 import { ExecutionContext } from '@nestjs/common';
-import { ThrottlerModule, ThrottlerException, ThrottlerModuleOptions, ThrottlerStorage } from '@nestjs/throttler';
+import { ThrottlerModule, ThrottlerModuleOptions } from '@nestjs/throttler';
 import { Test, TestingModule } from '@nestjs/testing';
 import { ThrottlingGuard } from './throttling.guard';
 import { ConfigModule } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
-import { THROTTLER_OPTIONS } from '@nestjs/throttler/dist/throttler.constants';
 
 // Test-only subclass that exposes protected methods for testing
 class TestableThrottlingGuard extends ThrottlingGuard {
@@ -23,6 +22,7 @@ class TestableThrottlingGuard extends ThrottlingGuard {
 
 describe('ThrottlingGuard', () => {
   let guard: TestableThrottlingGuard;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let mockStorageService: any;
   let mockOptions: ThrottlerModuleOptions;
   let mockReflector: Reflector;
@@ -56,12 +56,12 @@ describe('ThrottlingGuard', () => {
         {
           name: 'default',
           ttl: 60000,
-          limit: 10,
+          limit: 300,
         },
         {
           name: 'auth',
           ttl: 60000,
-          limit: 5,
+          limit: 30,
         },
       ],
     };

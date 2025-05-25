@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { RegistrationsService } from './registrations.service';
 import { PrismaService } from '../common/prisma/prisma.service';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { NotFoundException, ConflictException } from '@nestjs/common';
 import { RegistrationStatus } from '@prisma/client';
 import { CreateRegistrationDto } from './dto';
 
@@ -16,6 +16,12 @@ describe('RegistrationsService', () => {
       findUnique: jest.fn(),
       findFirst: jest.fn(),
       update: jest.fn(),
+      delete: jest.fn(),
+    },
+    registrationJob: {
+      create: jest.fn(),
+      findMany: jest.fn(),
+      findFirst: jest.fn(),
       delete: jest.fn(),
     },
     job: {
@@ -54,16 +60,22 @@ describe('RegistrationsService', () => {
   describe('create', () => {
     const createDto: CreateRegistrationDto = {
       userId: 'user-id',
-      jobId: 'job-id',
+      year: 2024,
+      jobIds: ['job-id-1', 'job-id-2'],
     };
 
-    const mockJob = {
-      id: 'job-id',
-      shift: {
+    const mockJobs = [
+      {
+        id: 'job-id-1',
         maxRegistrations: 10,
+        registrations: [],
       },
-      registrations: [],
-    };
+      {
+        id: 'job-id-2',
+        maxRegistrations: 5,
+        registrations: [],
+      },
+    ];
 
     const mockUser = {
       id: 'user-id',
@@ -73,73 +85,78 @@ describe('RegistrationsService', () => {
     const mockRegistration = {
       id: 'registration-id',
       userId: 'user-id',
-      jobId: 'job-id',
+      year: 2024,
       status: RegistrationStatus.PENDING,
+      jobs: [],
+      payments: [],
     };
 
     it('should create a registration successfully', async () => {
-      mockPrismaService.job.findUnique.mockResolvedValue(mockJob);
       mockPrismaService.user.findUnique.mockResolvedValue(mockUser);
-      mockPrismaService.registration.findFirst.mockResolvedValue(null);
+      mockPrismaService.registration.findUnique.mockResolvedValue(null);
+      mockPrismaService.job.findUnique
+        .mockResolvedValueOnce(mockJobs[0])
+        .mockResolvedValueOnce(mockJobs[1]);
       mockPrismaService.registration.create.mockResolvedValue(mockRegistration);
 
       const result = await service.create(createDto);
       
-      expect(mockPrismaService.job.findUnique).toHaveBeenCalledWith({
-        where: { id: createDto.jobId },
-        include: { shift: true, registrations: true },
-      });
       expect(mockPrismaService.user.findUnique).toHaveBeenCalledWith({
         where: { id: createDto.userId },
       });
-      expect(mockPrismaService.registration.findFirst).toHaveBeenCalled();
+      expect(mockPrismaService.registration.findUnique).toHaveBeenCalledWith({
+        where: {
+          userId_year: {
+            userId: createDto.userId,
+            year: createDto.year,
+          },
+        },
+      });
+      expect(mockPrismaService.job.findUnique).toHaveBeenCalledTimes(2);
       expect(mockPrismaService.registration.create).toHaveBeenCalled();
       expect(result).toEqual(mockRegistration);
     });
 
     it('should throw NotFoundException if job does not exist', async () => {
+      mockPrismaService.user.findUnique.mockResolvedValue(mockUser);
+      mockPrismaService.registration.findUnique.mockResolvedValue(null);
       mockPrismaService.job.findUnique.mockResolvedValue(null);
 
       await expect(service.create(createDto)).rejects.toThrow(NotFoundException);
     });
 
     it('should throw NotFoundException if user does not exist', async () => {
-      mockPrismaService.job.findUnique.mockResolvedValue(mockJob);
       mockPrismaService.user.findUnique.mockResolvedValue(null);
 
       await expect(service.create(createDto)).rejects.toThrow(NotFoundException);
     });
 
-    it('should throw BadRequestException if user already registered for job', async () => {
-      mockPrismaService.job.findUnique.mockResolvedValue(mockJob);
+    it('should throw ConflictException if user already has registration for year', async () => {
       mockPrismaService.user.findUnique.mockResolvedValue(mockUser);
-      mockPrismaService.registration.findFirst.mockResolvedValue({
+      mockPrismaService.registration.findUnique.mockResolvedValue({
         id: 'existing-registration',
         userId: 'user-id',
-        jobId: 'job-id',
+        year: 2024,
       });
 
-      await expect(service.create(createDto)).rejects.toThrow(BadRequestException);
+      await expect(service.create(createDto)).rejects.toThrow(ConflictException);
     });
 
-    it('should set status to WAITLISTED if job is at capacity', async () => {
+    it('should set status to WAITLISTED if any job is at capacity', async () => {
       const fullJob = {
-        ...mockJob,
-        shift: {
-          maxRegistrations: 10,
-        },
-        registrations: Array(10).fill({ status: RegistrationStatus.CONFIRMED }),
+        id: 'job-id-1',
+        maxRegistrations: 1,
+        registrations: [{ registration: { status: RegistrationStatus.CONFIRMED } }],
       };
       
-      mockPrismaService.job.findUnique.mockResolvedValue(fullJob);
       mockPrismaService.user.findUnique.mockResolvedValue(mockUser);
-      mockPrismaService.registration.findFirst.mockResolvedValue(null);
-      mockPrismaService.registration.create.mockImplementation((args) => {
-        return Promise.resolve({
-          ...args.data,
-          id: 'registration-id',
-          status: RegistrationStatus.WAITLISTED,
-        });
+      mockPrismaService.registration.findUnique.mockResolvedValue(null);
+      mockPrismaService.job.findUnique
+        .mockResolvedValueOnce(fullJob)
+        .mockResolvedValueOnce(mockJobs[1]);
+      mockPrismaService.registration.create.mockResolvedValue({
+        ...mockRegistration,
+        status: RegistrationStatus.WAITLISTED,
       });
 
       const result = await service.create(createDto);
@@ -151,8 +168,8 @@ describe('RegistrationsService', () => {
   describe('findAll', () => {
     it('should return an array of registrations', async () => {
       const expectedRegistrations = [
-        { id: '1', userId: 'user1', jobId: 'job1' },
-        { id: '2', userId: 'user2', jobId: 'job2' },
+        { id: '1', userId: 'user1', year: 2024, jobs: [], payments: [] },
+        { id: '2', userId: 'user2', year: 2024, jobs: [], payments: [] },
       ];
       mockPrismaService.registration.findMany.mockResolvedValue(expectedRegistrations);
 
@@ -168,8 +185,8 @@ describe('RegistrationsService', () => {
     
     it('should return registrations for a specific user', async () => {
       const expectedRegistrations = [
-        { id: '1', userId, jobId: 'job1' },
-        { id: '2', userId, jobId: 'job2' },
+        { id: '1', userId, year: 2024, jobs: [], payments: [] },
+        { id: '2', userId, year: 2023, jobs: [], payments: [] },
       ];
       
       mockPrismaService.user.findUnique.mockResolvedValue({ id: userId });
@@ -182,7 +199,22 @@ describe('RegistrationsService', () => {
       });
       expect(mockPrismaService.registration.findMany).toHaveBeenCalledWith({
         where: { userId },
-        include: expect.any(Object),
+        include: {
+          jobs: {
+            include: {
+              job: {
+                include: {
+                  category: true,
+                  shift: true,
+                },
+              },
+            },
+          },
+          payments: true,
+        },
+        orderBy: {
+          year: 'desc',
+        },
       });
       expect(result).toEqual(expectedRegistrations);
     });
@@ -198,24 +230,31 @@ describe('RegistrationsService', () => {
     const jobId = 'job-id';
     
     it('should return registrations for a specific job', async () => {
-      const expectedRegistrations = [
-        { id: '1', userId: 'user1', jobId },
-        { id: '2', userId: 'user2', jobId },
+      const expectedRegistrationJobs = [
+        { registration: { id: '1', userId: 'user1', year: 2024, user: {}, payments: [] } },
+        { registration: { id: '2', userId: 'user2', year: 2024, user: {}, payments: [] } },
       ];
       
       mockPrismaService.job.findUnique.mockResolvedValue({ id: jobId });
-      mockPrismaService.registration.findMany.mockResolvedValue(expectedRegistrations);
+      mockPrismaService.registrationJob.findMany.mockResolvedValue(expectedRegistrationJobs);
 
       const result = await service.findByJob(jobId);
       
       expect(mockPrismaService.job.findUnique).toHaveBeenCalledWith({
         where: { id: jobId },
       });
-      expect(mockPrismaService.registration.findMany).toHaveBeenCalledWith({
+      expect(mockPrismaService.registrationJob.findMany).toHaveBeenCalledWith({
         where: { jobId },
-        include: expect.any(Object),
+        include: {
+          registration: {
+            include: {
+              user: true,
+              payments: true,
+            },
+          },
+        },
       });
-      expect(result).toEqual(expectedRegistrations);
+      expect(result).toEqual(expectedRegistrationJobs.map(rj => rj.registration));
     });
 
     it('should throw NotFoundException if job does not exist', async () => {
@@ -227,10 +266,17 @@ describe('RegistrationsService', () => {
 
   describe('findOne', () => {
     const registrationId = 'registration-id';
-    const mockRegistration = { id: registrationId, userId: 'user-id', jobId: 'job-id' };
     
     it('should return a registration by id', async () => {
-      mockPrismaService.registration.findUnique.mockResolvedValue(mockRegistration);
+      const expectedRegistration = {
+        id: registrationId,
+        userId: 'user-id',
+        year: 2024,
+        jobs: [],
+        payments: [],
+      };
+      
+      mockPrismaService.registration.findUnique.mockResolvedValue(expectedRegistration);
 
       const result = await service.findOne(registrationId);
       
@@ -238,7 +284,7 @@ describe('RegistrationsService', () => {
         where: { id: registrationId },
         include: expect.any(Object),
       });
-      expect(result).toEqual(mockRegistration);
+      expect(result).toEqual(expectedRegistration);
     });
 
     it('should throw NotFoundException if registration does not exist', async () => {
@@ -251,24 +297,25 @@ describe('RegistrationsService', () => {
   describe('update', () => {
     const registrationId = 'registration-id';
     const updateDto = { status: RegistrationStatus.CONFIRMED };
-    const mockRegistration = { 
-      id: registrationId, 
-      userId: 'user-id', 
-      jobId: 'job-id',
-      status: RegistrationStatus.PENDING,
-    };
     
     it('should update a registration successfully', async () => {
-      const updatedRegistration = { ...mockRegistration, ...updateDto };
+      const existingRegistration = {
+        id: registrationId,
+        userId: 'user-id',
+        year: 2024,
+      };
+      const updatedRegistration = {
+        ...existingRegistration,
+        status: RegistrationStatus.CONFIRMED,
+      };
       
-      mockPrismaService.registration.findUnique.mockResolvedValue(mockRegistration);
+      mockPrismaService.registration.findUnique.mockResolvedValue(existingRegistration);
       mockPrismaService.registration.update.mockResolvedValue(updatedRegistration);
 
       const result = await service.update(registrationId, updateDto);
       
       expect(mockPrismaService.registration.findUnique).toHaveBeenCalledWith({
         where: { id: registrationId },
-        include: expect.any(Object),
       });
       expect(mockPrismaService.registration.update).toHaveBeenCalledWith({
         where: { id: registrationId },
@@ -287,11 +334,18 @@ describe('RegistrationsService', () => {
 
   describe('remove', () => {
     const registrationId = 'registration-id';
-    const mockRegistration = { id: registrationId, userId: 'user-id', jobId: 'job-id' };
     
     it('should delete a registration successfully', async () => {
-      mockPrismaService.registration.findUnique.mockResolvedValue(mockRegistration);
-      mockPrismaService.registration.delete.mockResolvedValue(mockRegistration);
+      const existingRegistration = {
+        id: registrationId,
+        userId: 'user-id',
+        year: 2024,
+        jobs: [],
+        payments: [],
+      };
+      
+      mockPrismaService.registration.findUnique.mockResolvedValue(existingRegistration);
+      mockPrismaService.registration.delete.mockResolvedValue(existingRegistration);
 
       const result = await service.remove(registrationId);
       
@@ -301,18 +355,8 @@ describe('RegistrationsService', () => {
       });
       expect(mockPrismaService.registration.delete).toHaveBeenCalledWith({
         where: { id: registrationId },
-        include: {
-          user: true,
-          job: {
-            include: {
-              category: true,
-              shift: true,
-            }
-          },
-          payment: true,
-        },
       });
-      expect(result).toEqual(mockRegistration);
+      expect(result).toEqual(existingRegistration);
     });
 
     it('should throw NotFoundException if registration does not exist', async () => {

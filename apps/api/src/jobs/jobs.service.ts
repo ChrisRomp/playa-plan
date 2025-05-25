@@ -33,7 +33,6 @@ export class JobsService {
     const job = await this.prisma.job.create({
       data: {
         name: createJobDto.name,
-        description: createJobDto.description,
         location: createJobDto.location,
         maxRegistrations: createJobDto.maxRegistrations || 10, // Default to 10 if not provided
         category: {
@@ -88,7 +87,6 @@ export class JobsService {
       const updateData: Prisma.JobUpdateInput = {};
       
       if (updateJobDto.name) updateData.name = updateJobDto.name;
-      if (updateJobDto.description) updateData.description = updateJobDto.description;
       if (updateJobDto.location) updateData.location = updateJobDto.location;
       if (updateJobDto.maxRegistrations) updateData.maxRegistrations = updateJobDto.maxRegistrations;
       

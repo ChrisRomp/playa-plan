@@ -4,10 +4,10 @@ import { useJobCategories } from '../hooks/useJobCategories';
 import { useShifts } from '../hooks/useShifts';
 import { Job } from '../lib/api';
 import { isAxiosError } from 'axios';
+import { getFriendlyDayName, formatTime } from '../utils/shiftUtils';
 
 interface JobFormState {
   name: string;
-  description: string;
   location: string;
   categoryId: string;
   shiftId: string;
@@ -38,7 +38,6 @@ export default function AdminJobsPage() {
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState<JobFormState>({
     name: '',
-    description: '',
     location: '',
     categoryId: '',
     shiftId: '',
@@ -52,57 +51,7 @@ export default function AdminJobsPage() {
   const [sortColumn, setSortColumn] = useState<'name' | 'category' | 'shift' | 'maxRegistrations'>('name');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   
-  const formatTime = useCallback((timeString: string): string => {
-    try {
-      // Check if timeString is already a time string in HH:MM format
-      if (/^\d{2}:\d{2}$/.test(timeString)) {
-        return timeString;
-      }
-      
-      const date = new Date(timeString);
-      // Check if date is valid
-      if (isNaN(date.getTime())) {
-        return timeString;
-      }
-      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    } catch {
-      // Return the original string if parsing fails
-      return timeString;
-    }
-  }, []);
-  
-  const getFriendlyDayName = useCallback((day: string): string => {
-    if (!day) return '';
-    
-    const dayMap: Record<string, string> = {
-      // Standard days
-      MONDAY: 'Monday',
-      TUESDAY: 'Tuesday',
-      WEDNESDAY: 'Wednesday',
-      THURSDAY: 'Thursday',
-      FRIDAY: 'Friday',
-      SATURDAY: 'Saturday',
-      SUNDAY: 'Sunday',
-      // Special event days from schema
-      PRE_OPENING: 'Pre-Opening',
-      OPENING_SUNDAY: 'Opening Sunday',
-      CLOSING_SUNDAY: 'Closing Sunday',
-      POST_EVENT: 'Post-Event',
-      // Handle lowercase versions too
-      monday: 'Monday',
-      tuesday: 'Tuesday',
-      wednesday: 'Wednesday',
-      thursday: 'Thursday',
-      friday: 'Friday',
-      saturday: 'Saturday',
-      sunday: 'Sunday',
-      pre_opening: 'Pre-Opening',
-      opening_sunday: 'Opening Sunday',
-      closing_sunday: 'Closing Sunday',
-      post_event: 'Post-Event'
-    };
-    return dayMap[day] || day; // Return mapped value or original if not found
-  }, []);
+
   
   const getCategoryNameById = useCallback((id: string): string => {
     const category = categories.find(cat => cat.id === id);
@@ -143,7 +92,7 @@ export default function AdminJobsPage() {
     }
     
     return `${dayName}, ${startTime} - ${endTime}`;
-  }, [shifts, getFriendlyDayName, formatTime, getShiftNameById]);
+  }, [shifts, getShiftNameById]);
 
   const handleSearchChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(event.target.value);
@@ -237,7 +186,6 @@ export default function AdminJobsPage() {
     setEditId(null);
     setForm({
       name: '',
-      description: '',
       location: '',
       categoryId: categories.length > 0 ? categories[0].id : '',
       shiftId: shifts.length > 0 ? shifts[0].id : '',
@@ -253,7 +201,6 @@ export default function AdminJobsPage() {
     setEditId(job.id);
     setForm({
       name: job.name,
-      description: job.description,
       location: job.location,
       categoryId: job.categoryId,
       shiftId: job.shiftId,
@@ -285,7 +232,7 @@ export default function AdminJobsPage() {
 
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.name.trim() || !form.description.trim() || !form.location.trim() || !form.categoryId || !form.shiftId) {
+    if (!form.name.trim() || !form.location.trim() || !form.categoryId || !form.shiftId) {
       setFormError('All fields are required.');
       return;
     }
@@ -500,19 +447,6 @@ export default function AdminJobsPage() {
                   required
                   maxLength={100}
                   autoFocus
-                />
-              </div>
-              <div className="mb-4">
-                <label htmlFor="description" className="block font-medium mb-1">Description</label>
-                <textarea
-                  id="description"
-                  name="description"
-                  className="w-full border rounded px-3 py-2"
-                  value={form.description}
-                  onChange={handleFormChange}
-                  required
-                  maxLength={500}
-                  rows={3}
                 />
               </div>
               <div className="mb-4">

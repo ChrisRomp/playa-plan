@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsOptional, IsString, IsUUID } from 'class-validator';
+import { IsNotEmpty, IsString, IsUUID, IsInt, IsArray, Min } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 /**
@@ -15,21 +15,34 @@ export class CreateRegistrationDto {
   userId!: string;
 
   @ApiProperty({
-    description: 'ID of the job being registered for',
+    description: 'Year of the registration',
+    example: 2024,
+  })
+  @IsNotEmpty()
+  @IsInt()
+  @Min(2020)
+  year!: number;
+
+  @ApiProperty({
+    description: 'IDs of the jobs being registered for',
+    example: ['7c8d0d55-e0a3-4cf0-a620-2412acd4361d', '8c8d0d55-e0a3-4cf0-a620-2412acd4361e'],
+  })
+  @IsNotEmpty()
+  @IsArray()
+  @IsUUID(undefined, { each: true })
+  jobIds!: string[];
+}
+
+/**
+ * Data Transfer Object for adding a job to an existing registration
+ */
+export class AddJobToRegistrationDto {
+  @ApiProperty({
+    description: 'ID of the job to add to the registration',
     example: '7c8d0d55-e0a3-4cf0-a620-2412acd4361d',
   })
   @IsNotEmpty()
   @IsString()
   @IsUUID()
   jobId!: string;
-
-  @ApiProperty({
-    description: 'ID of the payment associated with this registration (optional)',
-    example: '9c8d0d55-e0a3-4cf0-a620-2412acd4361e',
-    required: false,
-  })
-  @IsOptional()
-  @IsString()
-  @IsUUID()
-  paymentId?: string;
 }

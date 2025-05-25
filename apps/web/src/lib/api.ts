@@ -217,6 +217,12 @@ export const UserSchema = z.object({
   stateProvince: z.string().max(50).nullable().optional(),
   country: z.string().max(50).nullable().optional(),
   emergencyContact: z.string().max(1024).nullable().optional(),
+  // User permission fields
+  allowRegistration: z.boolean().optional(),
+  allowEarlyRegistration: z.boolean().optional(),
+  allowDeferredDuesPayment: z.boolean().optional(),
+  allowNoJob: z.boolean().optional(),
+  internalNotes: z.string().nullable().optional(),
 });
 
 export const AuthResponseSchema = z.object({
@@ -264,6 +270,7 @@ export const CampingOptionFieldSchema = z.object({
   maxLength: z.number().nullable().optional(),
   minValue: z.number().nullable().optional(),
   maxValue: z.number().nullable().optional(),
+  order: z.number().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
   campingOptionId: z.string(),
@@ -325,7 +332,6 @@ export interface IShift {
 export interface IJob {
   id: string;
   name: string;
-  description: string;
   location: string;
   categoryId: string;
   category?: IJobCategory;
@@ -369,7 +375,6 @@ export const JobSchema: z.ZodType<IJob> = z.lazy(() =>
   z.object({
     id: z.string(),
     name: z.string(),
-    description: z.string(),
     location: z.string(),
     categoryId: z.string(),
     category: JobCategorySchema.optional(),
@@ -383,6 +388,46 @@ export const JobSchema: z.ZodType<IJob> = z.lazy(() =>
 );
 
 export type Job = z.infer<typeof JobSchema>;
+
+// Registration interface
+export interface Registration {
+  id: string;
+  userId: string;
+  year: number;
+  status: 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'WAITLISTED';
+  createdAt: string;
+  updatedAt: string;
+  user?: User;
+  jobs: Array<{
+    id: string;
+    registrationId: string;
+    jobId: string;
+    createdAt: string;
+    job: Job;
+  }>;
+  payments: Array<{
+    id: string;
+    amount: number;
+    currency: string;
+    status: 'PENDING' | 'COMPLETED' | 'FAILED' | 'REFUNDED';
+    provider: 'STRIPE' | 'PAYPAL';
+    providerRefId?: string;
+    createdAt: string;
+    updatedAt: string;
+    userId: string;
+    registrationId?: string;
+  }>;
+}
+
+// Camping Option Registration interface
+export interface CampingOptionRegistration {
+  id: string;
+  userId: string;
+  campingOptionId: string;
+  createdAt: string;
+  updatedAt: string;
+  campingOption?: CampingOption;
+}
 
 // API Functions
 export const auth = {
@@ -788,6 +833,24 @@ export const campingOptions = {
       throw error;
     }
   },
+
+  /**
+   * Reorder fields for a camping option
+   * @param campingOptionId The ID of the camping option
+   * @param fieldOrders Array of field IDs with their new order values
+   * @returns A promise that resolves to the reordered fields
+   */
+  reorderFields: async (campingOptionId: string, fieldOrders: Array<{ id: string; order: number }>): Promise<CampingOptionField[]> => {
+    try {
+      const response = await api.patch<CampingOptionField[]>(`/camping-option-fields/reorder/${campingOptionId}`, {
+        fieldOrders
+      });
+      return response.data.map(field => CampingOptionFieldSchema.parse(field));
+    } catch (error) {
+      console.error('Error reordering fields for camping option with ID:', campingOptionId, error);
+      throw error;
+    }
+  }
 };
 
 export const jobCategories = {
@@ -925,5 +988,61 @@ export const shifts = {
   getRegistrations: async (shiftId: string): Promise<unknown[]> => {
     const response = await api.get(`/shifts/${shiftId}/registrations`);
     return response.data;
+  },
+};
+
+export const registrations = {
+  /**
+   * Get all registrations for the current user
+   * @returns A promise that resolves to an array of user registrations
+   */
+  getMyRegistrations: async (): Promise<Registration[]> => {
+    try {
+      const response = await api.get<Registration[]>('/registrations/me');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching user registrations:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Get the current user's registration for a specific year
+   * @param year The year to get registration for
+   * @returns A promise that resolves to the user's registration for that year
+   */
+  getMyRegistrationForYear: async (year: number): Promise<Registration | null> => {
+    try {
+      const response = await api.get<Registration>(`/registrations/me?year=${year}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching user registration for year:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Get the complete camp registration for the current user
+   * @returns A promise that resolves to the user's complete camp registration
+   */
+  getMyCampRegistration: async (): Promise<{
+    campingOptions: CampingOptionRegistration[];
+    customFieldValues: Array<{
+      id: string;
+      value: string;
+      fieldId: string;
+      registrationId: string;
+      field: CampingOptionField;
+    }>;
+    jobRegistrations: Registration[];
+    hasRegistration: boolean;
+  }> => {
+    try {
+      const response = await api.get('/registrations/camp/me');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching camp registration:', error);
+      throw error;
+    }
   },
 };

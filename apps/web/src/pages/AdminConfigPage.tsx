@@ -27,7 +27,7 @@ const AdminConfigPage: React.FC = () => {
     campIconAltText: '',
     registrationYear: new Date().getFullYear(),
     earlyRegistrationOpen: false,
-    registrationOpen: false,
+    registrationOpen: true,
     registrationTerms: '',
     allowDeferredDuesPayment: false,
     stripeEnabled: false,

@@ -6,6 +6,7 @@ import { RegisterDto } from '../dto/register.dto';
 import { User, UserRole } from '@prisma/client';
 import { v4 as uuidv4 } from 'uuid';
 import { NotificationsService } from '../../notifications/services/notifications.service';
+import { randomInt } from 'crypto';
 
 /**
  * Authentication service responsible for user registration, login, and token management
@@ -57,7 +58,7 @@ export class AuthService {
       // Generate email verification token
       const verificationToken = uuidv4();
 
-      // Create new user
+      // Create new user (always as PARTICIPANT initially - admin promotion happens on first authentication)
       const newUser = await this.prisma.user.create({
         data: {
           email,
@@ -133,14 +134,23 @@ export class AuthService {
         return false;
       }
 
-      // Update user to mark email as verified
+      // Check if this should be the first admin user (before marking as verified)
+      const shouldBeAdmin = await this.shouldMakeFirstUserAdmin();
+
+      // Update user to mark email as verified, potentially promoting to admin
       await this.prisma.user.update({
         where: { id: user.id },
         data: {
           isEmailVerified: true,
           verificationToken: null,
+          // Promote to admin if this is the first user to authenticate
+          ...(shouldBeAdmin && { role: UserRole.ADMIN }),
         },
       });
+
+      if (shouldBeAdmin) {
+        this.logger.log(`First user to authenticate promoted to ADMIN: ${user.id}`);
+      }
 
       return true;
     } catch (error: unknown) {
@@ -184,8 +194,15 @@ export class AuthService {
       // We'll generate and send a code regardless of whether the user exists
       // This will handle both login and registration via the same flow
 
-      // Generate a random 6-digit code
-      const loginCode = Math.floor(100000 + Math.random() * 900000).toString();
+      // Generate a login code - use fixed code in development for easier testing
+      const isDevelopment = this.configService.get<string>('nodeEnv') === 'development';
+      const loginCode = isDevelopment 
+        ? '123456' 
+        : randomInt(100000, 1000000).toString(); // Cryptographically secure random 6-digit code
+      
+      if (isDevelopment) {
+        this.logger.log(`Development mode: Using fixed login code '123456' for ${email}`);
+      }
       
       // Set expiry time (15 minutes from now)
       const loginCodeExpiry = new Date();
@@ -203,19 +220,20 @@ export class AuthService {
       } else {
         // If user doesn't exist, create a new user with the login code
         // This creates a minimal user record that will be completed after verification
+        
         await this.prisma.user.create({
           data: {
             email,
             loginCode,
             loginCodeExpiry,
-            role: UserRole.PARTICIPANT,
+            role: UserRole.PARTICIPANT, // Always PARTICIPANT initially - admin promotion happens on authentication
             firstName: '', // These will be updated after verification
             lastName: '', // These will be updated after verification
             isEmailVerified: false,
           },
         });
         
-        this.logger.log(`Created new user with email: ${email} (pending verification)`);  
+        this.logger.log(`Created new user with email: ${email} (pending verification)`);
       }
 
       // Send login code email
@@ -274,16 +292,24 @@ export class AuthService {
         return null;
       }
 
-      // Step 2: Clear the login code after successful validation
+      // Step 2: Check if this should be the first admin user (before marking as verified)
+      const shouldBeAdmin = await this.shouldMakeFirstUserAdmin();
+
+      // Step 3: Clear the login code and mark as verified, potentially promoting to admin
       const updatedUser = await this.prisma.user.update({
         where: { id: user.id },
         data: {
           loginCode: null,
           loginCodeExpiry: null,
-          // If this is the first time they're verifying their email, mark it as verified
           isEmailVerified: true,
+          // Promote to admin if this is the first user to authenticate
+          ...(shouldBeAdmin && { role: UserRole.ADMIN }),
         },
       });
+
+      if (shouldBeAdmin) {
+        this.logger.log(`First user to authenticate promoted to ADMIN: ${updatedUser.id}`);
+      }
 
       // Return user without password field
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -302,5 +328,27 @@ export class AuthService {
    */
   private getErrorMessage(error: unknown): string {
     return error instanceof Error ? error.message : String(error);
+  }
+
+  /**
+   * Determines if a new user should be made an admin
+   * This happens when there are no authenticated users yet (first user to actually log in)
+   * @returns True if the new user should be an admin, false otherwise
+   */
+  private async shouldMakeFirstUserAdmin(): Promise<boolean> {
+    try {
+      // Check if there are any users who have successfully authenticated
+      // (either verified their email or completed login code verification)
+      const authenticatedUserCount = await this.prisma.user.count({
+        where: {
+          isEmailVerified: true,
+        },
+      });
+      
+      return authenticatedUserCount === 0;
+    } catch (error: unknown) {
+      this.logger.error(`Error checking authenticated user count: ${this.getErrorMessage(error)}`);
+      return false;
+    }
   }
 }
