@@ -214,12 +214,12 @@ async function main() {
           },
           {
             displayName: 'How many skydives have you done in total?',
-            dataType: 'NUMBER',
+            dataType: 'INTEGER',
             required: true
           },
           {
             displayName: 'How many skydives have you done in the last 6 months?',
-            dataType: 'NUMBER',
+            dataType: 'INTEGER',
             required: true
           },
           {
@@ -232,7 +232,7 @@ async function main() {
           {
             displayName: 'Total Years Jumping with Burning Sky',
             description: 'Including this year',
-            dataType: 'NUMBER',
+            dataType: 'INTEGER',
             required: true,
             minValue: 1
           }
