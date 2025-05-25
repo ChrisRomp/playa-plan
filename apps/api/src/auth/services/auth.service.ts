@@ -6,6 +6,7 @@ import { RegisterDto } from '../dto/register.dto';
 import { User, UserRole } from '@prisma/client';
 import { v4 as uuidv4 } from 'uuid';
 import { NotificationsService } from '../../notifications/services/notifications.service';
+import { randomInt } from 'crypto';
 
 /**
  * Authentication service responsible for user registration, login, and token management
@@ -193,8 +194,15 @@ export class AuthService {
       // We'll generate and send a code regardless of whether the user exists
       // This will handle both login and registration via the same flow
 
-      // Generate a random 6-digit code
-      const loginCode = Math.floor(100000 + Math.random() * 900000).toString();
+      // Generate a login code - use fixed code in development for easier testing
+      const isDevelopment = this.configService.get<string>('nodeEnv') === 'development';
+      const loginCode = isDevelopment 
+        ? '123456' 
+        : randomInt(100000, 1000000).toString(); // Cryptographically secure random 6-digit code
+      
+      if (isDevelopment) {
+        this.logger.log(`Development mode: Using fixed login code '123456' for ${email}`);
+      }
       
       // Set expiry time (15 minutes from now)
       const loginCodeExpiry = new Date();

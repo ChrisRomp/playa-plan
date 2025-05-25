@@ -65,8 +65,14 @@ export class ThrottlingModule {
             return {
               throttlers: [
                 {
+                  name: 'default',
                   ttl: ttlMs,
-                  limit
+                  limit: Math.min(limit, 10) // Cap default at 10 requests per minute
+                },
+                {
+                  name: 'auth',
+                  ttl: ttlMs,
+                  limit: Math.min(limit, 5) // Stricter limit for auth endpoints: 5 requests per minute
                 }
               ]
             };
@@ -84,8 +90,14 @@ export class ThrottlingModule {
             const defaultOptions: ThrottlerModuleOptions = {
               throttlers: [
                 {
+                  name: 'default',
                   ttl: 60000,
-                  limit: 100
+                  limit: 10
+                },
+                {
+                  name: 'auth',
+                  ttl: 60000,
+                  limit: 5
                 }
               ]
             };

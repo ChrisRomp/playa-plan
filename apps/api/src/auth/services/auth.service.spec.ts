@@ -514,6 +514,74 @@ describe('AuthService', () => {
       // Assert
       expect(result).toBe(false);
     });
+
+    it('should use fixed code "123456" in development mode', async () => {
+      // Arrange
+      mockPrismaService.user.findUnique.mockResolvedValue(mockUser);
+      mockConfigService.get.mockImplementation((key: string) => {
+        switch (key) {
+          case 'nodeEnv':
+            return 'development';
+          case 'jwt.secret':
+            return 'test-secret';
+          case 'jwt.expirationTime':
+            return '1h';
+          default:
+            return undefined;
+        }
+      });
+      
+      // Act
+      const result = await service.generateLoginCode('test@example.playaplan.app');
+      
+      // Assert
+      expect(result).toBe(true);
+      expect(mockPrismaService.user.update).toHaveBeenCalledWith({
+        where: { id: mockUser.id },
+        data: {
+          loginCode: '123456',
+          loginCodeExpiry: expect.any(Date),
+        },
+      });
+      expect(notificationsService.sendLoginCodeEmail).toHaveBeenCalledWith(
+        'test@example.playaplan.app',
+        '123456'
+      );
+    });
+
+    it('should use random code in production mode', async () => {
+      // Arrange
+      mockPrismaService.user.findUnique.mockResolvedValue(mockUser);
+      mockConfigService.get.mockImplementation((key: string) => {
+        switch (key) {
+          case 'nodeEnv':
+            return 'production';
+          case 'jwt.secret':
+            return 'test-secret';
+          case 'jwt.expirationTime':
+            return '1h';
+          default:
+            return undefined;
+        }
+      });
+      
+      // Act
+      const result = await service.generateLoginCode('test@example.playaplan.app');
+      
+      // Assert
+      expect(result).toBe(true);
+      expect(mockPrismaService.user.update).toHaveBeenCalledWith({
+        where: { id: mockUser.id },
+        data: {
+          loginCode: expect.stringMatching(/^\d{6}$/), // 6-digit number
+          loginCodeExpiry: expect.any(Date),
+        },
+      });
+      expect(notificationsService.sendLoginCodeEmail).toHaveBeenCalledWith(
+        'test@example.playaplan.app',
+        expect.stringMatching(/^\d{6}$/)
+      );
+    });
   });
 
   describe('validateLoginCode', () => {
