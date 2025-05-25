@@ -10,6 +10,7 @@ import { JobCategory, Job, CampingOptionField } from '../../lib/api';
 import { getFriendlyDayName, formatTime } from '../../utils/shiftUtils';
 import { canUserRegister, getRegistrationStatusMessage } from '../../utils/registrationUtils';
 import { PATHS } from '../../routes';
+import PaymentButton from '../../components/payment/PaymentButton';
 
 /**
  * RegistrationPage component for user camp registration
@@ -56,6 +57,7 @@ export default function RegistrationPage() {
   // Multi-step form control
   const [currentStep, setCurrentStep] = useState(1);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [registrationId, setRegistrationId] = useState<string | null>(null);
   
   // Collapsible categories state for shifts step
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
@@ -409,6 +411,7 @@ export default function RegistrationPage() {
         errors.acceptedTerms = 'You must accept the terms to continue';
       }
     }
+    // No validation needed for step 6 (payment) as it's handled by the payment component
     
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
@@ -431,10 +434,25 @@ export default function RegistrationPage() {
         }
       }
       setCurrentStep(currentStep + 1);
+    } else if (currentStep === 5) {
+      // Terms step - move to payment step
+      setCurrentStep(6);
     } else {
+      // Payment step - create registration
       try {
-        await submitRegistration(formData);
-        navigate('/dashboard'); // Redirect to dashboard after successful registration
+        const result = await submitRegistration(formData);
+        if (result?.id) {
+          setRegistrationId(result.id);
+        }
+        
+        const totalCost = calculateTotalCost();
+        const needsPayment = totalCost > 0 && (!config?.allowDeferredDuesPayment || !user?.allowDeferredDuesPayment);
+        
+        if (!needsPayment) {
+          // No payment needed, redirect to dashboard
+          navigate('/dashboard');
+        }
+        // If payment is needed, the PaymentButton component will handle the redirect to Stripe
       } catch (err) {
         console.error('Registration failed:', err);
         setFormErrors({ submit: 'Registration submission failed. Please try again.' });
@@ -1146,6 +1164,81 @@ export default function RegistrationPage() {
     );
   };
 
+  // Render payment step
+  const renderPaymentStep = () => {
+    const totalCost = calculateTotalCost();
+    const needsPayment = totalCost > 0 && (!config?.allowDeferredDuesPayment || !user?.allowDeferredDuesPayment);
+
+    return (
+      <div>
+        <h2 className="text-xl font-semibold mb-4">Payment</h2>
+        
+        <div className="mb-6">
+          <h3 className="text-lg font-medium mb-2">Registration Summary</h3>
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+            <div className="space-y-2">
+              <div className="flex justify-between">
+                <span>Total Registration Cost:</span>
+                <span className="font-medium">${totalCost.toFixed(2)}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {needsPayment ? (
+          <div className="space-y-4">
+            <p className="text-gray-600">
+              Please complete your payment to finalize your registration.
+            </p>
+            
+            <PaymentButton
+              amount={totalCost}
+              registrationId={registrationId || undefined}
+              description="Camp registration payment"
+              onPaymentStart={() => {
+                console.log('Payment started');
+              }}
+              onPaymentError={(error) => {
+                setFormErrors(prev => ({ ...prev, payment: error }));
+              }}
+              className="w-full"
+            >
+              Complete Registration - ${totalCost.toFixed(2)}
+            </PaymentButton>
+
+            {formErrors.payment && (
+              <div className="text-red-600 text-sm mt-2">
+                {formErrors.payment}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <p className="text-blue-800">
+                {totalCost === 0 
+                  ? 'No payment required for your selected options.'
+                  : 'Payment has been deferred. You can complete payment later.'
+                }
+              </p>
+            </div>
+            
+            <button
+              type="button"
+              onClick={() => {
+                // Complete registration without payment
+                navigate('/dashboard');
+              }}
+              className="w-full bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium"
+            >
+              Complete Registration
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   // Render the current step
   const renderCurrentStep = () => {
     switch (currentStep) {
@@ -1159,6 +1252,8 @@ export default function RegistrationPage() {
         return renderJobsStep();
       case 5:
         return renderTermsStep();
+      case 6:
+        return renderPaymentStep();
       default:
         return null;
     }
@@ -1244,7 +1339,7 @@ export default function RegistrationPage() {
       
       {/* Step Progress Indicator */}
       <div className="flex mb-8">
-        {[1, 2, 3, 4, 5].map(step => (
+        {[1, 2, 3, 4, 5, 6].map(step => (
           <div key={step} className="flex-1">
             <div className={`h-2 ${step <= currentStep ? 'bg-blue-500' : 'bg-gray-200'}`} />
             <div className="mt-2 text-center text-sm">
@@ -1253,6 +1348,7 @@ export default function RegistrationPage() {
               {step === 3 && 'Details'}
               {step === 4 && 'Shifts'}
               {step === 5 && 'Review'}
+              {step === 6 && 'Payment'}
             </div>
           </div>
         ))}
@@ -1305,7 +1401,7 @@ export default function RegistrationPage() {
             type="submit"
             className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
           >
-            {currentStep < 5 ? 'Continue' : 'Complete Registration'}
+            {currentStep < 5 ? 'Continue' : currentStep === 5 ? 'Review & Pay' : 'Complete Registration'}
           </button>
         </div>
         
