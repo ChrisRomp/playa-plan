@@ -57,6 +57,9 @@ export default function RegistrationPage() {
   const [currentStep, setCurrentStep] = useState(1);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   
+  // Collapsible categories state for shifts step
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
+  
   // Profile form state
   const [profileFormData, setProfileFormData] = useState({
     firstName: profile?.firstName || '',
@@ -86,6 +89,45 @@ export default function RegistrationPage() {
       });
     }
   }, [profile]);
+
+  // Auto-expand categories with selected jobs or errors when on shifts step
+  useEffect(() => {
+    if (currentStep === 4) {
+      const categoriesToExpand = new Set<string>();
+      
+      // Expand categories with selected jobs
+      formData.jobs.forEach(jobId => {
+        const job = jobs.find(j => j.id === jobId);
+        if (job) {
+          categoriesToExpand.add(job.categoryId);
+        }
+      });
+      
+      // Expand categories with validation errors
+      Object.keys(formErrors).forEach(errorKey => {
+        if (errorKey.startsWith('category_')) {
+          const categoryId = errorKey.replace('category_', '');
+          categoriesToExpand.add(categoryId);
+        }
+      });
+      
+      // Always expand all always-required categories by default
+      const alwaysRequiredCategories = getAlwaysRequiredCategories();
+      alwaysRequiredCategories.forEach(category => {
+        categoriesToExpand.add(category.id);
+      });
+      
+      // If no categories are expanded and we have categories to show, expand the first one
+      if (categoriesToExpand.size === 0 && jobCategories.length > 0) {
+        const firstCategory = jobCategories[0];
+        if (firstCategory) {
+          categoriesToExpand.add(firstCategory.id);
+        }
+      }
+      
+      setExpandedCategories(categoriesToExpand);
+    }
+  }, [currentStep, formData.jobs, formErrors, jobs, jobCategories]);
   
   // Track loaded custom fields for selected camping options
   const [customFieldsByOption, setCustomFieldsByOption] = useState<Record<string, CampingOptionField[]>>({});
@@ -198,6 +240,36 @@ export default function RegistrationPage() {
     });
     
     return allFields;
+  };
+
+  // Toggle category expansion state
+  const toggleCategoryExpansion = (categoryId: string) => {
+    setExpandedCategories(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(categoryId)) {
+        newSet.delete(categoryId);
+      } else {
+        newSet.add(categoryId);
+      }
+      return newSet;
+    });
+  };
+
+  // Group jobs by category
+  const groupJobsByCategory = (jobList: Job[]): Record<string, { category: JobCategory; jobs: Job[] }> => {
+    const grouped: Record<string, { category: JobCategory; jobs: Job[] }> = {};
+    
+    jobList.forEach(job => {
+      const category = jobCategories.find(cat => cat.id === job.categoryId);
+      if (category) {
+        if (!grouped[category.id]) {
+          grouped[category.id] = { category, jobs: [] };
+        }
+        grouped[category.id].jobs.push(job);
+      }
+    });
+    
+    return grouped;
   };
 
   // Validate the current step
@@ -823,12 +895,105 @@ export default function RegistrationPage() {
     );
   };
 
+  // Helper component to render a collapsible job category section
+  const renderJobCategorySection = (
+    categoryId: string,
+    categoryName: string,
+    categoryDescription: string,
+    jobs: Job[],
+    isRequired: boolean = false,
+    errorKey?: string
+  ) => {
+    const isExpanded = expandedCategories.has(categoryId);
+    const hasError = errorKey && formErrors[errorKey];
+    
+    return (
+      <div key={categoryId} className="mb-4 border rounded-lg">
+        <button
+          type="button"
+          onClick={() => toggleCategoryExpansion(categoryId)}
+          className={`w-full p-4 text-left flex items-center justify-between hover:bg-gray-50 rounded-lg transition-colors ${
+            hasError ? 'border-red-300 bg-red-50' : ''
+          }`}
+        >
+          <div className="flex-1">
+            <div className="flex items-center">
+              <h4 className={`font-medium ${hasError ? 'text-red-800' : ''}`}>
+                {categoryName}
+                {isRequired && <span className="text-red-600 ml-1">*</span>}
+              </h4>
+              <span className="ml-2 text-sm text-gray-500">
+                ({jobs.length} shift{jobs.length !== 1 ? 's' : ''})
+              </span>
+            </div>
+            {categoryDescription && (
+              <p className={`text-sm mt-1 ${hasError ? 'text-red-700' : 'text-gray-600'}`}>
+                {categoryDescription}
+              </p>
+            )}
+          </div>
+          <div className="ml-4">
+            <svg
+              className={`w-5 h-5 transform transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </div>
+        </button>
+        
+        {hasError && (
+          <div className="px-4 pb-2 text-red-600 text-sm">{formErrors[errorKey!]}</div>
+        )}
+        
+        {isExpanded && (
+          <div className="px-4 pb-4">
+            <div className="space-y-2">
+              {jobs.map(job => (
+                <div key={job.id} className="border p-3 rounded bg-white">
+                  <label className="flex items-start">
+                    <input
+                      type="checkbox"
+                      className="mt-1 h-4 w-4"
+                      checked={formData.jobs.includes(job.id)}
+                      onChange={() => handleJobChange(job.id)}
+                    />
+                    <div className="ml-2">
+                      <div className="font-medium">{job.name}</div>
+                      <div className="text-sm text-gray-600">
+                        {getShiftInfoForJob(job)}
+                      </div>
+                      <div className="text-sm text-gray-600">
+                        Spots: {job.maxRegistrations - (job.currentRegistrations || 0)} of {job.maxRegistrations} available
+                      </div>
+                    </div>
+                  </label>
+                </div>
+              ))}
+              
+              {jobs.length === 0 && (
+                <div className="text-amber-600 p-3 bg-amber-50 rounded">
+                  No shifts available for this category
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   // Render jobs step
   const renderJobsStep = () => {
     const requiredCount = calculateRequiredJobCount();
     const alwaysRequiredJobs = getAlwaysRequiredJobs();
     const campingOptionJobs = getCampingOptionJobs();
     const alwaysRequiredCategories = getAlwaysRequiredCategories();
+    
+    // Group camping option jobs by category
+    const groupedCampingJobs = groupJobsByCategory(campingOptionJobs);
     
     // Calculate required shifts for camping options
     const selectedOptions = campingOptions.filter(option => 
@@ -847,44 +1012,31 @@ export default function RegistrationPage() {
         </p>
         
         {/* Camp Shifts Section */}
-        {campingOptionJobs.length > 0 && (
+        {Object.keys(groupedCampingJobs).length > 0 && (
           <div className="mb-6">
             <h3 className="text-lg font-medium mb-2">
               Camp Shifts{campingShiftsRequired > 0 ? `: ${campingShiftsRequired} required` : ''}
             </h3>
             <p className="text-sm text-gray-700 mb-4">
-              Please select a work shift for camp.
+              Please select work shifts for camp.
             </p>
             
             {formErrors.campingJobs && (
-              <div className="text-red-600 mb-4">{formErrors.campingJobs}</div>
+              <div className="text-red-600 mb-4 p-3 bg-red-50 border border-red-200 rounded">
+                {formErrors.campingJobs}
+              </div>
             )}
             
             <div className="space-y-2">
-              {campingOptionJobs.map(job => (
-                <div key={job.id} className="border p-3 rounded">
-                  <label className="flex items-start">
-                    <input
-                      type="checkbox"
-                      className="mt-1 h-4 w-4"
-                      checked={formData.jobs.includes(job.id)}
-                      onChange={() => handleJobChange(job.id)}
-                    />
-                    <div className="ml-2">
-                      <div>{job.name}</div>
-                      <div className="text-sm text-gray-600">
-                        Category: {job.category ? job.category.name : 'Unknown'}
-                      </div>
-                      <div className="text-sm text-gray-600">
-                        {getShiftInfoForJob(job)}
-                      </div>
-                      <div className="text-sm text-gray-600">
-                        Spots: {job.maxRegistrations} available
-                      </div>
-                    </div>
-                  </label>
-                </div>
-              ))}
+              {Object.values(groupedCampingJobs).map(({ category, jobs }) =>
+                renderJobCategorySection(
+                  category.id,
+                  category.name,
+                  category.description || '',
+                  jobs,
+                  false
+                )
+              )}
             </div>
           </div>
         )}
@@ -900,57 +1052,30 @@ export default function RegistrationPage() {
               You must select at least one shift from each required category.
             </p>
             
-            {alwaysRequiredCategories.map(category => {
-              const categoryJobs = alwaysRequiredJobs.filter(
-                job => job.categoryId === category.id
-              );
-              
-              const errorKey = `category_${category.id}`;
-              
-              return (
-                <div key={category.id} className="mb-6">
-                  <h4 className="font-medium mb-2">{category.name}</h4>
-                  <p className="text-sm text-gray-600 mb-2">{category.description}</p>
-                  
-                  {formErrors[errorKey] && (
-                    <div className="text-red-600 mb-2">{formErrors[errorKey]}</div>
-                  )}
-                  
-                  <div className="space-y-2">
-                    {categoryJobs.map(job => (
-                      <div key={job.id} className="border p-3 rounded">
-                        <label className="flex items-start">
-                          <input
-                            type="checkbox"
-                            className="mt-1 h-4 w-4"
-                            checked={formData.jobs.includes(job.id)}
-                            onChange={() => handleJobChange(job.id)}
-                          />
-                          <div className="ml-2">
-                            <div>{job.name}</div>
-                            <div className="text-sm text-gray-600">
-                              {getShiftInfoForJob(job)}
-                            </div>
-                            <div className="text-sm text-gray-600">
-                              Spots: {job.maxRegistrations - (job.currentRegistrations || 0)} of {job.maxRegistrations} available
-                            </div>
-                          </div>
-                        </label>
-                      </div>
-                    ))}
-                    
-                    {categoryJobs.length === 0 && (
-                      <div className="text-amber-600">No shifts available for this category</div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+            <div className="space-y-2">
+              {alwaysRequiredCategories.map(category => {
+                const categoryJobs = alwaysRequiredJobs.filter(
+                  job => job.categoryId === category.id
+                );
+                const errorKey = `category_${category.id}`;
+                
+                return renderJobCategorySection(
+                  category.id,
+                  category.name,
+                  category.description || '',
+                  categoryJobs,
+                  true,
+                  errorKey
+                );
+              })}
+            </div>
           </div>
         )}
         
         {formErrors.jobs && (
-          <div className="text-red-600 mt-2">{formErrors.jobs}</div>
+          <div className="text-red-600 mt-2 p-3 bg-red-50 border border-red-200 rounded">
+            {formErrors.jobs}
+          </div>
         )}
       </div>
     );

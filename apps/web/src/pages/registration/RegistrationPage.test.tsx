@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import RegistrationPage from './RegistrationPage';
 import { AuthContext } from '../../store/authUtils';
@@ -188,6 +188,10 @@ describe('RegistrationPage', () => {
 
   // Setup mocks before each test
   beforeEach(() => {
+    // Clear all mocks to ensure test isolation
+    vi.clearAllMocks();
+    vi.restoreAllMocks();
+    
     // Mock useRegistration hook
     vi.spyOn(useRegistrationModule, 'useRegistration').mockReturnValue({
       campingOptions: mockCampingOptions,
@@ -257,6 +261,12 @@ describe('RegistrationPage', () => {
       error: null,
       refreshConfig: vi.fn(),
     });
+  });
+
+  // Cleanup after each test
+  afterEach(() => {
+    vi.clearAllMocks();
+    vi.restoreAllMocks();
   });
 
   // Helper function to render component with context
@@ -535,9 +545,20 @@ describe('RegistrationPage', () => {
     it('should reject selection of only camping jobs when teardown is required', async () => {
       await navigateToJobsStep();
       
-      // Select two camping jobs but no teardown jobs
+      // First expand the Art Car Driver category to make jobs visible
+      const allButtons = screen.getAllByRole('button');
+      const artCarButton = allButtons.find(button => button.textContent?.includes('Art Car Driver'));
+      
+      expect(artCarButton).toBeDefined();
+      
+      // Expand Art Car Driver category
+      fireEvent.click(artCarButton!);
+      await waitFor(() => {
+        expect(screen.getByLabelText(/Art Car Driver/)).toBeInTheDocument();
+      });
+      
+      // Select one camping job but no teardown jobs (sufficient to test the validation)
       fireEvent.click(screen.getByLabelText(/Art Car Driver/));
-      fireEvent.click(screen.getByLabelText(/Manifest Assistant/));
       
       // Try to continue
       fireEvent.click(screen.getByText('Continue'));
@@ -553,6 +574,18 @@ describe('RegistrationPage', () => {
 
     it('should accept valid selection of both camping and teardown jobs', async () => {
       await navigateToJobsStep();
+      
+      // Expand the Art Car Driver category to select camping job (Teardown should auto-expand)
+      const allButtons = screen.getAllByRole('button');
+      const artCarButton = allButtons.find(button => button.textContent?.includes('Art Car Driver'));
+      expect(artCarButton).toBeDefined();
+      fireEvent.click(artCarButton!);
+      
+      // Wait for the categories to expand and jobs to be visible (Teardown auto-expands as always-required)
+      await waitFor(() => {
+        expect(screen.getByLabelText(/Art Car Driver/)).toBeInTheDocument();
+        expect(screen.getByLabelText(/Teardown Team 1/)).toBeInTheDocument();
+      });
       
       // Select one camping job and one teardown job
       fireEvent.click(screen.getByLabelText(/Art Car Driver/));
@@ -597,6 +630,24 @@ describe('RegistrationPage', () => {
       // Should show updated requirement
       expect(screen.getByText('Camp Shifts: 2 required')).toBeInTheDocument();
       
+      // Expand camping job categories (teardown should auto-expand as always-required)
+      const allButtons = screen.getAllByRole('button');
+      const artCarButton = allButtons.find(button => button.textContent?.includes('Art Car Driver'));
+      const manifestButton = allButtons.find(button => button.textContent?.includes('Manifest Assistant'));
+      
+      expect(artCarButton).toBeDefined();
+      expect(manifestButton).toBeDefined();
+      
+      fireEvent.click(artCarButton!);
+      fireEvent.click(manifestButton!);
+      
+      // Wait for jobs to be visible
+      await waitFor(() => {
+        expect(screen.getByLabelText(/Art Car Driver/)).toBeInTheDocument();
+        expect(screen.getByLabelText(/Teardown Team 1/)).toBeInTheDocument();
+        expect(screen.getByLabelText(/Manifest Assistant/)).toBeInTheDocument();
+      });
+      
       // Select only one camping job and one teardown job
       fireEvent.click(screen.getByLabelText(/Art Car Driver/));
       fireEvent.click(screen.getByLabelText(/Teardown Team 1/));
@@ -607,6 +658,17 @@ describe('RegistrationPage', () => {
       // Should show camping job validation error for insufficient camping jobs
       await waitFor(() => {
         expect(screen.getAllByText('You must select at least 2 Skydiving work shifts')).toHaveLength(2);
+      });
+      
+              // First need to expand the Manifest Assistant category
+        const buttons = screen.getAllByRole('button');
+        const manifestBtn = buttons.find(button => button.textContent?.includes('Manifest Assistant'));
+        expect(manifestBtn).toBeDefined();
+        fireEvent.click(manifestBtn!);
+      
+      // Wait for the category to expand
+      await waitFor(() => {
+        expect(screen.getByLabelText(/Manifest Assistant/)).toBeInTheDocument();
       });
       
       // Add another camping job
@@ -660,6 +722,21 @@ describe('RegistrationPage', () => {
       
       // Should show 2 required additional shifts
       expect(screen.getByText('Additional Shifts: 2 required')).toBeInTheDocument();
+      
+      // Expand camping job categories (teardown and security should auto-expand as always-required)
+      const allButtons = screen.getAllByRole('button');
+      const artCarButton = allButtons.find(button => button.textContent?.includes('Art Car Driver'));
+      
+      expect(artCarButton).toBeDefined();
+      
+      fireEvent.click(artCarButton!);
+      
+      // Wait for jobs to be visible
+      await waitFor(() => {
+        expect(screen.getByLabelText(/Art Car Driver/)).toBeInTheDocument();
+        expect(screen.getByLabelText(/Teardown Team 1/)).toBeInTheDocument();
+        expect(screen.getByLabelText(/Security Patrol/)).toBeInTheDocument();
+      });
       
       // Select camping job and only one required job
       fireEvent.click(screen.getByLabelText(/Art Car Driver/));
@@ -749,6 +826,30 @@ describe('RegistrationPage', () => {
       
       // Should show updated requirement (1 + 2 = 3 camping shifts required)
       expect(screen.getByText('Camp Shifts: 3 required')).toBeInTheDocument();
+      
+      // Expand the camping job categories (teardown should auto-expand as always-required)
+      const allButtons = screen.getAllByRole('button');
+      const artCarButton = allButtons.find(button => button.textContent?.includes('Art Car Driver'));
+      const manifestButton = allButtons.find(button => button.textContent?.includes('Manifest Assistant'));
+      
+      expect(artCarButton).toBeDefined();
+      expect(manifestButton).toBeDefined();
+      
+      // Click camping job category buttons to expand them
+      await act(async () => {
+        fireEvent.click(artCarButton!);
+      });
+      
+      await act(async () => {
+        fireEvent.click(manifestButton!);
+      });
+      
+      // Wait for jobs to be visible (Teardown should already be expanded due to auto-expansion)
+      await waitFor(() => {
+        expect(screen.getByLabelText(/Art Car Driver/)).toBeInTheDocument();
+        expect(screen.getByLabelText(/Teardown Team 1/)).toBeInTheDocument();
+        expect(screen.getByLabelText(/Manifest Assistant/)).toBeInTheDocument();
+      }, { timeout: 5000 });
       
       // Select only teardown job but no camping jobs
       fireEvent.click(screen.getByLabelText(/Teardown Team 1/));
