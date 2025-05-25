@@ -20,18 +20,18 @@ export const usePayment = () => {
    * Process a payment via Stripe
    */
   const processStripePayment = async (options: PaymentOptions): Promise<void> => {
-    if (!user) {
-      throw new Error('User must be logged in to make payment');
-    }
-
-    if (!config?.stripeEnabled || !config?.stripePublicKey) {
-      throw new Error('Stripe payments are not configured');
-    }
-
     setIsProcessing(true);
     setError(null);
 
     try {
+      if (!user) {
+        throw new Error('User must be logged in to make payment');
+      }
+
+      if (!config?.stripeEnabled || !config?.stripePublicKey) {
+        throw new Error('Stripe payments are not configured');
+      }
+
       const paymentRequest: StripePaymentRequest = {
         amount: Math.round(options.amount * 100), // Convert to cents
         currency: 'USD',
@@ -56,15 +56,25 @@ export const usePayment = () => {
    * Process a payment via PayPal (placeholder for future implementation)
    */
   const processPayPalPayment = async (options: PaymentOptions): Promise<void> => {
-    if (!config?.paypalEnabled) {
-      throw new Error('PayPal payments are not configured');
+    setIsProcessing(true);
+    setError(null);
+
+    try {
+      if (!config?.paypalEnabled) {
+        throw new Error('PayPal payments are not configured');
+      }
+      
+      // Log the options for debugging when we implement PayPal
+      console.log('PayPal payment options:', options);
+      
+      throw new Error('PayPal payments not yet implemented');
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Payment failed';
+      setError(errorMessage);
+      throw err;
+    } finally {
+      setIsProcessing(false);
     }
-    
-    // Log the options for debugging when we implement PayPal
-    console.log('PayPal payment options:', options);
-    
-    setError('PayPal payments not yet implemented');
-    throw new Error('PayPal payments not yet implemented');
   };
 
   /**
