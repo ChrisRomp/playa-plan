@@ -85,7 +85,6 @@ const AdminUserPage: React.FC = () => {
       allowEarlyRegistration: user.allowEarlyRegistration || false,
       allowDeferredDuesPayment: user.allowDeferredDuesPayment || false,
       allowNoJob: user.allowNoJob || false,
-      internalNotes: user.internalNotes || '',
     });
     setIsEditing(true);
     setIsCreating(false);

@@ -78,7 +78,7 @@ export const UpdateUserSchema = z.object({
   allowEarlyRegistration: z.boolean().optional(),
   allowDeferredDuesPayment: z.boolean().optional(),
   allowNoJob: z.boolean().optional(),
-  internalNotes: z.string().optional(),
+});
 
 /**
  * UpdateUserDTO type derived from the schema
