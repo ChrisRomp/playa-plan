@@ -12,7 +12,6 @@ Repository: https://github.com/ChrisRomp/playa-plan
 
 - Node.js version 22 or higher is required
 - For setting up the development environment, refer to [Copilot Setup Documentation](../docs/copilot-setup.md)
-- Use `.nvmrc` to ensure the correct Node.js version is used
 
 ## Development instructions
 

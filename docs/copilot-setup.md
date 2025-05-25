@@ -4,11 +4,11 @@ This document describes how to set up the GitHub Copilot development environment
 
 ## Node.js Version
 
-The project uses Node.js version 22. An `.nvmrc` file is included in the repository for Node Version Manager support.
+The project requires Node.js version 22 or higher. This is specified in the `engines` field in package.json.
 
 ```bash
-# If you use nvm, you can easily switch to the correct Node version with:
-nvm use
+# Verify your Node.js version
+node --version
 ```
 
 ## Dependencies
