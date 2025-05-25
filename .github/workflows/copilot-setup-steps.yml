@@ -1,50 +1,28 @@
-name: Copilot Setup Steps
+name: "Copilot Setup Steps"
 
-on:
-  workflow_dispatch:
-  push:
-    branches:
-      - main
-    paths:
-      - 'package.json'
-      - 'package-lock.json'
-      - '.github/copilot-config.json'
-  pull_request:
-    branches:
-      - main
-    paths:
-      - 'package.json'
-      - 'package-lock.json'
-      - '.github/copilot-config.json'
+# Allow testing of the setup steps from your repository's "Actions" tab.
+on: workflow_dispatch
 
 jobs:
-  setup:
-    name: Setup Development Environment
+  # The job MUST be called `copilot-setup-steps` or it will not be picked up by Copilot.
+  copilot-setup-steps:
     runs-on: ubuntu-latest
-    
+
+    # Set the permissions to the lowest permissions possible needed for your steps.
+    # Copilot will be given its own token for its operations.
+    permissions:
+      # If you want to clone the repository as part of your setup steps, for example to install dependencies, you'll need the `contents: read` permission.
+      contents: read
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
-      - name: Setup Node.js
+
+      - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
-          cache: 'npm'
-      
+          node-version: "22"
+          cache: "npm"
+
       - name: Install dependencies
         run: npm install
-      
-      - name: Verify setup
-        run: |
-          echo "Node.js version: $(node -v)"
-          echo "npm version: $(npm -v)"
-      
-      - name: Run tests
-        run: npm run test
-        
-      - name: Lint code
-        run: npm run lint
-        
-      - name: Check build
-        run: npm run build
