@@ -70,6 +70,7 @@ model CampingOptionField {
   maxLength       Int?
   minValue        Float?
   maxValue        Float?
+  order           Int                       @default(0)
   createdAt       DateTime                  @default(now())
   updatedAt       DateTime                  @updatedAt
   campingOptionId String

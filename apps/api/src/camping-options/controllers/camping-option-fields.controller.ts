@@ -11,17 +11,25 @@ import {
   ClassSerializerInterceptor,
   NotFoundException,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam, ApiBody } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
 import { CampingOptionFieldsService } from '../services/camping-option-fields.service';
+import { CampingOptionsService } from '../services/camping-options.service';
 import { 
   CreateCampingOptionFieldDto, 
   UpdateCampingOptionFieldDto,
   CampingOptionFieldResponseDto 
 } from '../dto';
 import { UserRole } from '@prisma/client';
+
+/**
+ * DTO for reordering fields
+ */
+class ReorderFieldsDto {
+  fieldOrders!: Array<{ id: string; order: number }>;
+}
 
 /**
  * Controller for managing camping option fields
@@ -136,5 +144,49 @@ export class CampingOptionFieldsController {
   async remove(@Param('id') id: string): Promise<CampingOptionFieldResponseDto> {
     const field = await this.campingOptionFieldsService.remove(id);
     return field as CampingOptionFieldResponseDto;
+  }
+
+  /**
+   * Reorder camping option fields (Admin only)
+   */
+  @ApiOperation({ summary: 'Reorder camping option fields' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'The camping option fields have been successfully reordered.',
+    type: [CampingOptionFieldResponseDto],
+  })
+  @ApiResponse({ status: 400, description: 'Bad request' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - requires admin role' })
+  @ApiResponse({ status: 404, description: 'Camping option not found' })
+  @ApiParam({ name: 'campingOptionId', description: 'The ID of the camping option' })
+  @ApiBody({ 
+    description: 'Array of field IDs with their new order values',
+    schema: {
+      type: 'object',
+      properties: {
+        fieldOrders: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              id: { type: 'string', description: 'Field ID' },
+              order: { type: 'number', description: 'New order value' }
+            },
+            required: ['id', 'order']
+          }
+        }
+      },
+      required: ['fieldOrders']
+    }
+  })
+  @Patch('reorder/:campingOptionId')
+  @Roles(UserRole.ADMIN)
+  async reorderFields(
+    @Param('campingOptionId') campingOptionId: string,
+    @Body() reorderDto: ReorderFieldsDto
+  ): Promise<CampingOptionFieldResponseDto[]> {
+    const fields = await this.campingOptionFieldsService.reorderFields(campingOptionId, reorderDto.fieldOrders);
+    return fields as CampingOptionFieldResponseDto[];
   }
 } 

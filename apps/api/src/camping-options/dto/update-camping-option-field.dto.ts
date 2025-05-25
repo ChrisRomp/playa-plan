@@ -106,4 +106,18 @@ export class UpdateCampingOptionFieldDto {
   @ValidateIf(o => !o.dataType || o.dataType === FieldType.NUMBER || o.dataType === FieldType.INTEGER)
   @Type(() => Number)
   maxValue?: number;
+  
+  /**
+   * Display order of the field
+   */
+  @ApiProperty({
+    description: 'Display order of the field (lower numbers appear first)',
+    example: 1,
+    required: false,
+  })
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  @Type(() => Number)
+  order?: number;
 } 

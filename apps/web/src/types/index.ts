@@ -131,3 +131,18 @@ export interface Payment {
   userId: string;
   registrationId?: string;
 }
+
+export interface CampingOptionField {
+  id: string;
+  displayName: string;
+  description?: string | null;
+  dataType: 'STRING' | 'MULTILINE_STRING' | 'INTEGER' | 'NUMBER' | 'BOOLEAN' | 'DATE';
+  required: boolean;
+  maxLength?: number | null;
+  minValue?: number | null;
+  maxValue?: number | null;
+  order?: number;
+  createdAt: string;
+  updatedAt: string;
+  campingOptionId: string;
+}

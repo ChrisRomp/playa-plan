@@ -19,6 +19,7 @@ interface FieldFormData {
   maxLength: number | null;
   minValue: number | null;
   maxValue: number | null;
+  order?: number;
 }
 
 const AdminCampingOptionFieldsPage: React.FC = () => {
@@ -54,6 +55,9 @@ const AdminCampingOptionFieldsPage: React.FC = () => {
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
+  const [draggedField, setDraggedField] = useState<CampingOptionField | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const [isReordering, setIsReordering] = useState(false);
 
   // Load camping option and its fields on component mount
   useEffect(() => {
@@ -241,6 +245,65 @@ const AdminCampingOptionFieldsPage: React.FC = () => {
     navigate('/admin/camping-options');
   };
 
+  // Drag and drop handlers
+  const handleDragStart = (e: React.DragEvent, field: CampingOptionField) => {
+    setDraggedField(field);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverIndex(index);
+  };
+
+  const handleDragLeave = () => {
+    setDragOverIndex(null);
+  };
+
+  const handleDrop = async (e: React.DragEvent, dropIndex: number) => {
+    e.preventDefault();
+    setDragOverIndex(null);
+    
+    if (!draggedField || !optionId) return;
+    
+    const dragIndex = fields.findIndex(f => f.id === draggedField.id);
+    if (dragIndex === dropIndex) return;
+    
+    setIsReordering(true);
+    
+    try {
+      // Create new order for all fields
+      const reorderedFields = [...fields];
+      const [removed] = reorderedFields.splice(dragIndex, 1);
+      reorderedFields.splice(dropIndex, 0, removed);
+      
+      // Create field orders array with new positions
+      const fieldOrders = reorderedFields.map((field, index) => ({
+        id: field.id,
+        order: index
+      }));
+      
+      // Call API to reorder fields using the campingOptions API
+      const { campingOptions } = await import('../lib/api');
+      await campingOptions.reorderFields(optionId, fieldOrders);
+      
+      // Reload fields to get updated order
+      await loadCampingOptionFields(optionId);
+    } catch (error) {
+      console.error('Error reordering fields:', error);
+      setApiError('Failed to reorder fields. Please try again.');
+    } finally {
+      setIsReordering(false);
+      setDraggedField(null);
+    }
+  };
+
+  const handleDragEnd = () => {
+    setDraggedField(null);
+    setDragOverIndex(null);
+  };
+
   return (
     <div className="container mx-auto p-4">
       <div className="flex justify-between items-center mb-6">
@@ -284,6 +347,7 @@ const AdminCampingOptionFieldsPage: React.FC = () => {
               <table className="min-w-full bg-white border border-gray-200">
                 <thead>
                   <tr className="bg-gray-100">
+                    <th className="py-2 px-4 border-b text-left">Order</th>
                     <th className="py-2 px-4 border-b text-left">Field Name</th>
                     <th className="py-2 px-4 border-b text-left">Type</th>
                     <th className="py-2 px-4 border-b text-left">Required</th>
@@ -292,8 +356,25 @@ const AdminCampingOptionFieldsPage: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {fields.map((field) => (
-                    <tr key={field.id} className="hover:bg-gray-50">
+                  {fields.map((field, index) => (
+                    <tr 
+                      key={field.id} 
+                      className={`hover:bg-gray-50 cursor-move ${
+                        dragOverIndex === index ? 'bg-blue-100 border-blue-300' : ''
+                      } ${isReordering ? 'opacity-50' : ''}`}
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, field)}
+                      onDragOver={(e) => handleDragOver(e, index)}
+                      onDragLeave={handleDragLeave}
+                      onDrop={(e) => handleDrop(e, index)}
+                      onDragEnd={handleDragEnd}
+                    >
+                      <td className="py-2 px-4 border-b text-gray-500">
+                        <span className="flex items-center">
+                          <span className="mr-2">⋮⋮</span>
+                          {field.order ?? index}
+                        </span>
+                      </td>
                       <td className="py-2 px-4 border-b">{field.displayName}</td>
                       <td className="py-2 px-4 border-b">{field.dataType}</td>
                       <td className="py-2 px-4 border-b">
@@ -335,6 +416,11 @@ const AdminCampingOptionFieldsPage: React.FC = () => {
                   ))}
                 </tbody>
               </table>
+              {isReordering && (
+                <div className="mt-2 text-center text-gray-600">
+                  <span>Reordering fields...</span>
+                </div>
+              )}
             </div>
           )}
         </>

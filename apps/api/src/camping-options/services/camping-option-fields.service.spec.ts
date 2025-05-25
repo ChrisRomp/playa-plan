@@ -18,6 +18,7 @@ describe('CampingOptionFieldsService', () => {
     maxLength: 100,
     minValue: null,
     maxValue: null,
+    order: 0,
     campingOptionId: 'camping-option-id',
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -51,6 +52,7 @@ describe('CampingOptionFieldsService', () => {
             campingOptionField: {
               create: jest.fn().mockResolvedValue(mockCampingOptionField),
               findMany: jest.fn().mockResolvedValue([mockCampingOptionField]),
+              findFirst: jest.fn().mockResolvedValue(null),
               findUnique: jest.fn().mockResolvedValue(mockCampingOptionField),
               update: jest.fn().mockResolvedValue(mockCampingOptionField),
               delete: jest.fn().mockResolvedValue(mockCampingOptionField),
@@ -83,11 +85,18 @@ describe('CampingOptionFieldsService', () => {
         select: { id: true },
       });
 
+      expect(prismaService.campingOptionField.findFirst).toHaveBeenCalledWith({
+        where: { campingOptionId: mockCreateFieldDto.campingOptionId },
+        orderBy: { order: 'desc' },
+        select: { order: true },
+      });
+
       expect(prismaService.campingOptionField.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
           displayName: mockCreateFieldDto.displayName,
           description: mockCreateFieldDto.description,
           dataType: mockCreateFieldDto.dataType,
+          order: 0,
         }),
       });
 
@@ -107,7 +116,7 @@ describe('CampingOptionFieldsService', () => {
 
       expect(prismaService.campingOptionField.findMany).toHaveBeenCalledWith({
         where: { campingOptionId: 'camping-option-id' },
-        orderBy: { createdAt: 'asc' },
+        orderBy: { order: 'asc' },
       });
 
       expect(result).toBeInstanceOf(Array);
@@ -185,6 +194,57 @@ describe('CampingOptionFieldsService', () => {
       // Since we don't have campingOptionResponse, this test is no longer valid
       // We'd need to check the implementation of the service method to properly mock this
       expect(service.remove).toBeDefined();
+    });
+  });
+
+  describe('reorderFields', () => {
+    it('should reorder fields successfully', async () => {
+      const fieldOrders = [
+        { id: 'field-1', order: 1 },
+        { id: 'field-2', order: 0 },
+      ];
+
+      jest.spyOn(prismaService.campingOptionField, 'findMany').mockResolvedValueOnce([
+        { id: 'field-1' },
+        { id: 'field-2' },
+        /* Jest's mockResolvedValueOnce expects the full return type. 
+          Since this is a test mock and we only need the id field, 
+          the cleanest solution is to cast it properly using any.
+        */
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ] as any);
+
+      const result = await service.reorderFields('camping-option-id', fieldOrders);
+
+      expect(prismaService.campingOption.findUnique).toHaveBeenCalledWith({
+        where: { id: 'camping-option-id' },
+        select: { id: true },
+      });
+
+      expect(prismaService.campingOptionField.findMany).toHaveBeenCalledWith({
+        where: { 
+          campingOptionId: 'camping-option-id',
+          id: { in: ['field-1', 'field-2'] }
+        },
+        select: { id: true },
+      });
+
+      expect(prismaService.campingOptionField.update).toHaveBeenCalledTimes(2);
+      expect(result).toBeInstanceOf(Array);
+    });
+
+    it('should throw NotFoundException if camping option not found', async () => {
+      jest.spyOn(prismaService.campingOption, 'findUnique').mockResolvedValueOnce(null);
+
+      await expect(service.reorderFields('non-existent', [])).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw BadRequestException if field IDs are invalid', async () => {
+      const fieldOrders = [{ id: 'field-1', order: 0 }];
+
+      jest.spyOn(prismaService.campingOptionField, 'findMany').mockResolvedValueOnce([]);
+
+      await expect(service.reorderFields('camping-option-id', fieldOrders)).rejects.toThrow(BadRequestException);
     });
   });
 }); 

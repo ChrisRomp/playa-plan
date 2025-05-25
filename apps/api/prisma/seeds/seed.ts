@@ -210,31 +210,36 @@ async function main() {
             description: 'Please describe your camping footprint, space, etc. If you\'re not camping at Burning Sky, leave blank.',
             dataType: 'MULTILINE_STRING',
             required: false,
-            maxLength: 1024
+            maxLength: 1024,
+            order: 0
           },
           {
             displayName: 'How many skydives have you done in total?',
             dataType: 'INTEGER',
-            required: true
+            required: true,
+            order: 1
           },
           {
             displayName: 'How many skydives have you done in the last 6 months?',
             dataType: 'INTEGER',
-            required: true
+            required: true,
+            order: 2
           },
           {
             displayName: 'Please list your license(s) (with numbers) and rating(s)',
             description: 'Optional, but helps us get to know you better. Burning Sky is not a UPSA drop zone.',
             dataType: 'MULTILINE_STRING',
             required: false,
-            maxLength: 1024
+            maxLength: 1024,
+            order: 3
           },
           {
             displayName: 'Total Years Jumping with Burning Sky',
             description: 'Including this year',
             dataType: 'INTEGER',
             required: true,
-            minValue: 1
+            minValue: 1,
+            order: 4
           }
         ]
       }

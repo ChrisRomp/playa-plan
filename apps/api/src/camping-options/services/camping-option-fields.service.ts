@@ -14,7 +14,20 @@ export class CampingOptionFieldsService {
    */
   constructor(private readonly prisma: PrismaService) {}
 
-  private mapToEntity(field: any): CampingOptionField {
+  private mapToEntity(field: {
+    id: string;
+    displayName: string;
+    description: string | null;
+    dataType: string;
+    required: boolean;
+    maxLength: number | null;
+    minValue: number | null;
+    maxValue: number | null;
+    order: number;
+    campingOptionId: string;
+    createdAt: Date;
+    updatedAt: Date;
+  }): CampingOptionField {
     return new CampingOptionField({
       id: field.id,
       displayName: field.displayName,
@@ -24,6 +37,7 @@ export class CampingOptionFieldsService {
       maxLength: field.maxLength,
       minValue: field.minValue,
       maxValue: field.maxValue,
+      order: field.order,
       campingOptionId: field.campingOptionId,
       createdAt: field.createdAt,
       updatedAt: field.updatedAt,
@@ -42,6 +56,18 @@ export class CampingOptionFieldsService {
           `Camping option with ID ${createCampingOptionFieldDto.campingOptionId} not found`
         );
       }
+      
+      // If no order is specified, assign the next available order
+      let order = createCampingOptionFieldDto.order;
+      if (order === undefined || order === null) {
+        const maxOrderField = await this.prisma.campingOptionField.findFirst({
+          where: { campingOptionId: createCampingOptionFieldDto.campingOptionId },
+          orderBy: { order: 'desc' },
+          select: { order: true },
+        });
+        order = (maxOrderField?.order ?? -1) + 1;
+      }
+      
       const field = await this.prisma.campingOptionField.create({
         data: {
           displayName: createCampingOptionFieldDto.displayName,
@@ -51,6 +77,7 @@ export class CampingOptionFieldsService {
           maxLength: createCampingOptionFieldDto.maxLength ?? null,
           minValue: createCampingOptionFieldDto.minValue ?? null,
           maxValue: createCampingOptionFieldDto.maxValue ?? null,
+          order: order,
           campingOption: { connect: { id: createCampingOptionFieldDto.campingOptionId } },
         },
       });
@@ -66,7 +93,7 @@ export class CampingOptionFieldsService {
   async findAll(campingOptionId: string): Promise<CampingOptionField[]> {
     const fields = await this.prisma.campingOptionField.findMany({
       where: { campingOptionId },
-      orderBy: { createdAt: 'asc' },
+      orderBy: { order: 'asc' },
     });
     return fields.map(field => this.mapToEntity(field));
   }
@@ -133,6 +160,59 @@ export class CampingOptionFieldsService {
         throw error;
       }
       throw new BadRequestException('Failed to delete camping option field');
+    }
+  }
+
+  /**
+   * Reorder camping option fields
+   * @param campingOptionId - The ID of the camping option
+   * @param fieldOrders - Array of field IDs with their new order values
+   * @returns The updated fields
+   */
+  async reorderFields(
+    campingOptionId: string,
+    fieldOrders: Array<{ id: string; order: number }>
+  ): Promise<CampingOptionField[]> {
+    try {
+      // Verify that the camping option exists
+      const campingOption = await this.prisma.campingOption.findUnique({
+        where: { id: campingOptionId },
+        select: { id: true },
+      });
+      if (!campingOption) {
+        throw new NotFoundException(`Camping option with ID ${campingOptionId} not found`);
+      }
+
+      // Verify all field IDs belong to this camping option
+      const existingFields = await this.prisma.campingOptionField.findMany({
+        where: { 
+          campingOptionId,
+          id: { in: fieldOrders.map(fo => fo.id) }
+        },
+        select: { id: true },
+      });
+
+      if (existingFields.length !== fieldOrders.length) {
+        throw new BadRequestException('One or more field IDs are invalid or do not belong to this camping option');
+      }
+
+      // Update the order for each field
+      await Promise.all(
+        fieldOrders.map(({ id, order }) =>
+          this.prisma.campingOptionField.update({
+            where: { id },
+            data: { order },
+          })
+        )
+      );
+
+      // Return the updated fields
+      return this.findAll(campingOptionId);
+    } catch (error) {
+      if (error instanceof NotFoundException || error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new BadRequestException('Failed to reorder camping option fields');
     }
   }
 }

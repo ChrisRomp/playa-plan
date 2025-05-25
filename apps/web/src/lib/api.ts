@@ -270,6 +270,7 @@ export const CampingOptionFieldSchema = z.object({
   maxLength: z.number().nullable().optional(),
   minValue: z.number().nullable().optional(),
   maxValue: z.number().nullable().optional(),
+  order: z.number().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
   campingOptionId: z.string(),
@@ -832,6 +833,24 @@ export const campingOptions = {
       throw error;
     }
   },
+
+  /**
+   * Reorder fields for a camping option
+   * @param campingOptionId The ID of the camping option
+   * @param fieldOrders Array of field IDs with their new order values
+   * @returns A promise that resolves to the reordered fields
+   */
+  reorderFields: async (campingOptionId: string, fieldOrders: Array<{ id: string; order: number }>): Promise<CampingOptionField[]> => {
+    try {
+      const response = await api.patch<CampingOptionField[]>(`/camping-option-fields/reorder/${campingOptionId}`, {
+        fieldOrders
+      });
+      return response.data.map(field => CampingOptionFieldSchema.parse(field));
+    } catch (error) {
+      console.error(`Error reordering fields for camping option with ID ${campingOptionId}:`, error);
+      throw error;
+    }
+  }
 };
 
 export const jobCategories = {
