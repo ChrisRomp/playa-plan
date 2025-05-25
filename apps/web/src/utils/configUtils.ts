@@ -25,7 +25,14 @@ export const mapApiConfigToFrontend = (apiConfig: CoreConfig): CampConfig => {
     homePageBlurb: apiConfig.homePageBlurb ?? '<h2>Welcome to PlayaPlan.</h2><p>Please log in as an admin and configure your site.</p>',
     registrationOpen: apiConfig.registrationOpen,
     earlyRegistrationOpen: apiConfig.earlyRegistrationOpen,
-    currentYear: apiConfig.registrationYear
+    currentYear: apiConfig.registrationYear,
+    // Payment configuration
+    stripeEnabled: apiConfig.stripeEnabled,
+    stripePublicKey: apiConfig.stripePublicKey ?? undefined,
+    paypalEnabled: apiConfig.paypalEnabled,
+    paypalClientId: apiConfig.paypalClientId ?? undefined,
+    paypalMode: apiConfig.paypalMode ?? undefined,
+    allowDeferredDuesPayment: apiConfig.allowDeferredDuesPayment
   };
 };
 
@@ -43,5 +50,12 @@ export const fallbackConfig: CampConfig = {
   homePageBlurb: "<h2>Welcome to PlayaPlan.</h2><p>Please log in as an admin and configure your site.</p>",
   registrationOpen: false,
   earlyRegistrationOpen: false,
-  currentYear: new Date().getFullYear()
+  currentYear: new Date().getFullYear(),
+  // Payment configuration defaults
+  stripeEnabled: false,
+  stripePublicKey: undefined,
+  paypalEnabled: false,
+  paypalClientId: undefined,
+  paypalMode: 'sandbox',
+  allowDeferredDuesPayment: false
 };
