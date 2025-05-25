@@ -908,7 +908,7 @@ async function main() {
   // Teardown jobs - Closing Sunday shifts (50 for first shift, 20 for second)
   await prisma.job.create({
     data: {
-      name: 'Teardown Team 1',
+      name: 'Teardown Morning',
       categoryId: teardownCategory.id,
       location: 'Entire Camp',
       shiftId: closingSunday1.id,
@@ -918,7 +918,7 @@ async function main() {
 
   await prisma.job.create({
     data: {
-      name: 'Teardown Team 2',
+      name: 'Teardown Afternoon',
       categoryId: teardownCategory.id,
       location: 'Entire Camp',
       shiftId: closingSunday2.id,
