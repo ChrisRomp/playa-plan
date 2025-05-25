@@ -54,6 +54,31 @@ async function main() {
     console.log('Cleaned job_categories table');
   }
   
+  if (await tableExists('camping_option_field_values')) {
+    await prisma.campingOptionFieldValue.deleteMany({});
+    console.log('Cleaned camping_option_field_values table');
+  }
+  
+  if (await tableExists('camping_option_registrations')) {
+    await prisma.campingOptionRegistration.deleteMany({});
+    console.log('Cleaned camping_option_registrations table');
+  }
+  
+  if (await tableExists('camping_option_fields')) {
+    await prisma.campingOptionField.deleteMany({});
+    console.log('Cleaned camping_option_fields table');
+  }
+  
+  if (await tableExists('camping_option_job_categories')) {
+    await prisma.campingOptionJobCategory.deleteMany({});
+    console.log('Cleaned camping_option_job_categories table');
+  }
+  
+  if (await tableExists('camping_options')) {
+    await prisma.campingOption.deleteMany({});
+    console.log('Cleaned camping_options table');
+  }
+  
   // Camp entity has been removed
   
   if (await tableExists('users')) {
@@ -78,16 +103,40 @@ async function main() {
   const dayBossCategory = await prisma.jobCategory.create({
     data: {
       name: 'Day Boss',
-      description: 'Oversee DZ operations.',
+      description: 'Keep the DZ running. Move around and make sure it is.',
+      staffOnly: true
+    }
+  });
+
+  const artCarDriverCategory = await prisma.jobCategory.create({
+    data: {
+      name: 'Art Car Driver',
+      description: 'Driving the art car between the Burning Sky camp and the airport to ferry skydivers and fireflies to and from the airport.',
       staffOnly: false
     }
   });
 
-  const artCarCategory = await prisma.jobCategory.create({
+  const artCarCaptainCategory = await prisma.jobCategory.create({
     data: {
-      name: 'Art Car',
-      description: 'Driving the "Skyvan" art car between the Burning Sky camp and the airport to ferry skydivers to and fireflies to and from the airport.',
-      staffOnly: false
+      name: 'Art Car Captain',
+      description: 'Responsible for the care and feeding of our beloved Betsy Gossamer Deathtrap',
+      staffOnly: true
+    }
+  });
+
+  const artCarMaintenanceCategory = await prisma.jobCategory.create({
+    data: {
+      name: 'Art Car Maintenance',
+      description: 'Day to day maintenance of the Art Car. If it does not run, make it run.',
+      staffOnly: true
+    }
+  });
+
+  const dzManagerCategory = await prisma.jobCategory.create({
+    data: {
+      name: 'DZ Manager',
+      description: 'Bitch on call.',
+      staffOnly: true
     }
   });
 
@@ -101,7 +150,7 @@ async function main() {
 
   const landingAreaCategory = await prisma.jobCategory.create({
     data: {
-      name: 'Landing Area',
+      name: 'Landing Area Radio Station',
       description: 'This person is stationed at the windsock to observe landings and provide radio support',
       staffOnly: false
     }
@@ -127,19 +176,72 @@ async function main() {
     data: {
       name: 'Teardown',
       description: 'Help with taking down airport/camp, mooping, leaving no trace.',
-      staffOnly: false
+      staffOnly: false,
+      alwaysRequired: true
     }
   });
 
   const airportManagerCategory = await prisma.jobCategory.create({
     data: {
       name: 'Airport Manager',
-      description: 'Manage the Greeters and keep the plane turning. Keep Manifest aware of what\'s up.',
+      description: 'Keep the plane turning. Take care of pilots needs. Manage the Greeters. Keep Manifest aware of what\'s up.',
       staffOnly: true
     }
   });
 
   console.log(`Created ${await prisma.jobCategory.count()} job categories`);
+
+  // Create camping options
+  console.log('Creating camping options...');
+  
+  const skydivingCampingOption = await prisma.campingOption.create({
+    data: {
+      name: 'Skydiving',
+      description: 'Skydiving camp option',
+      enabled: true,
+      workShiftsRequired: 1,
+      participantDues: 600.0,
+      staffDues: 600.0,
+      maxSignups: 60,
+      fields: {
+        create: [
+          {
+            displayName: 'Camping Footprint',
+            description: 'Please describe your camping footprint, space, etc. If you\'re not camping at Burning Sky, leave blank.',
+            dataType: 'MULTILINE_STRING',
+            required: false,
+            maxLength: 1024
+          },
+          {
+            displayName: 'How many skydives have you done in total?',
+            dataType: 'NUMBER',
+            required: true
+          },
+          {
+            displayName: 'How many skydives have you done in the last 6 months?',
+            dataType: 'NUMBER',
+            required: true
+          },
+          {
+            displayName: 'Please list your license(s) (with numbers) and rating(s)',
+            description: 'Optional, but helps us get to know you better. Burning Sky is not a UPSA drop zone.',
+            dataType: 'MULTILINE_STRING',
+            required: false,
+            maxLength: 1024
+          },
+          {
+            displayName: 'Total Years Jumping with Burning Sky',
+            description: 'Including this year',
+            dataType: 'NUMBER',
+            required: true,
+            minValue: 1
+          }
+        ]
+      }
+    }
+  });
+
+  console.log(`Created ${await prisma.campingOption.count()} camping options`);
 
   // Create shifts
   console.log('Creating shifts...');
@@ -249,14 +351,44 @@ async function main() {
     },
   });
 
-  // Pre-opening shift (keep one for setup)
-  const preOpeningShift = await prisma.shift.create({
+  // Full-day shifts for Wed-Sat (9:00-19:00)
+  const wednesdayFull = await prisma.shift.create({
     data: {
-      name: 'Pre-Opening Setup',
-      description: 'Early camp setup',
-      startTime: '10:00',
-      endTime: '16:00',
-      dayOfWeek: 'PRE_OPENING',
+      name: 'Wednesday Full',
+      description: 'Wednesday full day shift',
+      startTime: '09:00',
+      endTime: '19:00',
+      dayOfWeek: 'WEDNESDAY',
+    },
+  });
+
+  const thursdayFull = await prisma.shift.create({
+    data: {
+      name: 'Thursday Full',
+      description: 'Thursday full day shift',
+      startTime: '09:00',
+      endTime: '19:00',
+      dayOfWeek: 'THURSDAY',
+    },
+  });
+
+  const fridayFull = await prisma.shift.create({
+    data: {
+      name: 'Friday Full',
+      description: 'Friday full day shift',
+      startTime: '09:00',
+      endTime: '19:00',
+      dayOfWeek: 'FRIDAY',
+    },
+  });
+
+  const saturdayFull = await prisma.shift.create({
+    data: {
+      name: 'Saturday Full',
+      description: 'Saturday full day shift',
+      startTime: '09:00',
+      endTime: '19:00',
+      dayOfWeek: 'SATURDAY',
     },
   });
   
@@ -264,32 +396,92 @@ async function main() {
 
   // Create jobs (after shifts)
   
-  // Teardown jobs - Closing Sunday shifts
+  // Airport Manager jobs - AM/PM shifts Wed-Sat (1 per shift)
   await prisma.job.create({
     data: {
-      name: 'Teardown Team 1',
-      categoryId: teardownCategory.id,
-      location: 'Entire Camp',
-      shiftId: closingSunday1.id,
-      maxRegistrations: 6
+      name: 'Airport Manager - Wednesday AM',
+      categoryId: airportManagerCategory.id,
+      location: 'Airport',
+      shiftId: wednesdayAM.id,
+      maxRegistrations: 1
     }
   });
 
   await prisma.job.create({
     data: {
-      name: 'Teardown Team 2',
-      categoryId: teardownCategory.id,
-      location: 'Entire Camp',
-      shiftId: closingSunday2.id,
-      maxRegistrations: 6
+      name: 'Airport Manager - Wednesday PM',
+      categoryId: airportManagerCategory.id,
+      location: 'Airport',
+      shiftId: wednesdayPM.id,
+      maxRegistrations: 1
     }
   });
 
-  // Art Car Driver jobs - AM/PM shifts for Wed-Sat
+  await prisma.job.create({
+    data: {
+      name: 'Airport Manager - Thursday AM',
+      categoryId: airportManagerCategory.id,
+      location: 'Airport',
+      shiftId: thursdayAM.id,
+      maxRegistrations: 1
+    }
+  });
+
+  await prisma.job.create({
+    data: {
+      name: 'Airport Manager - Thursday PM',
+      categoryId: airportManagerCategory.id,
+      location: 'Airport',
+      shiftId: thursdayPM.id,
+      maxRegistrations: 1
+    }
+  });
+
+  await prisma.job.create({
+    data: {
+      name: 'Airport Manager - Friday AM',
+      categoryId: airportManagerCategory.id,
+      location: 'Airport',
+      shiftId: fridayAM.id,
+      maxRegistrations: 1
+    }
+  });
+
+  await prisma.job.create({
+    data: {
+      name: 'Airport Manager - Friday PM',
+      categoryId: airportManagerCategory.id,
+      location: 'Airport',
+      shiftId: fridayPM.id,
+      maxRegistrations: 1
+    }
+  });
+
+  await prisma.job.create({
+    data: {
+      name: 'Airport Manager - Saturday AM',
+      categoryId: airportManagerCategory.id,
+      location: 'Airport',
+      shiftId: saturdayAM.id,
+      maxRegistrations: 1
+    }
+  });
+
+  await prisma.job.create({
+    data: {
+      name: 'Airport Manager - Saturday PM',
+      categoryId: airportManagerCategory.id,
+      location: 'Airport',
+      shiftId: saturdayPM.id,
+      maxRegistrations: 1
+    }
+  });
+
+  // Art Car Driver jobs - AM/PM shifts Wed-Sat (2 per shift)
   await prisma.job.create({
     data: {
       name: 'Art Car Driver - Wednesday AM',
-      categoryId: artCarCategory.id,
+      categoryId: artCarDriverCategory.id,
       location: 'Between Camp and Airport',
       shiftId: wednesdayAM.id,
       maxRegistrations: 2
@@ -299,7 +491,7 @@ async function main() {
   await prisma.job.create({
     data: {
       name: 'Art Car Driver - Wednesday PM',
-      categoryId: artCarCategory.id,
+      categoryId: artCarDriverCategory.id,
       location: 'Between Camp and Airport',
       shiftId: wednesdayPM.id,
       maxRegistrations: 2
@@ -309,7 +501,7 @@ async function main() {
   await prisma.job.create({
     data: {
       name: 'Art Car Driver - Thursday AM',
-      categoryId: artCarCategory.id,
+      categoryId: artCarDriverCategory.id,
       location: 'Between Camp and Airport',
       shiftId: thursdayAM.id,
       maxRegistrations: 2
@@ -319,7 +511,7 @@ async function main() {
   await prisma.job.create({
     data: {
       name: 'Art Car Driver - Thursday PM',
-      categoryId: artCarCategory.id,
+      categoryId: artCarDriverCategory.id,
       location: 'Between Camp and Airport',
       shiftId: thursdayPM.id,
       maxRegistrations: 2
@@ -329,7 +521,7 @@ async function main() {
   await prisma.job.create({
     data: {
       name: 'Art Car Driver - Friday AM',
-      categoryId: artCarCategory.id,
+      categoryId: artCarDriverCategory.id,
       location: 'Between Camp and Airport',
       shiftId: fridayAM.id,
       maxRegistrations: 2
@@ -339,7 +531,7 @@ async function main() {
   await prisma.job.create({
     data: {
       name: 'Art Car Driver - Friday PM',
-      categoryId: artCarCategory.id,
+      categoryId: artCarDriverCategory.id,
       location: 'Between Camp and Airport',
       shiftId: fridayPM.id,
       maxRegistrations: 2
@@ -349,7 +541,7 @@ async function main() {
   await prisma.job.create({
     data: {
       name: 'Art Car Driver - Saturday AM',
-      categoryId: artCarCategory.id,
+      categoryId: artCarDriverCategory.id,
       location: 'Between Camp and Airport',
       shiftId: saturdayAM.id,
       maxRegistrations: 2
@@ -359,95 +551,55 @@ async function main() {
   await prisma.job.create({
     data: {
       name: 'Art Car Driver - Saturday PM',
-      categoryId: artCarCategory.id,
+      categoryId: artCarDriverCategory.id,
       location: 'Between Camp and Airport',
       shiftId: saturdayPM.id,
       maxRegistrations: 2
     }
   });
 
-  // Manifest Assistant jobs - AM/PM shifts for Wed-Sat
+  // Day Boss jobs - Full day shifts Wed-Sat (1 per shift)
   await prisma.job.create({
     data: {
-      name: 'Manifest Assistant - Wednesday AM',
-      categoryId: manifestAssistantCategory.id,
-      location: 'Manifest',
-      shiftId: wednesdayAM.id,
-      maxRegistrations: 2
+      name: 'Day Boss - Wednesday',
+      categoryId: dayBossCategory.id,
+      location: 'DZ',
+      shiftId: wednesdayFull.id,
+      maxRegistrations: 1
     }
   });
 
   await prisma.job.create({
     data: {
-      name: 'Manifest Assistant - Wednesday PM',
-      categoryId: manifestAssistantCategory.id,
-      location: 'Manifest',
-      shiftId: wednesdayPM.id,
-      maxRegistrations: 2
+      name: 'Day Boss - Thursday',
+      categoryId: dayBossCategory.id,
+      location: 'DZ',
+      shiftId: thursdayFull.id,
+      maxRegistrations: 1
     }
   });
 
   await prisma.job.create({
     data: {
-      name: 'Manifest Assistant - Thursday AM',
-      categoryId: manifestAssistantCategory.id,
-      location: 'Manifest',
-      shiftId: thursdayAM.id,
-      maxRegistrations: 2
+      name: 'Day Boss - Friday',
+      categoryId: dayBossCategory.id,
+      location: 'DZ',
+      shiftId: fridayFull.id,
+      maxRegistrations: 1
     }
   });
 
   await prisma.job.create({
     data: {
-      name: 'Manifest Assistant - Thursday PM',
-      categoryId: manifestAssistantCategory.id,
-      location: 'Manifest',
-      shiftId: thursdayPM.id,
-      maxRegistrations: 2
+      name: 'Day Boss - Saturday',
+      categoryId: dayBossCategory.id,
+      location: 'DZ',
+      shiftId: saturdayFull.id,
+      maxRegistrations: 1
     }
   });
 
-  await prisma.job.create({
-    data: {
-      name: 'Manifest Assistant - Friday AM',
-      categoryId: manifestAssistantCategory.id,
-      location: 'Manifest',
-      shiftId: fridayAM.id,
-      maxRegistrations: 2
-    }
-  });
-
-  await prisma.job.create({
-    data: {
-      name: 'Manifest Assistant - Friday PM',
-      categoryId: manifestAssistantCategory.id,
-      location: 'Manifest',
-      shiftId: fridayPM.id,
-      maxRegistrations: 2
-    }
-  });
-
-  await prisma.job.create({
-    data: {
-      name: 'Manifest Assistant - Saturday AM',
-      categoryId: manifestAssistantCategory.id,
-      location: 'Manifest',
-      shiftId: saturdayAM.id,
-      maxRegistrations: 2
-    }
-  });
-
-  await prisma.job.create({
-    data: {
-      name: 'Manifest Assistant - Saturday PM',
-      categoryId: manifestAssistantCategory.id,
-      location: 'Manifest',
-      shiftId: saturdayPM.id,
-      maxRegistrations: 2
-    }
-  });
-
-  // Firefly Greeter jobs - AM/PM shifts for Wed-Sat
+  // Firefly Greeter jobs - AM/PM shifts Wed-Sat (3 per shift)
   await prisma.job.create({
     data: {
       name: 'Firefly Greeter - Wednesday AM',
@@ -528,10 +680,10 @@ async function main() {
     }
   });
 
-  // Landing Area jobs - AM/PM shifts for Wed-Sat
+  // Landing Area Radio Station jobs - AM/PM shifts Wed-Sat (1 per shift)
   await prisma.job.create({
     data: {
-      name: 'Landing Area - Wednesday AM',
+      name: 'Landing Area Radio Station - Wednesday AM',
       categoryId: landingAreaCategory.id,
       location: 'Landing Area',
       shiftId: wednesdayAM.id,
@@ -541,7 +693,7 @@ async function main() {
 
   await prisma.job.create({
     data: {
-      name: 'Landing Area - Wednesday PM',
+      name: 'Landing Area Radio Station - Wednesday PM',
       categoryId: landingAreaCategory.id,
       location: 'Landing Area',
       shiftId: wednesdayPM.id,
@@ -551,7 +703,7 @@ async function main() {
 
   await prisma.job.create({
     data: {
-      name: 'Landing Area - Thursday AM',
+      name: 'Landing Area Radio Station - Thursday AM',
       categoryId: landingAreaCategory.id,
       location: 'Landing Area',
       shiftId: thursdayAM.id,
@@ -561,7 +713,7 @@ async function main() {
 
   await prisma.job.create({
     data: {
-      name: 'Landing Area - Thursday PM',
+      name: 'Landing Area Radio Station - Thursday PM',
       categoryId: landingAreaCategory.id,
       location: 'Landing Area',
       shiftId: thursdayPM.id,
@@ -571,7 +723,7 @@ async function main() {
 
   await prisma.job.create({
     data: {
-      name: 'Landing Area - Friday AM',
+      name: 'Landing Area Radio Station - Friday AM',
       categoryId: landingAreaCategory.id,
       location: 'Landing Area',
       shiftId: fridayAM.id,
@@ -581,7 +733,7 @@ async function main() {
 
   await prisma.job.create({
     data: {
-      name: 'Landing Area - Friday PM',
+      name: 'Landing Area Radio Station - Friday PM',
       categoryId: landingAreaCategory.id,
       location: 'Landing Area',
       shiftId: fridayPM.id,
@@ -591,7 +743,7 @@ async function main() {
 
   await prisma.job.create({
     data: {
-      name: 'Landing Area - Saturday AM',
+      name: 'Landing Area Radio Station - Saturday AM',
       categoryId: landingAreaCategory.id,
       location: 'Landing Area',
       shiftId: saturdayAM.id,
@@ -601,11 +753,154 @@ async function main() {
 
   await prisma.job.create({
     data: {
-      name: 'Landing Area - Saturday PM',
+      name: 'Landing Area Radio Station - Saturday PM',
       categoryId: landingAreaCategory.id,
       location: 'Landing Area',
       shiftId: saturdayPM.id,
       maxRegistrations: 1
+    }
+  });
+
+  // Manifest Assistant jobs - AM/PM shifts Wed-Sat (3 per shift, 4 for Wed AM)
+  await prisma.job.create({
+    data: {
+      name: 'Manifest Assistant - Wednesday AM',
+      categoryId: manifestAssistantCategory.id,
+      location: 'Manifest',
+      shiftId: wednesdayAM.id,
+      maxRegistrations: 4
+    }
+  });
+
+  await prisma.job.create({
+    data: {
+      name: 'Manifest Assistant - Wednesday PM',
+      categoryId: manifestAssistantCategory.id,
+      location: 'Manifest',
+      shiftId: wednesdayPM.id,
+      maxRegistrations: 3
+    }
+  });
+
+  await prisma.job.create({
+    data: {
+      name: 'Manifest Assistant - Thursday AM',
+      categoryId: manifestAssistantCategory.id,
+      location: 'Manifest',
+      shiftId: thursdayAM.id,
+      maxRegistrations: 3
+    }
+  });
+
+  await prisma.job.create({
+    data: {
+      name: 'Manifest Assistant - Thursday PM',
+      categoryId: manifestAssistantCategory.id,
+      location: 'Manifest',
+      shiftId: thursdayPM.id,
+      maxRegistrations: 3
+    }
+  });
+
+  await prisma.job.create({
+    data: {
+      name: 'Manifest Assistant - Friday AM',
+      categoryId: manifestAssistantCategory.id,
+      location: 'Manifest',
+      shiftId: fridayAM.id,
+      maxRegistrations: 3
+    }
+  });
+
+  await prisma.job.create({
+    data: {
+      name: 'Manifest Assistant - Friday PM',
+      categoryId: manifestAssistantCategory.id,
+      location: 'Manifest',
+      shiftId: fridayPM.id,
+      maxRegistrations: 3
+    }
+  });
+
+  await prisma.job.create({
+    data: {
+      name: 'Manifest Assistant - Saturday AM',
+      categoryId: manifestAssistantCategory.id,
+      location: 'Manifest',
+      shiftId: saturdayAM.id,
+      maxRegistrations: 3
+    }
+  });
+
+  await prisma.job.create({
+    data: {
+      name: 'Manifest Assistant - Saturday PM',
+      categoryId: manifestAssistantCategory.id,
+      location: 'Manifest',
+      shiftId: saturdayPM.id,
+      maxRegistrations: 3
+    }
+  });
+
+  // Manifest Manager jobs - Full day shifts Wed-Sat (1 per shift)
+  await prisma.job.create({
+    data: {
+      name: 'Manifest Manager - Wednesday',
+      categoryId: manifestManagerCategory.id,
+      location: 'Manifest',
+      shiftId: wednesdayFull.id,
+      maxRegistrations: 1
+    }
+  });
+
+  await prisma.job.create({
+    data: {
+      name: 'Manifest Manager - Thursday',
+      categoryId: manifestManagerCategory.id,
+      location: 'Manifest',
+      shiftId: thursdayFull.id,
+      maxRegistrations: 1
+    }
+  });
+
+  await prisma.job.create({
+    data: {
+      name: 'Manifest Manager - Friday',
+      categoryId: manifestManagerCategory.id,
+      location: 'Manifest',
+      shiftId: fridayFull.id,
+      maxRegistrations: 1
+    }
+  });
+
+  await prisma.job.create({
+    data: {
+      name: 'Manifest Manager - Saturday',
+      categoryId: manifestManagerCategory.id,
+      location: 'Manifest',
+      shiftId: saturdayFull.id,
+      maxRegistrations: 1
+    }
+  });
+
+  // Teardown jobs - Closing Sunday shifts (50 for first shift, 20 for second)
+  await prisma.job.create({
+    data: {
+      name: 'Teardown Team 1',
+      categoryId: teardownCategory.id,
+      location: 'Entire Camp',
+      shiftId: closingSunday1.id,
+      maxRegistrations: 50
+    }
+  });
+
+  await prisma.job.create({
+    data: {
+      name: 'Teardown Team 2',
+      categoryId: teardownCategory.id,
+      location: 'Entire Camp',
+      shiftId: closingSunday2.id,
+      maxRegistrations: 20
     }
   });
 
