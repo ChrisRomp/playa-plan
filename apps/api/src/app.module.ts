@@ -38,7 +38,7 @@ import validationSchema from './config/validation.schema';
     // Security modules
     ThrottlingModule.register({
       ttl: 60, // 60 second window
-      limit: 100, // 100 requests per minute by default
+      limit: 300, // 300 requests per minute by default (5 per second)
       ignoreGetRequests: true, // Don't throttle GET requests
     }),
     // Feature modules

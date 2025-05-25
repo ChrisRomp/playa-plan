@@ -67,12 +67,12 @@ export class ThrottlingModule {
                 {
                   name: 'default',
                   ttl: ttlMs,
-                  limit: Math.min(limit, 120) // 120 requests per minute for normal usage
+                  limit: Math.min(limit, 300) // 300 requests per minute for normal usage
                 },
                 {
                   name: 'auth',
                   ttl: ttlMs,
-                  limit: Math.min(limit, 10) // 10 requests per minute for auth endpoints
+                  limit: Math.min(limit, 30) // 30 requests per minute for auth endpoints
                 }
               ]
             };
@@ -92,12 +92,12 @@ export class ThrottlingModule {
                 {
                   name: 'default',
                   ttl: 60000,
-                  limit: 60
+                  limit: 300
                 },
                 {
                   name: 'auth',
                   ttl: 60000,
-                  limit: 10
+                  limit: 30
                 }
               ]
             };

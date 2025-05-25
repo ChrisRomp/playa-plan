@@ -56,12 +56,12 @@ describe('ThrottlingGuard', () => {
         {
           name: 'default',
           ttl: 60000,
-          limit: 120,
+          limit: 300,
         },
         {
           name: 'auth',
           ttl: 60000,
-          limit: 10,
+          limit: 30,
         },
       ],
     };
