@@ -41,7 +41,7 @@ jobs:
 
       - name: Set up environment
         run: |
-          cp .env.example .env
+          cp .env.sample .env
           sed -i 's|DATABASE_URL="[^"]*"|DATABASE_URL="postgresql://postgres:postgres@localhost:5432/playa_plan_test?schema=public"|' .env
 
       - name: Install dependencies for all workspaces
