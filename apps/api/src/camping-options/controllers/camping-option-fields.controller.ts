@@ -20,16 +20,12 @@ import { CampingOptionsService } from '../services/camping-options.service';
 import { 
   CreateCampingOptionFieldDto, 
   UpdateCampingOptionFieldDto,
-  CampingOptionFieldResponseDto 
+  CampingOptionFieldResponseDto,
+  ReorderFieldsDto
 } from '../dto';
 import { UserRole } from '@prisma/client';
 
-/**
- * DTO for reordering fields
- */
-class ReorderFieldsDto {
-  fieldOrders!: Array<{ id: string; order: number }>;
-}
+
 
 /**
  * Controller for managing camping option fields

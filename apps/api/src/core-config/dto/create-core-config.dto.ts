@@ -78,7 +78,7 @@ export class CreateCoreConfigDto {
   })
   @IsString()
   @IsOptional()
-  @Length(1, 250)
+  @Length(0, 250)
   campBannerAltText?: string;
 
   /**
@@ -105,7 +105,7 @@ export class CreateCoreConfigDto {
   })
   @IsString()
   @IsOptional()
-  @Length(1, 250)
+  @Length(0, 250)
   campIconAltText?: string;
 
   /**

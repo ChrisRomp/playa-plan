@@ -47,7 +47,6 @@ describe('CampingOptionFieldsController (e2e)', () => {
   let prisma: PrismaService;
   let adminToken: string;
   let userToken: string;
-  let testCampId: string;
   let testCampingOptionId: string;
 
   beforeAll(async () => {
@@ -61,20 +60,7 @@ describe('CampingOptionFieldsController (e2e)', () => {
     await app.init();
 
     // Create test data
-    // Create a test camp
-    const camp = await prisma.camp.create({
-      data: {
-        name: 'Test Camp for Fields',
-        startDate: new Date('2023-08-01'),
-        endDate: new Date('2023-08-07'),
-        description: 'Test Camp Description',
-        location: 'Test Location',
-        capacity: 100,
-      },
-    });
-    testCampId = camp.id;
-
-    // Create a test camping option
+    // Create a test camping option (camp entity was removed from schema)
     const campingOption = await prisma.campingOption.create({
       data: {
         name: 'Test Camping Option for Fields',
@@ -84,8 +70,6 @@ describe('CampingOptionFieldsController (e2e)', () => {
         participantDues: 200.00,
         staffDues: 100.00,
         maxSignups: 30,
-        campId: testCampId,
-        jobCategoryIds: [],
       }
     });
 
@@ -148,16 +132,9 @@ describe('CampingOptionFieldsController (e2e)', () => {
 
   afterAll(async () => {
     // Clean up test data
-    // First delete camping option fields (will cascade to camping option fields)
+    // Delete camping option (will cascade to camping option fields)
     await prisma.campingOption.delete({
       where: { id: testCampingOptionId },
-    }).catch(() => {
-      // Ignore errors if already deleted
-    });
-
-    // Then delete camp
-    await prisma.camp.delete({
-      where: { id: testCampId },
     }).catch(() => {
       // Ignore errors if already deleted
     });
@@ -348,6 +325,198 @@ describe('CampingOptionFieldsController (e2e)', () => {
         .delete(`/camping-option-fields/${fieldId}`)
         .set('Authorization', `Bearer ${userToken}`)
         .expect(403);
+    });
+  });
+
+  describe('PATCH /camping-option-fields/reorder/:campingOptionId', () => {
+    let field1Id: string;
+    let field2Id: string;
+    let field3Id: string;
+
+    beforeAll(async () => {
+      // Create multiple fields to test reordering
+      const field1 = await prisma.campingOptionField.create({
+        data: {
+          displayName: 'Field 1 for Reorder',
+          description: 'First field',
+          dataType: 'STRING',
+          required: true,
+          order: 0,
+          campingOptionId: testCampingOptionId,
+        }
+      });
+
+      const field2 = await prisma.campingOptionField.create({
+        data: {
+          displayName: 'Field 2 for Reorder',
+          description: 'Second field',
+          dataType: 'INTEGER',
+          required: false,
+          order: 1,
+          campingOptionId: testCampingOptionId,
+        }
+      });
+
+      const field3 = await prisma.campingOptionField.create({
+        data: {
+          displayName: 'Field 3 for Reorder',
+          description: 'Third field',
+          dataType: 'BOOLEAN',
+          required: true,
+          order: 2,
+          campingOptionId: testCampingOptionId,
+        }
+      });
+
+      field1Id = field1.id;
+      field2Id = field2.id;
+      field3Id = field3.id;
+    });
+
+    it('should reorder fields successfully (admin)', async () => {
+      const reorderDto = {
+        fieldOrders: [
+          { id: field2Id, order: 0 },
+          { id: field3Id, order: 1 },
+          { id: field1Id, order: 2 }
+        ]
+      };
+
+      const response = await request(app.getHttpServer())
+        .patch(`/camping-option-fields/reorder/${testCampingOptionId}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send(reorderDto)
+        .expect(200);
+
+      expect(Array.isArray(response.body)).toBe(true);
+      expect(response.body.length).toBe(3);
+
+      // Verify the new order
+      const field2 = response.body.find((f: { id: string; order: number }) => f.id === field2Id);
+      const field3 = response.body.find((f: { id: string; order: number }) => f.id === field3Id);
+      const field1 = response.body.find((f: { id: string; order: number }) => f.id === field1Id);
+
+      expect(field2?.order).toBe(0);
+      expect(field3?.order).toBe(1);
+      expect(field1?.order).toBe(2);
+    });
+
+    it('should not reorder fields (non-admin)', async () => {
+      const reorderDto = {
+        fieldOrders: [
+          { id: field1Id, order: 0 },
+          { id: field2Id, order: 1 }
+        ]
+      };
+
+      await request(app.getHttpServer())
+        .patch(`/camping-option-fields/reorder/${testCampingOptionId}`)
+        .set('Authorization', `Bearer ${userToken}`)
+        .send(reorderDto)
+        .expect(403);
+    });
+
+    it('should return 404 for non-existent camping option', async () => {
+      const reorderDto = {
+        fieldOrders: [
+          { id: field1Id, order: 0 }
+        ]
+      };
+
+      await request(app.getHttpServer())
+        .patch('/camping-option-fields/reorder/00000000-0000-0000-0000-000000000000')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send(reorderDto)
+        .expect(404);
+    });
+
+    it('should return 400 for invalid field IDs', async () => {
+      const reorderDto = {
+        fieldOrders: [
+          { id: '00000000-0000-0000-0000-000000000000', order: 0 }
+        ]
+      };
+
+      await request(app.getHttpServer())
+        .patch(`/camping-option-fields/reorder/${testCampingOptionId}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send(reorderDto)
+        .expect(400);
+    });
+
+    it('should return 400 for validation errors - invalid payload structure', async () => {
+      // Test the exact error scenario from the user's report
+      const invalidPayload = {
+        // Missing fieldOrders property
+        someOtherProperty: 'invalid'
+      };
+
+      const response = await request(app.getHttpServer())
+        .patch(`/camping-option-fields/reorder/${testCampingOptionId}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send(invalidPayload)
+        .expect(400);
+
+      expect(response.body.statusCode).toBe(400);
+      expect(response.body.error).toBe('Bad Request');
+      expect(Array.isArray(response.body.message)).toBe(true);
+    });
+
+    it('should return 400 for validation errors - invalid field ID format', async () => {
+      const invalidPayload = {
+        fieldOrders: [
+          { id: 'not-a-uuid', order: 0 }
+        ]
+      };
+
+      const response = await request(app.getHttpServer())
+        .patch(`/camping-option-fields/reorder/${testCampingOptionId}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send(invalidPayload)
+        .expect(400);
+
+      expect(response.body.statusCode).toBe(400);
+      expect(response.body.error).toBe('Bad Request');
+      expect(Array.isArray(response.body.message)).toBe(true);
+      expect(response.body.message.some((msg: string) => msg.includes('must be a UUID'))).toBe(true);
+    });
+
+    it('should return 400 for validation errors - negative order value', async () => {
+      const invalidPayload = {
+        fieldOrders: [
+          { id: field1Id, order: -1 }
+        ]
+      };
+
+      const response = await request(app.getHttpServer())
+        .patch(`/camping-option-fields/reorder/${testCampingOptionId}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send(invalidPayload)
+        .expect(400);
+
+      expect(response.body.statusCode).toBe(400);
+      expect(response.body.error).toBe('Bad Request');
+      expect(Array.isArray(response.body.message)).toBe(true);
+      expect(response.body.message.some((msg: string) => msg.includes('must not be less than 0'))).toBe(true);
+    });
+
+    it('should return 400 for validation errors - missing required fields', async () => {
+      const invalidPayload = {
+        fieldOrders: [
+          { id: field1Id } // Missing order property
+        ]
+      };
+
+      const response = await request(app.getHttpServer())
+        .patch(`/camping-option-fields/reorder/${testCampingOptionId}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send(invalidPayload)
+        .expect(400);
+
+      expect(response.body.statusCode).toBe(400);
+      expect(response.body.error).toBe('Bad Request');
+      expect(Array.isArray(response.body.message)).toBe(true);
+      expect(response.body.message.some((msg: string) => msg.includes('order'))).toBe(true);
     });
   });
 }); 

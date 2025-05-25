@@ -246,5 +246,46 @@ describe('CampingOptionFieldsService', () => {
 
       await expect(service.reorderFields('camping-option-id', fieldOrders)).rejects.toThrow(BadRequestException);
     });
+
+    it('should handle the exact scenario from user report - missing camping option ID validation', async () => {
+      const fieldOrders = [
+        { id: 'e3e4f056-ee1c-4729-80a1-4611403e2217', order: 0 },
+        { id: 'dad1fd3b-a10c-4fd5-9fdc-2067c63c6a12', order: 1 },
+        { id: '8ba1f11a-c48d-40ea-a2b0-3f8d5ecbfb73', order: 2 },
+        { id: '5e5f2be3-0bde-4187-bb49-07f422834318', order: 3 },
+        { id: '03ab222f-c521-4e28-9456-33d3849561ed', order: 4 }
+      ];
+
+      // Mock camping option not found
+      jest.spyOn(prismaService.campingOption, 'findUnique').mockResolvedValueOnce(null);
+
+      await expect(service.reorderFields('05c1eea1-2441-4478-a7c4-85df669dd2d7', fieldOrders))
+        .rejects.toThrow(NotFoundException);
+    });
+
+    it('should handle field order validation correctly', async () => {
+      const fieldOrders = [
+        { id: 'e3e4f056-ee1c-4729-80a1-4611403e2217', order: 0 },
+        { id: 'dad1fd3b-a10c-4fd5-9fdc-2067c63c6a12', order: 1 }
+      ];
+
+      // Mock successful field lookup but one field doesn't belong to camping option
+      jest.spyOn(prismaService.campingOptionField, 'findMany').mockResolvedValueOnce([
+        { id: 'e3e4f056-ee1c-4729-80a1-4611403e2217' }
+        // Missing second field - simulates field not belonging to camping option
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ] as any);
+
+      await expect(service.reorderFields('camping-option-id', fieldOrders))
+        .rejects.toThrow(BadRequestException);
+      
+      expect(prismaService.campingOptionField.findMany).toHaveBeenCalledWith({
+        where: { 
+          campingOptionId: 'camping-option-id',
+          id: { in: ['e3e4f056-ee1c-4729-80a1-4611403e2217', 'dad1fd3b-a10c-4fd5-9fdc-2067c63c6a12'] }
+        },
+        select: { id: true },
+      });
+    });
   });
 }); 
