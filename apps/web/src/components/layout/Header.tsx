@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { Menu, X } from 'lucide-react';
 import { useConfig } from '../../store/ConfigContext';
+import { PATHS } from '../../routes';
 import Navigation from './Navigation';
 
 const Header: React.FC = () => {
@@ -69,7 +71,11 @@ const Header: React.FC = () => {
         
         <div className="absolute inset-0 flex flex-col justify-between p-4 md:p-8">
           <div className="flex justify-between items-center relative z-20 w-full">
-            <div className="flex-shrink-0 flex items-center space-x-4">
+            <Link 
+              to={PATHS.DASHBOARD} 
+              className="flex-shrink-0 flex items-center space-x-4 hover:opacity-80 transition-opacity duration-200"
+              aria-label="Go to dashboard"
+            >
               <img 
                 src={iconUrl} 
                 alt={config.iconAltText || `${config.name} camp icon`}
@@ -82,7 +88,7 @@ const Header: React.FC = () => {
               }`}>
                 {config.name}
               </h1>
-            </div>
+            </Link>
             
             <button 
               onClick={toggleMenu}
@@ -100,9 +106,15 @@ const Header: React.FC = () => {
           </div>
           
           <div className={`mt-auto transition-opacity duration-300 ${isScrolled ? 'opacity-0' : 'opacity-100'}`}>
-            <h2 className="text-white text-3xl md:text-4xl font-bold mb-2 drop-shadow-lg">
-              {config.name}
-            </h2>
+            <Link 
+              to={PATHS.DASHBOARD} 
+              className="inline-block hover:opacity-80 transition-opacity duration-200"
+              aria-label="Go to dashboard"
+            >
+              <h2 className="text-white text-3xl md:text-4xl font-bold mb-2 drop-shadow-lg">
+                {config.name}
+              </h2>
+            </Link>
             <p className="text-white/90 text-lg md:text-xl drop-shadow-md">
               {config.description}
             </p>
