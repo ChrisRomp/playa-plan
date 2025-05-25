@@ -14,6 +14,21 @@ jobs:
       # If you want to clone the repository as part of your setup steps, for example to install dependencies, you'll need the `contents: read` permission.
       contents: read
 
+    services:
+      postgres:
+        image: postgres:14
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: playa_plan_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -23,6 +38,11 @@ jobs:
         with:
           node-version: "22"
           cache: "npm"
+
+      - name: Set up environment
+        run: |
+          cp .env.example .env
+          sed -i 's|DATABASE_URL="[^"]*"|DATABASE_URL="postgresql://postgres:postgres@localhost:5432/playa_plan_test?schema=public"|' .env
 
       - name: Install dependencies for all workspaces
         run: npm ci
