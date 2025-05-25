@@ -26,11 +26,13 @@
     "prisma:reset": "prisma migrate reset --schema=./prisma/schema.prisma --force",
     "prisma:reset:test": "dotenv -e .env.test -- prisma migrate reset --schema=./prisma/schema.prisma --force",
     "prisma:studio": "prisma studio --schema=./prisma/schema.prisma",
+    "prisma:migrate:manual": "node ./scripts/apply-manual-migrations.js",
     "seed": "ts-node ./prisma/seeds/seed.ts",
     "seed:dev": "ts-node ./prisma/seeds/seed.ts",
     "seed:test": "dotenv -e .env.test -- ts-node ./prisma/seeds/seed.ts",
     "db:setup": "npm run prisma:generate && npm run prisma:migrate:dev && npm run seed:dev",
-    "db:setup:test": "npm run prisma:generate && npm run prisma:migrate:test && npm run seed:test"
+    "db:setup:test": "npm run prisma:generate && npm run prisma:migrate:test && npm run seed:test",
+    "db:setup:manual": "npm run prisma:generate && npm run prisma:migrate:manual && npm run seed:dev"
   },
   "prisma": {
     "seed": "ts-node ./prisma/seeds/seed.ts"
@@ -59,6 +61,7 @@
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "passport-local": "^1.0.0",
+    "pg": "^8.11.3",
     "reflect-metadata": "^0.1.14",
     "rxjs": "^7.8.2",
     "sanitize-html": "^2.16.0",
