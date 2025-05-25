@@ -23,7 +23,6 @@ export const UserSchema = z.object({
   stateProvince: z.string().optional().nullable(),
   country: z.string().optional().nullable(),
   emergencyContact: z.string().optional().nullable(),
-  internalNotes: z.string().optional().nullable(),
 });
 
 /**
@@ -52,7 +51,6 @@ export const CreateUserSchema = z.object({
   allowEarlyRegistration: z.boolean().optional(),
   allowDeferredDuesPayment: z.boolean().optional(),
   allowNoJob: z.boolean().optional(),
-  internalNotes: z.string().optional(),
 });
 
 /**
@@ -81,7 +79,6 @@ export const UpdateUserSchema = z.object({
   allowDeferredDuesPayment: z.boolean().optional(),
   allowNoJob: z.boolean().optional(),
   internalNotes: z.string().optional(),
-});
 
 /**
  * UpdateUserDTO type derived from the schema

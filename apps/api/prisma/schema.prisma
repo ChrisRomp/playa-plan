@@ -29,7 +29,6 @@ model User {
   city                       String?
   country                    String?
   emergencyContact           String?
-  internalNotes              String?
   phone                      String?
   stateProvince              String?
   loginCode                  String?
