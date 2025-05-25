@@ -228,12 +228,24 @@ export default function RegistrationPage() {
       customFields.forEach(field => {
         const value = formData.customFields[field.id];
         
-        if (field.required && (value === undefined || value === '')) {
-          errors[`field_${field.id}`] = `${field.displayName} is required`;
+        // For required fields, check if value is missing
+        if (field.required) {
+          if (field.dataType === 'INTEGER' || field.dataType === 'NUMBER') {
+            // For number fields, check if value is null, undefined, or empty string
+            // but allow 0 as a valid value
+            if (value === undefined || value === null || value === '') {
+              errors[`field_${field.id}`] = `${field.displayName} is required`;
+            }
+          } else {
+            // For other field types, check if value is undefined or empty string
+            if (value === undefined || value === '') {
+              errors[`field_${field.id}`] = `${field.displayName} is required`;
+            }
+          }
         }
         
-        if (value !== undefined && value !== '') {
-          // Type-specific validations
+        // Type-specific validations (only if value is provided)
+        if (value !== undefined && value !== null && value !== '') {
           switch (field.dataType) {
             case 'STRING':
             case 'MULTILINE_STRING': {
@@ -246,11 +258,13 @@ export default function RegistrationPage() {
             case 'INTEGER':
             case 'NUMBER': {
               const numValue = Number(value);
-              if (field.minValue !== null && numValue < field.minValue!) {
-                errors[`field_${field.id}`] = `${field.displayName} must be at least ${field.minValue}`;
-              }
-              if (field.maxValue !== null && numValue > field.maxValue!) {
-                errors[`field_${field.id}`] = `${field.displayName} must be at most ${field.maxValue}`;
+              if (!isNaN(numValue)) {
+                if (field.minValue !== null && numValue < field.minValue!) {
+                  errors[`field_${field.id}`] = `${field.displayName} must be at least ${field.minValue}`;
+                }
+                if (field.maxValue !== null && numValue > field.maxValue!) {
+                  errors[`field_${field.id}`] = `${field.displayName} must be at most ${field.maxValue}`;
+                }
               }
               break;
             }
@@ -667,7 +681,7 @@ export default function RegistrationPage() {
       <div>
         <h2 className="text-xl font-semibold mb-4">Additional Information</h2>
         
-        <div className="space-y-6">
+        <div className="space-y-4">
           {allCustomFields.map(field => {
             const fieldId = field.id;
             const value = formData.customFields[fieldId] || '';
@@ -688,19 +702,19 @@ export default function RegistrationPage() {
                 {field.dataType === 'STRING' && (
                   <input
                     type="text"
-                    value={value as string}
+                    value={value === undefined || value === null ? '' : String(value)}
                     onChange={(e) => handleCustomFieldChange(fieldId, e.target.value)}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
                     maxLength={field.maxLength || undefined}
                   />
                 )}
                 
                 {field.dataType === 'MULTILINE_STRING' && (
                   <textarea
-                    value={value as string}
+                    value={value === undefined || value === null ? '' : String(value)}
                     onChange={(e) => handleCustomFieldChange(fieldId, e.target.value)}
                     rows={3}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
                     maxLength={field.maxLength || undefined}
                   />
                 )}
@@ -709,7 +723,7 @@ export default function RegistrationPage() {
                   <input
                     type="number"
                     step="1"
-                    value={value as string}
+                    value={value === undefined || value === null ? '' : String(value)}
                     onChange={(e) => {
                       const val = e.target.value;
                       if (val === '') {
@@ -719,7 +733,7 @@ export default function RegistrationPage() {
                         handleCustomFieldChange(fieldId, isNaN(parsed) ? '' : parsed);
                       }
                     }}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     min={field.minValue !== null ? field.minValue : undefined}
                     max={field.maxValue !== null ? field.maxValue : undefined}
                   />
@@ -729,7 +743,7 @@ export default function RegistrationPage() {
                   <input
                     type="number"
                     step="0.01"
-                    value={value as string}
+                    value={value === undefined || value === null ? '' : String(value)}
                     onChange={(e) => {
                       const val = e.target.value;
                       if (val === '') {
@@ -739,7 +753,7 @@ export default function RegistrationPage() {
                         handleCustomFieldChange(fieldId, isNaN(parsed) ? '' : parsed);
                       }
                     }}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     min={field.minValue !== null ? field.minValue : undefined}
                     max={field.maxValue !== null ? field.maxValue : undefined}
                   />
@@ -760,9 +774,9 @@ export default function RegistrationPage() {
                 {field.dataType === 'DATE' && (
                   <input
                     type="date"
-                    value={value as string}
+                    value={value === undefined || value === null ? '' : String(value)}
                     onChange={(e) => handleCustomFieldChange(fieldId, e.target.value)}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
                   />
                 )}
                 
