@@ -67,6 +67,11 @@ export function useUsers() {
     setLoading(true);
     setError(null);
     try {
+      // Remove internalNotes if present as it's now handled separately
+      if ('internalNotes' in userData) {
+        delete userData.internalNotes;
+      }
+
       const response = await api.put(`/users/${id}`, userData);
       const updatedUser = UserSchema.parse(response.data);
       setUsers(prev => prev.map(user => user.id === id ? updatedUser : user));

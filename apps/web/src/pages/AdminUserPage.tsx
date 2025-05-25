@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useUsers } from '../hooks/useUsers';
 import { User, CreateUserDTO, UpdateUserDTO } from '../types/users';
 import { ROUTES } from '../routes';
+import UserNotesSection from '../components/UserNotesSection';
 
 /**
  * Admin User Management Page
@@ -437,21 +438,6 @@ const AdminUserPage: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Internal Notes */}
-                  <div>
-                    <label htmlFor="internalNotes" className="block text-sm font-medium text-gray-700">
-                      Internal Notes
-                    </label>
-                    <textarea
-                      name="internalNotes"
-                      id="internalNotes"
-                      rows={3}
-                      value={formData.internalNotes || ''}
-                      onChange={handleInputChange}
-                      className="mt-1 block w-full shadow-sm sm:text-sm rounded-md border-gray-300 focus:ring-indigo-500 focus:border-indigo-500"
-                    />
-                  </div>
-
                   <div className="flex justify-end space-x-3 pt-4">
                     <button
                       type="button"
@@ -470,6 +456,11 @@ const AdminUserPage: React.FC = () => {
                 </div>
               </form>
             </div>
+          )}
+
+          {/* User Notes Section - only show when a user is selected */}
+          {selectedUser && (
+            <UserNotesSection userId={selectedUser.id} />
           )}
 
           {!isCreating && !isEditing && (
