@@ -80,11 +80,7 @@ npm run test:watch
 
 ## GitHub Copilot Configuration
 
-The repository includes a `.github/copilot-config.json` file that configures GitHub Copilot to understand the development environment, including:
-
-- Install command
-- Development command and ports
-- Test command
+The repository includes a GitHub workflow in `.github/workflows/copilot-setup-steps.yml` that sets up the development environment for GitHub Copilot.
 
 ## Database Setup
 
