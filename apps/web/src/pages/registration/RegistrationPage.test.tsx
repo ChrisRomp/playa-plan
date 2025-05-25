@@ -342,4 +342,424 @@ describe('RegistrationPage', () => {
   });
 
   // Add more tests as needed for other steps in the registration flow
+
+  describe('Job Selection Validation', () => {
+    // Mock data for job validation tests
+    const mockSkydivingOption = {
+      id: 'skydiving',
+      name: 'Skydiving',
+      description: 'Skydiving camping option',
+      enabled: true,
+      workShiftsRequired: 1, // Requires 1 camping job
+      participantDues: 600,
+      staffDues: 600,
+      maxSignups: 60,
+      currentRegistrations: 10,
+      createdAt: '2025-05-01T00:00:00Z',
+      updatedAt: '2025-05-01T00:00:00Z',
+      jobCategoryIds: ['artCar', 'manifest'],
+    };
+
+    const mockTeardownCategory = {
+      id: 'teardown',
+      name: 'Teardown',
+      description: 'Help with camp breakdown and mooping',
+      alwaysRequired: true, // Always required
+      staffOnly: false,
+    };
+
+    const mockArtCarCategory = {
+      id: 'artCar',
+      name: 'Art Car Driver',
+      description: 'Driving the art car',
+      alwaysRequired: false,
+      staffOnly: false,
+    };
+
+    const mockManifestCategory = {
+      id: 'manifest',
+      name: 'Manifest Assistant',
+      description: 'Working at manifest',
+      alwaysRequired: false,
+      staffOnly: false,
+    };
+
+    const mockTeardownJob1 = {
+      id: 'teardown1',
+      name: 'Teardown Team 1',
+      categoryId: 'teardown',
+      shiftId: 'shift1',
+      category: mockTeardownCategory,
+      maxRegistrations: 50,
+      currentRegistrations: 10,
+      location: 'Entire Camp',
+    };
+
+    const mockTeardownJob2 = {
+      id: 'teardown2',
+      name: 'Teardown Team 2',
+      categoryId: 'teardown',
+      shiftId: 'shift2',
+      category: mockTeardownCategory,
+      maxRegistrations: 20,
+      currentRegistrations: 5,
+      location: 'Entire Camp',
+    };
+
+    const mockArtCarJob = {
+      id: 'artcar1',
+      name: 'Art Car Driver - Wednesday AM',
+      categoryId: 'artCar',
+      shiftId: 'shift1',
+      category: mockArtCarCategory,
+      maxRegistrations: 2,
+      currentRegistrations: 0,
+      location: 'Between Camp and Airport',
+    };
+
+    const mockManifestJob = {
+      id: 'manifest1',
+      name: 'Manifest Assistant - Wednesday AM',
+      categoryId: 'manifest',
+      shiftId: 'shift1',
+      category: mockManifestCategory,
+      maxRegistrations: 3,
+      currentRegistrations: 1,
+      location: 'Manifest',
+    };
+
+    beforeEach(() => {
+      // Override mocks for job validation tests
+      vi.spyOn(useRegistrationModule, 'useRegistration').mockReturnValue({
+        campingOptions: [mockSkydivingOption],
+        jobCategories: [mockTeardownCategory, mockArtCarCategory, mockManifestCategory],
+        jobs: [mockTeardownJob1, mockTeardownJob2, mockArtCarJob, mockManifestJob],
+        shifts: mockShifts,
+        loading: false,
+        error: null,
+        fetchCampingOptions: vi.fn(),
+        fetchJobCategories: vi.fn(),
+        fetchShifts: vi.fn(),
+        fetchJobs: vi.fn(),
+        submitRegistration: vi.fn().mockResolvedValue({}),
+      });
+      
+      // Mock useCampingOptions to return no custom fields for easier testing
+      vi.spyOn(useCampingOptionsModule, 'useCampingOptions').mockReturnValue({
+        options: [],
+        selectedOption: null,
+        fields: [], // No custom fields for job validation tests
+        loading: false,
+        error: null,
+        loadCampingOptions: vi.fn(),
+        loadCampingOption: vi.fn(),
+        createCampingOption: vi.fn(),
+        updateCampingOption: vi.fn(),
+        deleteCampingOption: vi.fn(),
+        loadCampingOptionFields: vi.fn().mockResolvedValue([]), // Return empty array
+        createCampingOptionField: vi.fn(),
+        updateCampingOptionField: vi.fn(),
+        deleteCampingOptionField: vi.fn(),
+      });
+    });
+
+    const navigateToJobsStep = async () => {
+      renderWithAuth();
+      
+      // Step 1: Fill profile form
+      fireEvent.change(screen.getByLabelText('First Name*'), { target: { value: 'Test' } });
+      fireEvent.change(screen.getByLabelText('Last Name*'), { target: { value: 'User' } });
+      fireEvent.change(screen.getByLabelText('Phone Number*'), { target: { value: '555-1234' } });
+      fireEvent.change(screen.getByLabelText('Emergency Contact(s)*'), { target: { value: 'Emergency Contact' } });
+      fireEvent.click(screen.getByText('Continue'));
+      
+      // Step 2: Select camping option
+      await waitFor(() => {
+        expect(screen.getByText('Select Camping Options')).toBeInTheDocument();
+      });
+      fireEvent.click(screen.getByLabelText(/Skydiving/));
+      fireEvent.click(screen.getByText('Continue'));
+      
+      // Step 3: Handle custom fields step (should show "No additional information" since we mocked no fields)
+      await waitFor(() => {
+        expect(screen.getByText('Additional Information')).toBeInTheDocument();
+      });
+      
+      // Should show "No additional information is required" message
+      expect(screen.getByText('No additional information is required for your selected camping options.')).toBeInTheDocument();
+      fireEvent.click(screen.getByText('Continue'));
+      
+      // Step 4: Now on jobs step
+      await waitFor(() => {
+        expect(screen.getByText('Select Work Shifts')).toBeInTheDocument();
+      });
+    };
+
+    it('should enforce both camping option jobs and always required jobs separately', async () => {
+      await navigateToJobsStep();
+      
+      // Should see both camping option jobs and always required jobs
+      expect(screen.getByText('Camp Shifts: 1 required')).toBeInTheDocument();
+      expect(screen.getByText('Additional Shifts: 1 required')).toBeInTheDocument();
+      
+      // Try to continue without selecting any jobs
+      fireEvent.click(screen.getByText('Continue'));
+      
+      // Should show validation errors
+      await waitFor(() => {
+        expect(screen.getAllByText('You need to select at least 2 shifts')).toHaveLength(2);
+        expect(screen.getAllByText('You must select at least 1 Skydiving work shift')).toHaveLength(2);
+        expect(screen.getAllByText('You must select at least one Teardown shift')).toHaveLength(2);
+      });
+    });
+
+    it('should reject selection of only teardown jobs when camping jobs are required', async () => {
+      await navigateToJobsStep();
+      
+      // Select two teardown jobs but no camping jobs
+      fireEvent.click(screen.getByLabelText(/Teardown Team 1/));
+      fireEvent.click(screen.getByLabelText(/Teardown Team 2/));
+      
+      // Try to continue
+      fireEvent.click(screen.getByText('Continue'));
+      
+      // Should show camping job validation error
+      await waitFor(() => {
+        expect(screen.getAllByText('You must select at least 1 Skydiving work shift')).toHaveLength(2);
+      });
+      
+      // Should NOT show teardown error (since we selected teardown jobs)
+      expect(screen.queryByText('You must select at least one Teardown shift')).not.toBeInTheDocument();
+    });
+
+    it('should reject selection of only camping jobs when teardown is required', async () => {
+      await navigateToJobsStep();
+      
+      // Select two camping jobs but no teardown jobs
+      fireEvent.click(screen.getByLabelText(/Art Car Driver/));
+      fireEvent.click(screen.getByLabelText(/Manifest Assistant/));
+      
+      // Try to continue
+      fireEvent.click(screen.getByText('Continue'));
+      
+      // Should show teardown validation error
+      await waitFor(() => {
+        expect(screen.getAllByText('You must select at least one Teardown shift')).toHaveLength(2);
+      });
+      
+      // Should NOT show camping job error (since we selected enough camping jobs)
+      expect(screen.queryByText('You must select at least 1 Skydiving work shift')).not.toBeInTheDocument();
+    });
+
+    it('should accept valid selection of both camping and teardown jobs', async () => {
+      await navigateToJobsStep();
+      
+      // Select one camping job and one teardown job
+      fireEvent.click(screen.getByLabelText(/Art Car Driver/));
+      fireEvent.click(screen.getByLabelText(/Teardown Team 1/));
+      
+      // Try to continue
+      fireEvent.click(screen.getByText('Continue'));
+      
+      // Should proceed to next step without validation errors
+      await waitFor(() => {
+        expect(screen.getByText('Review & Accept Terms')).toBeInTheDocument();
+      });
+      
+      // Should not show any job validation errors
+      expect(screen.queryByText('You must select at least 1 Skydiving work shift')).not.toBeInTheDocument();
+      expect(screen.queryByText('You must select at least one Teardown shift')).not.toBeInTheDocument();
+    });
+
+    it('should handle camping options with multiple work shifts required', async () => {
+      // Mock camping option that requires 2 work shifts
+      const multiShiftOption = {
+        ...mockSkydivingOption,
+        workShiftsRequired: 2,
+      };
+      
+      vi.spyOn(useRegistrationModule, 'useRegistration').mockReturnValue({
+        campingOptions: [multiShiftOption],
+        jobCategories: [mockTeardownCategory, mockArtCarCategory, mockManifestCategory],
+        jobs: [mockTeardownJob1, mockTeardownJob2, mockArtCarJob, mockManifestJob],
+        shifts: mockShifts,
+        loading: false,
+        error: null,
+        fetchCampingOptions: vi.fn(),
+        fetchJobCategories: vi.fn(),
+        fetchShifts: vi.fn(),
+        fetchJobs: vi.fn(),
+        submitRegistration: vi.fn().mockResolvedValue({}),
+      });
+      
+      await navigateToJobsStep();
+      
+      // Should show updated requirement
+      expect(screen.getByText('Camp Shifts: 2 required')).toBeInTheDocument();
+      
+      // Select only one camping job and one teardown job
+      fireEvent.click(screen.getByLabelText(/Art Car Driver/));
+      fireEvent.click(screen.getByLabelText(/Teardown Team 1/));
+      
+      // Try to continue
+      fireEvent.click(screen.getByText('Continue'));
+      
+      // Should show camping job validation error for insufficient camping jobs
+      await waitFor(() => {
+        expect(screen.getAllByText('You must select at least 2 Skydiving work shifts')).toHaveLength(2);
+      });
+      
+      // Add another camping job
+      fireEvent.click(screen.getByLabelText(/Manifest Assistant/));
+      
+      // Try to continue again
+      fireEvent.click(screen.getByText('Continue'));
+      
+      // Should now proceed successfully
+      await waitFor(() => {
+        expect(screen.getByText('Review & Accept Terms')).toBeInTheDocument();
+      });
+    });
+
+    it('should handle multiple always required categories', async () => {
+      // Add another always required category
+      const mockSecondRequiredCategory = {
+        id: 'security',
+        name: 'Security',
+        description: 'Security duties',
+        alwaysRequired: true,
+        staffOnly: false,
+      };
+      
+      const mockSecurityJob = {
+        id: 'security1',
+        name: 'Security Patrol',
+        categoryId: 'security',
+        shiftId: 'shift1',
+        category: mockSecondRequiredCategory,
+        maxRegistrations: 5,
+        currentRegistrations: 2,
+        location: 'Camp Perimeter',
+      };
+      
+      vi.spyOn(useRegistrationModule, 'useRegistration').mockReturnValue({
+        campingOptions: [mockSkydivingOption],
+        jobCategories: [mockTeardownCategory, mockSecondRequiredCategory, mockArtCarCategory, mockManifestCategory],
+        jobs: [mockTeardownJob1, mockTeardownJob2, mockSecurityJob, mockArtCarJob, mockManifestJob],
+        shifts: mockShifts,
+        loading: false,
+        error: null,
+        fetchCampingOptions: vi.fn(),
+        fetchJobCategories: vi.fn(),
+        fetchShifts: vi.fn(),
+        fetchJobs: vi.fn(),
+        submitRegistration: vi.fn().mockResolvedValue({}),
+      });
+      
+      await navigateToJobsStep();
+      
+      // Should show 2 required additional shifts
+      expect(screen.getByText('Additional Shifts: 2 required')).toBeInTheDocument();
+      
+      // Select camping job and only one required job
+      fireEvent.click(screen.getByLabelText(/Art Car Driver/));
+      fireEvent.click(screen.getByLabelText(/Teardown Team 1/));
+      
+      // Try to continue
+      fireEvent.click(screen.getByText('Continue'));
+      
+      // Should show validation error for missing security job
+      await waitFor(() => {
+        expect(screen.getAllByText('You must select at least one Security shift')).toHaveLength(2);
+      });
+      
+      // Add security job
+      fireEvent.click(screen.getByLabelText(/Security Patrol/));
+      
+      // Try to continue again
+      fireEvent.click(screen.getByText('Continue'));
+      
+      // Should now proceed successfully
+      await waitFor(() => {
+        expect(screen.getByText('Review & Accept Terms')).toBeInTheDocument();
+      });
+    });
+
+    it('should handle multiple camping options with different work shift requirements', async () => {
+      // Mock multiple camping options with different requirements
+      const multipleOptions = [
+        {
+          ...mockSkydivingOption,
+          id: 'skydiving',
+          name: 'Skydiving',
+          workShiftsRequired: 1,
+        },
+        {
+          ...mockSkydivingOption,
+          id: 'premium',
+          name: 'Premium Camping',
+          workShiftsRequired: 2,
+        }
+      ];
+      
+      vi.spyOn(useRegistrationModule, 'useRegistration').mockReturnValue({
+        campingOptions: multipleOptions,
+        jobCategories: [mockTeardownCategory, mockArtCarCategory, mockManifestCategory],
+        jobs: [mockTeardownJob1, mockTeardownJob2, mockArtCarJob, mockManifestJob],
+        shifts: mockShifts,
+        loading: false,
+        error: null,
+        fetchCampingOptions: vi.fn(),
+        fetchJobCategories: vi.fn(),
+        fetchShifts: vi.fn(),
+        fetchJobs: vi.fn(),
+        submitRegistration: vi.fn().mockResolvedValue({}),
+      });
+      
+      renderWithAuth();
+      
+      // Step 1: Fill profile form
+      fireEvent.change(screen.getByLabelText('First Name*'), { target: { value: 'Test' } });
+      fireEvent.change(screen.getByLabelText('Last Name*'), { target: { value: 'User' } });
+      fireEvent.change(screen.getByLabelText('Phone Number*'), { target: { value: '555-1234' } });
+      fireEvent.change(screen.getByLabelText('Emergency Contact(s)*'), { target: { value: 'Emergency Contact' } });
+      fireEvent.click(screen.getByText('Continue'));
+      
+      // Step 2: Select both camping options
+      await waitFor(() => {
+        expect(screen.getByText('Select Camping Options')).toBeInTheDocument();
+      });
+      
+      // Get all checkboxes and select the first two (Skydiving and Premium Camping)
+      const checkboxes = screen.getAllByRole('checkbox');
+      fireEvent.click(checkboxes[0]); // Skydiving
+      fireEvent.click(checkboxes[1]); // Premium Camping
+      fireEvent.click(screen.getByText('Continue'));
+      
+      // Step 3: Handle custom fields step
+      await waitFor(() => {
+        expect(screen.getByText('Additional Information')).toBeInTheDocument();
+      });
+      fireEvent.click(screen.getByText('Continue'));
+      
+      // Step 4: Now on jobs step
+      await waitFor(() => {
+        expect(screen.getByText('Select Work Shifts')).toBeInTheDocument();
+      });
+      
+      // Should show updated requirement (1 + 2 = 3 camping shifts required)
+      expect(screen.getByText('Camp Shifts: 3 required')).toBeInTheDocument();
+      
+      // Select only teardown job but no camping jobs
+      fireEvent.click(screen.getByLabelText(/Teardown Team 1/));
+      
+      // Try to continue
+      fireEvent.click(screen.getByText('Continue'));
+      
+      // Should show detailed camping job validation error for multiple options
+      await waitFor(() => {
+        expect(screen.getAllByText('You must select at least 1 Skydiving work shift and 2 Premium Camping work shifts')).toHaveLength(2);
+      });
+    });
+  });
 });

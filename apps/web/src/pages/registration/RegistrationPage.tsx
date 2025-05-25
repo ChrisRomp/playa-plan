@@ -296,6 +296,40 @@ export default function RegistrationPage() {
             `You must select at least one ${category.name} shift`;
         }
       });
+      
+      // Ensure camping option job requirements are met
+      const selectedOptions = campingOptions.filter(option => 
+        formData.campingOptions.includes(option.id)
+      );
+      
+      const campingJobsRequired = selectedOptions.reduce(
+        (total, option) => total + option.workShiftsRequired, 
+        0
+      );
+      
+      if (campingJobsRequired > 0) {
+        const campingOptionJobs = getCampingOptionJobs();
+        const selectedCampingJobs = campingOptionJobs.filter(
+          job => formData.jobs.includes(job.id)
+        );
+        
+        if (selectedCampingJobs.length < campingJobsRequired) {
+          // Create a detailed error message showing each camping option's requirements
+          const optionMessages = selectedOptions
+            .filter(option => option.workShiftsRequired > 0)
+            .map(option => {
+              const shiftText = option.workShiftsRequired === 1 ? 'work shift' : 'work shifts';
+              return `${option.workShiftsRequired} ${option.name} ${shiftText}`;
+            });
+          
+          if (optionMessages.length === 1) {
+            errors.campingJobs = `You must select at least ${optionMessages[0]}`;
+          } else {
+            const lastOption = optionMessages.pop();
+            errors.campingJobs = `You must select at least ${optionMessages.join(', ')} and ${lastOption}`;
+          }
+        }
+      }
     } 
     else if (currentStep === 5) {
       // Validate terms acceptance
@@ -822,6 +856,10 @@ export default function RegistrationPage() {
               Please select a work shift for camp.
             </p>
             
+            {formErrors.campingJobs && (
+              <div className="text-red-600 mb-4">{formErrors.campingJobs}</div>
+            )}
+            
             <div className="space-y-2">
               {campingOptionJobs.map(job => (
                 <div key={job.id} className="border p-3 rounded">
@@ -1101,6 +1139,29 @@ export default function RegistrationPage() {
         {formErrors.submit && (
           <div className="text-red-600 mt-4 p-2 bg-red-50 border border-red-200 rounded">
             {formErrors.submit}
+          </div>
+        )}
+        
+        {/* Show job validation errors at bottom for step 4 (jobs step) */}
+        {currentStep === 4 && Object.keys(formErrors).some(key => 
+          key === 'jobs' || key === 'campingJobs' || key.startsWith('category_')
+        ) && (
+          <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded">
+            <h4 className="font-medium text-red-800 mb-2">Please fix the following issues:</h4>
+            <div className="space-y-1">
+              {formErrors.jobs && (
+                <div className="text-red-600">{formErrors.jobs}</div>
+              )}
+              {formErrors.campingJobs && (
+                <div className="text-red-600">{formErrors.campingJobs}</div>
+              )}
+              {Object.entries(formErrors)
+                .filter(([key]) => key.startsWith('category_'))
+                .map(([key, error]) => (
+                  <div key={key} className="text-red-600">{error}</div>
+                ))
+              }
+            </div>
           </div>
         )}
         
