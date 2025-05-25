@@ -56,6 +56,7 @@ describe('AuthService', () => {
       findFirst: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
+      count: jest.fn(),
     },
   };
 
@@ -189,6 +190,83 @@ describe('AuthService', () => {
       await expect(service.register(registerDto)).rejects.toThrow(BadRequestException);
       await expect(service.register(registerDto)).rejects.toThrow('User registration failed');
     });
+
+    it('should create first user as ADMIN when Users table is empty', async () => {
+      // Arrange
+      mockPrismaService.user.findUnique.mockResolvedValue(null);
+      mockPrismaService.user.count.mockResolvedValue(0); // Empty table
+      mockPrismaService.user.create.mockResolvedValue({
+        ...mockUser,
+        id: 'first-admin-user',
+        email: 'admin@example.playaplan.app',
+        firstName: 'Admin',
+        lastName: 'User',
+        role: UserRole.PARTICIPANT, // Created as PARTICIPANT initially
+        verificationToken: 'mocked-uuid-token',
+      });
+      
+      const adminRegisterDto: RegisterDto = {
+        email: 'admin@example.playaplan.app',
+        firstName: 'Admin',
+        lastName: 'User',
+        playaName: 'AdminUser',
+      };
+      
+      // Act
+      const result = await service.register(adminRegisterDto);
+      
+      // Assert
+      expect(result).toBeDefined();
+      expect(result.role).toBe(UserRole.PARTICIPANT); // Created as PARTICIPANT, will be promoted on authentication
+      expect(mockPrismaService.user.create).toHaveBeenCalledWith({
+        data: {
+          email: 'admin@example.playaplan.app',
+          firstName: 'Admin',
+          lastName: 'User',
+          playaName: 'AdminUser',
+          role: UserRole.PARTICIPANT,
+          verificationToken: 'mocked-uuid-token',
+        },
+      });
+    });
+
+    it('should create subsequent users as PARTICIPANT when Users table is not empty', async () => {
+      // Arrange
+      mockPrismaService.user.findUnique.mockResolvedValue(null);
+      mockPrismaService.user.create.mockResolvedValue({
+        ...mockUser,
+        id: 'regular-user',
+        email: 'user@example.playaplan.app',
+        firstName: 'Regular',
+        lastName: 'User',
+        role: UserRole.PARTICIPANT,
+        verificationToken: 'mocked-uuid-token',
+      });
+      
+      const regularRegisterDto: RegisterDto = {
+        email: 'user@example.playaplan.app',
+        firstName: 'Regular',
+        lastName: 'User',
+        playaName: 'RegularUser',
+      };
+      
+      // Act
+      const result = await service.register(regularRegisterDto);
+      
+      // Assert
+      expect(result).toBeDefined();
+      expect(result.role).toBe(UserRole.PARTICIPANT);
+      expect(mockPrismaService.user.create).toHaveBeenCalledWith({
+        data: {
+          email: 'user@example.playaplan.app',
+          firstName: 'Regular',
+          lastName: 'User',
+          playaName: 'RegularUser',
+          role: UserRole.PARTICIPANT,
+          verificationToken: 'mocked-uuid-token',
+        },
+      });
+    });
   });
 
   describe('login', () => {
@@ -238,6 +316,7 @@ describe('AuthService', () => {
     it('should mark email as verified and clear token', async () => {
       // Arrange
       mockPrismaService.user.findFirst.mockResolvedValue(mockUser);
+      mockPrismaService.user.count.mockResolvedValue(1); // Already has authenticated users
       mockPrismaService.user.update.mockResolvedValue({
         ...mockUser,
         isEmailVerified: true,
@@ -267,6 +346,59 @@ describe('AuthService', () => {
       
       // Assert
       expect(result).toBe(false);
+    });
+
+    it('should promote first user to authenticate to ADMIN via email verification', async () => {
+      // Arrange
+      mockPrismaService.user.findFirst.mockResolvedValue(mockUser);
+      mockPrismaService.user.count.mockResolvedValue(0); // No authenticated users yet
+      mockPrismaService.user.update.mockResolvedValue({
+        ...mockUser,
+        isEmailVerified: true,
+        verificationToken: null,
+        role: UserRole.ADMIN,
+      });
+      
+      // Act
+      const result = await service.verifyEmail('verification-token');
+      
+      // Assert
+      expect(result).toBe(true);
+      expect(mockPrismaService.user.count).toHaveBeenCalledWith({
+        where: { isEmailVerified: true },
+      });
+      expect(mockPrismaService.user.update).toHaveBeenCalledWith({
+        where: { id: mockUser.id },
+        data: {
+          isEmailVerified: true,
+          verificationToken: null,
+          role: UserRole.ADMIN,
+        },
+      });
+    });
+
+    it('should not promote subsequent users to ADMIN via email verification', async () => {
+      // Arrange
+      mockPrismaService.user.findFirst.mockResolvedValue(mockUser);
+      mockPrismaService.user.count.mockResolvedValue(1); // Already has authenticated users
+      mockPrismaService.user.update.mockResolvedValue({
+        ...mockUser,
+        isEmailVerified: true,
+        verificationToken: null,
+      });
+      
+      // Act
+      const result = await service.verifyEmail('verification-token');
+      
+      // Assert
+      expect(result).toBe(true);
+      expect(mockPrismaService.user.update).toHaveBeenCalledWith({
+        where: { id: mockUser.id },
+        data: {
+          isEmailVerified: true,
+          verificationToken: null,
+        },
+      });
     });
   });
 
@@ -330,6 +462,44 @@ describe('AuthService', () => {
       });
       expect(notificationsService.sendLoginCodeEmail).toHaveBeenCalledWith(
         'new@example.playaplan.app',
+        expect.any(String)
+      );
+    });
+
+    it('should create first user as ADMIN via login code when Users table is empty', async () => {
+      // Arrange
+      mockPrismaService.user.findUnique.mockResolvedValue(null);
+      
+      // Mock user creation result to be successful
+      mockPrismaService.user.create.mockResolvedValue({
+        ...mockUser,
+        email: 'admin@example.playaplan.app',
+        role: UserRole.PARTICIPANT, // Created as PARTICIPANT initially
+        loginCode: '123456',
+        loginCodeExpiry: new Date(Date.now() + 900000) // 15 minutes in the future
+      });
+
+      // Mock sendLoginCodeEmail to return true
+      mockNotificationsService.sendLoginCodeEmail.mockResolvedValue(true);
+      
+      // Act
+      const result = await service.generateLoginCode('admin@example.playaplan.app');
+      
+      // Assert
+      expect(result).toBe(true);
+      expect(mockPrismaService.user.create).toHaveBeenCalledWith({
+        data: {
+          email: 'admin@example.playaplan.app',
+          loginCode: expect.any(String),
+          loginCodeExpiry: expect.any(Date),
+          role: UserRole.PARTICIPANT,
+          firstName: '',
+          lastName: '',
+          isEmailVerified: false,
+        },
+      });
+      expect(notificationsService.sendLoginCodeEmail).toHaveBeenCalledWith(
+        'admin@example.playaplan.app',
         expect.any(String)
       );
     });
@@ -411,6 +581,87 @@ describe('AuthService', () => {
       
       // Assert
       expect(result).toBeNull();
+    });
+
+    it('should promote first user to authenticate to ADMIN via login code', async () => {
+      // Arrange
+      const futureDate = new Date();
+      futureDate.setMinutes(futureDate.getMinutes() + 10);
+      
+      const mockUserWithCode = {
+        ...mockUser,
+        loginCode: '123456',
+        loginCodeExpiry: futureDate,
+      };
+
+      mockPrismaService.user.findFirst.mockResolvedValue(mockUserWithCode);
+      mockPrismaService.user.count.mockResolvedValue(0); // No authenticated users yet
+      mockPrismaService.user.update.mockResolvedValue({ 
+        ...mockUserWithCode, 
+        loginCode: null, 
+        loginCodeExpiry: null,
+        isEmailVerified: true,
+        role: UserRole.ADMIN,
+      });
+
+      // Act
+      const result = await service.validateLoginCode(mockUserWithCode.email, mockUserWithCode.loginCode);
+      
+      // Assert
+      expect(result).toBeDefined();
+      expect(result).not.toBeNull();
+      expect(result?.role).toBe(UserRole.ADMIN);
+      
+      expect(mockPrismaService.user.count).toHaveBeenCalledWith({
+        where: { isEmailVerified: true },
+      });
+      expect(mockPrismaService.user.update).toHaveBeenCalledWith({
+        where: { id: mockUser.id },
+        data: {
+          loginCode: null,
+          loginCodeExpiry: null,
+          isEmailVerified: true,
+          role: UserRole.ADMIN,
+        },
+      });
+    });
+
+    it('should not promote subsequent users to ADMIN via login code', async () => {
+      // Arrange
+      const futureDate = new Date();
+      futureDate.setMinutes(futureDate.getMinutes() + 10);
+      
+      const mockUserWithCode = {
+        ...mockUser,
+        loginCode: '123456',
+        loginCodeExpiry: futureDate,
+      };
+
+      mockPrismaService.user.findFirst.mockResolvedValue(mockUserWithCode);
+      mockPrismaService.user.count.mockResolvedValue(1); // Already has authenticated users
+      mockPrismaService.user.update.mockResolvedValue({ 
+        ...mockUserWithCode, 
+        loginCode: null, 
+        loginCodeExpiry: null,
+        isEmailVerified: true,
+      });
+
+      // Act
+      const result = await service.validateLoginCode(mockUserWithCode.email, mockUserWithCode.loginCode);
+      
+      // Assert
+      expect(result).toBeDefined();
+      expect(result).not.toBeNull();
+      expect(result?.role).toBe(UserRole.PARTICIPANT);
+      
+      expect(mockPrismaService.user.update).toHaveBeenCalledWith({
+        where: { id: mockUser.id },
+        data: {
+          loginCode: null,
+          loginCodeExpiry: null,
+          isEmailVerified: true,
+        },
+      });
     });
   });
 });
