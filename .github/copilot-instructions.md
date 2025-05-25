@@ -89,7 +89,8 @@ Repository: https://github.com/ChrisRomp/playa-plan
   - Source in `apps/api`
   - Refer to [api-nestjs-development](./instructions/api-nestjs-development.instructions.md)
 - Database: PostgreSQL managed via Prisma ORM
-- Authentication: Passport.js (Local and JWT strategies), with email magic link login to be added later
+- Authentication: Passport.js (Local and JWT strategies) with authentication code sent via email
+  - In development mode, the authentication code email is sent to the console, and is always 123456 for testing
 - Payments: Stripe and PayPal integrations
 - Notifications: Transactional emails via SendGrid, Mailgun, or Postmark
 - Documentation: Swagger (OpenAPI)
