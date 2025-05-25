@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "install": {
+    "command": "npm install"
+  },
+  "dev": {
+    "command": "npm run dev",
+    "port": 3000,
+    "web": {
+      "port": 5173
+    }
+  },
+  "test": {
+    "command": "npm run test"
+  }
+}
