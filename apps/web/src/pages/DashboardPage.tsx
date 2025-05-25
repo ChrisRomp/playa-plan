@@ -6,6 +6,7 @@ import { useUserRegistrations } from '../hooks/useUserRegistrations';
 import { useCampRegistration } from '../hooks/useCampRegistration';
 import { useConfig } from '../store/ConfigContextDefinition';
 import { getFriendlyDayName, formatTime } from '../utils/shiftUtils';
+import { isRegistrationAccessible, getRegistrationStatusMessage } from '../utils/registrationUtils';
 import { PATHS } from '../routes';
 
 /**
@@ -22,6 +23,11 @@ const DashboardPage: React.FC = () => {
   // Get current year registration
   const currentYear = config?.currentYear || new Date().getFullYear();
   const currentRegistration = registrations?.find(reg => reg.year === currentYear);
+  
+  // Check registration access status
+  const hasCurrentRegistration = !!currentRegistration;
+  const canAccessRegistration = isRegistrationAccessible(config, user);
+  const registrationStatusMessage = getRegistrationStatusMessage(config, user, hasCurrentRegistration);
   
   return (
     <div className="max-w-4xl mx-auto">
@@ -75,13 +81,15 @@ const DashboardPage: React.FC = () => {
             
             {!registrationsLoading && !registrationsError && !currentRegistration && (
               <div className="bg-gray-50 p-6 rounded-lg text-center">
-                <p className="text-gray-600 mb-4">You haven't registered for camp yet.</p>
-                <Link 
-                  to={PATHS.REGISTRATION} 
-                  className="inline-block bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
-                >
-                  Start Registration
-                </Link>
+                <p className="text-gray-600 mb-4">{registrationStatusMessage}</p>
+                {canAccessRegistration && (
+                  <Link 
+                    to={PATHS.REGISTRATION} 
+                    className="inline-block bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
+                  >
+                    Start Registration
+                  </Link>
+                )}
               </div>
             )}
             
