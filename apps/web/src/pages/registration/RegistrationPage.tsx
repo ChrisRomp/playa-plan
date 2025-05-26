@@ -1178,7 +1178,7 @@ export default function RegistrationPage() {
           <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
             <div className="space-y-2">
               <div className="flex justify-between">
-                <span>Total Registration Cost:</span>
+                <span>Total Dues:</span>
                 <span className="font-medium">${totalCost.toFixed(2)}</span>
               </div>
             </div>
