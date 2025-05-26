@@ -5,7 +5,7 @@ import {
   BadRequestException,
   Logger,
 } from '@nestjs/common';
-import { validate } from 'class-validator';
+import { validate, ValidationError } from 'class-validator';
 import { plainToInstance } from 'class-transformer';
 import sanitizeHtml from 'sanitize-html';
 import { isObject } from 'class-validator';
@@ -16,11 +16,46 @@ import { isObject } from 'class-validator';
  * to prevent XSS attacks and other injection vulnerabilities.
  */
 @Injectable()
-export class GlobalValidationPipe implements PipeTransform<any> {
+export class GlobalValidationPipe implements PipeTransform {
   private readonly logger = new Logger(GlobalValidationPipe.name);
+  
+  // Fields that are allowed to contain HTML content
+  private readonly htmlAllowedFields: string[] = [
+    'homePageBlurb', 
+    'campDescription', 
+    'registrationTerms'
+  ];
+  
+  // Strict sanitization options for regular text fields (removes all HTML)
   private readonly sanitizeHtmlOptions: sanitizeHtml.IOptions = {
     allowedTags: [],
     allowedAttributes: {},
+    allowedIframeHostnames: [],
+  };
+  
+  // More permissive sanitization options for fields that should allow HTML
+  private readonly htmlFieldSanitizeOptions: sanitizeHtml.IOptions = {
+    allowedTags: [
+      'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'br', 'hr',
+      'ul', 'ol', 'li', 'b', 'i', 'strong', 'em', 'a', 'span',
+      'blockquote', 'code', 'pre', 'div'
+    ],
+    allowedAttributes: {
+      'a': ['href', 'target', 'rel', 'title', 'aria-label'],
+      'span': ['style', 'class'],
+      'div': ['style', 'class'],
+      'p': ['style', 'class'],
+      'li': ['style', 'class'],
+      'ul': ['style', 'class'],
+      'ol': ['style', 'class'],
+      'h1': ['style', 'class'],
+      'h2': ['style', 'class'],
+      'h3': ['style', 'class'],
+      'h4': ['style', 'class'],
+      'h5': ['style', 'class'],
+      'h6': ['style', 'class'],
+      'blockquote': ['style', 'class']
+    },
     allowedIframeHostnames: [],
   };
 
@@ -33,12 +68,12 @@ export class GlobalValidationPipe implements PipeTransform<any> {
    * @returns The validated and sanitized value
    * @throws BadRequestException if validation fails
    */
-  async transform(value: any, metadata: ArgumentMetadata): Promise<any> {
+  async transform(value: unknown, metadata: ArgumentMetadata): Promise<unknown> {
     const { metatype } = metadata;
     
     // Skip validation if no metatype or if metatype is a primitive type
     if (!metatype || !this.shouldValidate(metatype)) {
-      return this.sanitizeData(value);
+      return this.sanitizeData(value, metadata.data);
     }
 
     // If the incoming value is not an object (null or undefined), throw an error
@@ -67,7 +102,7 @@ export class GlobalValidationPipe implements PipeTransform<any> {
     }
 
     // If validation passes, sanitize all strings in the object to prevent XSS attacks
-    return this.sanitizeData(object);
+    return this.sanitizeData(object, metadata.data);
   }
 
   /**
@@ -76,7 +111,7 @@ export class GlobalValidationPipe implements PipeTransform<any> {
    * @param errors - Array of validation errors
    * @returns Array of error messages
    */
-  private buildErrorMessages(errors: any[]): string[] {
+  private buildErrorMessages(errors: ValidationError[]): string[] {
     const result: string[] = [];
     
     errors.forEach(err => {
@@ -102,25 +137,32 @@ export class GlobalValidationPipe implements PipeTransform<any> {
    * Sanitizes data to prevent XSS attacks and other injection vulnerabilities
    * 
    * @param data - The data to sanitize
+   * @param fieldName - Optional field name to check if HTML is allowed
    * @returns Sanitized data
    */
-  private sanitizeData(data: any): any {
+  private sanitizeData(data: unknown, fieldName?: string): unknown {
     if (typeof data === 'string') {
+      // Choose sanitization options based on whether this field allows HTML
+      const options = this.htmlAllowedFields.includes(fieldName || '') 
+        ? this.htmlFieldSanitizeOptions 
+        : this.sanitizeHtmlOptions;
+        
       // Sanitize simple string values
-      return sanitizeHtml(data, this.sanitizeHtmlOptions);
+      return sanitizeHtml(data, options);
     }
     
     if (Array.isArray(data)) {
       // Recursively sanitize arrays
-      return data.map(item => this.sanitizeData(item));
+      return data.map(item => this.sanitizeData(item, fieldName));
     }
     
     if (isObject(data) && data !== null) {
       // Recursively sanitize objects
-      const sanitized: Record<string, any> = { ...data };
+      const sanitized: Record<string, unknown> = { ...data };
       
       for (const key of Object.keys(sanitized)) {
-        sanitized[key] = this.sanitizeData(sanitized[key]);
+        // Pass the current field name down to child properties
+        sanitized[key] = this.sanitizeData(sanitized[key], key);
       }
       
       return sanitized;
@@ -136,8 +178,8 @@ export class GlobalValidationPipe implements PipeTransform<any> {
    * @param metatype - The type to check
    * @returns True if the type should be validated, false otherwise
    */
-  private shouldValidate(metatype: any): boolean {
-    const types = [String, Boolean, Number, Array, Object];
+  private shouldValidate(metatype: abstract new (...args: unknown[]) => unknown): boolean {
+    const types: Array<abstract new (...args: unknown[]) => unknown> = [String, Boolean, Number, Array, Object];
     return !types.includes(metatype);
   }
 }

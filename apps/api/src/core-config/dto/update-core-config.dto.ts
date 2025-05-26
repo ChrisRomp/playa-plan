@@ -3,7 +3,6 @@ import {
   IsString, 
   IsBoolean, 
   IsNumber, 
-  IsUrl, 
   IsEmail, 
   IsIn, 
   IsOptional, 
@@ -212,18 +211,6 @@ export class UpdateCoreConfigDto {
   @IsString()
   @IsOptional()
   stripeApiKey?: string;
-
-  /**
-   * Stripe webhook secret
-   */
-  @ApiProperty({
-    description: 'Stripe webhook secret',
-    example: 'whsec_...',
-    required: false
-  })
-  @IsString()
-  @IsOptional()
-  stripeWebhookSecret?: string;
 
   /**
    * Whether PayPal is enabled

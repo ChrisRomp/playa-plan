@@ -264,7 +264,6 @@ describe('CoreConfigController (e2e)', () => {
       
       // Sensitive fields should be excluded
       expect(response.body.stripeApiKey).toBeUndefined();
-      expect(response.body.stripeWebhookSecret).toBeUndefined();
       expect(response.body.paypalClientSecret).toBeUndefined();
       expect(response.body.smtpPassword).toBeUndefined();
     });

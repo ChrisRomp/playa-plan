@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { CheckCircleIcon, AlertCircleIcon } from 'lucide-react';
 import { handleStripeSuccess } from '../../lib/stripe';
+import { PATHS } from '../../routes';
 
 interface PaymentVerificationResult {
   paymentStatus: string;
@@ -78,7 +79,7 @@ const PaymentSuccessPage: React.FC = () => {
           <div className="space-y-3">
             {isAuthError ? (
               <button
-                onClick={() => navigate('/login')}
+                onClick={() => navigate(PATHS.LOGIN)}
                 className="w-full bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
               >
                 Login

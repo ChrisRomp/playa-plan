@@ -26,6 +26,7 @@ export const mapApiConfigToFrontend = (apiConfig: CoreConfig): CampConfig => {
     registrationOpen: apiConfig.registrationOpen,
     earlyRegistrationOpen: apiConfig.earlyRegistrationOpen,
     currentYear: apiConfig.registrationYear,
+    registrationTerms: apiConfig.registrationTerms ?? undefined,
     // Payment configuration
     stripeEnabled: apiConfig.stripeEnabled,
     stripePublicKey: apiConfig.stripePublicKey ?? undefined,
@@ -51,6 +52,7 @@ export const fallbackConfig: CampConfig = {
   registrationOpen: false,
   earlyRegistrationOpen: false,
   currentYear: new Date().getFullYear(),
+  registrationTerms: undefined,
   // Payment configuration defaults
   stripeEnabled: false,
   stripePublicKey: undefined,

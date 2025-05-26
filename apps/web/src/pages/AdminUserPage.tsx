@@ -30,8 +30,8 @@ const AdminUserPage: React.FC = () => {
     email: '',
     firstName: '',
     lastName: '',
-    password: '',
     role: 'PARTICIPANT',
+    allowRegistration: true,
   });
 
   // Filter and sort users by first name
@@ -57,8 +57,8 @@ const AdminUserPage: React.FC = () => {
       email: '',
       firstName: '',
       lastName: '',
-      password: '',
       role: 'PARTICIPANT',
+      allowRegistration: true,
     });
     setIsCreating(false);
     setIsEditing(false);
@@ -112,22 +112,10 @@ const AdminUserPage: React.FC = () => {
     e.preventDefault();
     
     if (isCreating) {
-      // Ensure password is provided for new users
-      if (!formData.password) {
-        alert('Password is required when creating a new user');
-        return;
-      }
-      
       await createUser(formData as CreateUserDTO);
       resetForm();
     } else if (isEditing && selectedUser) {
-      // Don't send password if it's empty (not being changed)
-      const updateData = { ...formData };
-      if (!updateData.password) {
-        delete updateData.password;
-      }
-      
-      await updateUser(selectedUser.id, updateData as UpdateUserDTO);
+      await updateUser(selectedUser.id, formData as UpdateUserDTO);
       resetForm();
     }
   };
@@ -277,110 +265,102 @@ const AdminUserPage: React.FC = () => {
                 {isCreating ? 'Create New User' : 'Edit User'}
               </h2>
               <form onSubmit={handleSubmit}>
-                <div className="space-y-4">
-                  {/* Email */}
+                <div className="space-y-6">
+                  {/* Basic Information Section */}
                   <div>
-                    <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                      Email Address *
-                    </label>
-                    <input
-                      type="email"
-                      name="email"
-                      id="email"
-                      required
-                      value={formData.email || ''}
-                      onChange={handleInputChange}
-                      className="mt-1 block w-full shadow-sm sm:text-sm rounded-md border-gray-300 focus:ring-indigo-500 focus:border-indigo-500"
-                    />
-                  </div>
+                    <h3 className="text-lg font-semibold mb-4 pb-2 border-b">Basic Information</h3>
+                    
+                    <div className="space-y-4">
+                      {/* Email */}
+                      <div>
+                        <label htmlFor="email" className="block text-gray-700 font-medium mb-2">
+                          Email Address *
+                        </label>
+                        <input
+                          type="email"
+                          name="email"
+                          id="email"
+                          required
+                          value={formData.email || ''}
+                          onChange={handleInputChange}
+                          className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
 
-                  {/* Password - only show in create mode */}
-                  {isCreating && (
-                    <div>
-                      <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-                        Password *
-                      </label>
-                      <input
-                        type="password"
-                        name="password"
-                        id="password"
-                        required
-                        value={formData.password || ''}
-                        onChange={handleInputChange}
-                        className="mt-1 block w-full shadow-sm sm:text-sm rounded-md border-gray-300 focus:ring-indigo-500 focus:border-indigo-500"
-                      />
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* First Name */}
+                        <div>
+                          <label htmlFor="firstName" className="block text-gray-700 font-medium mb-2">
+                            First Name *
+                          </label>
+                          <input
+                            type="text"
+                            name="firstName"
+                            id="firstName"
+                            required
+                            value={formData.firstName || ''}
+                            onChange={handleInputChange}
+                            className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+
+                        {/* Last Name */}
+                        <div>
+                          <label htmlFor="lastName" className="block text-gray-700 font-medium mb-2">
+                            Last Name *
+                          </label>
+                          <input
+                            type="text"
+                            name="lastName"
+                            id="lastName"
+                            required
+                            value={formData.lastName || ''}
+                            onChange={handleInputChange}
+                            className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Playa Name */}
+                      <div>
+                        <label htmlFor="playaName" className="block text-gray-700 font-medium mb-2">
+                          Playa Name
+                        </label>
+                        <input
+                          type="text"
+                          name="playaName"
+                          id="playaName"
+                          value={formData.playaName || ''}
+                          onChange={handleInputChange}
+                          className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+
+                      {/* Role */}
+                      <div>
+                        <label htmlFor="role" className="block text-gray-700 font-medium mb-2">
+                          Role *
+                        </label>
+                        <select
+                          name="role"
+                          id="role"
+                          required
+                          value={formData.role || 'PARTICIPANT'}
+                          onChange={handleInputChange}
+                          className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value="PARTICIPANT">Participant</option>
+                          <option value="STAFF">Staff</option>
+                          <option value="ADMIN">Admin</option>
+                        </select>
+                      </div>
                     </div>
-                  )}
-
-                  {/* First Name */}
-                  <div>
-                    <label htmlFor="firstName" className="block text-sm font-medium text-gray-700">
-                      First Name *
-                    </label>
-                    <input
-                      type="text"
-                      name="firstName"
-                      id="firstName"
-                      required
-                      value={formData.firstName || ''}
-                      onChange={handleInputChange}
-                      className="mt-1 block w-full shadow-sm sm:text-sm rounded-md border-gray-300 focus:ring-indigo-500 focus:border-indigo-500"
-                    />
-                  </div>
-
-                  {/* Last Name */}
-                  <div>
-                    <label htmlFor="lastName" className="block text-sm font-medium text-gray-700">
-                      Last Name *
-                    </label>
-                    <input
-                      type="text"
-                      name="lastName"
-                      id="lastName"
-                      required
-                      value={formData.lastName || ''}
-                      onChange={handleInputChange}
-                      className="mt-1 block w-full shadow-sm sm:text-sm rounded-md border-gray-300 focus:ring-indigo-500 focus:border-indigo-500"
-                    />
-                  </div>
-
-                  {/* Playa Name */}
-                  <div>
-                    <label htmlFor="playaName" className="block text-sm font-medium text-gray-700">
-                      Playa Name
-                    </label>
-                    <input
-                      type="text"
-                      name="playaName"
-                      id="playaName"
-                      value={formData.playaName || ''}
-                      onChange={handleInputChange}
-                      className="mt-1 block w-full shadow-sm sm:text-sm rounded-md border-gray-300 focus:ring-indigo-500 focus:border-indigo-500"
-                    />
-                  </div>
-
-                  {/* Role */}
-                  <div>
-                    <label htmlFor="role" className="block text-sm font-medium text-gray-700">
-                      Role *
-                    </label>
-                    <select
-                      name="role"
-                      id="role"
-                      required
-                      value={formData.role || 'PARTICIPANT'}
-                      onChange={handleInputChange}
-                      className="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                    >
-                      <option value="PARTICIPANT">Participant</option>
-                      <option value="STAFF">Staff</option>
-                      <option value="ADMIN">Admin</option>
-                    </select>
                   </div>
 
                   {/* Permissions */}
-                  <div className="pt-2">
-                    <h3 className="text-sm font-medium text-gray-700 mb-2">User Permissions</h3>
+                  <div>
+                    <h3 className="text-lg font-semibold mb-4 pb-2 border-b">User Permissions</h3>
                     <div className="space-y-2">
                       <div className="flex items-start">
                         <input
@@ -439,30 +419,33 @@ const AdminUserPage: React.FC = () => {
 
                   {/* Internal Notes */}
                   <div>
-                    <label htmlFor="internalNotes" className="block text-sm font-medium text-gray-700">
-                      Internal Notes
-                    </label>
-                    <textarea
-                      name="internalNotes"
-                      id="internalNotes"
-                      rows={3}
-                      value={formData.internalNotes || ''}
-                      onChange={handleInputChange}
-                      className="mt-1 block w-full shadow-sm sm:text-sm rounded-md border-gray-300 focus:ring-indigo-500 focus:border-indigo-500"
-                    />
+                    <h3 className="text-lg font-semibold mb-4 pb-2 border-b">Internal Notes</h3>
+                    <div>
+                      <label htmlFor="internalNotes" className="block text-gray-700 font-medium mb-2">
+                        Notes (visible to administrators only)
+                      </label>
+                      <textarea
+                        name="internalNotes"
+                        id="internalNotes"
+                        rows={3}
+                        value={formData.internalNotes || ''}
+                        onChange={handleInputChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
                   </div>
 
-                  <div className="flex justify-end space-x-3 pt-4">
+                  <div className="flex justify-end space-x-4 mt-8">
                     <button
                       type="button"
                       onClick={resetForm}
-                      className="inline-flex justify-center py-2 px-4 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                      className="px-6 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors"
                     >
                       Cancel
                     </button>
                     <button
                       type="submit"
-                      className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                      className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors disabled:bg-blue-300"
                     >
                       {isCreating ? 'Create' : 'Update'}
                     </button>

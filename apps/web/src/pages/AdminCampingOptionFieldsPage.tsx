@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useCampingOptions } from '../hooks/useCampingOptions';
 import { CampingOptionField } from '../lib/api';
 import axios, { AxiosError } from 'axios';
+import { PATHS } from '../routes';
 
 // Define type for API error response
 interface ApiErrorResponse {
@@ -242,7 +243,7 @@ const AdminCampingOptionFieldsPage: React.FC = () => {
   };
 
   const handleBack = () => {
-    navigate('/admin/camping-options');
+    navigate(PATHS.ADMIN_CAMPING_OPTIONS);
   };
 
   // Drag and drop handlers

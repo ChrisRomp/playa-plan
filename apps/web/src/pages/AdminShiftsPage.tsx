@@ -1,7 +1,9 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useShifts } from '../hooks/useShifts';
 import { Shift } from '../lib/api';
 import { isAxiosError } from 'axios';
+import { PATHS } from '../routes';
 
 interface ShiftFormState {
   name: string;
@@ -26,6 +28,7 @@ const dayOfWeekOptions = [
 ];
 
 export default function AdminShiftsPage() {
+  const navigate = useNavigate();
   const {
     shifts,
     loading: shiftsLoading,
@@ -203,7 +206,7 @@ export default function AdminShiftsPage() {
         <h1 className="text-2xl font-bold text-gray-900">Shifts</h1>
         <div className="ml-auto flex space-x-2">
           <button
-            onClick={() => window.location.href = '/admin'}
+            onClick={() => navigate(PATHS.ADMIN)}
             className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors"
           >
             Back to Admin

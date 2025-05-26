@@ -25,7 +25,6 @@ describe('CoreConfigService', () => {
     stripeEnabled: true,
     stripePublicKey: 'pk_test_123',
     stripeApiKey: 'sk_test_123',
-    stripeWebhookSecret: 'whsec_123',
     paypalEnabled: false,
     paypalClientId: null,
     paypalClientSecret: null,
@@ -96,7 +95,6 @@ describe('CoreConfigService', () => {
       stripeEnabled: true,
       stripePublicKey: 'pk_test_123',
       stripeApiKey: 'sk_test_123',
-      stripeWebhookSecret: 'whsec_123',
       paypalEnabled: false,
       timeZone: 'America/Los_Angeles',
     };

@@ -14,15 +14,6 @@ export class CreateUserDto {
   @IsNotEmpty({ message: 'Email is required' })
   email!: string;
 
-  @ApiProperty({
-    description: 'User password',
-    example: 'Secure123!',
-    minLength: 8,
-  })
-  @IsString()
-  @IsNotEmpty({ message: 'Password is required' })
-  @MinLength(8, { message: 'Password must be at least 8 characters long' })
-  password!: string;
 
   @ApiProperty({
     description: 'User first name',

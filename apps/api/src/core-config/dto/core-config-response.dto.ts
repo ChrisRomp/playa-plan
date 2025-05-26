@@ -147,12 +147,6 @@ export class CoreConfigResponseDto {
   stripeApiKey!: string | null;
 
   /**
-   * Stripe webhook secret (hidden from responses)
-   */
-  @Exclude()
-  stripeWebhookSecret!: string | null;
-
-  /**
    * Whether PayPal is enabled
    */
   @ApiProperty({

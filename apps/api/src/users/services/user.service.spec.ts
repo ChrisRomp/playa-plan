@@ -161,7 +161,6 @@ describe('UserService', () => {
       // Arrange
       const createUserDto: CreateUserDto = {
         email: 'new@example.playaplan.app',
-        password: 'password123',
         firstName: 'New',
         lastName: 'User',
         role: UserRole.PARTICIPANT,
@@ -183,12 +182,9 @@ describe('UserService', () => {
       expect(prismaServiceMock.user.findUnique).toHaveBeenCalledWith({
         where: { email: createUserDto.email },
       });
-      expect(bcrypt.genSalt).toHaveBeenCalledWith(10);
-      expect(bcrypt.hash).toHaveBeenCalledWith('password123', 'salt');
       expect(prismaServiceMock.user.create).toHaveBeenCalledWith({
         data: {
           email: createUserDto.email,
-          password: 'hashed_password',
           firstName: createUserDto.firstName,
           lastName: createUserDto.lastName,
           role: createUserDto.role,
@@ -200,7 +196,6 @@ describe('UserService', () => {
       // Arrange
       const createUserDto: CreateUserDto = {
         email: 'existing@example.playaplan.app',
-        password: 'password123',
         firstName: 'Existing',
         lastName: 'User',
         role: UserRole.PARTICIPANT,

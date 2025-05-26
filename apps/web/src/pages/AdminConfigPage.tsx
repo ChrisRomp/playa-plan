@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useConfig } from '../store/ConfigContext';
 import { api } from '../lib/api';
 import { useNavigate } from 'react-router-dom';
+import { PATHS } from '../routes';
 
 /**
  * Admin Configuration Page
@@ -33,7 +34,6 @@ const AdminConfigPage: React.FC = () => {
     stripeEnabled: false,
     stripePublicKey: '',
     stripeApiKey: '',
-    stripeWebhookSecret: '',
     paypalEnabled: false,
     paypalClientId: '',
     paypalClientSecret: '',
@@ -61,6 +61,9 @@ const AdminConfigPage: React.FC = () => {
         
         if (response.data) {
           // Update form with current data
+          // Note: Sensitive fields (stripeApiKey, paypalClientSecret, smtpPassword)
+          // are excluded from API responses for security and should remain empty in the form unless
+          // the user explicitly provides new values
           setFormData({
             campName: response.data.campName || '',
             campDescription: response.data.campDescription || '',
@@ -76,16 +79,15 @@ const AdminConfigPage: React.FC = () => {
             allowDeferredDuesPayment: response.data.allowDeferredDuesPayment || false,
             stripeEnabled: response.data.stripeEnabled || false,
             stripePublicKey: response.data.stripePublicKey || '',
-            stripeApiKey: response.data.stripeApiKey || '',
-            stripeWebhookSecret: response.data.stripeWebhookSecret || '',
+            stripeApiKey: '', // Always empty - excluded from API response for security
             paypalEnabled: response.data.paypalEnabled || false,
             paypalClientId: response.data.paypalClientId || '',
-            paypalClientSecret: response.data.paypalClientSecret || '',
+            paypalClientSecret: '', // Always empty - excluded from API response for security
             paypalMode: response.data.paypalMode || 'sandbox',
             smtpHost: response.data.smtpHost || '',
             smtpPort: response.data.smtpPort || 587,
             smtpUsername: response.data.smtpUsername || '',
-            smtpPassword: response.data.smtpPassword || '',
+            smtpPassword: '', // Always empty - excluded from API response for security
             smtpUseSsl: response.data.smtpUseSsl || false,
             senderEmail: response.data.senderEmail || '',
             senderName: response.data.senderName || '',
@@ -172,12 +174,51 @@ const AdminConfigPage: React.FC = () => {
     setSuccess(null);
     
     // Create a copy of the form data to format URL fields
-    const formattedData = {
-      ...formData,
+    // Exclude sensitive fields from base data as they will be conditionally added
+    const baseData = {
+      campName: formData.campName,
+      campDescription: formData.campDescription,
+      homePageBlurb: formData.homePageBlurb,
       campBannerUrl: formData.campBannerUrl ? formatUrlField(formData.campBannerUrl) : '',
+      campBannerAltText: formData.campBannerAltText,
       campIconUrl: formData.campIconUrl ? formatUrlField(formData.campIconUrl) : '',
-      senderEmail: formData.senderEmail.trim()
+      campIconAltText: formData.campIconAltText,
+      registrationYear: formData.registrationYear,
+      earlyRegistrationOpen: formData.earlyRegistrationOpen,
+      registrationOpen: formData.registrationOpen,
+      registrationTerms: formData.registrationTerms,
+      allowDeferredDuesPayment: formData.allowDeferredDuesPayment,
+      stripeEnabled: formData.stripeEnabled,
+      stripePublicKey: formData.stripePublicKey,
+      // Note: stripeApiKey excluded - will be conditionally added below
+      paypalEnabled: formData.paypalEnabled,
+      paypalClientId: formData.paypalClientId,
+      // Note: paypalClientSecret excluded - will be conditionally added below
+      paypalMode: formData.paypalMode,
+      smtpHost: formData.smtpHost,
+      smtpPort: formData.smtpPort,
+      smtpUsername: formData.smtpUsername,
+      // Note: smtpPassword excluded - will be conditionally added below
+      smtpUseSsl: formData.smtpUseSsl,
+      senderEmail: formData.senderEmail.trim(),
+      senderName: formData.senderName,
+      timeZone: formData.timeZone
     };
+    
+    // Only include sensitive keys if they have been provided (not empty)
+    // This prevents clearing existing keys when they're not returned from the API for security
+    const formattedData = {
+      ...baseData,
+      // Only include these fields if they have values to prevent clearing existing secrets
+      ...(formData.stripeApiKey && formData.stripeApiKey.trim() !== '' && { stripeApiKey: formData.stripeApiKey }),
+      ...(formData.paypalClientSecret && formData.paypalClientSecret.trim() !== '' && { paypalClientSecret: formData.paypalClientSecret }),
+      ...(formData.smtpPassword && formData.smtpPassword.trim() !== '' && { smtpPassword: formData.smtpPassword })
+    };
+
+    // Debug logging to verify sensitive fields are handled correctly
+    const sensitiveFields = ['stripeApiKey', 'paypalClientSecret', 'smtpPassword'];
+    const includedSensitiveFields = sensitiveFields.filter(field => field in formattedData);
+    console.log('Sensitive fields included in payload:', includedSensitiveFields.length > 0 ? includedSensitiveFields : 'none');
     
     try {
       // Log the formatted data for debugging
@@ -265,7 +306,7 @@ const AdminConfigPage: React.FC = () => {
 
   // Handle cancel button
   const handleCancel = () => {
-    navigate('/admin');
+    navigate(PATHS.ADMIN);
   };
   
   return (
@@ -373,6 +414,8 @@ const AdminConfigPage: React.FC = () => {
                 />
                 <p className="text-sm text-gray-500 mt-1">
                   URL to the banner image. Both relative URLs (like /images/banner.png) and full URLs are supported.
+                  <br />
+                  <strong>Recommended:</strong> 1920x600px or 16:5 aspect ratio for best display across devices.
                 </p>
               </div>
               
@@ -526,7 +569,7 @@ const AdminConfigPage: React.FC = () => {
               <div className={`grid grid-cols-1 md:grid-cols-2 gap-4 ${!formData.stripeEnabled ? 'opacity-50' : ''}`}>
                 <div className="mb-4">
                   <label htmlFor="stripePublicKey" className="block text-gray-700 mb-2">
-                    Stripe Public Key
+                    Stripe Publishable Key
                   </label>
                   <input
                     type="text"
@@ -541,7 +584,7 @@ const AdminConfigPage: React.FC = () => {
                 
                 <div className="mb-4">
                   <label htmlFor="stripeApiKey" className="block text-gray-700 mb-2">
-                    Stripe API Key
+                    Stripe Secret Key
                   </label>
                   <input
                     type="password"
@@ -550,23 +593,12 @@ const AdminConfigPage: React.FC = () => {
                     value={formData.stripeApiKey}
                     onChange={handleInputChange}
                     disabled={!formData.stripeEnabled}
+                    placeholder={formData.stripeApiKey === '' ? 'Leave blank to keep existing key' : ''}
                     className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
-                </div>
-                
-                <div className="mb-4 md:col-span-2">
-                  <label htmlFor="stripeWebhookSecret" className="block text-gray-700 mb-2">
-                    Stripe Webhook Secret
-                  </label>
-                  <input
-                    type="password"
-                    id="stripeWebhookSecret"
-                    name="stripeWebhookSecret"
-                    value={formData.stripeWebhookSecret}
-                    onChange={handleInputChange}
-                    disabled={!formData.stripeEnabled}
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+                  <p className="text-sm text-gray-500 mt-1">
+                    Leave blank to keep the existing secret key. Only enter a new key if you want to change it.
+                  </p>
                 </div>
               </div>
             </div>
@@ -579,10 +611,11 @@ const AdminConfigPage: React.FC = () => {
                   name="paypalEnabled"
                   checked={formData.paypalEnabled}
                   onChange={handleInputChange}
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  disabled={true}
+                  className="h-4 w-4 text-gray-400 border-gray-300 rounded cursor-not-allowed"
                 />
-                <label htmlFor="paypalEnabled" className="ml-2 block text-gray-700 font-medium">
-                  Enable PayPal Payments
+                <label htmlFor="paypalEnabled" className="ml-2 block text-gray-500 font-medium">
+                  Enable PayPal Payments (Not yet implemented)
                 </label>
               </div>
               
@@ -613,8 +646,12 @@ const AdminConfigPage: React.FC = () => {
                     value={formData.paypalClientSecret}
                     onChange={handleInputChange}
                     disabled={!formData.paypalEnabled}
+                    placeholder={formData.paypalClientSecret === '' ? 'Leave blank to keep existing secret' : ''}
                     className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
+                  <p className="text-sm text-gray-500 mt-1">
+                    Leave blank to keep the existing client secret. Only enter a new secret if you want to change it.
+                  </p>
                 </div>
                 
                 <div className="mb-4">
@@ -697,8 +734,12 @@ const AdminConfigPage: React.FC = () => {
                   name="smtpPassword"
                   value={formData.smtpPassword}
                   onChange={handleInputChange}
+                  placeholder={formData.smtpPassword === '' ? 'Leave blank to keep existing password' : ''}
                   className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
+                <p className="text-sm text-gray-500 mt-1">
+                  Leave blank to keep the existing password. Only enter a new password if you want to change it.
+                </p>
               </div>
             </div>
             

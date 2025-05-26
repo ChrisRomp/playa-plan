@@ -34,6 +34,18 @@ vi.mock('../pages/AdminPage.tsx', () => ({
   default: () => <div data-testid="admin-page">Admin Page</div>
 }));
 
+vi.mock('../pages/AdminJobCategoriesPage.tsx', () => ({
+  default: () => <div data-testid="admin-job-categories-page">Admin Job Categories Page</div>
+}));
+
+vi.mock('../pages/AdminShiftsPage.tsx', () => ({
+  default: () => <div data-testid="admin-shifts-page">Admin Shifts Page</div>
+}));
+
+vi.mock('../pages/AdminJobsPage.tsx', () => ({
+  default: () => <div data-testid="admin-jobs-page">Admin Jobs Page</div>
+}));
+
 vi.mock('../pages/ShiftsPage.tsx', () => ({
   default: () => <div data-testid="shifts-page">Shifts Page</div>
 }));

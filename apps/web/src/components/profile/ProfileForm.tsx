@@ -1,6 +1,7 @@
 import React, { useState, ChangeEvent, useEffect } from 'react';
 import { useProfile } from '../../hooks/useProfile';
 import { useNavigate } from 'react-router-dom';
+import { PATHS } from '../../routes';
 
 const ProfileForm: React.FC = () => {
   const { profile, updateProfile, isLoading, error } = useProfile();
@@ -76,7 +77,7 @@ const ProfileForm: React.FC = () => {
       });
       
       // Redirect to dashboard after successful save
-      navigate('/dashboard');
+      navigate(PATHS.DASHBOARD);
     } catch (err) {
       console.error('Error submitting profile:', err);
     }

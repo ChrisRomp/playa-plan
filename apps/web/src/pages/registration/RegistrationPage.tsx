@@ -1127,9 +1127,14 @@ export default function RegistrationPage() {
         <div className="mb-6">
           <h3 className="text-lg font-medium mb-2">Terms & Conditions</h3>
           <div className="border p-4 rounded bg-gray-50 h-40 overflow-y-auto mb-4">
-            <p>
-              Terms and conditions text would go here. This would be pulled from the API.
-            </p>
+            {config && config.registrationTerms ? (
+              <div 
+                className="[&_a]:text-blue-600 [&_a]:underline [&_a:hover]:text-blue-800 [&_a]:cursor-pointer"
+                dangerouslySetInnerHTML={{ __html: config.registrationTerms }} 
+              />
+            ) : (
+              <p>No terms and conditions have been specified.</p>
+            )}
           </div>
           
           <label className="flex items-start">
@@ -1318,7 +1323,7 @@ export default function RegistrationPage() {
       <div className="p-6">
         <p className="text-red-600">You must be logged in to register.</p>
         <button 
-          onClick={() => navigate('/login')}
+          onClick={() => navigate(PATHS.LOGIN)}
           className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
         >
           Go to Login

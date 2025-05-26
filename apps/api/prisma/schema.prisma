@@ -238,7 +238,6 @@ model CoreConfig {
   stripeEnabled            Boolean    @default(false)
   stripePublicKey          String?
   stripeApiKey             String?
-  stripeWebhookSecret      String?
   paypalEnabled            Boolean    @default(false)
   paypalClientId           String?
   paypalClientSecret       String?

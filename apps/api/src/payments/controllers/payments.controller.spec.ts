@@ -2,9 +2,6 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { PaymentsController } from './payments.controller';
 import { PaymentsService, StripeService, PaypalService } from '../services';
 import { PaymentStatus, PaymentProvider } from '@prisma/client';
-import { BadRequestException } from '@nestjs/common';
-import { RawBodyRequest } from '@nestjs/common';
-import { Request } from 'express';
 
 // Mock implementations
 const mockPaymentsService = {
@@ -17,7 +14,6 @@ const mockPaymentsService = {
   initiatePaypalPayment: jest.fn(),
   processRefund: jest.fn(),
   linkToRegistration: jest.fn(),
-  handleStripeWebhook: jest.fn(),
   handlePaypalWebhook: jest.fn(),
 };
 
@@ -313,47 +309,6 @@ describe('PaymentsController', () => {
       // Assert
       expect(mockPaymentsService.linkToRegistration).toHaveBeenCalledWith(paymentId, registrationId);
       expect(result).toEqual(mockPayment);
-    });
-  });
-
-  describe('handleStripeWebhook', () => {
-    it('should handle Stripe webhook events', async () => {
-      // Mock data
-      const mockPayload = Buffer.from(JSON.stringify({ id: 'event-id', type: 'payment_intent.succeeded' }));
-      const mockSignature = 'stripe-signature';
-      const mockRequest = { rawBody: mockPayload } as RawBodyRequest<Request>;
-      const mockResponse = { received: true, type: 'payment_intent.succeeded' };
-
-      // Setup mocks
-      mockPaymentsService.handleStripeWebhook.mockResolvedValue(mockResponse);
-
-      // Execute
-      const result = await controller.handleStripeWebhook(mockRequest, mockSignature);
-
-      // Assert
-      expect(mockPaymentsService.handleStripeWebhook).toHaveBeenCalledWith(mockPayload, mockSignature);
-      expect(result).toEqual(mockResponse);
-    });
-
-    it('should throw BadRequestException if signature is missing', async () => {
-      // Mock data
-      const mockPayload = Buffer.from(JSON.stringify({ id: 'event-id', type: 'payment_intent.succeeded' }));
-      const mockRequest = { rawBody: mockPayload } as RawBodyRequest<Request>;
-      const emptySignature = '';
-      
-      // Execute & Assert
-      await expect(controller.handleStripeWebhook(mockRequest, emptySignature)).rejects.toThrow(BadRequestException);
-      expect(mockPaymentsService.handleStripeWebhook).not.toHaveBeenCalled();
-    });
-
-    it('should throw BadRequestException if rawBody is missing', async () => {
-      // Mock data
-      const mockSignature = 'stripe-signature';
-      const mockRequest = { rawBody: undefined } as RawBodyRequest<Request>;
-      
-      // Execute & Assert
-      await expect(controller.handleStripeWebhook(mockRequest, mockSignature)).rejects.toThrow(BadRequestException);
-      expect(mockPaymentsService.handleStripeWebhook).not.toHaveBeenCalled();
     });
   });
 

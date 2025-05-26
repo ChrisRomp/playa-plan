@@ -5,6 +5,15 @@ import AdminUserPage from './AdminUserPage';
 import * as useUsersModule from '../hooks/useUsers';
 import { User } from '../types/users';
 
+// Mock react-router-dom
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual('react-router-dom');
+  return {
+    ...actual,
+    useNavigate: () => vi.fn()
+  };
+});
+
 // Mock the useUsers hook
 vi.mock('../hooks/useUsers', () => {
   const originalModule = vi.importActual('../hooks/useUsers');
@@ -113,7 +122,6 @@ describe('AdminUserPage', () => {
     
     expect(screen.getByText('Create New User')).toBeInTheDocument();
     expect(screen.getByLabelText(/Email Address/)).toBeInTheDocument();
-    expect(screen.getByLabelText(/Password/)).toBeInTheDocument();
     expect(screen.getByLabelText(/First Name/)).toBeInTheDocument();
     expect(screen.getByLabelText(/Last Name/)).toBeInTheDocument();
     expect(screen.getByLabelText(/Role/)).toBeInTheDocument();
