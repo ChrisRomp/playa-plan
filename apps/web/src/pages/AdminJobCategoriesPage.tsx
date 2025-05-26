@@ -1,7 +1,9 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useJobCategories } from '../hooks/useJobCategories';
 import { JobCategory } from '../lib/api';
 import { isAxiosError } from 'axios';
+import { PATHS } from '../routes';
 
 interface CategoryFormState {
   name: string;
@@ -11,6 +13,7 @@ interface CategoryFormState {
 }
 
 export default function AdminJobCategoriesPage() {
+  const navigate = useNavigate();
   const {
     categories,
     loading,
@@ -108,7 +111,7 @@ export default function AdminJobCategoriesPage() {
         <h1 className="text-2xl font-bold">Job Category Management</h1>
         <div className="ml-auto flex space-x-2">
           <button
-            onClick={() => window.location.href = '/admin'}
+            onClick={() => navigate(PATHS.ADMIN)}
             className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors"
           >
             Back to Admin

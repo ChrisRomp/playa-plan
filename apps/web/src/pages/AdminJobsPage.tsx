@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useJobs } from '../hooks/useJobs';
 import { useJobCategories } from '../hooks/useJobCategories';
 import { useShifts } from '../hooks/useShifts';
 import { Job } from '../lib/api';
 import { isAxiosError } from 'axios';
 import { getFriendlyDayName, formatTime } from '../utils/shiftUtils';
+import { PATHS } from '../routes';
 
 interface JobFormState {
   name: string;
@@ -15,6 +17,7 @@ interface JobFormState {
 }
 
 export default function AdminJobsPage() {
+  const navigate = useNavigate();
   const {
     jobs,
     loading: jobsLoading,
@@ -297,7 +300,7 @@ export default function AdminJobsPage() {
               </span>
             </div>
             <button
-              onClick={() => window.location.href = '/admin'}
+              onClick={() => navigate(PATHS.ADMIN)}
               className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors"
             >
               Back to Admin
