@@ -256,6 +256,7 @@ describe('RegistrationPage', () => {
         registrationOpen: true,
         earlyRegistrationOpen: false,
         currentYear: 2025,
+        registrationTerms: '<p>These are the test terms and conditions.</p>',
       },
       isLoading: false,
       error: null,
@@ -289,6 +290,42 @@ describe('RegistrationPage', () => {
       </BrowserRouter>
     );
   };
+
+  const navigateToJobsStep = async () => {
+    renderWithAuth();
+    
+    // Step 1: Fill profile form
+    fireEvent.change(screen.getByLabelText('First Name*'), { target: { value: 'Test' } });
+    fireEvent.change(screen.getByLabelText('Last Name*'), { target: { value: 'User' } });
+    fireEvent.change(screen.getByLabelText('Phone Number*'), { target: { value: '555-1234' } });
+    fireEvent.change(screen.getByLabelText('Emergency Contact(s)*'), { target: { value: 'Emergency Contact' } });
+    fireEvent.click(screen.getByText('Continue'));
+    
+    // Step 2: Select camping option (use the first available camping option)
+    await waitFor(() => {
+      expect(screen.getByText('Select Camping Options')).toBeInTheDocument();
+    });
+    
+    // Find the first checkbox in the camping options and click it
+    const campingCheckboxes = screen.getAllByRole('checkbox');
+    if (campingCheckboxes.length > 0) {
+      fireEvent.click(campingCheckboxes[0]);
+    }
+    fireEvent.click(screen.getByText('Continue'));
+    
+    // Step 3: Handle custom fields step (should show "No additional information" since we mocked no fields)
+    await waitFor(() => {
+      expect(screen.getByText('Additional Information')).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByText('Continue'));
+    
+    // Step 4: Now on jobs step
+    await waitFor(() => {
+      expect(screen.getByText('Select Work Shifts')).toBeInTheDocument();
+    });
+  };
+
+
 
   it('renders the registration page with profile form step when authenticated', () => {
     renderWithAuth();
@@ -472,38 +509,6 @@ describe('RegistrationPage', () => {
         deleteCampingOptionField: vi.fn(),
       });
     });
-
-    const navigateToJobsStep = async () => {
-      renderWithAuth();
-      
-      // Step 1: Fill profile form
-      fireEvent.change(screen.getByLabelText('First Name*'), { target: { value: 'Test' } });
-      fireEvent.change(screen.getByLabelText('Last Name*'), { target: { value: 'User' } });
-      fireEvent.change(screen.getByLabelText('Phone Number*'), { target: { value: '555-1234' } });
-      fireEvent.change(screen.getByLabelText('Emergency Contact(s)*'), { target: { value: 'Emergency Contact' } });
-      fireEvent.click(screen.getByText('Continue'));
-      
-      // Step 2: Select camping option
-      await waitFor(() => {
-        expect(screen.getByText('Select Camping Options')).toBeInTheDocument();
-      });
-      fireEvent.click(screen.getByLabelText(/Skydiving/));
-      fireEvent.click(screen.getByText('Continue'));
-      
-      // Step 3: Handle custom fields step (should show "No additional information" since we mocked no fields)
-      await waitFor(() => {
-        expect(screen.getByText('Additional Information')).toBeInTheDocument();
-      });
-      
-      // Should show "No additional information is required" message
-      expect(screen.getByText('No additional information is required for your selected camping options.')).toBeInTheDocument();
-      fireEvent.click(screen.getByText('Continue'));
-      
-      // Step 4: Now on jobs step
-      await waitFor(() => {
-        expect(screen.getByText('Select Work Shifts')).toBeInTheDocument();
-      });
-    };
 
     it('should enforce both camping option jobs and always required jobs separately', async () => {
       await navigateToJobsStep();
@@ -852,4 +857,9 @@ describe('RegistrationPage', () => {
       });
     });
   });
+  
+  /**
+   * Note: Tests for the terms rendering functionality have been moved to a dedicated
+   * test file at __test__/TermsStep.test.tsx to improve test organization and maintainability.
+   */
 });

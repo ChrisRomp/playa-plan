@@ -62,6 +62,7 @@ export interface CampConfig {
   registrationOpen: boolean;
   earlyRegistrationOpen: boolean;
   currentYear: number;
+  registrationTerms?: string;
   stripeEnabled?: boolean;
   stripePublicKey?: string;
   paypalEnabled?: boolean;
