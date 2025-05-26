@@ -437,28 +437,8 @@ export default function RegistrationPage() {
       }
       setCurrentStep(currentStep + 1);
     } else if (currentStep === 5) {
-      // Terms step - create registration and move to payment step
-      try {
-        const result = await submitRegistration(formData);
-        
-        if (result?.jobRegistration?.id) {
-          setRegistrationId(result.jobRegistration.id);
-        }
-        
-        const totalCost = calculateTotalCost();
-        const needsPayment = totalCost > 0 && (!config?.allowDeferredDuesPayment || !user?.allowDeferredDuesPayment);
-        
-        if (!needsPayment) {
-          // No payment needed, redirect to dashboard
-          navigate('/dashboard');
-        } else {
-          // Payment needed, move to payment step
-          setCurrentStep(6);
-        }
-      } catch (err) {
-        console.error('Registration failed:', err);
-        setFormErrors({ submit: 'Registration submission failed. Please try again.' });
-      }
+      // Terms step - just move to payment step without creating registration yet
+      setCurrentStep(6);
     }
   };
 
@@ -1206,7 +1186,20 @@ export default function RegistrationPage() {
               amount={totalCost}
               registrationId={registrationId || undefined}
               description={`${config?.name || 'Camp'} Dues Payment ${config?.currentYear || new Date().getFullYear()}`}
-              onPaymentStart={() => {
+              onPaymentStart={async () => {
+                // Create registration if it doesn't exist yet
+                if (!registrationId) {
+                  try {
+                    const result = await submitRegistration(formData);
+                    if (result?.jobRegistration?.id) {
+                      setRegistrationId(result.jobRegistration.id);
+                    }
+                  } catch (err) {
+                    console.error('Registration creation failed:', err);
+                    setFormErrors(prev => ({ ...prev, payment: 'Failed to create registration. Please try again.' }));
+                    throw err; // Prevent payment from proceeding
+                  }
+                }
                 console.log('Payment started with registrationId:', registrationId);
               }}
               onPaymentError={(error) => {
@@ -1239,7 +1232,7 @@ export default function RegistrationPage() {
               onClick={async () => {
                 // Complete registration without payment
                 try {
-                  // If registration doesn't exist yet, create it
+                  // Create registration if it doesn't exist yet
                   if (!registrationId) {
                     const result = await submitRegistration(formData);
                     if (result?.jobRegistration?.id) {

@@ -6,7 +6,7 @@ interface PaymentButtonProps {
   amount: number;
   registrationId?: string;
   description?: string;
-  onPaymentStart?: () => void;
+  onPaymentStart?: () => void | Promise<void>;
   onPaymentError?: (error: string) => void;
   disabled?: boolean;
   className?: string;
@@ -43,7 +43,15 @@ const PaymentButton: React.FC<PaymentButtonProps> = ({
     }
 
     clearError();
-    onPaymentStart?.();
+    
+    try {
+      // Call onPaymentStart and wait if it's async
+      await onPaymentStart?.();
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to prepare payment';
+      onPaymentError?.(errorMessage);
+      return;
+    }
 
     const paymentOptions: PaymentOptions = {
       amount,

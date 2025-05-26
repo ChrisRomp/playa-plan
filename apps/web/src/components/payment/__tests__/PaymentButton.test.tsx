@@ -140,7 +140,60 @@ describe('PaymentButton', () => {
     const button = screen.getByRole('button');
     fireEvent.click(button);
 
-    expect(onPaymentStart).toHaveBeenCalled();
+    await waitFor(() => {
+      expect(onPaymentStart).toHaveBeenCalled();
+    });
+  });
+
+  it('should handle async onPaymentStart callback', async () => {
+    const onPaymentStart = vi.fn().mockResolvedValue(undefined);
+    const mockProcessStripePayment = vi.fn().mockResolvedValue(undefined);
+    vi.mocked(usePayment).mockReturnValue({
+      ...mockUsePayment,
+      processStripePayment: mockProcessStripePayment,
+    });
+
+    render(
+      <PaymentButton 
+        amount={100} 
+        onPaymentStart={onPaymentStart}
+      />
+    );
+
+    const button = screen.getByRole('button');
+    fireEvent.click(button);
+
+    await waitFor(() => {
+      expect(onPaymentStart).toHaveBeenCalled();
+      expect(mockProcessStripePayment).toHaveBeenCalled();
+    });
+  });
+
+  it('should handle onPaymentStart callback error', async () => {
+    const onPaymentStart = vi.fn().mockRejectedValue(new Error('Registration failed'));
+    const onPaymentError = vi.fn();
+    const mockProcessStripePayment = vi.fn().mockResolvedValue(undefined);
+    vi.mocked(usePayment).mockReturnValue({
+      ...mockUsePayment,
+      processStripePayment: mockProcessStripePayment,
+    });
+
+    render(
+      <PaymentButton 
+        amount={100} 
+        onPaymentStart={onPaymentStart}
+        onPaymentError={onPaymentError}
+      />
+    );
+
+    const button = screen.getByRole('button');
+    fireEvent.click(button);
+
+    await waitFor(() => {
+      expect(onPaymentStart).toHaveBeenCalled();
+      expect(onPaymentError).toHaveBeenCalledWith('Registration failed');
+      expect(mockProcessStripePayment).not.toHaveBeenCalled();
+    });
   });
 
   it('should call onPaymentError callback on payment failure', async () => {
