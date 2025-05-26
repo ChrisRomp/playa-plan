@@ -171,17 +171,6 @@ export class JobsService {
   }
 
   /**
-   * Add derived properties from category to a job
-   */
-  private addDerivedProperties(job: JobWithRelations) {
-    return {
-      ...job,
-      staffOnly: job.category?.staffOnly || false,
-      alwaysRequired: job.category?.alwaysRequired || false,
-    };
-  }
-
-  /**
    * Add derived properties from category and calculate current registrations for a job
    */
   private addDerivedPropertiesWithRegistrations(job: JobWithRelations) {

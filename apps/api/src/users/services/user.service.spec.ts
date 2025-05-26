@@ -12,9 +12,24 @@ jest.mock('bcrypt', () => ({
   hash: jest.fn().mockResolvedValue('hashed_password'),
 }));
 
+// Mock type for PrismaService with only the methods we need
+type MockPrismaService = {
+  user: {
+    findMany: jest.Mock;
+    findUnique: jest.Mock;
+    findFirst: jest.Mock;
+    create: jest.Mock;
+    update: jest.Mock;
+    delete: jest.Mock;
+    count: jest.Mock;
+  };
+  $connect: jest.Mock;
+  $disconnect: jest.Mock;
+};
+
 describe('UserService', () => {
   let service: UserService;
-  let prismaServiceMock: any;
+  let prismaServiceMock: MockPrismaService;
 
   const mockUser = {
     id: 'test-uuid',
