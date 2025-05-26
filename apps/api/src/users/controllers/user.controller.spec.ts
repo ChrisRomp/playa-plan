@@ -151,7 +151,6 @@ describe('UserController', () => {
       // Arrange
       const createUserDto: CreateUserDto = {
         email: 'new@example.playaplan.app',
-        password: 'password123',
         firstName: 'New',
         lastName: 'User',
         role: UserRole.PARTICIPANT,
@@ -178,7 +177,6 @@ describe('UserController', () => {
       // Arrange
       const createUserDto: CreateUserDto = {
         email: 'new@example.playaplan.app',
-        password: 'password123',
         firstName: 'New',
         lastName: 'User',
         role: UserRole.ADMIN, // Trying to create admin

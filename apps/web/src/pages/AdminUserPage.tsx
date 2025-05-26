@@ -30,8 +30,8 @@ const AdminUserPage: React.FC = () => {
     email: '',
     firstName: '',
     lastName: '',
-    password: '',
     role: 'PARTICIPANT',
+    allowRegistration: true,
   });
 
   // Filter and sort users by first name
@@ -57,8 +57,8 @@ const AdminUserPage: React.FC = () => {
       email: '',
       firstName: '',
       lastName: '',
-      password: '',
       role: 'PARTICIPANT',
+      allowRegistration: true,
     });
     setIsCreating(false);
     setIsEditing(false);
@@ -112,22 +112,10 @@ const AdminUserPage: React.FC = () => {
     e.preventDefault();
     
     if (isCreating) {
-      // Ensure password is provided for new users
-      if (!formData.password) {
-        alert('Password is required when creating a new user');
-        return;
-      }
-      
       await createUser(formData as CreateUserDTO);
       resetForm();
     } else if (isEditing && selectedUser) {
-      // Don't send password if it's empty (not being changed)
-      const updateData = { ...formData };
-      if (!updateData.password) {
-        delete updateData.password;
-      }
-      
-      await updateUser(selectedUser.id, updateData as UpdateUserDTO);
+      await updateUser(selectedUser.id, formData as UpdateUserDTO);
       resetForm();
     }
   };
@@ -299,23 +287,6 @@ const AdminUserPage: React.FC = () => {
                         />
                       </div>
 
-                      {/* Password - only show in create mode */}
-                      {isCreating && (
-                        <div>
-                          <label htmlFor="password" className="block text-gray-700 font-medium mb-2">
-                            Password *
-                          </label>
-                          <input
-                            type="password"
-                            name="password"
-                            id="password"
-                            required
-                            value={formData.password || ''}
-                            onChange={handleInputChange}
-                            className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          />
-                        </div>
-                      )}
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {/* First Name */}

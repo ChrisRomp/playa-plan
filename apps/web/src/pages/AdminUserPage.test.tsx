@@ -122,7 +122,6 @@ describe('AdminUserPage', () => {
     
     expect(screen.getByText('Create New User')).toBeInTheDocument();
     expect(screen.getByLabelText(/Email Address/)).toBeInTheDocument();
-    expect(screen.getByLabelText(/Password/)).toBeInTheDocument();
     expect(screen.getByLabelText(/First Name/)).toBeInTheDocument();
     expect(screen.getByLabelText(/Last Name/)).toBeInTheDocument();
     expect(screen.getByLabelText(/Role/)).toBeInTheDocument();

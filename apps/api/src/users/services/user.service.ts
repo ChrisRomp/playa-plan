@@ -53,7 +53,7 @@ export class UserService {
    * @throws ConflictException if the email is already registered
    */
   async create(createUserDto: CreateUserDto): Promise<PrismaUser> {
-    const { email, password, ...userData } = createUserDto;
+    const { email, ...userData } = createUserDto;
     
     // Check if user already exists
     const existingUser = await this.findByEmail(email);
@@ -62,14 +62,10 @@ export class UserService {
       throw new ConflictException('Email already registered');
     }
     
-    // Hash the password
-    const hashedPassword = await this.hashPassword(password);
-    
-    // Create the user
+    // Create the user without password (auth is via email verification codes)
     return this.prisma.user.create({
       data: {
         email,
-        password: hashedPassword,
         ...userData,
       },
     });
