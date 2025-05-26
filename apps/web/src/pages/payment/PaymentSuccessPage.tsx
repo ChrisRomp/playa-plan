@@ -59,11 +59,9 @@ const PaymentSuccessPage: React.FC = () => {
 
   if (isProcessing) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="max-w-md mx-auto text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Processing your payment...</p>
-        </div>
+      <div className="max-w-md mx-auto text-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+        <p className="text-gray-600">Processing your payment...</p>
       </div>
     );
   }
@@ -72,35 +70,33 @@ const PaymentSuccessPage: React.FC = () => {
     const isAuthError = error.includes('session has expired');
     
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="max-w-md mx-auto text-center">
-          <div className="bg-red-50 border border-red-200 rounded-lg p-6">
-            <AlertCircleIcon className="w-16 h-16 text-red-600 mx-auto mb-4" />
-            <h1 className="text-2xl font-semibold text-red-800 mb-2">Payment Error</h1>
-            <p className="text-red-600 mb-4">{error}</p>
-            <div className="space-y-3">
-              {isAuthError ? (
-                <button
-                  onClick={() => navigate('/login')}
-                  className="w-full bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                  Login
-                </button>
-              ) : (
-                <button
-                  onClick={handleGoToDashboard}
-                  className="w-full bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                  Go to Dashboard
-                </button>
-              )}
+      <div className="max-w-md mx-auto text-center">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+          <AlertCircleIcon className="w-16 h-16 text-red-600 mx-auto mb-4" />
+          <h1 className="text-2xl font-semibold text-red-800 mb-2">Payment Error</h1>
+          <p className="text-red-600 mb-4">{error}</p>
+          <div className="space-y-3">
+            {isAuthError ? (
               <button
-                onClick={() => window.location.reload()}
-                className="w-full bg-gray-200 text-gray-800 px-6 py-2 rounded-lg hover:bg-gray-300 transition-colors"
+                onClick={() => navigate('/login')}
+                className="w-full bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
               >
-                Refresh Page
+                Login
               </button>
-            </div>
+            ) : (
+              <button
+                onClick={handleGoToDashboard}
+                className="w-full bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Go to Dashboard
+              </button>
+            )}
+            <button
+              onClick={() => window.location.reload()}
+              className="w-full bg-gray-200 text-gray-800 px-6 py-2 rounded-lg hover:bg-gray-300 transition-colors"
+            >
+              Refresh Page
+            </button>
           </div>
         </div>
       </div>
@@ -111,56 +107,54 @@ const PaymentSuccessPage: React.FC = () => {
   const isRegistrationConfirmed = verificationResult?.registrationStatus === 'CONFIRMED';
 
   return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="max-w-md mx-auto text-center">
-        <div className={`border rounded-lg p-8 ${
-          isPaymentCompleted ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'
+    <div className="max-w-md mx-auto text-center">
+      <div className={`border rounded-lg p-8 ${
+        isPaymentCompleted ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'
+      }`}>
+        {isPaymentCompleted ? (
+          <CheckCircleIcon className="w-16 h-16 text-green-600 mx-auto mb-4" />
+        ) : (
+          <AlertCircleIcon className="w-16 h-16 text-yellow-600 mx-auto mb-4" />
+        )}
+        
+        <h1 className={`text-2xl font-semibold mb-2 ${
+          isPaymentCompleted ? 'text-green-800' : 'text-yellow-800'
+        }`}>
+          {isPaymentCompleted ? 'Payment Successful!' : 'Payment Processing'}
+        </h1>
+        
+        <div className={`mb-6 ${
+          isPaymentCompleted ? 'text-green-600' : 'text-yellow-600'
         }`}>
           {isPaymentCompleted ? (
-            <CheckCircleIcon className="w-16 h-16 text-green-600 mx-auto mb-4" />
+            <div>
+              <p className="mb-2">Your payment has been processed successfully.</p>
+              {isRegistrationConfirmed ? (
+                <p className="font-medium">Your registration is now confirmed!</p>
+              ) : (
+                <p>Your registration is being processed and will be confirmed shortly.</p>
+              )}
+            </div>
           ) : (
-            <AlertCircleIcon className="w-16 h-16 text-yellow-600 mx-auto mb-4" />
+            <div>
+              <p className="mb-2">Your payment is being processed.</p>
+              <p>Current status: {verificationResult?.paymentStatus}</p>
+              {verificationResult?.registrationStatus && (
+                <p>Registration status: {verificationResult.registrationStatus}</p>
+              )}
+            </div>
           )}
-          
-          <h1 className={`text-2xl font-semibold mb-2 ${
-            isPaymentCompleted ? 'text-green-800' : 'text-yellow-800'
-          }`}>
-            {isPaymentCompleted ? 'Payment Successful!' : 'Payment Processing'}
-          </h1>
-          
-          <div className={`mb-6 ${
-            isPaymentCompleted ? 'text-green-600' : 'text-yellow-600'
-          }`}>
-            {isPaymentCompleted ? (
-              <div>
-                <p className="mb-2">Your payment has been processed successfully.</p>
-                {isRegistrationConfirmed ? (
-                  <p className="font-medium">Your registration is now confirmed!</p>
-                ) : (
-                  <p>Your registration is being processed and will be confirmed shortly.</p>
-                )}
-              </div>
-            ) : (
-              <div>
-                <p className="mb-2">Your payment is being processed.</p>
-                <p>Current status: {verificationResult?.paymentStatus}</p>
-                {verificationResult?.registrationStatus && (
-                  <p>Registration status: {verificationResult.registrationStatus}</p>
-                )}
-              </div>
-            )}
-          </div>
-          
-          <div className="space-y-3">
-            <button
-              onClick={handleGoToDashboard}
-              className="w-full bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium"
-            >
-              View Dashboard
-            </button>
-          </div>
-
         </div>
+        
+        <div className="space-y-3">
+          <button
+            onClick={handleGoToDashboard}
+            className="w-full bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium"
+          >
+            View Dashboard
+          </button>
+        </div>
+
       </div>
     </div>
   );
