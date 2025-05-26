@@ -389,6 +389,20 @@ export const JobSchema: z.ZodType<IJob> = z.lazy(() =>
 
 export type Job = z.infer<typeof JobSchema>;
 
+// Payment interface
+export interface Payment {
+  id: string;
+  amount: number;
+  currency: string;
+  status: 'PENDING' | 'COMPLETED' | 'FAILED' | 'REFUNDED';
+  provider: 'STRIPE' | 'PAYPAL';
+  providerRefId?: string;
+  createdAt: string;
+  updatedAt: string;
+  userId: string;
+  registrationId?: string;
+}
+
 // Registration interface
 export interface Registration {
   id: string;
@@ -405,18 +419,7 @@ export interface Registration {
     createdAt: string;
     job: Job;
   }>;
-  payments: Array<{
-    id: string;
-    amount: number;
-    currency: string;
-    status: 'PENDING' | 'COMPLETED' | 'FAILED' | 'REFUNDED';
-    provider: 'STRIPE' | 'PAYPAL';
-    providerRefId?: string;
-    createdAt: string;
-    updatedAt: string;
-    userId: string;
-    registrationId?: string;
-  }>;
+  payments: Payment[];
 }
 
 // Camping Option Registration interface
@@ -1042,6 +1045,74 @@ export const registrations = {
       return response.data;
     } catch (error) {
       console.error('Error fetching camp registration:', error);
+      throw error;
+    }
+  },
+};
+
+export const reports = {
+  /**
+   * Get all registrations for staff/admin reports
+   * @param filters Optional filters for the report
+   * @returns A promise that resolves to an array of all registrations
+   */
+  getRegistrations: async (filters?: {
+    userId?: string;
+    jobId?: string;
+    year?: number;
+  }): Promise<Registration[]> => {
+    try {
+      const params = new URLSearchParams();
+      if (filters?.userId) params.append('userId', filters.userId);
+      if (filters?.jobId) params.append('jobId', filters.jobId);
+      if (filters?.year) params.append('year', filters.year.toString());
+      
+      const url = `/registrations${params.toString() ? `?${params.toString()}` : ''}`;
+      const response = await api.get<Registration[]>(url);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching registrations report:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Get all users for staff/admin reports
+   * @returns A promise that resolves to an array of all users
+   */
+  getUsers: async (): Promise<User[]> => {
+    try {
+      const response = await api.get<User[]>('/users');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching users report:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Get all payments for admin reports
+   * @param filters Optional filters for the report
+   * @returns A promise that resolves to an array of all payments
+   */
+  getPayments: async (filters?: {
+    userId?: string;
+    registrationId?: string;
+    status?: string;
+    provider?: string;
+  }): Promise<Payment[]> => {
+    try {
+      const params = new URLSearchParams();
+      if (filters?.userId) params.append('userId', filters.userId);
+      if (filters?.registrationId) params.append('registrationId', filters.registrationId);
+      if (filters?.status) params.append('status', filters.status);
+      if (filters?.provider) params.append('provider', filters.provider);
+      
+      const url = `/payments${params.toString() ? `?${params.toString()}` : ''}`;
+      const response = await api.get<Payment[]>(url);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching payments report:', error);
       throw error;
     }
   },

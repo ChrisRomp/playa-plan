@@ -63,7 +63,7 @@ const Navigation: React.FC<NavigationProps> = ({
           
           {user && (user.role === 'staff' || user.role === 'admin') && (
             <Link
-              to={PATHS.DASHBOARD} /* Update this path when you add Reports page */
+              to={PATHS.REPORTS}
               className={linkClass}
               onClick={() => closeMenu?.()}
             >
