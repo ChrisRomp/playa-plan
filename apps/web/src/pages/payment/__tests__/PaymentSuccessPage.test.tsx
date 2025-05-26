@@ -134,7 +134,7 @@ describe('PaymentSuccessPage', () => {
     expect(mockNavigate).toHaveBeenCalledWith('/dashboard');
   });
 
-  it('should navigate to registration when "View Registration Details" is clicked', async () => {
+  it('should only show dashboard button when payment is successful', async () => {
     vi.mocked(mockSearchParams.get).mockReturnValue('session_123');
     vi.mocked(handleStripeSuccess).mockResolvedValue({
       paymentStatus: 'COMPLETED',
@@ -149,10 +149,9 @@ describe('PaymentSuccessPage', () => {
       expect(screen.getByText('Payment Successful!')).toBeInTheDocument();
     });
 
-    const registrationButton = screen.getByText('View Registration Details');
-    fireEvent.click(registrationButton);
-
-    expect(mockNavigate).toHaveBeenCalledWith('/registration/reg_123');
+    // Should only have dashboard button, no registration button
+    expect(screen.getByText('View Dashboard')).toBeInTheDocument();
+    expect(screen.queryByText('View Registration Details')).not.toBeInTheDocument();
   });
 
   it('should navigate to dashboard from error state', async () => {
@@ -190,7 +189,7 @@ describe('PaymentSuccessPage', () => {
 
     // Check for action buttons
     expect(screen.getByText('View Dashboard')).toBeInTheDocument();
-    expect(screen.getByText('View Registration Details')).toBeInTheDocument();
+    expect(screen.queryByText('View Registration Details')).not.toBeInTheDocument();
   });
 
   it('should display processing UI elements correctly', async () => {
@@ -212,9 +211,9 @@ describe('PaymentSuccessPage', () => {
     const warningIcon = document.querySelector('svg.lucide-alert-circle');
     expect(warningIcon).toBeInTheDocument();
 
-    // Check for dashboard button (registration button should still be there if registrationId exists)
+    // Check for dashboard button (registration button should no longer exist)
     expect(screen.getByText('View Dashboard')).toBeInTheDocument();
-    expect(screen.getByText('View Registration Details')).toBeInTheDocument();
+    expect(screen.queryByText('View Registration Details')).not.toBeInTheDocument();
   });
 
   it('should display error UI elements correctly', async () => {
@@ -303,15 +302,15 @@ describe('PaymentSuccessPage', () => {
     });
 
     const dashboardButton = screen.getByText('View Dashboard');
-    const registrationButton = screen.getByText('View Registration Details');
 
     // Check button classes for proper styling
     expect(dashboardButton).toHaveClass('bg-blue-600', 'text-white');
-    expect(registrationButton).toHaveClass('bg-gray-200', 'text-gray-800');
 
-    // Check that buttons are accessible
+    // Check that button is accessible
     expect(dashboardButton).toBeVisible();
-    expect(registrationButton).toBeVisible();
+    
+    // Ensure registration button is not present
+    expect(screen.queryByText('View Registration Details')).not.toBeInTheDocument();
   });
 
   it('should handle registration without confirmed status', async () => {

@@ -109,7 +109,7 @@ export class StripeService {
       const cancelUrl = paymentData.cancelUrl || 
         this.configService.get<string>('frontend.url') + '/payment/cancel.html';
 
-      const session = await stripe.checkout.sessions.create({
+      const sessionParams: Stripe.Checkout.SessionCreateParams = {
         payment_method_types: ['card'],
         line_items: [
           {
@@ -130,7 +130,9 @@ export class StripeService {
           userId: paymentData.userId,
           registrationId: paymentData.registrationId || '',
         },
-      });
+      };
+
+      const session = await stripe.checkout.sessions.create(sessionParams);
       
       this.logger.log(`Created checkout session ${session.id}`);
       return session;

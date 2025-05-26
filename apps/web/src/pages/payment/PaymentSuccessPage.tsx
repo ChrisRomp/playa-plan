@@ -55,13 +55,7 @@ const PaymentSuccessPage: React.FC = () => {
     navigate('/dashboard');
   };
 
-  const handleGoToRegistration = () => {
-    if (verificationResult?.registrationId) {
-      navigate(`/registration/${verificationResult.registrationId}`);
-    } else {
-      navigate('/registration');
-    }
-  };
+
 
   if (isProcessing) {
     return (
@@ -164,26 +158,8 @@ const PaymentSuccessPage: React.FC = () => {
             >
               View Dashboard
             </button>
-            {verificationResult?.registrationId && (
-              <button
-                onClick={handleGoToRegistration}
-                className="w-full bg-gray-200 text-gray-800 px-6 py-3 rounded-lg hover:bg-gray-300 transition-colors font-medium"
-              >
-                View Registration Details
-              </button>
-            )}
           </div>
-          
-          {/* Debug info for development */}
-          {process.env.NODE_ENV === 'development' && verificationResult && (
-            <div className="mt-6 p-3 bg-gray-100 rounded text-xs text-left">
-              <p><strong>Debug Info:</strong></p>
-              <p>Payment ID: {verificationResult.paymentId}</p>
-              <p>Payment Status: {verificationResult.paymentStatus}</p>
-              <p>Registration ID: {verificationResult.registrationId}</p>
-              <p>Registration Status: {verificationResult.registrationStatus}</p>
-            </div>
-          )}
+
         </div>
       </div>
     </div>
