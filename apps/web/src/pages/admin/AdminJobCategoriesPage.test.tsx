@@ -4,6 +4,18 @@ import * as useJobCategoriesModule from '../../hooks/useJobCategories';
 import { describe, it, vi, beforeEach } from 'vitest';
 import type { Mock } from 'vitest';
 
+// Mock react-router-dom
+vi.mock('react-router-dom', () => ({
+  useNavigate: () => vi.fn()
+}));
+
+// Mock the routes
+vi.mock('../../routes', () => ({
+  PATHS: {
+    ADMIN: '/admin'
+  }
+}));
+
 const mockCategories = [
   { id: '1', name: 'Kitchen', description: 'Kitchen jobs', staffOnly: false, alwaysRequired: false },
   { id: '2', name: 'Greeter', description: 'Greeting jobs', staffOnly: true, alwaysRequired: false },
