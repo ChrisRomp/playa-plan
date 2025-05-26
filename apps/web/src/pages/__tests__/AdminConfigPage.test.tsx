@@ -3,7 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import AdminConfigPage from '../AdminConfigPage';
-import { ConfigProvider } from '../../store/ConfigContext';
+import { ConfigContext, type ConfigContextType } from '../../store/ConfigContextDefinition';
 import * as api from '../../lib/api';
 
 // Mock the API module
@@ -19,40 +19,42 @@ vi.mock('../../lib/api', () => ({
   }
 }));
 
+// Type the mocked API functions
+const mockApiGet = api.api.get as ReturnType<typeof vi.fn>;
+const mockApiPatch = api.api.patch as ReturnType<typeof vi.fn>;
+
 // Mock console methods to capture debug logs
 const mockConsoleLog = vi.spyOn(console, 'log').mockImplementation(() => {});
 const mockConsoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
 
 const mockConfig = {
-  id: '1',
-  campName: 'Test Camp',
-  campDescription: 'A test camp',
-  registrationYear: 2024,
+  name: 'Test Camp',
+  description: 'A test camp',
+  homePageBlurb: 'Welcome to our test camp',
+  registrationOpen: true,
+  earlyRegistrationOpen: false,
+  currentYear: 2024,
   stripeEnabled: true,
   stripePublicKey: 'pk_test_123',
   paypalEnabled: false,
   paypalClientId: '',
-  smtpHost: 'smtp.test.com',
-  smtpPort: 587,
-  smtpUsername: 'test@test.com',
-  smtpUseSsl: false,
   // Note: Sensitive fields are excluded from API responses
   // stripeApiKey, stripeWebhookSecret, paypalClientSecret, smtpPassword are not included
 };
 
 const renderWithProviders = (component: React.ReactElement) => {
-  const mockConfigContext = {
+  const mockConfigContext: ConfigContextType = {
     config: mockConfig,
-    publicConfig: mockConfig,
-    refreshConfig: vi.fn(),
-    isLoading: false
+    isLoading: false,
+    error: null,
+    refreshConfig: vi.fn()
   };
 
   return render(
     <BrowserRouter>
-      <ConfigProvider value={mockConfigContext}>
+      <ConfigContext.Provider value={mockConfigContext}>
         {component}
-      </ConfigProvider>
+      </ConfigContext.Provider>
     </BrowserRouter>
   );
 };
@@ -66,7 +68,7 @@ describe('AdminConfigPage - Secure Field Preservation', () => {
 
   it('should load configuration without setting sensitive fields to empty strings', async () => {
     // Mock API response that excludes sensitive fields (as in real API)
-    (api.api.get as any).mockResolvedValue({
+    mockApiGet.mockResolvedValue({
       data: mockConfig
     });
 
@@ -74,7 +76,7 @@ describe('AdminConfigPage - Secure Field Preservation', () => {
 
     // Wait for the config to load
     await waitFor(() => {
-      expect(api.api.get).toHaveBeenCalledWith('/core-config/current');
+      expect(mockApiGet).toHaveBeenCalledWith('/core-config/current');
     });
 
     // Check that sensitive field inputs are empty and have proper placeholders
@@ -96,14 +98,14 @@ describe('AdminConfigPage - Secure Field Preservation', () => {
   });
 
   it('should exclude empty sensitive fields from API payload when saving', async () => {
-    (api.api.get as any).mockResolvedValue({ data: mockConfig });
-    (api.api.patch as any).mockResolvedValue({ status: 200, data: mockConfig });
+    mockApiGet.mockResolvedValue({ data: mockConfig });
+    mockApiPatch.mockResolvedValue({ status: 200, data: mockConfig });
 
     renderWithProviders(<AdminConfigPage />);
 
     // Wait for config to load
     await waitFor(() => {
-      expect(api.api.get).toHaveBeenCalledWith('/core-config/current');
+      expect(mockApiGet).toHaveBeenCalledWith('/core-config/current');
     });
 
     // Fill in some non-sensitive fields
@@ -115,12 +117,12 @@ describe('AdminConfigPage - Secure Field Preservation', () => {
     fireEvent.click(saveButton);
 
     await waitFor(() => {
-      expect(api.api.patch).toHaveBeenCalled();
+      expect(mockApiPatch).toHaveBeenCalled();
     });
 
     // Get the payload that was sent
-    const patchCall = (api.api.patch as any).mock.calls[0];
-    const payload = patchCall[1];
+    const patchCall = mockApiPatch.mock.calls[0];
+    const payload = patchCall?.[1] as Record<string, unknown>;
 
     // Verify sensitive fields are NOT in the payload
     expect(payload).not.toHaveProperty('stripeApiKey');
@@ -140,14 +142,14 @@ describe('AdminConfigPage - Secure Field Preservation', () => {
   });
 
   it('should include sensitive fields in payload only when they have values', async () => {
-    (api.api.get as any).mockResolvedValue({ data: mockConfig });
-    (api.api.patch as any).mockResolvedValue({ status: 200, data: mockConfig });
+    mockApiGet.mockResolvedValue({ data: mockConfig });
+    mockApiPatch.mockResolvedValue({ status: 200, data: mockConfig });
 
     renderWithProviders(<AdminConfigPage />);
 
     // Wait for config to load
     await waitFor(() => {
-      expect(api.api.get).toHaveBeenCalledWith('/core-config/current');
+      expect(mockApiGet).toHaveBeenCalledWith('/core-config/current');
     });
 
     // Fill in some sensitive fields with actual values
@@ -162,12 +164,12 @@ describe('AdminConfigPage - Secure Field Preservation', () => {
     fireEvent.click(saveButton);
 
     await waitFor(() => {
-      expect(api.api.patch).toHaveBeenCalled();
+      expect(mockApiPatch).toHaveBeenCalled();
     });
 
     // Get the payload that was sent
-    const patchCall = (api.api.patch as any).mock.calls[0];
-    const payload = patchCall[1];
+    const patchCall = mockApiPatch.mock.calls[0];
+    const payload = patchCall?.[1] as Record<string, unknown>;
 
     // Verify only the filled sensitive fields are in the payload
     expect(payload).toHaveProperty('stripeApiKey', 'sk_test_new_key');
@@ -185,14 +187,14 @@ describe('AdminConfigPage - Secure Field Preservation', () => {
   });
 
   it('should trim whitespace from sensitive fields and exclude if only whitespace', async () => {
-    (api.api.get as any).mockResolvedValue({ data: mockConfig });
-    (api.api.patch as any).mockResolvedValue({ status: 200, data: mockConfig });
+    mockApiGet.mockResolvedValue({ data: mockConfig });
+    mockApiPatch.mockResolvedValue({ status: 200, data: mockConfig });
 
     renderWithProviders(<AdminConfigPage />);
 
     // Wait for config to load
     await waitFor(() => {
-      expect(api.api.get).toHaveBeenCalledWith('/core-config/current');
+      expect(mockApiGet).toHaveBeenCalledWith('/core-config/current');
     });
 
     // Fill sensitive fields with only whitespace
@@ -206,12 +208,12 @@ describe('AdminConfigPage - Secure Field Preservation', () => {
     fireEvent.click(saveButton);
 
     await waitFor(() => {
-      expect(api.api.patch).toHaveBeenCalled();
+      expect(mockApiPatch).toHaveBeenCalled();
     });
 
     // Get the payload that was sent
-    const patchCall = (api.api.patch as any).mock.calls[0];
-    const payload = patchCall[1];
+    const patchCall = mockApiPatch.mock.calls[0];
+    const payload = patchCall?.[1] as Record<string, unknown>;
 
     // Verify whitespace-only fields are NOT in the payload
     expect(payload).not.toHaveProperty('stripeApiKey');
@@ -225,14 +227,14 @@ describe('AdminConfigPage - Secure Field Preservation', () => {
   });
 
   it('should handle API errors gracefully when saving with sensitive fields', async () => {
-    (api.api.get as any).mockResolvedValue({ data: mockConfig });
-    (api.api.patch as any).mockRejectedValue(new Error('API Error'));
+    mockApiGet.mockResolvedValue({ data: mockConfig });
+    mockApiPatch.mockRejectedValue(new Error('API Error'));
 
     renderWithProviders(<AdminConfigPage />);
 
     // Wait for config to load
     await waitFor(() => {
-      expect(api.api.get).toHaveBeenCalledWith('/core-config/current');
+      expect(mockApiGet).toHaveBeenCalledWith('/core-config/current');
     });
 
     // Fill in a sensitive field
@@ -243,7 +245,7 @@ describe('AdminConfigPage - Secure Field Preservation', () => {
     fireEvent.click(saveButton);
 
     await waitFor(() => {
-      expect(api.api.patch).toHaveBeenCalled();
+      expect(mockApiPatch).toHaveBeenCalled();
     });
 
     // Verify error is handled and logged
@@ -257,12 +259,12 @@ describe('AdminConfigPage - Secure Field Preservation', () => {
   });
 
   it('should provide helpful guidance text for sensitive fields', async () => {
-    (api.api.get as any).mockResolvedValue({ data: mockConfig });
+    mockApiGet.mockResolvedValue({ data: mockConfig });
 
     renderWithProviders(<AdminConfigPage />);
 
     await waitFor(() => {
-      expect(api.api.get).toHaveBeenCalledWith('/core-config/current');
+      expect(mockApiGet).toHaveBeenCalledWith('/core-config/current');
     });
 
     // Check that help text exists for sensitive fields (there are multiple instances)
