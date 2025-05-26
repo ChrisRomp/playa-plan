@@ -633,10 +633,11 @@ const AdminConfigPage: React.FC = () => {
                   name="paypalEnabled"
                   checked={formData.paypalEnabled}
                   onChange={handleInputChange}
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  disabled={true}
+                  className="h-4 w-4 text-gray-400 border-gray-300 rounded cursor-not-allowed"
                 />
-                <label htmlFor="paypalEnabled" className="ml-2 block text-gray-700 font-medium">
-                  Enable PayPal Payments
+                <label htmlFor="paypalEnabled" className="ml-2 block text-gray-500 font-medium">
+                  Enable PayPal Payments (Not yet implemented)
                 </label>
               </div>
               
