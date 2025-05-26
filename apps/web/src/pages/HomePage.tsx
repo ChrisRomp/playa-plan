@@ -23,7 +23,7 @@ const HomePage: React.FC = () => {
         <div className="p-6">
           {config.homePageBlurb && (
             <div 
-              className="prose mb-6 p-4 bg-blue-50 rounded-md" 
+              className="prose mb-6 p-4 bg-blue-50 rounded-md [&_a]:text-blue-600 [&_a]:underline [&_a:hover]:text-blue-800 [&_a]:cursor-pointer" 
               dangerouslySetInnerHTML={{ __html: config.homePageBlurb }}
             />
           )}

@@ -119,9 +119,10 @@ const Header: React.FC = () => {
                 {config.name}
               </h2>
             </Link>
-            <p className="text-white/90 text-base md:text-lg lg:text-xl drop-shadow-md">
-              {config.description}
-            </p>
+            <p 
+              className="text-white/90 text-base md:text-lg lg:text-xl drop-shadow-md [&_a]:text-blue-200 [&_a]:underline [&_a:hover]:text-white [&_a]:cursor-pointer"
+              dangerouslySetInnerHTML={{ __html: config.description }}
+            />
           </div>
         </div>
       </header>

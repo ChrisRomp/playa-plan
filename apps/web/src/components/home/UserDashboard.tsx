@@ -26,7 +26,7 @@ const UserDashboard: React.FC = () => {
         <h2 className="text-2xl font-bold mb-4">Welcome, {user.name}!</h2>
         
         <div 
-          className="prose lg:prose-lg max-w-none mb-6"
+          className="prose lg:prose-lg max-w-none mb-6 [&_a]:text-blue-600 [&_a]:underline [&_a:hover]:text-blue-800 [&_a]:cursor-pointer"
           dangerouslySetInnerHTML={{ __html: config.homePageBlurb }}
         />
         
