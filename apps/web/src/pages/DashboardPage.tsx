@@ -8,6 +8,7 @@ import { useConfig } from '../store/ConfigContextDefinition';
 import { getFriendlyDayName, formatTime } from '../utils/shiftUtils';
 import { isRegistrationAccessible, getRegistrationStatusMessage } from '../utils/registrationUtils';
 import { PATHS } from '../routes';
+import PaymentButton from '../components/payment/PaymentButton';
 
 /**
  * Dashboard page component
@@ -16,10 +17,22 @@ import { PATHS } from '../routes';
 const DashboardPage: React.FC = () => {
   const { user } = useAuth();
   const { profile, isProfileComplete } = useProfile();
-  const { config } = useConfig();
+  const { config, isLoading: configLoading } = useConfig();
   const { registrations, loading: registrationsLoading, error: registrationsError } = useUserRegistrations();
   const { campRegistration, loading: campLoading, error: campError } = useCampRegistration();
   
+  // Show loading state while config is loading
+  if (configLoading || !config) {
+    return (
+      <div className="max-w-4xl mx-auto p-6">
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          <span className="ml-3 text-lg text-gray-600">Loading dashboard...</span>
+        </div>
+      </div>
+    );
+  }
+
   // Get current year registration
   const currentYear = config?.currentYear || new Date().getFullYear();
   const currentRegistration = registrations?.find(reg => reg.year === currentYear);
@@ -177,6 +190,42 @@ const DashboardPage: React.FC = () => {
                         </div>
                       ))}
                     </div>
+                    
+                    {/* Complete Payment Button for Pending Payments */}
+                    {(() => {
+                      const pendingPayments = currentRegistration.payments.filter(p => p.status === 'PENDING');
+                      const totalPending = pendingPayments.reduce((sum, p) => sum + p.amount, 0);
+                      
+                      if (pendingPayments.length > 0 && totalPending > 0) {
+                        return (
+                          <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                            <div className="flex items-center justify-between mb-3">
+                              <div>
+                                <h5 className="font-medium text-yellow-800">Outstanding Dues</h5>
+                                <p className="text-sm text-yellow-700">
+                                  You have ${totalPending.toFixed(2)} in pending dues
+                                </p>
+                              </div>
+                            </div>
+                            <PaymentButton
+                              amount={totalPending}
+                              registrationId={currentRegistration.id}
+                              description={`${config?.name || 'Camp'} Dues Payment ${config?.currentYear || new Date().getFullYear()}`}
+                              onPaymentStart={() => {
+                                console.log('Completing pending payment for registration:', currentRegistration.id);
+                              }}
+                              onPaymentError={(error) => {
+                                console.error('Payment error:', error);
+                              }}
+                              className="w-full"
+                            >
+                              Complete Dues Payment - ${totalPending.toFixed(2)}
+                            </PaymentButton>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
                   </div>
                 )}
               </div>

@@ -43,6 +43,16 @@ export const ROUTES = {
     name: 'Registration',
     requiresAuth: true,
   },
+  PAYMENT_SUCCESS: {
+    path: '/payment/success',
+    name: 'Payment Success',
+    requiresAuth: true,
+  },
+  PAYMENT_CANCEL: {
+    path: '/payment/cancel',
+    name: 'Payment Cancelled',
+    requiresAuth: true,
+  },
   ADMIN: {
     path: '/admin',
     name: 'Admin',

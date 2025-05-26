@@ -31,6 +31,7 @@ const mockStripeService = {
   createCheckoutSession: jest.fn(),
   createRefund: jest.fn(),
   getPaymentIntent: jest.fn(),
+  getCheckoutSession: jest.fn(),
   constructEventFromWebhook: jest.fn(),
 };
 
@@ -275,6 +276,335 @@ describe('PaymentsService', () => {
 
       // Execute & Assert
       await expect(service.findOne(paymentId)).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('verifyStripeSession', () => {
+    const sessionId = 'cs_test_session_id';
+    const mockPayment = {
+      id: 'payment-id',
+      amount: 100,
+      status: PaymentStatus.PENDING,
+      provider: PaymentProvider.STRIPE,
+      providerRefId: sessionId,
+      userId: 'user-id',
+      registrationId: 'registration-id',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    const mockRegistration = {
+      id: 'registration-id',
+      userId: 'user-id',
+      status: 'PENDING',
+      year: 2024,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    beforeEach(() => {
+      // Reset mocks before each test
+      jest.clearAllMocks();
+    });
+
+    it('should verify successful payment and update statuses', async () => {
+      // Mock payment with registration
+      const paymentWithRegistration = {
+        ...mockPayment,
+        registration: mockRegistration,
+      };
+
+      // Mock successful Stripe session
+      const mockStripeSession = {
+        id: sessionId,
+        status: 'complete',
+        payment_status: 'paid',
+      };
+
+      // Setup mocks
+      mockPrismaService.payment.findFirst.mockResolvedValue(paymentWithRegistration);
+      mockPrismaService.payment.findUnique.mockResolvedValue(paymentWithRegistration);
+      mockStripeService.getCheckoutSession.mockResolvedValue(mockStripeSession);
+      mockPrismaService.payment.update.mockResolvedValue({
+        ...mockPayment,
+        status: PaymentStatus.COMPLETED,
+      });
+      mockPrismaService.registration.update.mockResolvedValue({
+        ...mockRegistration,
+        status: 'CONFIRMED',
+      });
+
+      // Execute
+      const result = await service.verifyStripeSession(sessionId);
+
+      // Assert
+      expect(mockPrismaService.payment.findFirst).toHaveBeenCalledWith({
+        where: { providerRefId: sessionId },
+        include: { registration: true },
+      });
+      expect(mockStripeService.getCheckoutSession).toHaveBeenCalledWith(sessionId);
+      expect(mockPrismaService.payment.update).toHaveBeenCalledWith({
+        where: { id: mockPayment.id },
+        data: { status: PaymentStatus.COMPLETED },
+      });
+      expect(mockPrismaService.registration.update).toHaveBeenCalledWith({
+        where: { id: mockRegistration.id },
+        data: { status: 'CONFIRMED' },
+      });
+      expect(result).toEqual({
+        sessionId,
+        paymentStatus: PaymentStatus.COMPLETED,
+        registrationId: mockRegistration.id,
+        registrationStatus: 'CONFIRMED',
+        paymentId: mockPayment.id,
+      });
+    });
+
+    it('should verify successful payment without registration', async () => {
+      // Mock payment without registration
+      const paymentWithoutRegistration = {
+        ...mockPayment,
+        registrationId: null,
+        registration: null,
+      };
+
+      // Mock successful Stripe session
+      const mockStripeSession = {
+        id: sessionId,
+        status: 'complete',
+        payment_status: 'paid',
+      };
+
+      // Setup mocks
+      mockPrismaService.payment.findFirst.mockResolvedValue(paymentWithoutRegistration);
+      mockPrismaService.payment.findUnique.mockResolvedValue(paymentWithoutRegistration);
+      mockStripeService.getCheckoutSession.mockResolvedValue(mockStripeSession);
+      mockPrismaService.payment.update.mockResolvedValue({
+        ...mockPayment,
+        status: PaymentStatus.COMPLETED,
+      });
+
+      // Execute
+      const result = await service.verifyStripeSession(sessionId);
+
+      // Assert
+      expect(mockPrismaService.payment.findFirst).toHaveBeenCalledWith({
+        where: { providerRefId: sessionId },
+        include: { registration: true },
+      });
+      expect(mockStripeService.getCheckoutSession).toHaveBeenCalledWith(sessionId);
+      expect(mockPrismaService.payment.update).toHaveBeenCalledWith({
+        where: { id: mockPayment.id },
+        data: { status: PaymentStatus.COMPLETED },
+      });
+      expect(mockPrismaService.registration.update).not.toHaveBeenCalled();
+      expect(result).toEqual({
+        sessionId,
+        paymentStatus: PaymentStatus.COMPLETED,
+        registrationId: undefined,
+        registrationStatus: undefined,
+        paymentId: mockPayment.id,
+      });
+    });
+
+    it('should handle already completed payment', async () => {
+      // Mock already completed payment
+      const completedPayment = {
+        ...mockPayment,
+        status: PaymentStatus.COMPLETED,
+        registration: { ...mockRegistration, status: 'CONFIRMED' },
+      };
+
+      // Mock successful Stripe session
+      const mockStripeSession = {
+        id: sessionId,
+        status: 'complete',
+        payment_status: 'paid',
+      };
+
+      // Setup mocks
+      mockPrismaService.payment.findFirst.mockResolvedValue(completedPayment);
+      mockStripeService.getCheckoutSession.mockResolvedValue(mockStripeSession);
+
+      // Execute
+      const result = await service.verifyStripeSession(sessionId);
+
+      // Assert
+      expect(mockPrismaService.payment.findFirst).toHaveBeenCalledWith({
+        where: { providerRefId: sessionId },
+        include: { registration: true },
+      });
+      expect(mockStripeService.getCheckoutSession).toHaveBeenCalledWith(sessionId);
+      // Should not update already completed payment
+      expect(mockPrismaService.payment.update).not.toHaveBeenCalled();
+      expect(mockPrismaService.registration.update).not.toHaveBeenCalled();
+      expect(result).toEqual({
+        sessionId,
+        paymentStatus: PaymentStatus.COMPLETED,
+        registrationId: mockRegistration.id,
+        registrationStatus: 'CONFIRMED',
+        paymentId: mockPayment.id,
+      });
+    });
+
+    it('should handle expired session and update payment to failed', async () => {
+      // Mock pending payment
+      const paymentWithRegistration = {
+        ...mockPayment,
+        registration: mockRegistration,
+      };
+
+      // Mock expired Stripe session
+      const mockStripeSession = {
+        id: sessionId,
+        status: 'expired',
+        payment_status: 'unpaid',
+      };
+
+      // Setup mocks
+      mockPrismaService.payment.findFirst.mockResolvedValue(paymentWithRegistration);
+      mockPrismaService.payment.findUnique.mockResolvedValue(paymentWithRegistration);
+      mockStripeService.getCheckoutSession.mockResolvedValue(mockStripeSession);
+      mockPrismaService.payment.update.mockResolvedValue({
+        ...mockPayment,
+        status: PaymentStatus.FAILED,
+      });
+
+      // Execute
+      const result = await service.verifyStripeSession(sessionId);
+
+      // Assert
+      expect(mockPrismaService.payment.findFirst).toHaveBeenCalledWith({
+        where: { providerRefId: sessionId },
+        include: { registration: true },
+      });
+      expect(mockStripeService.getCheckoutSession).toHaveBeenCalledWith(sessionId);
+      expect(mockPrismaService.payment.update).toHaveBeenCalledWith({
+        where: { id: mockPayment.id },
+        data: {
+          status: PaymentStatus.FAILED,
+          notes: 'Checkout session expired',
+        },
+      });
+      // Should not update registration for failed payment
+      expect(mockPrismaService.registration.update).not.toHaveBeenCalled();
+      expect(result).toEqual({
+        sessionId,
+        paymentStatus: PaymentStatus.FAILED,
+        registrationId: mockRegistration.id,
+        registrationStatus: 'PENDING',
+        paymentId: mockPayment.id,
+      });
+    });
+
+    it('should handle pending payment with unpaid session', async () => {
+      // Mock pending payment
+      const paymentWithRegistration = {
+        ...mockPayment,
+        registration: mockRegistration,
+      };
+
+      // Mock unpaid but not expired Stripe session
+      const mockStripeSession = {
+        id: sessionId,
+        status: 'open',
+        payment_status: 'unpaid',
+      };
+
+      // Setup mocks
+      mockPrismaService.payment.findFirst.mockResolvedValue(paymentWithRegistration);
+      mockStripeService.getCheckoutSession.mockResolvedValue(mockStripeSession);
+
+      // Execute
+      const result = await service.verifyStripeSession(sessionId);
+
+      // Assert
+      expect(mockPrismaService.payment.findFirst).toHaveBeenCalledWith({
+        where: { providerRefId: sessionId },
+        include: { registration: true },
+      });
+      expect(mockStripeService.getCheckoutSession).toHaveBeenCalledWith(sessionId);
+      // Should not update payment or registration for still-pending session
+      expect(mockPrismaService.payment.update).not.toHaveBeenCalled();
+      expect(mockPrismaService.registration.update).not.toHaveBeenCalled();
+      expect(result).toEqual({
+        sessionId,
+        paymentStatus: PaymentStatus.PENDING,
+        registrationId: mockRegistration.id,
+        registrationStatus: 'PENDING',
+        paymentId: mockPayment.id,
+      });
+    });
+
+    it('should throw NotFoundException when payment not found', async () => {
+      // Setup mocks
+      mockPrismaService.payment.findFirst.mockResolvedValue(null);
+
+      // Execute & Assert
+      await expect(service.verifyStripeSession(sessionId)).rejects.toThrow(
+        new NotFoundException(`Payment not found for Stripe session ${sessionId}`)
+      );
+
+      expect(mockPrismaService.payment.findFirst).toHaveBeenCalledWith({
+        where: { providerRefId: sessionId },
+        include: { registration: true },
+      });
+      expect(mockStripeService.getCheckoutSession).not.toHaveBeenCalled();
+    });
+
+    it('should handle Stripe service errors', async () => {
+      // Mock payment
+      const paymentWithRegistration = {
+        ...mockPayment,
+        registration: mockRegistration,
+      };
+
+      // Setup mocks
+      mockPrismaService.payment.findFirst.mockResolvedValue(paymentWithRegistration);
+      mockStripeService.getCheckoutSession.mockRejectedValue(new Error('Stripe API error'));
+
+      // Execute & Assert
+      await expect(service.verifyStripeSession(sessionId)).rejects.toThrow(BadRequestException);
+
+      expect(mockPrismaService.payment.findFirst).toHaveBeenCalledWith({
+        where: { providerRefId: sessionId },
+        include: { registration: true },
+      });
+      expect(mockStripeService.getCheckoutSession).toHaveBeenCalledWith(sessionId);
+    });
+
+    it('should handle database update errors gracefully', async () => {
+      // Mock payment with registration
+      const paymentWithRegistration = {
+        ...mockPayment,
+        registration: mockRegistration,
+      };
+
+      // Mock successful Stripe session
+      const mockStripeSession = {
+        id: sessionId,
+        status: 'complete',
+        payment_status: 'paid',
+      };
+
+      // Setup mocks
+      mockPrismaService.payment.findFirst.mockResolvedValue(paymentWithRegistration);
+      mockPrismaService.payment.findUnique.mockResolvedValue(paymentWithRegistration);
+      mockStripeService.getCheckoutSession.mockResolvedValue(mockStripeSession);
+      mockPrismaService.payment.update.mockRejectedValue(new Error('Database error'));
+
+      // Execute & Assert
+      await expect(service.verifyStripeSession(sessionId)).rejects.toThrow(BadRequestException);
+
+      expect(mockPrismaService.payment.findFirst).toHaveBeenCalledWith({
+        where: { providerRefId: sessionId },
+        include: { registration: true },
+      });
+      expect(mockStripeService.getCheckoutSession).toHaveBeenCalledWith(sessionId);
+      expect(mockPrismaService.payment.update).toHaveBeenCalledWith({
+        where: { id: mockPayment.id },
+        data: { status: PaymentStatus.COMPLETED },
+      });
     });
   });
 

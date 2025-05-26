@@ -19,6 +19,8 @@ import AdminShiftsPage from '../pages/AdminShiftsPage.tsx';
 import ShiftsPage from '../pages/ShiftsPage.tsx';
 import RegistrationPage from '../pages/registration/RegistrationPage.tsx';
 import RegistrationProtectedRoute from './RegistrationProtectedRoute.tsx';
+import PaymentSuccessPage from '../pages/payment/PaymentSuccessPage.tsx';
+import PaymentCancelPage from '../pages/payment/PaymentCancelPage.tsx';
 import NotFoundPage from '../pages/NotFoundPage.tsx';
 import { ROLES } from '../types/auth.ts';
 
@@ -40,6 +42,8 @@ const AppRouter: React.FC = () => {
         <Route path={ROUTES.DASHBOARD.path} element={<DashboardPage />} />
         <Route path={ROUTES.PROFILE.path} element={<ProfilePage />} />
         <Route path={ROUTES.SHIFTS.path} element={<ShiftsPage />} />
+        <Route path={ROUTES.PAYMENT_SUCCESS.path} element={<PaymentSuccessPage />} />
+        <Route path={ROUTES.PAYMENT_CANCEL.path} element={<PaymentCancelPage />} />
       </Route>
 
       {/* Registration route with specialized protection */}

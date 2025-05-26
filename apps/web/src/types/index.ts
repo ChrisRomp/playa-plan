@@ -8,6 +8,7 @@ export interface User {
   isAuthenticated: boolean;
   isEarlyRegistrationEnabled: boolean;
   hasRegisteredForCurrentYear: boolean;
+  allowDeferredDuesPayment?: boolean;
   
   /**
    * The user's first name, as provided in the backend user profile.
@@ -61,6 +62,12 @@ export interface CampConfig {
   registrationOpen: boolean;
   earlyRegistrationOpen: boolean;
   currentYear: number;
+  stripeEnabled?: boolean;
+  stripePublicKey?: string;
+  paypalEnabled?: boolean;
+  paypalClientId?: string;
+  paypalMode?: 'sandbox' | 'live';
+  allowDeferredDuesPayment?: boolean;
 }
 
 export type RegistrationStatus = 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'WAITLISTED';
@@ -94,6 +101,7 @@ export interface Job {
   maxRegistrations: number;
   alwaysRequired: boolean;
   staffOnly: boolean;
+  currentRegistrations?: number;
   category?: JobCategory;
   shift?: Shift;
 }
@@ -130,6 +138,29 @@ export interface Payment {
   updatedAt: string;
   userId: string;
   registrationId?: string;
+}
+
+// Stripe Payment Types
+export interface StripePaymentRequest {
+  amount: number; // Amount in cents
+  currency?: string;
+  userId: string;
+  registrationId?: string;
+  description?: string;
+  successUrl?: string;
+  cancelUrl?: string;
+}
+
+export interface StripePaymentResponse {
+  paymentId: string;
+  url?: string;
+  clientSecret?: string;
+}
+
+export interface PaymentIntentConfirmation {
+  paymentIntentId: string;
+  status: 'succeeded' | 'failed' | 'cancelled';
+  error?: string;
 }
 
 export interface CampingOptionField {

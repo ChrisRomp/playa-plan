@@ -10,6 +10,7 @@ import { JobCategory, Job, CampingOptionField } from '../../lib/api';
 import { getFriendlyDayName, formatTime } from '../../utils/shiftUtils';
 import { canUserRegister, getRegistrationStatusMessage } from '../../utils/registrationUtils';
 import { PATHS } from '../../routes';
+import PaymentButton from '../../components/payment/PaymentButton';
 
 /**
  * RegistrationPage component for user camp registration
@@ -56,6 +57,7 @@ export default function RegistrationPage() {
   // Multi-step form control
   const [currentStep, setCurrentStep] = useState(1);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [registrationId, setRegistrationId] = useState<string | null>(null);
   
   // Collapsible categories state for shifts step
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
@@ -98,39 +100,41 @@ export default function RegistrationPage() {
   // Auto-expand categories with selected jobs or errors when on shifts step
   useEffect(() => {
     if (currentStep === 4) {
-      const categoriesToExpand = new Set<string>();
-      
-      // Expand categories with selected jobs
-      formData.jobs.forEach(jobId => {
-        const job = jobs.find(j => j.id === jobId);
-        if (job) {
-          categoriesToExpand.add(job.categoryId);
+      setExpandedCategories(prev => {
+        const categoriesToExpand = new Set(prev); // Start with currently expanded categories
+        
+        // Expand categories with selected jobs
+        formData.jobs.forEach(jobId => {
+          const job = jobs.find(j => j.id === jobId);
+          if (job) {
+            categoriesToExpand.add(job.categoryId);
+          }
+        });
+        
+        // Expand categories with validation errors
+        Object.keys(formErrors).forEach(errorKey => {
+          if (errorKey.startsWith('category_')) {
+            const categoryId = errorKey.replace('category_', '');
+            categoriesToExpand.add(categoryId);
+          }
+        });
+        
+        // Always expand all always-required categories by default
+        const alwaysRequiredCategories = getAlwaysRequiredCategories();
+        alwaysRequiredCategories.forEach(category => {
+          categoriesToExpand.add(category.id);
+        });
+        
+        // If no categories are expanded and we have categories to show, expand the first one
+        if (categoriesToExpand.size === 0 && jobCategories.length > 0) {
+          const firstCategory = jobCategories[0];
+          if (firstCategory) {
+            categoriesToExpand.add(firstCategory.id);
+          }
         }
+        
+        return categoriesToExpand;
       });
-      
-      // Expand categories with validation errors
-      Object.keys(formErrors).forEach(errorKey => {
-        if (errorKey.startsWith('category_')) {
-          const categoryId = errorKey.replace('category_', '');
-          categoriesToExpand.add(categoryId);
-        }
-      });
-      
-      // Always expand all always-required categories by default
-      const alwaysRequiredCategories = getAlwaysRequiredCategories();
-      alwaysRequiredCategories.forEach(category => {
-        categoriesToExpand.add(category.id);
-      });
-      
-      // If no categories are expanded and we have categories to show, expand the first one
-      if (categoriesToExpand.size === 0 && jobCategories.length > 0) {
-        const firstCategory = jobCategories[0];
-        if (firstCategory) {
-          categoriesToExpand.add(firstCategory.id);
-        }
-      }
-      
-      setExpandedCategories(categoriesToExpand);
     }
   }, [currentStep, formData.jobs, formErrors, jobs, jobCategories, getAlwaysRequiredCategories]);
   
@@ -409,6 +413,7 @@ export default function RegistrationPage() {
         errors.acceptedTerms = 'You must accept the terms to continue';
       }
     }
+    // No validation needed for step 6 (payment) as it's handled by the payment component
     
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
@@ -431,14 +436,9 @@ export default function RegistrationPage() {
         }
       }
       setCurrentStep(currentStep + 1);
-    } else {
-      try {
-        await submitRegistration(formData);
-        navigate('/dashboard'); // Redirect to dashboard after successful registration
-      } catch (err) {
-        console.error('Registration failed:', err);
-        setFormErrors({ submit: 'Registration submission failed. Please try again.' });
-      }
+    } else if (currentStep === 5) {
+      // Terms step - just move to payment step without creating registration yet
+      setCurrentStep(6);
     }
   };
 
@@ -951,27 +951,36 @@ export default function RegistrationPage() {
         {isExpanded && (
           <div className="px-4 pb-4">
             <div className="space-y-2">
-              {jobs.map(job => (
-                <div key={job.id} className="border p-3 rounded bg-white">
-                  <label className="flex items-start">
-                    <input
-                      type="checkbox"
-                      className="mt-1 h-4 w-4"
-                      checked={formData.jobs.includes(job.id)}
-                      onChange={() => handleJobChange(job.id)}
-                    />
-                    <div className="ml-2">
-                      <div className="font-medium">{job.name}</div>
-                      <div className="text-sm text-gray-600">
-                        {getShiftInfoForJob(job)}
+              {jobs.map(job => {
+                const spotsAvailable = job.maxRegistrations - (job.currentRegistrations || 0);
+                const isJobFull = spotsAvailable <= 0;
+                const isJobSelected = formData.jobs.includes(job.id);
+                
+                return (
+                  <div key={job.id} className={`border p-3 rounded ${isJobFull && !isJobSelected ? 'bg-gray-100' : 'bg-white'}`}>
+                    <label className={`flex items-start ${isJobFull && !isJobSelected ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+                      <input
+                        type="checkbox"
+                        className="mt-1 h-4 w-4"
+                        checked={isJobSelected}
+                        onChange={() => handleJobChange(job.id)}
+                        disabled={isJobFull && !isJobSelected}
+                      />
+                      <div className="ml-2">
+                        <div className={`font-medium ${isJobFull && !isJobSelected ? 'text-gray-500' : ''}`}>
+                          {job.name}
+                        </div>
+                        <div className={`text-sm ${isJobFull && !isJobSelected ? 'text-gray-400' : 'text-gray-600'}`}>
+                          {getShiftInfoForJob(job)}
+                        </div>
+                        <div className={`text-sm ${isJobFull && !isJobSelected ? 'text-gray-400' : 'text-gray-600'}`}>
+                          Spots: {spotsAvailable} of {job.maxRegistrations} available{isJobFull && !isJobSelected && <span className="ml-1 text-red-600">(Full)</span>}
+                        </div>
                       </div>
-                      <div className="text-sm text-gray-600">
-                        Spots: {job.maxRegistrations - (job.currentRegistrations || 0)} of {job.maxRegistrations} available
-                      </div>
-                    </div>
-                  </label>
-                </div>
-              ))}
+                    </label>
+                  </div>
+                );
+              })}
               
               {jobs.length === 0 && (
                 <div className="text-amber-600 p-3 bg-amber-50 rounded">
@@ -1146,6 +1155,106 @@ export default function RegistrationPage() {
     );
   };
 
+  // Render payment step
+  const renderPaymentStep = () => {
+    const totalCost = calculateTotalCost();
+    const needsPayment = totalCost > 0 && (!config?.allowDeferredDuesPayment || !user?.allowDeferredDuesPayment);
+
+    return (
+      <div>
+        <h2 className="text-xl font-semibold mb-4">Payment</h2>
+        
+        <div className="mb-6">
+          <h3 className="text-lg font-medium mb-2">Registration Summary</h3>
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+            <div className="space-y-2">
+              <div className="flex justify-between">
+                <span>Total Dues:</span>
+                <span className="font-medium">${totalCost.toFixed(2)}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {needsPayment ? (
+          <div className="space-y-4">
+            <p className="text-gray-600">
+              Please complete your payment to finalize your registration.
+            </p>
+            
+            <PaymentButton
+              amount={totalCost}
+              registrationId={registrationId || undefined}
+              description={`${config?.name || 'Camp'} Dues Payment ${config?.currentYear || new Date().getFullYear()}`}
+              onPaymentStart={async () => {
+                // Create registration if it doesn't exist yet
+                if (!registrationId) {
+                  try {
+                    const result = await submitRegistration(formData);
+                    if (result?.jobRegistration?.id) {
+                      setRegistrationId(result.jobRegistration.id);
+                    }
+                  } catch (err) {
+                    console.error('Registration creation failed:', err);
+                    setFormErrors(prev => ({ ...prev, payment: 'Failed to create registration. Please try again.' }));
+                    throw err; // Prevent payment from proceeding
+                  }
+                }
+                console.log('Payment started with registrationId:', registrationId);
+              }}
+              onPaymentError={(error) => {
+                setFormErrors(prev => ({ ...prev, payment: error }));
+              }}
+              className="w-full"
+            >
+              Complete Registration - ${totalCost.toFixed(2)}
+            </PaymentButton>
+
+            {formErrors.payment && (
+              <div className="text-red-600 text-sm mt-2">
+                {formErrors.payment}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <p className="text-blue-800">
+                {totalCost === 0 
+                  ? 'No payment required for your selected options.'
+                  : 'Payment has been deferred. You can complete payment later.'
+                }
+              </p>
+            </div>
+            
+            <button
+              type="button"
+              onClick={async () => {
+                // Complete registration without payment
+                try {
+                  // Create registration if it doesn't exist yet
+                  if (!registrationId) {
+                    const result = await submitRegistration(formData);
+                    if (result?.jobRegistration?.id) {
+                      setRegistrationId(result.jobRegistration.id);
+                    }
+                  }
+                  navigate('/dashboard');
+                } catch (err) {
+                  console.error('Registration completion failed:', err);
+                  setFormErrors(prev => ({ ...prev, payment: 'Failed to complete registration. Please try again.' }));
+                }
+              }}
+              className="w-full bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium"
+            >
+              {totalCost === 0 ? 'Complete Registration' : 'Pay Dues Later'}
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   // Render the current step
   const renderCurrentStep = () => {
     switch (currentStep) {
@@ -1159,6 +1268,8 @@ export default function RegistrationPage() {
         return renderJobsStep();
       case 5:
         return renderTermsStep();
+      case 6:
+        return renderPaymentStep();
       default:
         return null;
     }
@@ -1244,7 +1355,7 @@ export default function RegistrationPage() {
       
       {/* Step Progress Indicator */}
       <div className="flex mb-8">
-        {[1, 2, 3, 4, 5].map(step => (
+        {[1, 2, 3, 4, 5, 6].map(step => (
           <div key={step} className="flex-1">
             <div className={`h-2 ${step <= currentStep ? 'bg-blue-500' : 'bg-gray-200'}`} />
             <div className="mt-2 text-center text-sm">
@@ -1253,6 +1364,7 @@ export default function RegistrationPage() {
               {step === 3 && 'Details'}
               {step === 4 && 'Shifts'}
               {step === 5 && 'Review'}
+              {step === 6 && 'Payment'}
             </div>
           </div>
         ))}
@@ -1301,12 +1413,15 @@ export default function RegistrationPage() {
             </button>
           )}
           
-          <button
-            type="submit"
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-          >
-            {currentStep < 5 ? 'Continue' : 'Complete Registration'}
-          </button>
+          {/* Only show form submit button if not on payment step, or if on payment step but no payment needed */}
+          {currentStep !== 6 && (
+            <button
+              type="submit"
+              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            >
+              {currentStep < 5 ? 'Continue' : currentStep === 5 ? 'Review & Pay' : 'Complete Registration'}
+            </button>
+          )}
         </div>
         
         {/* Payment amount display */}

@@ -147,7 +147,10 @@ export class PaymentsController {
 
   @Post('webhook/stripe')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Handle Stripe webhook events' })
+  @ApiOperation({ 
+    summary: 'Handle Stripe webhook events (OPTIONAL - use session verification instead)',
+    description: 'This endpoint is kept for backwards compatibility. The recommended approach is to use the session verification endpoint instead, which eliminates the need for webhook configuration.'
+  })
   @ApiResponse({ status: 200, description: 'Webhook processed successfully' })
   @ApiResponse({ status: 400, description: 'Invalid webhook payload or signature' })
   async handleStripeWebhook(
@@ -170,7 +173,19 @@ export class PaymentsController {
   @ApiOperation({ summary: 'Handle PayPal webhook events' })
   @ApiResponse({ status: 200, description: 'Webhook processed successfully' })
   @ApiResponse({ status: 400, description: 'Invalid webhook payload' })
-  async handlePaypalWebhook(@Body() payload: any) {
+  async handlePaypalWebhook(@Body() payload: Record<string, unknown>) {
     return this.paymentsService.handlePaypalWebhook(payload);
+  }
+
+  @Get('stripe/session/:sessionId/verify')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Verify Stripe checkout session and get payment status' })
+  @ApiParam({ name: 'sessionId', required: true, description: 'Stripe checkout session ID' })
+  @ApiResponse({ status: 200, description: 'Session verification result' })
+  @ApiResponse({ status: 404, description: 'Session not found' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async verifyStripeSession(@Param('sessionId') sessionId: string) {
+    return this.paymentsService.verifyStripeSession(sessionId);
   }
 } 

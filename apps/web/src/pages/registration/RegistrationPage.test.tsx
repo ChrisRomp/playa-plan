@@ -660,18 +660,7 @@ describe('RegistrationPage', () => {
         expect(screen.getAllByText('You must select at least 2 Skydiving work shifts')).toHaveLength(2);
       });
       
-              // First need to expand the Manifest Assistant category
-        const buttons = screen.getAllByRole('button');
-        const manifestBtn = buttons.find(button => button.textContent?.includes('Manifest Assistant'));
-        expect(manifestBtn).toBeDefined();
-        fireEvent.click(manifestBtn!);
-      
-      // Wait for the category to expand
-      await waitFor(() => {
-        expect(screen.getByLabelText(/Manifest Assistant/)).toBeInTheDocument();
-      });
-      
-      // Add another camping job
+      // Add another camping job (Manifest Assistant should already be expanded from earlier)
       fireEvent.click(screen.getByLabelText(/Manifest Assistant/));
       
       // Try to continue again
