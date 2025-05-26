@@ -45,4 +45,4 @@ jobs:
           sed -i 's|DATABASE_URL="[^"]*"|DATABASE_URL="postgresql://postgres:postgres@localhost:5432/playa_plan_test?schema=public"|' .env
 
       - name: Install dependencies for all workspaces
-        run: npm ci
+        run: npm install
