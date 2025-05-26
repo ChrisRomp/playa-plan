@@ -26,7 +26,7 @@
     "prisma:reset": "prisma migrate reset --schema=./prisma/schema.prisma --force",
     "prisma:reset:test": "dotenv -e .env.test -- prisma migrate reset --schema=./prisma/schema.prisma --force",
     "prisma:studio": "prisma studio --schema=./prisma/schema.prisma",
-    "prisma:migrate:manual": "node ./scripts/apply-manual-migrations.js",
+    "prisma:migrate:manual": "node ./scripts/run-manual-migration.js",
     "seed": "ts-node ./prisma/seeds/seed.ts",
     "seed:dev": "ts-node ./prisma/seeds/seed.ts",
     "seed:test": "dotenv -e .env.test -- ts-node ./prisma/seeds/seed.ts",
