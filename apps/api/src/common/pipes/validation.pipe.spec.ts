@@ -60,7 +60,7 @@ describe('GlobalValidationPipe', () => {
     };
 
     // Act
-    const result = await validationPipe.transform(validInput, metadata);
+    const result = await validationPipe.transform(validInput, metadata) as TestDto;
 
     // Assert
     expect(result).toBeDefined();
@@ -101,7 +101,7 @@ describe('GlobalValidationPipe', () => {
     };
 
     // Act
-    const result = await validationPipe.transform(inputWithXss, metadata);
+    const result = await validationPipe.transform(inputWithXss, metadata) as TestDto;
 
     // Assert
     expect(result.name).not.toContain('<script>');
@@ -126,13 +126,13 @@ describe('GlobalValidationPipe', () => {
     };
 
     // Act
-    const result = await validationPipe.transform(nestedInputWithXss, nestedMetadata);
+    const result = await validationPipe.transform(nestedInputWithXss, nestedMetadata) as NestedTestDto;
 
     // Assert
     expect(result.parentField).not.toContain('<script>');
     expect(result.parentField).toEqual('Parent ');
-    expect(result.child.name).not.toContain('<b>');
-    expect(result.child.name).toEqual('Bold text');
+    expect(result.child!.name).not.toContain('<b>');
+    expect(result.child!.name).toEqual('Bold text');
   });
 
   it('should sanitize HTML in arrays', async () => {
@@ -144,7 +144,7 @@ describe('GlobalValidationPipe', () => {
       type: 'body',
       metatype: Array,
       data: '',
-    });
+    }) as string[];
 
     // Assert
     expect(result[0]).not.toContain('<script>');
