@@ -25,6 +25,18 @@ vi.mock('../../store/ConfigContextDefinition', () => ({
   useConfig: vi.fn(),
 }));
 
+vi.mock('../../components/payment/PaymentButton', () => ({
+  default: vi.fn(({ children, amount, onPaymentStart }) => (
+    <button 
+      onClick={onPaymentStart}
+      data-testid="payment-button"
+      data-amount={amount}
+    >
+      {children}
+    </button>
+  )),
+}));
+
 // Import the mocked functions
 import { useAuth } from '../../store/authUtils';
 import { useProfile } from '../../hooks/useProfile';
@@ -258,6 +270,136 @@ describe('DashboardPage Registration Status', () => {
       render(<DashboardPageWrapper />);
 
       expect(screen.getByText('Welcome, TestPlaya!')).toBeInTheDocument();
+    });
+  });
+
+  describe('Pending Payments', () => {
+    it('should show complete payment button for pending payments', () => {
+      const openConfig = {
+        name: 'Test Camp',
+        description: 'Test Description',
+        homePageBlurb: 'Test Blurb',
+        registrationOpen: true,
+        earlyRegistrationOpen: false,
+        currentYear: 2025,
+      };
+
+      const registrationWithPendingPayment = {
+        id: 'reg-1',
+        userId: 'user-1',
+        year: 2025,
+        status: 'PENDING' as const,
+        jobs: [],
+        payments: [
+          {
+            id: 'payment-1',
+            amount: 150.00,
+            currency: 'USD',
+            status: 'PENDING' as const,
+            provider: 'STRIPE' as const,
+            providerRefId: 'stripe-session-1',
+            userId: 'user-1',
+            registrationId: 'reg-1',
+            createdAt: '2025-01-01T00:00:00.000Z',
+            updatedAt: '2025-01-01T00:00:00.000Z',
+          },
+          {
+            id: 'payment-2',
+            amount: 50.00,
+            currency: 'USD',
+            status: 'COMPLETED' as const,
+            provider: 'STRIPE' as const,
+            providerRefId: 'stripe-session-2',
+            userId: 'user-1',
+            registrationId: 'reg-1',
+            createdAt: '2025-01-01T00:00:00.000Z',
+            updatedAt: '2025-01-01T00:00:00.000Z',
+          }
+        ],
+        createdAt: '2025-01-01T00:00:00.000Z',
+        updatedAt: '2025-01-01T00:00:00.000Z',
+      };
+
+      mockUseConfig.mockReturnValue({
+        config: openConfig,
+        isLoading: false,
+        error: null,
+        refreshConfig: vi.fn(),
+      });
+
+      mockUseUserRegistrations.mockReturnValue({
+        registrations: [registrationWithPendingPayment],
+        loading: false,
+        error: null,
+        refetch: vi.fn(),
+      });
+
+      render(<DashboardPageWrapper />);
+
+      // Should show the pending payment section
+      expect(screen.getByText('Outstanding Dues')).toBeInTheDocument();
+      expect(screen.getByText('You have $150.00 in pending dues')).toBeInTheDocument();
+      
+      // Should show the payment button
+      const paymentButton = screen.getByTestId('payment-button');
+      expect(paymentButton).toBeInTheDocument();
+      expect(paymentButton).toHaveAttribute('data-amount', '150');
+      expect(paymentButton).toHaveTextContent('Complete Dues Payment - $150.00');
+    });
+
+    it('should not show complete payment button when no pending payments', () => {
+      const openConfig = {
+        name: 'Test Camp',
+        description: 'Test Description',
+        homePageBlurb: 'Test Blurb',
+        registrationOpen: true,
+        earlyRegistrationOpen: false,
+        currentYear: 2025,
+      };
+
+      const registrationWithCompletedPayments = {
+        id: 'reg-1',
+        userId: 'user-1',
+        year: 2025,
+        status: 'CONFIRMED' as const,
+        jobs: [],
+        payments: [
+          {
+            id: 'payment-1',
+            amount: 150.00,
+            currency: 'USD',
+            status: 'COMPLETED' as const,
+            provider: 'STRIPE' as const,
+            providerRefId: 'stripe-session-3',
+            userId: 'user-1',
+            registrationId: 'reg-1',
+            createdAt: '2025-01-01T00:00:00.000Z',
+            updatedAt: '2025-01-01T00:00:00.000Z',
+          }
+        ],
+        createdAt: '2025-01-01T00:00:00.000Z',
+        updatedAt: '2025-01-01T00:00:00.000Z',
+      };
+
+      mockUseConfig.mockReturnValue({
+        config: openConfig,
+        isLoading: false,
+        error: null,
+        refreshConfig: vi.fn(),
+      });
+
+      mockUseUserRegistrations.mockReturnValue({
+        registrations: [registrationWithCompletedPayments],
+        loading: false,
+        error: null,
+        refetch: vi.fn(),
+      });
+
+      render(<DashboardPageWrapper />);
+
+      // Should not show the pending payment section
+      expect(screen.queryByText('Outstanding Dues')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('payment-button')).not.toBeInTheDocument();
     });
   });
 }); 
