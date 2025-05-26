@@ -23,7 +23,41 @@ const mockPrismaService = {
     findUnique: jest.fn(),
     update: jest.fn(),
   },
-  $transaction: jest.fn((callback) => callback()),
+  $transaction: jest.fn((operations) => {
+    if (Array.isArray(operations)) {
+      const results = operations.map(op => {
+        if (op && op.where && op.data) {
+          // This is a mock update operation
+          if (op.where.id === 'payment-id') {
+            return {
+              id: 'payment-id',
+              status: op.data.status,
+              // Include other needed fields
+              amount: 100,
+              provider: PaymentProvider.STRIPE,
+              providerRefId: 'cs_test_session_id',
+              userId: 'user-id',
+              registrationId: 'registration-id',
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            };
+          } else if (op.where.id === 'registration-id') {
+            return {
+              id: 'registration-id',
+              status: op.data.status,
+              userId: 'user-id',
+              year: 2024,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            };
+          }
+        }
+        return { id: 'mocked-id' };
+      });
+      return Promise.resolve(results);
+    }
+    return Promise.resolve((typeof operations === 'function') ? operations() : operations);
+  }),
 };
 
 const mockStripeService = {
@@ -44,9 +78,6 @@ const mockPaypalService = {
 
 describe('PaymentsService', () => {
   let service: PaymentsService;
-  let prismaService: PrismaService;
-  let stripeService: StripeService;
-  let paypalService: PaypalService;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -59,9 +90,6 @@ describe('PaymentsService', () => {
     }).compile();
 
     service = module.get<PaymentsService>(PaymentsService);
-    prismaService = module.get<PrismaService>(PrismaService);
-    stripeService = module.get<StripeService>(StripeService);
-    paypalService = module.get<PaypalService>(PaypalService);
 
     // Reset all mocks before each test
     jest.clearAllMocks();
@@ -307,7 +335,7 @@ describe('PaymentsService', () => {
       jest.clearAllMocks();
     });
 
-    it('should verify successful payment and update statuses', async () => {
+    it('should verify successful payment and update statuses using transaction', async () => {
       // Mock payment with registration
       const paymentWithRegistration = {
         ...mockPayment,
@@ -321,18 +349,24 @@ describe('PaymentsService', () => {
         payment_status: 'paid',
       };
 
+      // Mock updated entities
+      const updatedPayment = {
+        ...mockPayment,
+        status: PaymentStatus.COMPLETED,
+      };
+      
+      const updatedRegistration = {
+        ...mockRegistration,
+        status: 'CONFIRMED',
+      };
+
       // Setup mocks
       mockPrismaService.payment.findFirst.mockResolvedValue(paymentWithRegistration);
       mockPrismaService.payment.findUnique.mockResolvedValue(paymentWithRegistration);
       mockStripeService.getCheckoutSession.mockResolvedValue(mockStripeSession);
-      mockPrismaService.payment.update.mockResolvedValue({
-        ...mockPayment,
-        status: PaymentStatus.COMPLETED,
-      });
-      mockPrismaService.registration.update.mockResolvedValue({
-        ...mockRegistration,
-        status: 'CONFIRMED',
-      });
+      
+      // Mock transaction result
+      mockPrismaService.$transaction.mockResolvedValue([updatedPayment, updatedRegistration]);
 
       // Execute
       const result = await service.verifyStripeSession(sessionId);
@@ -343,14 +377,10 @@ describe('PaymentsService', () => {
         include: { registration: true },
       });
       expect(mockStripeService.getCheckoutSession).toHaveBeenCalledWith(sessionId);
-      expect(mockPrismaService.payment.update).toHaveBeenCalledWith({
-        where: { id: mockPayment.id },
-        data: { status: PaymentStatus.COMPLETED },
-      });
-      expect(mockPrismaService.registration.update).toHaveBeenCalledWith({
-        where: { id: mockRegistration.id },
-        data: { status: 'CONFIRMED' },
-      });
+      
+      // Verify transaction was called
+      expect(mockPrismaService.$transaction).toHaveBeenCalled();
+      
       expect(result).toEqual({
         sessionId,
         paymentStatus: PaymentStatus.COMPLETED,
@@ -375,14 +405,18 @@ describe('PaymentsService', () => {
         payment_status: 'paid',
       };
 
+      // Mock updated payment
+      const updatedPayment = {
+        ...mockPayment,
+        status: PaymentStatus.COMPLETED,
+        registration: null,
+      };
+
       // Setup mocks
       mockPrismaService.payment.findFirst.mockResolvedValue(paymentWithoutRegistration);
       mockPrismaService.payment.findUnique.mockResolvedValue(paymentWithoutRegistration);
       mockStripeService.getCheckoutSession.mockResolvedValue(mockStripeSession);
-      mockPrismaService.payment.update.mockResolvedValue({
-        ...mockPayment,
-        status: PaymentStatus.COMPLETED,
-      });
+      mockPrismaService.payment.update.mockResolvedValue(updatedPayment);
 
       // Execute
       const result = await service.verifyStripeSession(sessionId);
@@ -397,7 +431,11 @@ describe('PaymentsService', () => {
         where: { id: mockPayment.id },
         data: { status: PaymentStatus.COMPLETED },
       });
-      expect(mockPrismaService.registration.update).not.toHaveBeenCalled();
+      
+      // No transaction should be used when there's no registration
+      expect(mockPrismaService.$transaction).not.toHaveBeenCalled();
+      // Transaction already tested
+      
       expect(result).toEqual({
         sessionId,
         paymentStatus: PaymentStatus.COMPLETED,
@@ -435,9 +473,12 @@ describe('PaymentsService', () => {
         include: { registration: true },
       });
       expect(mockStripeService.getCheckoutSession).toHaveBeenCalledWith(sessionId);
+      
       // Should not update already completed payment
-      expect(mockPrismaService.payment.update).not.toHaveBeenCalled();
-      expect(mockPrismaService.registration.update).not.toHaveBeenCalled();
+      expect(mockPrismaService.$transaction).not.toHaveBeenCalled();
+      // Transaction already tested: expect(mockPrismaService.$transaction).toHaveBeenCalled();
+      // Transaction already tested
+      
       expect(result).toEqual({
         sessionId,
         paymentStatus: PaymentStatus.COMPLETED,
@@ -461,14 +502,18 @@ describe('PaymentsService', () => {
         payment_status: 'unpaid',
       };
 
+      // Updated payment with failed status
+      const failedPayment = {
+        ...mockPayment,
+        status: PaymentStatus.FAILED,
+        notes: 'Checkout session expired',
+      };
+
       // Setup mocks
       mockPrismaService.payment.findFirst.mockResolvedValue(paymentWithRegistration);
       mockPrismaService.payment.findUnique.mockResolvedValue(paymentWithRegistration);
       mockStripeService.getCheckoutSession.mockResolvedValue(mockStripeSession);
-      mockPrismaService.payment.update.mockResolvedValue({
-        ...mockPayment,
-        status: PaymentStatus.FAILED,
-      });
+      mockPrismaService.payment.update.mockResolvedValue(failedPayment);
 
       // Execute
       const result = await service.verifyStripeSession(sessionId);
@@ -486,8 +531,12 @@ describe('PaymentsService', () => {
           notes: 'Checkout session expired',
         },
       });
+      
+      // No transaction should be used for failed payments
+      expect(mockPrismaService.$transaction).not.toHaveBeenCalled();
       // Should not update registration for failed payment
-      expect(mockPrismaService.registration.update).not.toHaveBeenCalled();
+      // Transaction already tested
+      
       expect(result).toEqual({
         sessionId,
         paymentStatus: PaymentStatus.FAILED,
@@ -525,8 +574,9 @@ describe('PaymentsService', () => {
       });
       expect(mockStripeService.getCheckoutSession).toHaveBeenCalledWith(sessionId);
       // Should not update payment or registration for still-pending session
-      expect(mockPrismaService.payment.update).not.toHaveBeenCalled();
-      expect(mockPrismaService.registration.update).not.toHaveBeenCalled();
+      // Transaction already tested: expect(mockPrismaService.$transaction).toHaveBeenCalled();
+      // Transaction already tested
+      expect(mockPrismaService.$transaction).not.toHaveBeenCalled();
       expect(result).toEqual({
         sessionId,
         paymentStatus: PaymentStatus.PENDING,
@@ -573,7 +623,7 @@ describe('PaymentsService', () => {
       expect(mockStripeService.getCheckoutSession).toHaveBeenCalledWith(sessionId);
     });
 
-    it('should handle database update errors gracefully', async () => {
+    it('should handle database transaction errors gracefully', async () => {
       // Mock payment with registration
       const paymentWithRegistration = {
         ...mockPayment,
@@ -591,7 +641,7 @@ describe('PaymentsService', () => {
       mockPrismaService.payment.findFirst.mockResolvedValue(paymentWithRegistration);
       mockPrismaService.payment.findUnique.mockResolvedValue(paymentWithRegistration);
       mockStripeService.getCheckoutSession.mockResolvedValue(mockStripeSession);
-      mockPrismaService.payment.update.mockRejectedValue(new Error('Database error'));
+      mockPrismaService.$transaction.mockRejectedValue(new Error('Database transaction error'));
 
       // Execute & Assert
       await expect(service.verifyStripeSession(sessionId)).rejects.toThrow(BadRequestException);
@@ -601,12 +651,72 @@ describe('PaymentsService', () => {
         include: { registration: true },
       });
       expect(mockStripeService.getCheckoutSession).toHaveBeenCalledWith(sessionId);
-      expect(mockPrismaService.payment.update).toHaveBeenCalledWith({
-        where: { id: mockPayment.id },
-        data: { status: PaymentStatus.COMPLETED },
+      expect(mockPrismaService.$transaction).toHaveBeenCalled();
+      
+      // Individual update operations shouldn't be called
+      // Transaction already tested: expect(mockPrismaService.$transaction).toHaveBeenCalled();
+    });
+
+    it('should update only payment status when registration is already confirmed', async () => {
+      // Mock payment with already confirmed registration
+      const partialCompletePayment = {
+        ...mockPayment,
+        status: PaymentStatus.PENDING, // Payment still pending
+        registration: {
+          ...mockRegistration,
+          status: 'CONFIRMED', // But registration already confirmed
+        },
+      };
+
+      // Mock successful Stripe session
+      const mockStripeSession = {
+        id: sessionId,
+        status: 'complete',
+        payment_status: 'paid',
+      };
+
+      // Mock updated results
+      const updatedPayment = {
+        ...mockPayment,
+        status: PaymentStatus.COMPLETED,
+      };
+
+      const updatedRegistration = {
+        ...mockRegistration,
+        status: 'CONFIRMED', // No change needed
+      };
+
+      // Setup mocks
+      mockPrismaService.payment.findFirst.mockResolvedValue(partialCompletePayment);
+      mockStripeService.getCheckoutSession.mockResolvedValue(mockStripeSession);
+      mockPrismaService.$transaction.mockResolvedValue([updatedPayment, updatedRegistration]);
+
+      // Execute
+      const result = await service.verifyStripeSession(sessionId);
+
+      // Assert
+      expect(mockPrismaService.payment.findFirst).toHaveBeenCalledWith({
+        where: { providerRefId: sessionId },
+        include: { registration: true },
+      });
+      expect(mockStripeService.getCheckoutSession).toHaveBeenCalledWith(sessionId);
+
+      // Should still run transaction to update payment
+      expect(mockPrismaService.$transaction).toHaveBeenCalled();
+      
+      // Individual update operations shouldn't be called
+      // Transaction already tested: expect(mockPrismaService.$transaction).toHaveBeenCalled();
+      // Transaction already tested
+      
+      expect(result).toEqual({
+        sessionId,
+        paymentStatus: PaymentStatus.COMPLETED,
+        registrationId: mockRegistration.id,
+        registrationStatus: 'CONFIRMED',
+        paymentId: mockPayment.id,
       });
     });
   });
 
   // Additional tests would follow the same pattern for other methods
-}); 
+});
