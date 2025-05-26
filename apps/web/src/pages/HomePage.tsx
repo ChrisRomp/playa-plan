@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { useConfig } from '../store/ConfigContext';
+import { useAuth } from '../store/authUtils';
 import { PATHS } from '../routes';
 
 /**
@@ -9,6 +10,7 @@ import { PATHS } from '../routes';
  */
 const HomePage: React.FC = () => {
   const { config } = useConfig();
+  const { isAuthenticated } = useAuth();
 
   // Return early if config is not loaded yet
   if (!config) {
@@ -27,19 +29,21 @@ const HomePage: React.FC = () => {
           )}
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center mt-8">
-            <Link
-              to={PATHS.LOGIN}
-              className="inline-block bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md text-center"
-            >
-              Login
-            </Link>
-            
-            <Link
-              to={PATHS.DASHBOARD}
-              className="inline-block bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-2 px-4 rounded-md text-center"
-            >
-              Dashboard
-            </Link>
+            {!isAuthenticated ? (
+              <Link
+                to={PATHS.LOGIN}
+                className="inline-block bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md text-center"
+              >
+                Login
+              </Link>
+            ) : (
+              <Link
+                to={PATHS.DASHBOARD}
+                className="inline-block bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md text-center"
+              >
+                Dashboard
+              </Link>
+            )}
           </div>
         </div>
       </div>
