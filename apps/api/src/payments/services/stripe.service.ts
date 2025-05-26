@@ -213,35 +213,4 @@ export class StripeService {
       throw new Error(sanitizedMessage);
     }
   }
-
-  /**
-   * Verify and process a webhook event from Stripe
-   * @param payload - The raw request payload
-   * @param signature - The Stripe signature header
-   * @returns The constructed event
-   */
-  async constructEventFromWebhook(
-    payload: Buffer,
-    signature: string,
-  ): Promise<Stripe.Event> {
-    try {
-      const coreConfig = await this.getCoreConfig();
-      
-      if (!coreConfig.stripeWebhookSecret) {
-        throw new Error('Stripe webhook secret not configured');
-      }
-      
-      const stripe = await this.getStripe();
-      
-      return stripe.webhooks.constructEvent(
-        payload,
-        signature,
-        coreConfig.stripeWebhookSecret,
-      );
-    } catch (error: unknown) {
-      const sanitizedMessage = this.sanitizeErrorMessage(error);
-      this.logger.error(`Failed to verify webhook: ${sanitizedMessage}`);
-      throw new Error(sanitizedMessage);
-    }
-  }
 } 

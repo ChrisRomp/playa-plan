@@ -33,7 +33,6 @@ const AdminConfigPage: React.FC = () => {
     stripeEnabled: false,
     stripePublicKey: '',
     stripeApiKey: '',
-    stripeWebhookSecret: '',
     paypalEnabled: false,
     paypalClientId: '',
     paypalClientSecret: '',
@@ -61,7 +60,7 @@ const AdminConfigPage: React.FC = () => {
         
         if (response.data) {
           // Update form with current data
-          // Note: Sensitive fields (stripeApiKey, stripeWebhookSecret, paypalClientSecret, smtpPassword)
+          // Note: Sensitive fields (stripeApiKey, paypalClientSecret, smtpPassword)
           // are excluded from API responses for security and should remain empty in the form unless
           // the user explicitly provides new values
           setFormData({
@@ -80,7 +79,6 @@ const AdminConfigPage: React.FC = () => {
             stripeEnabled: response.data.stripeEnabled || false,
             stripePublicKey: response.data.stripePublicKey || '',
             stripeApiKey: '', // Always empty - excluded from API response for security
-            stripeWebhookSecret: '', // Always empty - excluded from API response for security
             paypalEnabled: response.data.paypalEnabled || false,
             paypalClientId: response.data.paypalClientId || '',
             paypalClientSecret: '', // Always empty - excluded from API response for security
@@ -192,7 +190,6 @@ const AdminConfigPage: React.FC = () => {
       stripeEnabled: formData.stripeEnabled,
       stripePublicKey: formData.stripePublicKey,
       // Note: stripeApiKey excluded - will be conditionally added below
-      // Note: stripeWebhookSecret excluded - will be conditionally added below
       paypalEnabled: formData.paypalEnabled,
       paypalClientId: formData.paypalClientId,
       // Note: paypalClientSecret excluded - will be conditionally added below
@@ -213,13 +210,12 @@ const AdminConfigPage: React.FC = () => {
       ...baseData,
       // Only include these fields if they have values to prevent clearing existing secrets
       ...(formData.stripeApiKey && formData.stripeApiKey.trim() !== '' && { stripeApiKey: formData.stripeApiKey }),
-      ...(formData.stripeWebhookSecret && formData.stripeWebhookSecret.trim() !== '' && { stripeWebhookSecret: formData.stripeWebhookSecret }),
       ...(formData.paypalClientSecret && formData.paypalClientSecret.trim() !== '' && { paypalClientSecret: formData.paypalClientSecret }),
       ...(formData.smtpPassword && formData.smtpPassword.trim() !== '' && { smtpPassword: formData.smtpPassword })
     };
 
     // Debug logging to verify sensitive fields are handled correctly
-    const sensitiveFields = ['stripeApiKey', 'stripeWebhookSecret', 'paypalClientSecret', 'smtpPassword'];
+    const sensitiveFields = ['stripeApiKey', 'paypalClientSecret', 'smtpPassword'];
     const includedSensitiveFields = sensitiveFields.filter(field => field in formattedData);
     console.log('Sensitive fields included in payload:', includedSensitiveFields.length > 0 ? includedSensitiveFields : 'none');
     
@@ -601,25 +597,6 @@ const AdminConfigPage: React.FC = () => {
                   />
                   <p className="text-sm text-gray-500 mt-1">
                     Leave blank to keep the existing secret key. Only enter a new key if you want to change it.
-                  </p>
-                </div>
-                
-                <div className="mb-4 md:col-span-2">
-                  <label htmlFor="stripeWebhookSecret" className="block text-gray-700 mb-2">
-                    Stripe Webhook Secret
-                  </label>
-                  <input
-                    type="password"
-                    id="stripeWebhookSecret"
-                    name="stripeWebhookSecret"
-                    value={formData.stripeWebhookSecret}
-                    onChange={handleInputChange}
-                    disabled={!formData.stripeEnabled}
-                    placeholder={formData.stripeWebhookSecret === '' ? 'Leave blank to keep existing secret' : ''}
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                  <p className="text-sm text-gray-500 mt-1">
-                    Leave blank to keep the existing webhook secret. Only enter a new secret if you want to change it.
                   </p>
                 </div>
               </div>

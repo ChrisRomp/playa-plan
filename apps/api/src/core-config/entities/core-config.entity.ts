@@ -151,16 +151,6 @@ export class CoreConfig {
   stripeApiKey!: string | null;
 
   /**
-   * Stripe webhook secret (hidden from responses)
-   */
-  @ApiProperty({
-    description: 'Stripe webhook secret',
-    example: 'whsec_...',
-    required: false
-  })
-  stripeWebhookSecret!: string | null;
-
-  /**
    * Whether PayPal is enabled
    */
   @ApiProperty({

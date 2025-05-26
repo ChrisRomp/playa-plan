@@ -1,12 +1,11 @@
-import { Controller, Post, Body, Get, Param, Query, Headers, Req, UseGuards, ParseUUIDPipe, BadRequestException, Put, HttpCode, HttpStatus, RawBodyRequest } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiParam, ApiBearerAuth, ApiBody } from '@nestjs/swagger';
+import { Controller, Post, Body, Get, Param, Query, UseGuards, ParseUUIDPipe, Put, HttpCode, HttpStatus } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiParam, ApiBearerAuth } from '@nestjs/swagger';
 import { PaymentsService, StripeService, PaypalService } from '../services';
 import { CreatePaymentDto, CreateStripePaymentDto, CreatePaypalPaymentDto, CreateRefundDto, RecordManualPaymentDto, UpdatePaymentDto } from '../dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
 import { PaymentStatus } from '@prisma/client';
-import { Request } from 'express';
 
 @ApiTags('payments')
 @Controller('payments')
@@ -143,29 +142,6 @@ export class PaymentsController {
     @Param('registrationId', ParseUUIDPipe) registrationId: string,
   ) {
     return this.paymentsService.linkToRegistration(paymentId, registrationId);
-  }
-
-  @Post('webhook/stripe')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ 
-    summary: 'Handle Stripe webhook events (OPTIONAL - use session verification instead)',
-    description: 'This endpoint is kept for backwards compatibility. The recommended approach is to use the session verification endpoint instead, which eliminates the need for webhook configuration.'
-  })
-  @ApiResponse({ status: 200, description: 'Webhook processed successfully' })
-  @ApiResponse({ status: 400, description: 'Invalid webhook payload or signature' })
-  async handleStripeWebhook(
-    @Req() request: RawBodyRequest<Request>,
-    @Headers('stripe-signature') signature: string,
-  ) {
-    if (!signature) {
-      throw new BadRequestException('Missing Stripe signature header');
-    }
-
-    if (!request.rawBody) {
-      throw new BadRequestException('Missing raw body');
-    }
-
-    return this.paymentsService.handleStripeWebhook(request.rawBody, signature);
   }
 
   @Post('webhook/paypal')

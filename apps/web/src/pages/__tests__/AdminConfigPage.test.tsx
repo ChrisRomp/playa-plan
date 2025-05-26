@@ -39,7 +39,7 @@ const mockConfig = {
   paypalEnabled: false,
   paypalClientId: '',
   // Note: Sensitive fields are excluded from API responses
-  // stripeApiKey, stripeWebhookSecret, paypalClientSecret, smtpPassword are not included
+  // stripeApiKey, paypalClientSecret, smtpPassword are not included
 };
 
 const renderWithProviders = (component: React.ReactElement) => {
@@ -81,18 +81,15 @@ describe('AdminConfigPage - Secure Field Preservation', () => {
 
     // Check that sensitive field inputs are empty and have proper placeholders
     const stripeApiKeyInput = screen.getByLabelText(/Stripe Secret Key/i);
-    const stripeWebhookSecretInput = screen.getByLabelText(/Stripe Webhook Secret/i);
     const paypalClientSecretInput = screen.getByLabelText(/PayPal Client Secret/i);
     const smtpPasswordInput = screen.getByLabelText(/SMTP Password/i);
 
     expect(stripeApiKeyInput).toHaveValue('');
-    expect(stripeWebhookSecretInput).toHaveValue('');
     expect(paypalClientSecretInput).toHaveValue('');
     expect(smtpPasswordInput).toHaveValue('');
 
     // Verify placeholders exist for guidance
     expect(stripeApiKeyInput).toHaveAttribute('placeholder', 'Leave blank to keep existing key');
-    expect(stripeWebhookSecretInput).toHaveAttribute('placeholder', 'Leave blank to keep existing secret');
     expect(paypalClientSecretInput).toHaveAttribute('placeholder', 'Leave blank to keep existing secret');
     expect(smtpPasswordInput).toHaveAttribute('placeholder', 'Leave blank to keep existing password');
   });
@@ -205,10 +202,8 @@ describe('AdminConfigPage - Secure Field Preservation', () => {
 
     // Fill sensitive fields with only whitespace
     const stripeApiKeyInput = screen.getByLabelText(/Stripe Secret Key/i);
-    const stripeWebhookSecretInput = screen.getByLabelText(/Stripe Webhook Secret/i);
     
     fireEvent.change(stripeApiKeyInput, { target: { value: '   ' } }); // Only spaces
-    fireEvent.change(stripeWebhookSecretInput, { target: { value: '\t\n' } }); // Only tabs/newlines
 
     // Submit the form using querySelector since there's no explicit form role
     const form = container.querySelector('form');
@@ -230,7 +225,6 @@ describe('AdminConfigPage - Secure Field Preservation', () => {
 
     // Verify whitespace-only fields are NOT in the payload
     expect(payload).not.toHaveProperty('stripeApiKey');
-    expect(payload).not.toHaveProperty('stripeWebhookSecret');
 
     // Verify debug log shows no sensitive fields included
     expect(mockConsoleLog).toHaveBeenCalledWith(
@@ -289,15 +283,14 @@ describe('AdminConfigPage - Secure Field Preservation', () => {
 
     // Check that help text exists for sensitive fields (there are multiple instances)
     const helpTexts = screen.getAllByText(/Leave blank to keep the existing/i);
-    expect(helpTexts).toHaveLength(4); // One for each sensitive field
+    expect(helpTexts).toHaveLength(3); // One for each sensitive field
     
     // Check that each sensitive field section has appropriate guidance
     const stripeSection = screen.getByText(/Stripe Secret Key/i).closest('div');
-    const webhookSection = screen.getByText(/Stripe Webhook Secret/i).closest('div');
     const paypalSection = screen.getByText(/PayPal Client Secret/i).closest('div');
     const smtpSection = screen.getByText(/SMTP Password/i).closest('div');
 
-    [stripeSection, webhookSection, paypalSection, smtpSection].forEach(section => {
+    [stripeSection, paypalSection, smtpSection].forEach(section => {
       expect(section).toBeInTheDocument();
     });
   });

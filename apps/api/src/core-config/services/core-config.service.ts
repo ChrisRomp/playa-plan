@@ -38,7 +38,6 @@ export class CoreConfigService {
       stripeEnabled: config.stripeEnabled,
       stripePublicKey: config.stripePublicKey,
       stripeApiKey: config.stripeApiKey,
-      stripeWebhookSecret: config.stripeWebhookSecret,
       paypalEnabled: config.paypalEnabled,
       paypalClientId: config.paypalClientId,
       paypalClientSecret: config.paypalClientSecret,
@@ -87,7 +86,6 @@ export class CoreConfigService {
           stripeEnabled: createCoreConfigDto.stripeEnabled ?? false,
           stripePublicKey: createCoreConfigDto.stripePublicKey ?? null,
           stripeApiKey: createCoreConfigDto.stripeApiKey ?? null,
-          stripeWebhookSecret: createCoreConfigDto.stripeWebhookSecret ?? null,
           paypalEnabled: createCoreConfigDto.paypalEnabled ?? false,
           paypalClientId: createCoreConfigDto.paypalClientId ?? null,
           paypalClientSecret: createCoreConfigDto.paypalClientSecret ?? null,
@@ -156,7 +154,6 @@ export class CoreConfigService {
       stripeEnabled: false,
       stripePublicKey: null,
       stripeApiKey: null,
-      stripeWebhookSecret: null,
       paypalEnabled: false,
       paypalClientId: null,
       paypalClientSecret: null,
@@ -245,7 +242,6 @@ export class CoreConfigService {
       if (updateCoreConfigDto.stripeEnabled !== undefined) data.stripeEnabled = updateCoreConfigDto.stripeEnabled;
       if (updateCoreConfigDto.stripePublicKey !== undefined) data.stripePublicKey = updateCoreConfigDto.stripePublicKey;
       if (updateCoreConfigDto.stripeApiKey !== undefined) data.stripeApiKey = updateCoreConfigDto.stripeApiKey;
-      if (updateCoreConfigDto.stripeWebhookSecret !== undefined) data.stripeWebhookSecret = updateCoreConfigDto.stripeWebhookSecret;
       if (updateCoreConfigDto.paypalEnabled !== undefined) data.paypalEnabled = updateCoreConfigDto.paypalEnabled;
       if (updateCoreConfigDto.paypalClientId !== undefined) data.paypalClientId = updateCoreConfigDto.paypalClientId;
       if (updateCoreConfigDto.paypalClientSecret !== undefined) data.paypalClientSecret = updateCoreConfigDto.paypalClientSecret;

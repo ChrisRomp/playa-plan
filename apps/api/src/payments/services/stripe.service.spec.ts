@@ -18,18 +18,12 @@ const mockStripeInstance = {
   refunds: {
     create: jest.fn(),
   },
-  webhooks: {
-    constructEvent: jest.fn(),
-  },
 };
 
 // Mock the Stripe constructor
 jest.mock('stripe', () => {
   return jest.fn().mockImplementation(() => mockStripeInstance);
 });
-
-// Import Stripe after mocking
-import Stripe from 'stripe';
 
 describe('StripeService', () => {
   let service: StripeService;
@@ -50,7 +44,6 @@ describe('StripeService', () => {
     findCurrent: jest.fn().mockResolvedValue({
       stripeEnabled: true,
       stripeApiKey: 'sk_test_mock_key',
-      stripeWebhookSecret: 'whsec_mock_secret',
     }),
   };
   
@@ -277,42 +270,6 @@ describe('StripeService', () => {
       
       expect(loggerSpy.error).toHaveBeenCalledWith(
         'Failed to retrieve payment intent: Stripe API error'
-      );
-    });
-  });
-  
-  describe('constructEventFromWebhook', () => {
-    it('should construct and return a webhook event', async () => {
-      const mockPayload = Buffer.from('{}');
-      const mockSignature = 'sig_123';
-      const mockEvent = { type: 'payment_intent.succeeded', data: { object: {} } };
-      
-      mockStripeInstance.webhooks.constructEvent.mockReturnValue(mockEvent);
-      
-      const result = await service.constructEventFromWebhook(mockPayload, mockSignature);
-      
-      expect(mockStripeInstance.webhooks.constructEvent).toHaveBeenCalledWith(
-        mockPayload,
-        mockSignature,
-        'whsec_mock_secret',
-      );
-      
-      expect(result).toEqual(mockEvent);
-    });
-    
-    it('should throw an error if webhook event construction fails', async () => {
-      const mockPayload = Buffer.from('{}');
-      const mockSignature = 'sig_123';
-      const mockError = new Error('Invalid signature');
-      
-      mockStripeInstance.webhooks.constructEvent.mockImplementation(() => {
-        throw mockError;
-      });
-      
-      await expect(service.constructEventFromWebhook(mockPayload, mockSignature)).rejects.toThrow('Invalid signature');
-      
-      expect(loggerSpy.error).toHaveBeenCalledWith(
-        'Failed to verify webhook: Invalid signature'
       );
     });
   });
