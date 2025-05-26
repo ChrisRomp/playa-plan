@@ -528,7 +528,6 @@ describe('PaymentsService', () => {
         where: { id: mockPayment.id },
         data: {
           status: PaymentStatus.FAILED,
-          notes: 'Checkout session expired',
         },
       });
       
@@ -623,7 +622,7 @@ describe('PaymentsService', () => {
       expect(mockStripeService.getCheckoutSession).toHaveBeenCalledWith(sessionId);
     });
 
-    it('should handle database transaction errors gracefully', async () => {
+    it('should handle database transaction errors by falling back to payment update', async () => {
       // Mock payment with registration
       const paymentWithRegistration = {
         ...mockPayment,
@@ -642,9 +641,16 @@ describe('PaymentsService', () => {
       mockPrismaService.payment.findUnique.mockResolvedValue(paymentWithRegistration);
       mockStripeService.getCheckoutSession.mockResolvedValue(mockStripeSession);
       mockPrismaService.$transaction.mockRejectedValue(new Error('Database transaction error'));
+      
+      // Mock the direct payment update (fallback)
+      mockPrismaService.payment.update.mockResolvedValue({
+        ...mockPayment,
+        status: PaymentStatus.COMPLETED,
+        notes: 'Payment completed but registration update failed: Database transaction error',
+      });
 
-      // Execute & Assert
-      await expect(service.verifyStripeSession(sessionId)).rejects.toThrow(BadRequestException);
+      // Execute
+      const result = await service.verifyStripeSession(sessionId);
 
       expect(mockPrismaService.payment.findFirst).toHaveBeenCalledWith({
         where: { providerRefId: sessionId },
@@ -653,8 +659,19 @@ describe('PaymentsService', () => {
       expect(mockStripeService.getCheckoutSession).toHaveBeenCalledWith(sessionId);
       expect(mockPrismaService.$transaction).toHaveBeenCalled();
       
-      // Individual update operations shouldn't be called
-      // Transaction already tested: expect(mockPrismaService.$transaction).toHaveBeenCalled();
+      // Should fall back to direct payment update when transaction fails
+      expect(mockPrismaService.payment.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: mockPayment.id },
+          data: expect.objectContaining({ 
+            status: PaymentStatus.COMPLETED
+            // notes field has been removed from the implementation
+          })
+        })
+      );
+      
+      // Result should indicate payment completed
+      expect(result.paymentStatus).toBe(PaymentStatus.COMPLETED);
     });
 
     it('should update only payment status when registration is already confirmed', async () => {
