@@ -438,8 +438,9 @@ export default function RegistrationPage() {
       // Terms step - create registration and move to payment step
       try {
         const result = await submitRegistration(formData);
-        if (result?.id) {
-          setRegistrationId(result.id);
+        
+        if (result?.jobRegistration?.id) {
+          setRegistrationId(result.jobRegistration.id);
         }
         
         const totalCost = calculateTotalCost();
@@ -1193,9 +1194,9 @@ export default function RegistrationPage() {
             <PaymentButton
               amount={totalCost}
               registrationId={registrationId || undefined}
-              description="Camp registration payment"
+              description={`${config?.name || 'Camp'} Dues Payment ${config?.currentYear || new Date().getFullYear()}`}
               onPaymentStart={() => {
-                console.log('Payment started');
+                console.log('Payment started with registrationId:', registrationId);
               }}
               onPaymentError={(error) => {
                 setFormErrors(prev => ({ ...prev, payment: error }));
@@ -1230,8 +1231,8 @@ export default function RegistrationPage() {
                   // If registration doesn't exist yet, create it
                   if (!registrationId) {
                     const result = await submitRegistration(formData);
-                    if (result?.id) {
-                      setRegistrationId(result.id);
+                    if (result?.jobRegistration?.id) {
+                      setRegistrationId(result.jobRegistration.id);
                     }
                   }
                   navigate('/dashboard');

@@ -104,10 +104,10 @@ export class StripeService {
       const stripe = await this.getStripe();
       
       const successUrl = paymentData.successUrl || 
-        this.configService.get<string>('frontend.url') + '/payment/success?session_id={CHECKOUT_SESSION_ID}';
+        this.configService.get<string>('frontend.url') + '/payment/success.html?session_id={CHECKOUT_SESSION_ID}';
       
       const cancelUrl = paymentData.cancelUrl || 
-        this.configService.get<string>('frontend.url') + '/payment/cancel';
+        this.configService.get<string>('frontend.url') + '/payment/cancel.html';
 
       const session = await stripe.checkout.sessions.create({
         payment_method_types: ['card'],

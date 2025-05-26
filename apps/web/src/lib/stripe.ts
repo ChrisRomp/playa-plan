@@ -68,8 +68,6 @@ export const handleStripeSuccess = async (sessionId: string): Promise<{
     const response = await api.get(`/payments/stripe/session/${sessionId}/verify`);
     const result = response.data;
     
-    console.log('Payment verification result:', result);
-    
     return {
       paymentStatus: result.paymentStatus,
       registrationId: result.registrationId,

@@ -109,7 +109,7 @@ describe('PaymentSuccessPage', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Payment Error')).toBeInTheDocument();
-      expect(screen.getByText('Error processing payment confirmation')).toBeInTheDocument();
+      expect(screen.getByText('Error processing payment confirmation. Please try refreshing the page.')).toBeInTheDocument();
     });
   });
 
@@ -243,6 +243,48 @@ describe('PaymentSuccessPage', () => {
 
     expect(consoleSpy).toHaveBeenCalledWith('Error processing payment success:', error);
     consoleSpy.mockRestore();
+  });
+
+  it('should show error for 401 errors', async () => {
+    vi.mocked(mockSearchParams.get).mockReturnValue('session_123');
+    const error = { response: { status: 401 } };
+    vi.mocked(handleStripeSuccess).mockRejectedValue(error);
+
+    renderComponent();
+
+    await waitFor(() => {
+      expect(screen.getByText('Payment Error')).toBeInTheDocument();
+      expect(screen.getByText('Your session has expired. Please log in again to view your payment status.')).toBeInTheDocument();
+    });
+  });
+
+  it('should show error for 404 errors', async () => {
+    vi.mocked(mockSearchParams.get).mockReturnValue('session_123');
+    const error = { response: { status: 404 } };
+    vi.mocked(handleStripeSuccess).mockRejectedValue(error);
+
+    renderComponent();
+
+    await waitFor(() => {
+      expect(screen.getByText('Payment Error')).toBeInTheDocument();
+      expect(screen.getByText('Payment session not found. Please contact support if you believe this is an error.')).toBeInTheDocument();
+    });
+  });
+
+  it('should show dashboard button for error types', async () => {
+    vi.mocked(mockSearchParams.get).mockReturnValue('session_123');
+    const error = new Error('Payment processing failed');
+    vi.mocked(handleStripeSuccess).mockRejectedValue(error);
+
+    renderComponent();
+
+    await waitFor(() => {
+      expect(screen.getByText('Payment Error')).toBeInTheDocument();
+    });
+
+    const dashboardButton = screen.getByText('Go to Dashboard');
+    expect(dashboardButton).toBeInTheDocument();
+    expect(dashboardButton).toBeEnabled();
   });
 
   it('should have proper button styling and accessibility', async () => {

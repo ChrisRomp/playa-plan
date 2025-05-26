@@ -38,7 +38,15 @@ const PaymentSuccessPage: React.FC = () => {
       })
       .catch((err) => {
         console.error('Error processing payment success:', err);
-        setError('Error processing payment confirmation');
+        
+        // Check if it's an authentication error
+        if (err?.response?.status === 401) {
+          setError('Your session has expired. Please log in again to view your payment status.');
+        } else if (err?.response?.status === 404) {
+          setError('Payment session not found. Please contact support if you believe this is an error.');
+        } else {
+          setError('Error processing payment confirmation. Please try refreshing the page.');
+        }
         setIsProcessing(false);
       });
   }, [searchParams]);
@@ -67,6 +75,8 @@ const PaymentSuccessPage: React.FC = () => {
   }
 
   if (error) {
+    const isAuthError = error.includes('session has expired');
+    
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="max-w-md mx-auto text-center">
@@ -74,12 +84,29 @@ const PaymentSuccessPage: React.FC = () => {
             <AlertCircleIcon className="w-16 h-16 text-red-600 mx-auto mb-4" />
             <h1 className="text-2xl font-semibold text-red-800 mb-2">Payment Error</h1>
             <p className="text-red-600 mb-4">{error}</p>
-            <button
-              onClick={handleGoToDashboard}
-              className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              Go to Dashboard
-            </button>
+            <div className="space-y-3">
+              {isAuthError ? (
+                <button
+                  onClick={() => navigate('/login')}
+                  className="w-full bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  Login
+                </button>
+              ) : (
+                <button
+                  onClick={handleGoToDashboard}
+                  className="w-full bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  Go to Dashboard
+                </button>
+              )}
+              <button
+                onClick={() => window.location.reload()}
+                className="w-full bg-gray-200 text-gray-800 px-6 py-2 rounded-lg hover:bg-gray-300 transition-colors"
+              >
+                Refresh Page
+              </button>
+            </div>
           </div>
         </div>
       </div>

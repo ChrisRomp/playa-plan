@@ -111,8 +111,8 @@ describe('usePayment', () => {
         userId: 'user-123',
         registrationId: 'reg-123',
         description: 'Test payment',
-        successUrl: 'http://localhost:3000/payment/success',
-        cancelUrl: 'http://localhost:3000/payment/cancel',
+        successUrl: 'http://localhost:3000/payment/success.html?session_id={CHECKOUT_SESSION_ID}',
+        cancelUrl: 'http://localhost:3000/payment/cancel.html',
       });
       expect(result.current.error).toBeNull();
       expect(result.current.isProcessing).toBe(false);
@@ -217,8 +217,8 @@ describe('usePayment', () => {
         currency: 'USD',
         userId: 'user-123',
         description: 'Camp registration payment',
-        successUrl: 'http://localhost:3000/payment/success',
-        cancelUrl: 'http://localhost:3000/payment/cancel',
+        successUrl: 'http://localhost:3000/payment/success.html?session_id={CHECKOUT_SESSION_ID}',
+        cancelUrl: 'http://localhost:3000/payment/cancel.html',
       });
     });
   });

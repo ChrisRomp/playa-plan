@@ -95,15 +95,20 @@ export class PaymentsService {
     }
     
     try {
+      const paymentData = {
+        amount: createPaymentDto.amount,
+        currency: createPaymentDto.currency || 'USD',
+        status: PaymentStatus.PENDING,
+        provider: createPaymentDto.provider,
+        providerRefId: createPaymentDto.providerRefId,
+        user: { connect: { id: createPaymentDto.userId } },
+        ...(createPaymentDto.registrationId && {
+          registration: { connect: { id: createPaymentDto.registrationId } }
+        }),
+      };
+
       return await this.prisma.payment.create({
-        data: {
-          amount: createPaymentDto.amount,
-          currency: createPaymentDto.currency || 'USD',
-          status: PaymentStatus.PENDING,
-          provider: createPaymentDto.provider,
-          providerRefId: createPaymentDto.providerRefId,
-          user: { connect: { id: createPaymentDto.userId } },
-        },
+        data: paymentData,
       });
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -298,6 +303,8 @@ export class PaymentsService {
    */
   async initiateStripePayment(data: CreateStripePaymentDto): Promise<{ paymentId: string; clientSecret?: string; url?: string }> {
     try {
+      this.logger.log(`Initiating Stripe payment for user ${data.userId}, registrationId: ${data.registrationId || 'none'}, amount: ${data.amount}`);
+      
       // Create checkout session
       const session = await this.stripeService.createCheckoutSession(data);
       
@@ -607,8 +614,12 @@ export class PaymentsService {
         throw new NotFoundException(`Payment not found for Stripe session ${sessionId}`);
       }
 
+      this.logger.log(`Found payment ${payment.id} for session ${sessionId}, registration: ${payment.registration?.id || 'none'}, registration status: ${payment.registration?.status || 'none'}`);
+
       // Get the actual session status from Stripe
       const stripeSession = await this.stripeService.getCheckoutSession(sessionId);
+      
+      this.logger.log(`Stripe session ${sessionId} status: ${stripeSession.status}, payment_status: ${stripeSession.payment_status}`);
       
       // Determine the payment status based on Stripe session
       let updatedPaymentStatus = payment.status;
@@ -626,11 +637,13 @@ export class PaymentsService {
         
         // If there's a registration, update its status to confirmed
         if (payment.registration) {
+          this.logger.log(`Updating registration ${payment.registration.id} status to CONFIRMED`);
           await this.prisma.registration.update({
             where: { id: payment.registration.id },
             data: { status: 'CONFIRMED' },
           });
           updatedRegistrationStatus = 'CONFIRMED';
+          this.logger.log(`Successfully updated registration ${payment.registration.id} status to CONFIRMED`);
         }
       } else if (stripeSession.payment_status === 'unpaid' && payment.status === PaymentStatus.PENDING) {
         // Payment is still pending or failed

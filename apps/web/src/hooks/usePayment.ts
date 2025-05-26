@@ -38,8 +38,8 @@ export const usePayment = () => {
         userId: user.id,
         registrationId: options.registrationId,
         description: options.description || 'Camp registration payment',
-        successUrl: `${window.location.origin}/payment/success`,
-        cancelUrl: `${window.location.origin}/payment/cancel`,
+        successUrl: `${window.location.origin}/payment/success.html?session_id={CHECKOUT_SESSION_ID}`,
+        cancelUrl: `${window.location.origin}/payment/cancel.html`,
       };
 
       await redirectToStripeCheckout(config.stripePublicKey, paymentRequest);

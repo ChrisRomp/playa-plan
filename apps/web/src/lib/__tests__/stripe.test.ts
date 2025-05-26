@@ -202,7 +202,6 @@ describe('Stripe Service', () => {
 
       expect(api.get).toHaveBeenCalledWith('/payments/stripe/session/cs_test_123/verify');
       expect(consoleSpy).toHaveBeenCalledWith('Verifying payment session:', sessionId);
-      expect(consoleSpy).toHaveBeenCalledWith('Payment verification result:', mockVerificationResponse.data);
       expect(result).toEqual({
         paymentStatus: 'COMPLETED',
         registrationId: 'reg_456',
