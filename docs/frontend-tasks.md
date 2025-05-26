@@ -98,11 +98,11 @@
    - [x] Payment for registration depending on camping options selected, accounting for different staff pricing that applies to admin or staff users
    - [x] Alternative handling when shifts are full
 
-4. [ ] Payment processing
-   - [ ] Stripe integration
+4. [x] Payment processing
+   - [x] Stripe integration
    - [ ] PayPal integration
    - [ ] Deferred payment handling
-   - [ ] Payment failure handling
+   - [x] Payment failure handling
 
 5. [ ] Registration modification
    - [ ] Editing existing registrations
@@ -111,8 +111,8 @@
    - [ ] Making payments for deferred/failed payments
 
 6. [ ] Work schedule management
-   - [ ] Job shift browsing
-   - [ ] Shift registration
+   - [x] Job shift browsing
+   - [x] Shift registration
    - [ ] Schedule viewing by day/category
      - [ ] Implement grouped view by day and category
      - [ ] Show available spots per shift
