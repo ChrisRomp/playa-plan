@@ -6,6 +6,15 @@ import AdminConfigPage from '../AdminConfigPage';
 import { ConfigContext, type ConfigContextType } from '../../store/ConfigContextDefinition';
 import * as api from '../../lib/api';
 
+// Mock react-router-dom's useNavigate
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual('react-router-dom');
+  return {
+    ...actual,
+    useNavigate: () => vi.fn()
+  };
+});
+
 // Mock the API module
 vi.mock('../../lib/api', () => ({
   api: {

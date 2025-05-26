@@ -2,6 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { XCircleIcon } from 'lucide-react';
 import { handleStripeCancel } from '../../lib/stripe';
+import { PATHS } from '../../routes';
 
 /**
  * PaymentCancelPage component
@@ -16,11 +17,11 @@ const PaymentCancelPage: React.FC = () => {
   }, []);
 
   const handleRetryPayment = () => {
-    navigate('/registration');
+    navigate(PATHS.REGISTRATION);
   };
 
   const handleGoToDashboard = () => {
-    navigate('/dashboard');
+    navigate(PATHS.DASHBOARD);
   };
 
   return (

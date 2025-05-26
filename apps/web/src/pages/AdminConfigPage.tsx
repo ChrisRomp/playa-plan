@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useConfig } from '../store/ConfigContext';
 import { api } from '../lib/api';
 import { useNavigate } from 'react-router-dom';
+import { PATHS } from '../routes';
 
 /**
  * Admin Configuration Page
@@ -305,7 +306,7 @@ const AdminConfigPage: React.FC = () => {
 
   // Handle cancel button
   const handleCancel = () => {
-    navigate('/admin');
+    navigate(PATHS.ADMIN);
   };
   
   return (

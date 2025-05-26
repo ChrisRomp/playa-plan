@@ -4,6 +4,7 @@ import { useConfig } from '../../store/ConfigContext';
 import { Tent, Calendar } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { isRegistrationAccessible, getRegistrationStatusMessage } from '../../utils/registrationUtils';
+import { PATHS } from '../../routes';
 
 /**
  * UserDashboard component displays personalized content for authenticated users
@@ -59,7 +60,7 @@ const UserDashboard: React.FC = () => {
                     {registrationStatusMessage}
                   </p>
                   <Link 
-                    to="/registration" 
+                    to={PATHS.REGISTRATION}
                     className="inline-flex items-center bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors shadow-md font-medium" 
                     aria-label="Begin registration process"
                   >
@@ -97,7 +98,7 @@ const UserDashboard: React.FC = () => {
                 </div>
               </div>
               
-              <Link to="/registration" className="text-blue-600 hover:text-blue-800 font-medium transition-colors">
+              <Link to={PATHS.REGISTRATION} className="text-blue-600 hover:text-blue-800 font-medium transition-colors">
                 View/Edit Registration Details
               </Link>
             </div>
@@ -121,7 +122,7 @@ const UserDashboard: React.FC = () => {
                   <div className="p-6 text-center">
                     <Calendar className="h-12 w-12 mx-auto text-gray-400 mb-2" aria-hidden="true" />
                     <p className="text-gray-600 mb-4">You haven't signed up for any shifts yet</p>
-                    <Link to="/shifts" className="inline-flex items-center bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors">
+                    <Link to={PATHS.SHIFTS} className="inline-flex items-center bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors">
                       Sign Up for Shifts
                     </Link>
                   </div>

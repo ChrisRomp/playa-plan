@@ -8,6 +8,15 @@ import { vi, describe, it, expect, beforeEach } from 'vitest';
 // Mock the useCampingOptions hook
 vi.mock('../hooks/useCampingOptions');
 
+// Mock react-router-dom
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual('react-router-dom');
+  return {
+    ...actual,
+    useNavigate: () => vi.fn()
+  };
+});
+
 // Mock camping option data
 const mockCampingOptions = [
   {

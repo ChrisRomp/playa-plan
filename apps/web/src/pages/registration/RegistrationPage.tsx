@@ -1318,7 +1318,7 @@ export default function RegistrationPage() {
       <div className="p-6">
         <p className="text-red-600">You must be logged in to register.</p>
         <button 
-          onClick={() => navigate('/login')}
+          onClick={() => navigate(PATHS.LOGIN)}
           className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
         >
           Go to Login
