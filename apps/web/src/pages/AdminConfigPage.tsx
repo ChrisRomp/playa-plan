@@ -373,6 +373,8 @@ const AdminConfigPage: React.FC = () => {
                 />
                 <p className="text-sm text-gray-500 mt-1">
                   URL to the banner image. Both relative URLs (like /images/banner.png) and full URLs are supported.
+                  <br />
+                  <strong>Recommended:</strong> 1920x600px or 16:5 aspect ratio for best display across devices.
                 </p>
               </div>
               
