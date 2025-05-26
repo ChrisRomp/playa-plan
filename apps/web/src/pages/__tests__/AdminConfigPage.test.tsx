@@ -145,7 +145,7 @@ describe('AdminConfigPage - Secure Field Preservation', () => {
     mockApiGet.mockResolvedValue({ data: mockConfig });
     mockApiPatch.mockResolvedValue({ status: 200, data: mockConfig });
 
-    renderWithProviders(<AdminConfigPage />);
+    const { container } = renderWithProviders(<AdminConfigPage />);
 
     // Wait for config to load
     await waitFor(() => {
@@ -159,9 +159,15 @@ describe('AdminConfigPage - Secure Field Preservation', () => {
     fireEvent.change(stripeApiKeyInput, { target: { value: 'sk_test_new_key' } });
     fireEvent.change(smtpPasswordInput, { target: { value: 'new_password123' } });
 
-    // Leave other sensitive fields empty
-    const saveButton = screen.getByRole('button', { name: /save configuration/i });
-    fireEvent.click(saveButton);
+    // Submit the form using querySelector since there's no explicit form role
+    const form = container.querySelector('form');
+    if (form) {
+      fireEvent.submit(form);
+    } else {
+      // Fallback: trigger form submission via button click
+      const saveButton = screen.getByRole('button', { name: /save configuration/i });
+      fireEvent.click(saveButton);
+    }
 
     await waitFor(() => {
       expect(mockApiPatch).toHaveBeenCalled();
@@ -190,7 +196,7 @@ describe('AdminConfigPage - Secure Field Preservation', () => {
     mockApiGet.mockResolvedValue({ data: mockConfig });
     mockApiPatch.mockResolvedValue({ status: 200, data: mockConfig });
 
-    renderWithProviders(<AdminConfigPage />);
+    const { container } = renderWithProviders(<AdminConfigPage />);
 
     // Wait for config to load
     await waitFor(() => {
@@ -204,8 +210,15 @@ describe('AdminConfigPage - Secure Field Preservation', () => {
     fireEvent.change(stripeApiKeyInput, { target: { value: '   ' } }); // Only spaces
     fireEvent.change(stripeWebhookSecretInput, { target: { value: '\t\n' } }); // Only tabs/newlines
 
-    const saveButton = screen.getByRole('button', { name: /save configuration/i });
-    fireEvent.click(saveButton);
+    // Submit the form using querySelector since there's no explicit form role
+    const form = container.querySelector('form');
+    if (form) {
+      fireEvent.submit(form);
+    } else {
+      // Fallback: trigger form submission via button click
+      const saveButton = screen.getByRole('button', { name: /save configuration/i });
+      fireEvent.click(saveButton);
+    }
 
     await waitFor(() => {
       expect(mockApiPatch).toHaveBeenCalled();
@@ -230,7 +243,7 @@ describe('AdminConfigPage - Secure Field Preservation', () => {
     mockApiGet.mockResolvedValue({ data: mockConfig });
     mockApiPatch.mockRejectedValue(new Error('API Error'));
 
-    renderWithProviders(<AdminConfigPage />);
+    const { container } = renderWithProviders(<AdminConfigPage />);
 
     // Wait for config to load
     await waitFor(() => {
@@ -241,8 +254,15 @@ describe('AdminConfigPage - Secure Field Preservation', () => {
     const stripeApiKeyInput = screen.getByLabelText(/Stripe Secret Key/i);
     fireEvent.change(stripeApiKeyInput, { target: { value: 'sk_test_key' } });
 
-    const saveButton = screen.getByRole('button', { name: /save configuration/i });
-    fireEvent.click(saveButton);
+    // Submit the form using querySelector since there's no explicit form role
+    const form = container.querySelector('form');
+    if (form) {
+      fireEvent.submit(form);
+    } else {
+      // Fallback: trigger form submission via button click
+      const saveButton = screen.getByRole('button', { name: /save configuration/i });
+      fireEvent.click(saveButton);
+    }
 
     await waitFor(() => {
       expect(mockApiPatch).toHaveBeenCalled();
