@@ -17,10 +17,22 @@ import PaymentButton from '../components/payment/PaymentButton';
 const DashboardPage: React.FC = () => {
   const { user } = useAuth();
   const { profile, isProfileComplete } = useProfile();
-  const { config } = useConfig();
+  const { config, isLoading: configLoading } = useConfig();
   const { registrations, loading: registrationsLoading, error: registrationsError } = useUserRegistrations();
   const { campRegistration, loading: campLoading, error: campError } = useCampRegistration();
   
+  // Show loading state while config is loading
+  if (configLoading || !config) {
+    return (
+      <div className="max-w-4xl mx-auto p-6">
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          <span className="ml-3 text-lg text-gray-600">Loading dashboard...</span>
+        </div>
+      </div>
+    );
+  }
+
   // Get current year registration
   const currentYear = config?.currentYear || new Date().getFullYear();
   const currentRegistration = registrations?.find(reg => reg.year === currentYear);

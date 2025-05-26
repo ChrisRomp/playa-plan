@@ -101,6 +101,7 @@ export interface Job {
   maxRegistrations: number;
   alwaysRequired: boolean;
   staffOnly: boolean;
+  currentRegistrations?: number;
   category?: JobCategory;
   shift?: Shift;
 }

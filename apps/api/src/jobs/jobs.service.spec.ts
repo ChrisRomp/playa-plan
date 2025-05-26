@@ -7,6 +7,7 @@ import { UpdateJobDto } from './dto/update-job.dto';
 
 describe('JobsService', () => {
   let service: JobsService;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   let prisma: PrismaService;
 
   const mockPrismaService = {
@@ -80,9 +81,13 @@ describe('JobsService', () => {
         ...mockJob,
         staffOnly: false,
         alwaysRequired: true,
+        currentRegistrations: 0,
       };
 
-      mockPrismaService.job.create.mockResolvedValue(mockJob);
+      mockPrismaService.job.create.mockResolvedValue({
+        ...mockJob,
+        registrations: [],
+      });
 
       const result = await service.create(createJobDto);
 
@@ -102,6 +107,11 @@ describe('JobsService', () => {
         include: {
           category: true,
           shift: true,
+          registrations: {
+            include: {
+              registration: true,
+            },
+          },
         },
       });
     });
@@ -177,9 +187,13 @@ describe('JobsService', () => {
         ...job,
         staffOnly: job.category.staffOnly,
         alwaysRequired: job.category.alwaysRequired,
+        currentRegistrations: 0,
       }));
 
-      mockPrismaService.job.findMany.mockResolvedValue(mockJobs);
+      mockPrismaService.job.findMany.mockResolvedValue(mockJobs.map(job => ({
+        ...job,
+        registrations: [],
+      })));
 
       const result = await service.findAll();
 
@@ -188,6 +202,11 @@ describe('JobsService', () => {
         include: {
           category: true,
           shift: true,
+          registrations: {
+            include: {
+              registration: true,
+            },
+          },
         },
       });
     });
@@ -232,9 +251,13 @@ describe('JobsService', () => {
         ...mockJob,
         staffOnly: true,
         alwaysRequired: false,
+        currentRegistrations: 0,
       };
 
-      mockPrismaService.job.findUnique.mockResolvedValue(mockJob);
+      mockPrismaService.job.findUnique.mockResolvedValue({
+        ...mockJob,
+        registrations: [],
+      });
 
       const result = await service.findOne(jobId);
 
@@ -244,6 +267,11 @@ describe('JobsService', () => {
         include: {
           category: true,
           shift: true,
+          registrations: {
+            include: {
+              registration: true,
+            },
+          },
         },
       });
     });
@@ -300,9 +328,13 @@ describe('JobsService', () => {
         ...mockUpdatedJob,
         staffOnly: false,
         alwaysRequired: true,
+        currentRegistrations: 0,
       };
 
-      mockPrismaService.job.update.mockResolvedValue(mockUpdatedJob);
+      mockPrismaService.job.update.mockResolvedValue({
+        ...mockUpdatedJob,
+        registrations: [],
+      });
 
       const result = await service.update(jobId, updateJobDto);
 
@@ -318,6 +350,11 @@ describe('JobsService', () => {
         include: {
           category: true,
           shift: true,
+          registrations: {
+            include: {
+              registration: true,
+            },
+          },
         },
       });
     });
@@ -371,9 +408,13 @@ describe('JobsService', () => {
         ...mockJob,
         staffOnly: true,
         alwaysRequired: false,
+        currentRegistrations: 0,
       };
 
-      mockPrismaService.job.delete.mockResolvedValue(mockJob);
+      mockPrismaService.job.delete.mockResolvedValue({
+        ...mockJob,
+        registrations: [],
+      });
 
       const result = await service.remove(jobId);
 
@@ -383,6 +424,11 @@ describe('JobsService', () => {
         include: {
           category: true,
           shift: true,
+          registrations: {
+            include: {
+              registration: true,
+            },
+          },
         },
       });
     });
@@ -392,6 +438,118 @@ describe('JobsService', () => {
       mockPrismaService.job.delete.mockRejectedValue(new Error());
 
       await expect(service.remove(jobId)).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('currentRegistrations calculation', () => {
+    it('should calculate currentRegistrations correctly with existing registrations', async () => {
+      const currentYear = new Date().getFullYear();
+      const mockJob = {
+        id: 'test-id',
+        name: 'Test Job',
+        location: 'Test Location',
+        categoryId: 'test-category-id',
+        shiftId: 'test-shift-id',
+        maxRegistrations: 5,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        category: {
+          id: 'test-category-id',
+          name: 'Test Category',
+          description: 'Test Category Description',
+          staffOnly: false,
+          alwaysRequired: true,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        shift: {
+          id: 'test-shift-id',
+          name: 'Test Shift',
+          description: 'Test Shift Description',
+          startTime: '09:00',
+          endTime: '17:00',
+          dayOfWeek: 'MONDAY',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        registrations: [
+          {
+            id: 'reg-job-1',
+            registrationId: 'reg-1',
+            jobId: 'test-id',
+            createdAt: new Date(),
+            registration: {
+              id: 'reg-1',
+              status: 'CONFIRMED',
+              year: currentYear,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+              userId: 'user-1',
+            },
+          },
+          {
+            id: 'reg-job-2',
+            registrationId: 'reg-2',
+            jobId: 'test-id',
+            createdAt: new Date(),
+            registration: {
+              id: 'reg-2',
+              status: 'PENDING',
+              year: currentYear,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+              userId: 'user-2',
+            },
+          },
+          {
+            id: 'reg-job-3',
+            registrationId: 'reg-3',
+            jobId: 'test-id',
+            createdAt: new Date(),
+            registration: {
+              id: 'reg-3',
+              status: 'CANCELLED',
+              year: currentYear,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+              userId: 'user-3',
+            },
+          },
+          {
+            id: 'reg-job-4',
+            registrationId: 'reg-4',
+            jobId: 'test-id',
+            createdAt: new Date(),
+            registration: {
+              id: 'reg-4',
+              status: 'CONFIRMED',
+              year: currentYear - 1, // Previous year
+              createdAt: new Date(),
+              updatedAt: new Date(),
+              userId: 'user-4',
+            },
+          },
+        ],
+      };
+
+      // Expected job with derived properties
+      // Should count 2 registrations: CONFIRMED and PENDING for current year
+      // Should exclude CANCELLED and previous year registrations
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { registrations, ...jobWithoutRegistrations } = mockJob;
+      const expectedJob = {
+        ...jobWithoutRegistrations,
+        staffOnly: false,
+        alwaysRequired: true,
+        currentRegistrations: 2,
+      };
+
+      mockPrismaService.job.findUnique.mockResolvedValue(mockJob);
+
+      const result = await service.findOne('test-id');
+
+      expect(result).toEqual(expectedJob);
+      expect(result.currentRegistrations).toBe(2);
     });
   });
 }); 

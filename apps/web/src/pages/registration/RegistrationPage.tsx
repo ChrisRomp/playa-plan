@@ -100,39 +100,41 @@ export default function RegistrationPage() {
   // Auto-expand categories with selected jobs or errors when on shifts step
   useEffect(() => {
     if (currentStep === 4) {
-      const categoriesToExpand = new Set<string>();
-      
-      // Expand categories with selected jobs
-      formData.jobs.forEach(jobId => {
-        const job = jobs.find(j => j.id === jobId);
-        if (job) {
-          categoriesToExpand.add(job.categoryId);
+      setExpandedCategories(prev => {
+        const categoriesToExpand = new Set(prev); // Start with currently expanded categories
+        
+        // Expand categories with selected jobs
+        formData.jobs.forEach(jobId => {
+          const job = jobs.find(j => j.id === jobId);
+          if (job) {
+            categoriesToExpand.add(job.categoryId);
+          }
+        });
+        
+        // Expand categories with validation errors
+        Object.keys(formErrors).forEach(errorKey => {
+          if (errorKey.startsWith('category_')) {
+            const categoryId = errorKey.replace('category_', '');
+            categoriesToExpand.add(categoryId);
+          }
+        });
+        
+        // Always expand all always-required categories by default
+        const alwaysRequiredCategories = getAlwaysRequiredCategories();
+        alwaysRequiredCategories.forEach(category => {
+          categoriesToExpand.add(category.id);
+        });
+        
+        // If no categories are expanded and we have categories to show, expand the first one
+        if (categoriesToExpand.size === 0 && jobCategories.length > 0) {
+          const firstCategory = jobCategories[0];
+          if (firstCategory) {
+            categoriesToExpand.add(firstCategory.id);
+          }
         }
+        
+        return categoriesToExpand;
       });
-      
-      // Expand categories with validation errors
-      Object.keys(formErrors).forEach(errorKey => {
-        if (errorKey.startsWith('category_')) {
-          const categoryId = errorKey.replace('category_', '');
-          categoriesToExpand.add(categoryId);
-        }
-      });
-      
-      // Always expand all always-required categories by default
-      const alwaysRequiredCategories = getAlwaysRequiredCategories();
-      alwaysRequiredCategories.forEach(category => {
-        categoriesToExpand.add(category.id);
-      });
-      
-      // If no categories are expanded and we have categories to show, expand the first one
-      if (categoriesToExpand.size === 0 && jobCategories.length > 0) {
-        const firstCategory = jobCategories[0];
-        if (firstCategory) {
-          categoriesToExpand.add(firstCategory.id);
-        }
-      }
-      
-      setExpandedCategories(categoriesToExpand);
     }
   }, [currentStep, formData.jobs, formErrors, jobs, jobCategories, getAlwaysRequiredCategories]);
   
@@ -969,27 +971,36 @@ export default function RegistrationPage() {
         {isExpanded && (
           <div className="px-4 pb-4">
             <div className="space-y-2">
-              {jobs.map(job => (
-                <div key={job.id} className="border p-3 rounded bg-white">
-                  <label className="flex items-start">
-                    <input
-                      type="checkbox"
-                      className="mt-1 h-4 w-4"
-                      checked={formData.jobs.includes(job.id)}
-                      onChange={() => handleJobChange(job.id)}
-                    />
-                    <div className="ml-2">
-                      <div className="font-medium">{job.name}</div>
-                      <div className="text-sm text-gray-600">
-                        {getShiftInfoForJob(job)}
+              {jobs.map(job => {
+                const spotsAvailable = job.maxRegistrations - (job.currentRegistrations || 0);
+                const isJobFull = spotsAvailable <= 0;
+                const isJobSelected = formData.jobs.includes(job.id);
+                
+                return (
+                  <div key={job.id} className={`border p-3 rounded ${isJobFull && !isJobSelected ? 'bg-gray-100' : 'bg-white'}`}>
+                    <label className={`flex items-start ${isJobFull && !isJobSelected ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+                      <input
+                        type="checkbox"
+                        className="mt-1 h-4 w-4"
+                        checked={isJobSelected}
+                        onChange={() => handleJobChange(job.id)}
+                        disabled={isJobFull && !isJobSelected}
+                      />
+                      <div className="ml-2">
+                        <div className={`font-medium ${isJobFull && !isJobSelected ? 'text-gray-500' : ''}`}>
+                          {job.name}
+                        </div>
+                        <div className={`text-sm ${isJobFull && !isJobSelected ? 'text-gray-400' : 'text-gray-600'}`}>
+                          {getShiftInfoForJob(job)}
+                        </div>
+                        <div className={`text-sm ${isJobFull && !isJobSelected ? 'text-gray-400' : 'text-gray-600'}`}>
+                          Spots: {spotsAvailable} of {job.maxRegistrations} available{isJobFull && !isJobSelected && <span className="ml-1 text-red-600">(Full)</span>}
+                        </div>
                       </div>
-                      <div className="text-sm text-gray-600">
-                        Spots: {job.maxRegistrations - (job.currentRegistrations || 0)} of {job.maxRegistrations} available
-                      </div>
-                    </div>
-                  </label>
-                </div>
-              ))}
+                    </label>
+                  </div>
+                );
+              })}
               
               {jobs.length === 0 && (
                 <div className="text-amber-600 p-3 bg-amber-50 rounded">

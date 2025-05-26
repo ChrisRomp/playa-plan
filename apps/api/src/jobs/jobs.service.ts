@@ -23,6 +23,20 @@ type JobWithRelations = Job & {
     endTime: string;
     dayOfWeek: string;
   } | null;
+  registrations?: Array<{
+    id: string;
+    registrationId: string;
+    jobId: string;
+    createdAt: Date;
+    registration: {
+      id: string;
+      status: string;
+      year: number;
+      createdAt: Date;
+      updatedAt: Date;
+      userId: string;
+    };
+  }>;
 };
 
 @Injectable()
@@ -45,11 +59,16 @@ export class JobsService {
       include: {
         category: true,
         shift: true,
+        registrations: {
+          include: {
+            registration: true,
+          },
+        },
       },
     });
 
-    // Add derived properties from category
-    return this.addDerivedProperties(job);
+    // Add derived properties from category and calculate current registrations
+    return this.addDerivedPropertiesWithRegistrations(job);
   }
 
   async findAll() {
@@ -57,11 +76,16 @@ export class JobsService {
       include: {
         category: true,
         shift: true,
+        registrations: {
+          include: {
+            registration: true,
+          },
+        },
       },
     });
 
-    // Add derived properties from categories
-    return jobs.map(job => this.addDerivedProperties(job));
+    // Add derived properties from categories and calculate current registrations
+    return jobs.map(job => this.addDerivedPropertiesWithRegistrations(job));
   }
 
   async findOne(id: string) {
@@ -70,6 +94,11 @@ export class JobsService {
       include: {
         category: true,
         shift: true,
+        registrations: {
+          include: {
+            registration: true,
+          },
+        },
       },
     });
 
@@ -77,8 +106,8 @@ export class JobsService {
       throw new NotFoundException(`Job with ID ${id} not found`);
     }
 
-    // Add derived properties from category
-    return this.addDerivedProperties(job);
+    // Add derived properties from category and calculate current registrations
+    return this.addDerivedPropertiesWithRegistrations(job);
   }
 
   async update(id: string, updateJobDto: UpdateJobDto) {
@@ -104,11 +133,16 @@ export class JobsService {
         include: {
           category: true,
           shift: true,
+          registrations: {
+            include: {
+              registration: true,
+            },
+          },
         },
       });
 
-      // Add derived properties from category
-      return this.addDerivedProperties(job);
+      // Add derived properties from category and calculate current registrations
+      return this.addDerivedPropertiesWithRegistrations(job);
     } catch {
       throw new NotFoundException(`Job with ID ${id} not found`);
     }
@@ -121,11 +155,16 @@ export class JobsService {
         include: {
           category: true,
           shift: true,
+          registrations: {
+            include: {
+              registration: true,
+            },
+          },
         },
       });
 
-      // Add derived properties from category
-      return this.addDerivedProperties(job);
+      // Add derived properties from category and calculate current registrations
+      return this.addDerivedPropertiesWithRegistrations(job);
     } catch {
       throw new NotFoundException(`Job with ID ${id} not found`);
     }
@@ -134,14 +173,36 @@ export class JobsService {
   /**
    * Add derived properties from category to a job
    */
-  /**
-   * Add derived properties from category to a job
-   */
   private addDerivedProperties(job: JobWithRelations) {
     return {
       ...job,
       staffOnly: job.category?.staffOnly || false,
       alwaysRequired: job.category?.alwaysRequired || false,
+    };
+  }
+
+  /**
+   * Add derived properties from category and calculate current registrations for a job
+   */
+  private addDerivedPropertiesWithRegistrations(job: JobWithRelations) {
+    // Get current year
+    const currentYear = new Date().getFullYear();
+    
+    // Count all non-cancelled registrations for the current year
+    // This includes PENDING, CONFIRMED, and WAITLISTED registrations
+    const currentRegistrations = job.registrations?.filter(
+      reg => reg.registration.status !== 'CANCELLED' && reg.registration.year === currentYear
+    ).length || 0;
+
+    // Exclude registrations from the returned object
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { registrations, ...jobWithoutRegistrations } = job;
+
+    return {
+      ...jobWithoutRegistrations,
+      staffOnly: job.category?.staffOnly || false,
+      alwaysRequired: job.category?.alwaysRequired || false,
+      currentRegistrations,
     };
   }
 } 
