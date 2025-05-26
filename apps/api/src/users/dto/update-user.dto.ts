@@ -148,16 +148,6 @@ export class UpdateUserDto {
   readonly allowNoJob?: boolean;
 
   @ApiPropertyOptional({
-    description: 'Internal notes about the user (admin only)',
-    example: 'Previous volunteer coordinator',
-    maxLength: 1024,
-  })
-  @IsString()
-  @MaxLength(1024, { message: 'Internal notes must be at most 1024 characters long' })
-  @IsOptional()
-  readonly internalNotes?: string;
-
-  @ApiPropertyOptional({
     description: 'User role',
     enum: UserRole,
   })

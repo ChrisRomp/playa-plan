@@ -29,7 +29,6 @@ model User {
   city                       String?
   country                    String?
   emergencyContact           String?
-  internalNotes              String?
   phone                      String?
   stateProvince              String?
   loginCode                  String?
@@ -37,8 +36,25 @@ model User {
   campingOptionRegistrations CampingOptionRegistration[]
   payments                   Payment[]
   registrations              Registration[]
+  notesCreated               UserNote[]                  @relation("CreatedNotes")
+  notes                      UserNote[]                  @relation("UserNotes")
 
   @@map("users")
+}
+
+model UserNote {
+  id          String   @id @default(uuid())
+  userId      String
+  note        String
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation("UserNotes", fields: [userId], references: [id], onDelete: Cascade)
+  createdBy   User     @relation("CreatedNotes", fields: [createdById], references: [id])
+
+  @@index([userId])
+  @@index([createdById])
+  @@map("user_notes")
 }
 
 // Camp model has been removed

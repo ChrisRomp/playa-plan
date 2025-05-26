@@ -70,7 +70,29 @@
   - [x] Add allow early registration boolean
   - [x] Add allow deferred dues payment boolean
   - [x] Add allow no job boolean
-  - [x] Add internal notes field
+  - [x] ~Add internal notes field~ Replaced with dedicated user_notes table
+
+### 🗒️ User Notes Module
+
+- [x] Implement dedicated UserNote entity and schema
+  - [x] Create schema with note content, user references, and timestamps
+  - [x] Set up proper relationships to User model
+  - [x] Implement foreign key constraints and indexes
+- [x] Create UserNotesService for note CRUD operations
+  - [x] Implement findAllByUserId method to get notes for a user
+  - [x] Implement create method for adding new notes
+  - [x] Implement delete method with proper permission checks
+- [x] Create UserNotesController with API endpoints
+  - [x] GET /admin/users/:id/notes - Retrieve all notes for a user
+  - [x] POST /admin/users/:id/notes - Add a new note
+  - [x] DELETE /admin/users/notes/:noteId - Delete a specific note
+- [x] Implement proper authorization (admin/staff only)
+- [x] Create necessary DTOs and entities
+  - [x] UserNote entity
+  - [x] CreateUserNoteDto
+  - [x] UserNoteResponseDto with creator information
+- [x] Write unit tests for service and controller
+- [x] Implement migration to transfer existing internal notes to new structure
 
 ### 🛡️ Security Foundations
 

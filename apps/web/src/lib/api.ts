@@ -222,7 +222,6 @@ export const UserSchema = z.object({
   allowEarlyRegistration: z.boolean().optional(),
   allowDeferredDuesPayment: z.boolean().optional(),
   allowNoJob: z.boolean().optional(),
-  internalNotes: z.string().nullable().optional(),
 });
 
 export const AuthResponseSchema = z.object({
