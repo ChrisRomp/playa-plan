@@ -3,9 +3,11 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { GlobalValidationPipe } from './common/pipes/validation.pipe';
 import helmet from 'helmet';
+import { ConfigService } from '@nestjs/config';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  const configService = app.get(ConfigService);
   
   // Apply helmet middleware for security headers
   app.use(helmet());
@@ -13,15 +15,18 @@ async function bootstrap() {
   // Global validation and sanitization pipe
   app.useGlobalPipes(new GlobalValidationPipe());
 
-  // CORS configuration with specific options for development
+  // CORS configuration using settings from config service
+  const corsConfig = configService.get('cors');
   app.enableCors({
-    origin: ['http://localhost:5173', 'http://localhost:5174'], // Frontend dev server URLs
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    credentials: true, // Allow credentials (cookies)
-    allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+    origin: corsConfig.origins,
+    methods: corsConfig.methods,
+    credentials: corsConfig.credentials,
+    allowedHeaders: corsConfig.allowedHeaders,
+    exposedHeaders: corsConfig.exposedHeaders,
+    maxAge: corsConfig.maxAge,
   });
   
-  console.log('CORS configured for development environment');
+  console.log(`CORS configured with origins: ${corsConfig.origins}`);
   
   // Swagger documentation setup
   const config = new DocumentBuilder()
