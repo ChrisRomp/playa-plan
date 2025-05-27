@@ -1,5 +1,7 @@
 {
     "name": "playaplan",
+    "version": "0.1.0",
+    "description": "PlayaPlan camp registration management system",
     "private": true,
     "engines": {
         "node": ">=22.0.0"
@@ -20,7 +22,19 @@
         "test:web": "npm run test --workspace=web",
         "test:watch": "npm run test:watch --workspaces --if-present",
         "test:coverage": "npm run test:coverage --workspaces --if-present",
-        "clean": "rimraf node_modules **/dist **/node_modules"
+        "clean": "rimraf node_modules **/dist **/node_modules",
+        "docker:build:api": "docker build --build-arg IMAGE_VERSION=$(node -p \"require('./apps/api/package.json').version\") --build-arg BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ') --build-arg GIT_COMMIT=$(git rev-parse HEAD 2>/dev/null || echo 'unknown') -t playaplan-api -f apps/api/Dockerfile .",
+        "docker:build:web": "docker build --build-arg IMAGE_VERSION=$(node -p \"require('./apps/web/package.json').version\") --build-arg BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ') --build-arg GIT_COMMIT=$(git rev-parse HEAD 2>/dev/null || echo 'unknown') -t playaplan-web -f apps/web/Dockerfile .",
+        "docker:build:web:dev": "docker build --target development --build-arg IMAGE_VERSION=$(node -p \"require('./apps/web/package.json').version\")-dev --build-arg BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ') --build-arg GIT_COMMIT=$(git rev-parse HEAD 2>/dev/null || echo 'unknown') -t playaplan-web:dev -f apps/web/Dockerfile .",
+        "docker:build:web:prod": "docker build --target production --build-arg IMAGE_VERSION=$(node -p \"require('./apps/web/package.json').version\") --build-arg BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ') --build-arg GIT_COMMIT=$(git rev-parse HEAD 2>/dev/null || echo 'unknown') -t playaplan-web:prod -f apps/web/Dockerfile .",
+        "docker:build": "npm run docker:build:api && npm run docker:build:web",
+        "docker:build:versioned": "npm run docker:build:api:versioned && npm run docker:build:web:versioned",
+        "docker:build:api:versioned": "docker build --build-arg IMAGE_VERSION=$(node -p \"require('./apps/api/package.json').version\") --build-arg BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ') --build-arg GIT_COMMIT=$(git rev-parse HEAD 2>/dev/null || echo 'unknown') -t playaplan-api:$(node -p \"require('./apps/api/package.json').version\") -t playaplan-api:latest -f apps/api/Dockerfile .",
+        "docker:build:web:versioned": "docker build --build-arg IMAGE_VERSION=$(node -p \"require('./apps/web/package.json').version\") --build-arg BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ') --build-arg GIT_COMMIT=$(git rev-parse HEAD 2>/dev/null || echo 'unknown') -t playaplan-web:$(node -p \"require('./apps/web/package.json').version\") -t playaplan-web:latest -f apps/web/Dockerfile .",
+        "docker:run:api": "docker run --rm -p 3000:3000 --env-file .env playaplan-api",
+        "docker:run:web": "docker run -p 5173:5173 -e NODE_ENV=${NODE_ENV:-development} -e VITE_API_URL=${VITE_API_URL:-http://localhost:3000} playaplan-web",
+        "docker:run:web:dev": "docker run -p 5173:5173 -e VITE_API_URL=${VITE_API_URL:-http://localhost:3000} playaplan-web:dev",
+        "docker:run:web:prod": "docker run -p 5173:5173 -e VITE_API_URL=${VITE_API_URL:-http://localhost:3000} playaplan-web:prod"
     },
     "devDependencies": {
         "@typescript-eslint/eslint-plugin": "^8.31.1",
