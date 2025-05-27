@@ -1,0 +1,30 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "environmentName": {
+      "value": "${AZURE_ENV_NAME}"
+    },
+    "location": {
+      "value": "${AZURE_LOCATION}"
+    },
+    "administratorLogin": {
+      "value": "${POSTGRES_ADMIN_USERNAME}"
+    },
+    "administratorLoginPassword": {
+      "value": "${POSTGRES_ADMIN_PASSWORD}"
+    },
+    "webDomainName": {
+      "value": "${WEB_DOMAIN_NAME}"
+    },
+    "apiDomainName": {
+      "value": "${API_DOMAIN_NAME}"
+    },
+    "githubUsername": {
+      "value": "${GITHUB_USERNAME}"
+    },
+    "githubToken": {
+      "value": "${GITHUB_TOKEN}"
+    }
+  }
+}

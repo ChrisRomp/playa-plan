@@ -2,6 +2,11 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
+// Check for force re-seed flag from environment or command line args
+const FORCE_RESEED = process.env.FORCE_RESEED === 'true' || 
+                     process.argv.includes('--force') || 
+                     process.argv.includes('-f');
+
 async function tableExists(tableName: string): Promise<boolean> {
   try {
     // Try to get a count from the table - if it doesn't exist, it will throw an error
@@ -12,12 +17,20 @@ async function tableExists(tableName: string): Promise<boolean> {
   }
 }
 
-async function main() {
-  console.log('Starting database seed...');
+async function isAlreadySeeded(): Promise<boolean> {
+  try {
+    // Check if core_config has any data - if it does, assume database is seeded
+    const coreConfigCount = await prisma.coreConfig.count();
+    return coreConfigCount > 0;
+  } catch {
+    return false;
+  }
+}
 
-  // Clean up existing data (in reverse order to respect foreign key constraints)
-  console.log('Checking and cleaning up existing data...');
+async function cleanupExistingData() {
+  console.log('Cleaning up existing data...');
   
+  // Clean up existing data (in reverse order to respect foreign key constraints)
   if (await tableExists('notifications')) {
     await prisma.notification.deleteMany({});
     console.log('Cleaned notifications table');
@@ -78,8 +91,6 @@ async function main() {
     console.log('Cleaned camping_options table');
   }
   
-  // Camp entity has been removed
-  
   if (await tableExists('users')) {
     await prisma.user.deleteMany({});
     console.log('Cleaned users table');
@@ -91,6 +102,29 @@ async function main() {
   }
   
   console.log('Successfully completed data cleanup');
+}
+
+async function main() {
+  console.log('Starting database seed...');
+  
+  // Check if we should seed
+  const alreadySeeded = await isAlreadySeeded();
+  
+  if (alreadySeeded && !FORCE_RESEED) {
+    console.log('Database appears to already be seeded. Skipping seed.');
+    console.log('To force re-seeding, use one of:');
+    console.log('  - FORCE_RESEED=true npm run seed:dev');
+    console.log('  - npm run seed:dev -- --force');
+    console.log('  - npm run seed:dev -- -f');
+    return;
+  }
+  
+  if (FORCE_RESEED) {
+    console.log('Force re-seed flag detected. Cleaning existing data...');
+    await cleanupExistingData();
+  } else {
+    console.log('Database appears empty. Proceeding with initial seed...');
+  }
 
   // Create users
   console.log(`Created ${await prisma.user.count()} users`);
@@ -934,6 +968,11 @@ async function main() {
 
   // Create core configuration
   console.log('Creating core configuration...');
+  
+  // Get the current year for registration
+  const currentYear = new Date().getFullYear();
+  console.log(`Setting registration year to current year: ${currentYear}`);
+  
   await prisma.coreConfig.create({
     data: {
       campName: 'Playa Plan',
@@ -943,7 +982,7 @@ async function main() {
       campBannerAltText: 'Stylized desert scene with abstract tents and sculptures, including a large wooden figure, representing a Burning Man-inspired setting.',
       campIconUrl: '/icons/playa-plan-icon.png',
       campIconAltText: 'Minimalist icon showing a checkmark integrated with a sun over stylized desert dunes, evoking themes of planning and the playa.',
-      registrationYear: 2025,
+      registrationYear: currentYear,
       earlyRegistrationOpen: false,
       registrationOpen: true,
       registrationTerms: 'By registering, you agree to follow our camp principles and contribute to our community.',

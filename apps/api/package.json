@@ -18,6 +18,7 @@
     "test:cov": "NODE_OPTIONS=--unhandled-rejections=strict jest --coverage --config jest.config.js",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand --config jest.config.js",
     "test:e2e": "jest --config ./test/jest-e2e.json",
+    "db:init": "npm run prisma:migrate:prod && npm run seed:dev",
     "prisma:generate": "prisma generate --schema=./prisma/schema.prisma",
     "prisma:migrate": "prisma migrate dev --schema=./prisma/schema.prisma",
     "prisma:migrate:dev": "prisma migrate dev --name dev-migration --schema=./prisma/schema.prisma",
@@ -28,7 +29,9 @@
     "prisma:studio": "prisma studio --schema=./prisma/schema.prisma",
     "seed": "ts-node ./prisma/seeds/seed.ts",
     "seed:dev": "ts-node ./prisma/seeds/seed.ts",
+    "seed:dev:force": "FORCE_RESEED=true ts-node ./prisma/seeds/seed.ts",
     "seed:test": "dotenv -e .env.test -- ts-node ./prisma/seeds/seed.ts",
+    "seed:test:force": "dotenv -e .env.test -- FORCE_RESEED=true ts-node ./prisma/seeds/seed.ts",
     "db:setup": "npm run prisma:generate && npm run prisma:migrate:dev && npm run seed:dev",
     "db:setup:test": "npm run prisma:generate && npm run prisma:migrate:test && npm run seed:test"
   },

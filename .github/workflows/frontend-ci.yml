@@ -1,10 +1,16 @@
 name: Frontend CI
 permissions:
   contents: read
+  packages: write
 
 on:
   push:
-    branches: [ main ]
+    # Tag pushes will trigger the workflow regardless of which files changed
+    tags:
+      - 'v*.*.*'
+    # Branch pushes only trigger the workflow if specific files changed
+    branches: 
+      - main
     paths:
       - 'apps/web/**'
       - '.github/workflows/frontend-ci.yml'
@@ -20,6 +26,7 @@ on:
 
 jobs:
   build-and-test:
+    name: Build and Test Web Frontend
     runs-on: ubuntu-latest
 
     strategy:
@@ -46,3 +53,81 @@ jobs:
     - name: Test frontend
       working-directory: apps/web
       run: npm run test
+      
+  build-and-publish-container:
+    name: Build and Publish Web Docker Image
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v3
+      with:
+        platforms: arm64
+        cache-image: true
+      
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      
+    - name: Login to GitHub Container Registry
+      # Only login when we'll be pushing images
+      if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Extract metadata (tags, labels) for Docker
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ghcr.io/${{ github.repository }}/web
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=semver,pattern={{version}}
+          type=semver,pattern={{major}}.{{minor}}
+          type=semver,pattern={{major}}
+          type=sha
+          # Add latest tag only for version tags (not for branch pushes)
+          type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+        flavor: |
+          latest=false
+          
+    - name: Extract version from tag
+      id: extract-version
+      run: |
+        # Default to 'dev' for non-tag builds
+        VERSION="dev"
+        if [[ "${{ github.ref }}" == "refs/tags/v"* ]]; then
+          VERSION="${{ github.ref_name }}"
+          # Remove 'v' prefix if present
+          VERSION="${VERSION#v}"
+        fi
+        echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+        
+    - name: Generate build timestamp
+      id: build-timestamp
+      run: echo "timestamp=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
+        
+    - name: Build and push Web Docker image
+      uses: docker/build-push-action@v6
+      with:
+        # Use repository root as context to have access to all files
+        context: .
+        # Specify the Dockerfile location relative to the context
+        file: ./apps/web/Dockerfile
+        # Only push to registry on main branch or version tags
+        push: ${{ github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')) }}
+        platforms: linux/amd64,linux/arm64
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        build-args: |
+          IMAGE_VERSION=${{ steps.extract-version.outputs.VERSION }}
+          BUILD_DATE=${{ steps.build-timestamp.outputs.timestamp }}
+          GIT_COMMIT=${{ github.sha }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max

@@ -424,13 +424,18 @@ const AdminUserPage: React.FC = () => {
                       <label htmlFor="internalNotes" className="block text-gray-700 font-medium mb-2">
                         Notes (visible to administrators only)
                       </label>
+                      <div className="text-sm text-amber-600 mb-2">
+                        Note: Internal notes functionality is not yet implemented and will be moved in a future update.
+                      </div>
                       <textarea
                         name="internalNotes"
                         id="internalNotes"
                         rows={3}
                         value={formData.internalNotes || ''}
                         onChange={handleInputChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-100"
+                        disabled
+                        placeholder="Not yet implemented"
                       />
                     </div>
                   </div>
@@ -490,4 +495,4 @@ const AdminUserPage: React.FC = () => {
   );
 };
 
-export default AdminUserPage; 
+export default AdminUserPage;
