@@ -1,11 +1,16 @@
-import { Controller, Post, Body, Get, Param, Query, UseGuards, ParseUUIDPipe, Put, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Body, Get, Param, Query, UseGuards, ParseUUIDPipe, Put, HttpCode, HttpStatus, Request } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiParam, ApiBearerAuth } from '@nestjs/swagger';
 import { PaymentsService, StripeService, PaypalService } from '../services';
 import { CreatePaymentDto, CreateStripePaymentDto, CreatePaypalPaymentDto, CreateRefundDto, RecordManualPaymentDto, UpdatePaymentDto } from '../dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
-import { PaymentStatus } from '@prisma/client';
+import { PaymentStatus, UserRole, User } from '@prisma/client';
+
+// Interface for authenticated request with user
+interface AuthenticatedRequest extends Request {
+  user: Omit<User, 'password'>;
+}
 
 @ApiTags('payments')
 @Controller('payments')
@@ -18,7 +23,7 @@ export class PaymentsController {
 
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('ADMIN')
+  @Roles(UserRole.ADMIN)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Create a new payment record' })
   @ApiResponse({ status: 201, description: 'Payment created successfully' })
@@ -29,15 +34,17 @@ export class PaymentsController {
   }
 
   @Get()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.STAFF)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get all payments, with optional filters' })
+  @ApiOperation({ summary: 'Get all payments (admin/staff only), with optional filters' })
   @ApiQuery({ name: 'skip', required: false, type: Number })
   @ApiQuery({ name: 'take', required: false, type: Number })
   @ApiQuery({ name: 'userId', required: false })
   @ApiQuery({ name: 'status', required: false, enum: PaymentStatus })
   @ApiResponse({ status: 200, description: 'Payments retrieved successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Admin/Staff access required' })
   async findAll(
     @Query('skip') skip?: string,
     @Query('take') take?: string,
@@ -52,16 +59,41 @@ export class PaymentsController {
     );
   }
 
+  @Get('my-payments')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get current user\'s payments only' })
+  @ApiQuery({ name: 'skip', required: false, type: Number })
+  @ApiQuery({ name: 'take', required: false, type: Number })
+  @ApiQuery({ name: 'status', required: false, enum: PaymentStatus })
+  @ApiResponse({ status: 200, description: 'User payments retrieved successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async findMyPayments(
+    @Request() req: AuthenticatedRequest,
+    @Query('skip') skip?: string,
+    @Query('take') take?: string,
+    @Query('status') status?: PaymentStatus,
+  ) {
+    const userId = req.user.id;
+    return this.paymentsService.findAll(
+      skip ? parseInt(skip, 10) : undefined,
+      take ? parseInt(take, 10) : undefined,
+      userId, // Force filter to current user
+      status,
+    );
+  }
+
   @Get(':id')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get payment by ID' })
+  @ApiOperation({ summary: 'Get payment by ID (own payments only unless admin/staff)' })
   @ApiParam({ name: 'id', required: true, description: 'Payment ID' })
   @ApiResponse({ status: 200, description: 'Payment retrieved successfully' })
   @ApiResponse({ status: 404, description: 'Payment not found' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async findOne(@Param('id', ParseUUIDPipe) id: string) {
-    return this.paymentsService.findOne(id);
+  @ApiResponse({ status: 403, description: 'Forbidden - Can only access own payments' })
+  async findOne(@Param('id', ParseUUIDPipe) id: string, @Request() req: AuthenticatedRequest) {
+    return this.paymentsService.findOneWithOwnershipCheck(id, req.user.id, req.user.role);
   }
 
   @Put(':id')
@@ -164,4 +196,4 @@ export class PaymentsController {
   async verifyStripeSession(@Param('sessionId') sessionId: string) {
     return this.paymentsService.verifyStripeSession(sessionId);
   }
-} 
+}

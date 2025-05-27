@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { CreatePaymentDto, UpdatePaymentDto, CreateRefundDto, RecordManualPaymentDto, CreateStripePaymentDto, CreatePaypalPaymentDto } from '../dto';
-import { Payment, PaymentProvider, PaymentStatus, Registration } from '@prisma/client';
+import { Payment, PaymentProvider, PaymentStatus, Registration, UserRole } from '@prisma/client';
 import { StripeService } from './stripe.service';
 import { PaypalService } from './paypal.service';
 
@@ -169,6 +169,41 @@ export class PaymentsService {
     
     if (!payment) {
       throw new NotFoundException(`Payment with ID ${id} not found`);
+    }
+    
+    return payment;
+  }
+
+  /**
+   * Find one payment by ID with ownership check
+   * @param id - Payment ID
+   * @param userId - Current user ID
+   * @param userRole - Current user role
+   * @returns The payment, if found and user has access
+   */
+  async findOneWithOwnershipCheck(id: string, userId: string, userRole: UserRole): Promise<PaymentWithRelations> {
+    const payment = await this.prisma.payment.findUnique({
+      where: { id },
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+        },
+        registration: true,
+      },
+    });
+    
+    if (!payment) {
+      throw new NotFoundException(`Payment with ID ${id} not found`);
+    }
+    
+    // Check ownership - only admins/staff can view any payment, others can only view their own
+    if (userRole !== UserRole.ADMIN && userRole !== UserRole.STAFF && payment.userId !== userId) {
+      throw new NotFoundException(`Payment with ID ${id} not found`); // Don't reveal that payment exists
     }
     
     return payment;

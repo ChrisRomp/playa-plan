@@ -1,13 +1,14 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { PaymentsController } from './payments.controller';
 import { PaymentsService, StripeService, PaypalService } from '../services';
-import { PaymentStatus, PaymentProvider } from '@prisma/client';
+import { PaymentStatus, PaymentProvider, UserRole } from '@prisma/client';
 
 // Mock implementations
 const mockPaymentsService = {
   create: jest.fn(),
   findAll: jest.fn(),
   findOne: jest.fn(),
+  findOneWithOwnershipCheck: jest.fn(),
   update: jest.fn(),
   recordManualPayment: jest.fn(),
   initiateStripePayment: jest.fn(),
@@ -135,14 +136,21 @@ describe('PaymentsController', () => {
         status: PaymentStatus.COMPLETED,
       };
 
+      const mockRequest = {
+        user: { 
+          id: 'user-id', 
+          role: UserRole.ADMIN 
+        }
+      } as unknown as { user: { id: string; role: UserRole } };
+
       // Setup mocks
-      mockPaymentsService.findOne.mockResolvedValue(mockPayment);
+      mockPaymentsService.findOneWithOwnershipCheck.mockResolvedValue(mockPayment);
 
       // Execute
-      const result = await controller.findOne(paymentId);
+      const result = await controller.findOne(paymentId, mockRequest);
 
       // Assert
-      expect(mockPaymentsService.findOne).toHaveBeenCalledWith(paymentId);
+      expect(mockPaymentsService.findOneWithOwnershipCheck).toHaveBeenCalledWith(paymentId, 'user-id', UserRole.ADMIN);
       expect(result).toEqual(mockPayment);
     });
   });
