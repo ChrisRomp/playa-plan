@@ -30,7 +30,6 @@ const mockPaypalService = {
 
 describe('PaymentsController', () => {
   let controller: PaymentsController;
-  let paymentsService: PaymentsService;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -43,7 +42,6 @@ describe('PaymentsController', () => {
     }).compile();
 
     controller = module.get<PaymentsController>(PaymentsController);
-    paymentsService = module.get<PaymentsService>(PaymentsService);
 
     // Reset all mocks before each test
     jest.clearAllMocks();
@@ -141,7 +139,7 @@ describe('PaymentsController', () => {
           id: 'user-id', 
           role: UserRole.ADMIN 
         }
-      } as unknown as { user: { id: string; role: UserRole } };
+      } as unknown as Parameters<typeof controller.findOne>[1];
 
       // Setup mocks
       mockPaymentsService.findOneWithOwnershipCheck.mockResolvedValue(mockPayment);

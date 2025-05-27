@@ -74,7 +74,9 @@ describe('PaymentsController Security', () => {
   describe('findMyPayments (user-specific)', () => {
     it('should only return payments for the authenticated user', async () => {
       const mockResult = { payments: [mockPayment], total: 1 };
-      const mockRequest = { user: { id: 'user-123', role: UserRole.PARTICIPANT } } as any;
+      const mockRequest = { 
+        user: { id: 'user-123', role: UserRole.PARTICIPANT } 
+      } as unknown as Parameters<typeof controller.findMyPayments>[0];
       
       jest.spyOn(paymentsService, 'findAll').mockResolvedValue(mockResult);
 
@@ -87,7 +89,9 @@ describe('PaymentsController Security', () => {
 
   describe('findOne (with ownership check)', () => {
     it('should allow admin to access any payment', async () => {
-      const mockRequest = { user: { id: 'admin-123', role: UserRole.ADMIN } } as any;
+      const mockRequest = { 
+        user: { id: 'admin-123', role: UserRole.ADMIN } 
+      } as unknown as Parameters<typeof controller.findOne>[1];
       
       jest.spyOn(paymentsService, 'findOneWithOwnershipCheck').mockResolvedValue(mockPayment);
 
@@ -98,7 +102,9 @@ describe('PaymentsController Security', () => {
     });
 
     it('should allow staff to access any payment', async () => {
-      const mockRequest = { user: { id: 'staff-123', role: UserRole.STAFF } } as any;
+      const mockRequest = { 
+        user: { id: 'staff-123', role: UserRole.STAFF } 
+      } as unknown as Parameters<typeof controller.findOne>[1];
       
       jest.spyOn(paymentsService, 'findOneWithOwnershipCheck').mockResolvedValue(mockPayment);
 
@@ -109,7 +115,9 @@ describe('PaymentsController Security', () => {
     });
 
     it('should only allow users to access their own payments', async () => {
-      const mockRequest = { user: { id: 'user-123', role: UserRole.PARTICIPANT } } as any;
+      const mockRequest = { 
+        user: { id: 'user-123', role: UserRole.PARTICIPANT } 
+      } as unknown as Parameters<typeof controller.findOne>[1];
       
       jest.spyOn(paymentsService, 'findOneWithOwnershipCheck').mockResolvedValue(mockPayment);
 
@@ -120,7 +128,9 @@ describe('PaymentsController Security', () => {
     });
 
     it('should throw NotFoundException when user tries to access another user\'s payment', async () => {
-      const mockRequest = { user: { id: 'user-456', role: UserRole.PARTICIPANT } } as any;
+      const mockRequest = { 
+        user: { id: 'user-456', role: UserRole.PARTICIPANT } 
+      } as unknown as Parameters<typeof controller.findOne>[1];
       
       jest.spyOn(paymentsService, 'findOneWithOwnershipCheck').mockRejectedValue(
         new NotFoundException('Payment with ID payment-123 not found')
