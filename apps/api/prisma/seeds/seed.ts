@@ -968,6 +968,11 @@ async function main() {
 
   // Create core configuration
   console.log('Creating core configuration...');
+  
+  // Get the current year for registration
+  const currentYear = new Date().getFullYear();
+  console.log(`Setting registration year to current year: ${currentYear}`);
+  
   await prisma.coreConfig.create({
     data: {
       campName: 'Playa Plan',
@@ -977,7 +982,7 @@ async function main() {
       campBannerAltText: 'Stylized desert scene with abstract tents and sculptures, including a large wooden figure, representing a Burning Man-inspired setting.',
       campIconUrl: '/icons/playa-plan-icon.png',
       campIconAltText: 'Minimalist icon showing a checkmark integrated with a sun over stylized desert dunes, evoking themes of planning and the playa.',
-      registrationYear: 2025,
+      registrationYear: currentYear,
       earlyRegistrationOpen: false,
       registrationOpen: true,
       registrationTerms: 'By registering, you agree to follow our camp principles and contribute to our community.',
