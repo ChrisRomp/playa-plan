@@ -16,11 +16,13 @@ export const getStripe = async (publicKey: string): Promise<Stripe | null> => {
 
 /**
  * Create a payment session with Stripe
+ * CRITICAL: paymentData.registrationId must be included to associate payment with registration
  */
 export const createStripePayment = async (
   paymentData: StripePaymentRequest
 ): Promise<StripePaymentResponse> => {
   try {
+    // CRITICAL: This API call sends registrationId to backend for payment-registration linking
     const response = await api.post('/payments/stripe', paymentData);
     return response.data;
   } catch (error) {

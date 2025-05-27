@@ -60,7 +60,10 @@ const PaymentButton: React.FC<PaymentButtonProps> = ({
 
     const paymentOptions: PaymentOptions = {
       amount,
-      // Use the actual registration ID from onPaymentStart result, otherwise use the prop
+      // CRITICAL: registrationId is essential for associating Stripe payment with camp registration
+      // This ID is sent to the backend /payments/stripe endpoint and stored in the Stripe session metadata
+      // When payment succeeds, the backend uses this ID to update the registration payment status
+      // Without this ID, we cannot link completed payments back to registrations!
       registrationId: actualRegistrationId,
       description,
     };

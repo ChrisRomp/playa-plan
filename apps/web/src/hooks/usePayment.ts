@@ -36,6 +36,7 @@ export const usePayment = () => {
         amount: Math.round(options.amount * 100), // Convert to cents
         currency: 'USD',
         userId: user.id,
+        // CRITICAL: registrationId links payment to registration - required for payment verification
         registrationId: options.registrationId,
         description: options.description || 'Camp registration payment',
         successUrl: `${window.location.origin}/payment/success.html?session_id={CHECKOUT_SESSION_ID}`,
