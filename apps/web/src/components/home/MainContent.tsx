@@ -5,7 +5,7 @@ import LoginFormReset from '../auth/LoginFormReset';
 import UserDashboard from './UserDashboard';
 import ProfilePage from '../profile/ProfilePage';
 
-const MainContent = () => {
+const MainContent: React.FC = () => {
   const { user } = useAuth();
   const { config, isLoading: configLoading } = useConfig();
   const { isProfileComplete, isLoading: profileLoading } = useProfile();

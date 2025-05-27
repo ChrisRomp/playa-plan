@@ -59,9 +59,6 @@ const PaymentButton: React.FC<PaymentButtonProps> & { actualRegistrationId?: str
       description,
     };
     
-    // Log the registration ID being used for payment
-    console.log('Using registrationId for payment:', paymentOptions.registrationId);
-
     try {
       await processStripePayment(paymentOptions);
       // Reset the static property after use
