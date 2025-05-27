@@ -1,4 +1,3 @@
-import React from 'react';
 import { renderHook, act } from '@testing-library/react-hooks';
 import { useCampingOptions } from '../useCampingOptions';
 import { campingOptions } from '../../lib/api';
@@ -221,40 +220,13 @@ describe('useCampingOptions', () => {
     
     (campingOptions.deleteField as ReturnType<typeof vi.fn>).mockResolvedValue(mockField);
     
-    // Mock implementation of useState for the fields state
-    const mockFields = [
-      { 
-        id: '1', 
-        displayName: 'Field to Delete',
-        dataType: 'STRING',
-        required: true,
-        campingOptionId: '123',
-        createdAt: '2023-01-01T00:00:00.000Z',
-        updatedAt: '2023-01-01T00:00:00.000Z'
-      },
-      { 
-        id: '2', 
-        displayName: 'Other Field',
-        dataType: 'NUMBER', 
-        required: false,
-        campingOptionId: '123',
-        createdAt: '2023-01-01T00:00:00.000Z',
-        updatedAt: '2023-01-01T00:00:00.000Z'
-      },
-    ];
-    
-    // Mock the fields state to start with our test data
-    // This avoids the need to directly set fields state
-    vi.spyOn(React, 'useState').mockImplementationOnce(() => [mockFields, vi.fn()]);
-    
     const { result } = renderHook(() => useCampingOptions());
     
     await act(async () => {
       await result.current.deleteCampingOptionField('123', '1');
     });
     
-    // Since we mocked the state setter, we won't see the update in our test
-    // Instead, verify the deleteField function was called correctly
+    // Verify the deleteField function was called correctly
     expect(campingOptions.deleteField).toHaveBeenCalledWith('123', '1');
     expect(result.current.error).toBe(null);
   });
