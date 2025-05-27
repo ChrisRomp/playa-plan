@@ -9,6 +9,7 @@ import { AuthContext } from '../../store/authUtils';
 import { JobCategory, Job, CampingOptionField } from '../../lib/api';
 import { getFriendlyDayName, formatTime } from '../../utils/shiftUtils';
 import { canUserRegister, getRegistrationStatusMessage } from '../../utils/registrationUtils';
+import { isStaffOrAdmin } from '../../utils/userUtils';
 import { PATHS } from '../../routes';
 import PaymentButton from '../../components/payment/PaymentButton';
 
@@ -202,7 +203,7 @@ export default function RegistrationPage() {
     return jobs.filter(job => 
       alwaysRequiredCategoryIds.includes(job.categoryId) &&
       // Only show staffOnly jobs to staff and admin users
-      (!job.staffOnly || (user?.role && ['staff', 'admin'].includes(user.role)))
+      (!job.staffOnly || isStaffOrAdmin(user))
     );
   };
 
@@ -216,7 +217,7 @@ export default function RegistrationPage() {
     return jobs.filter(job => 
       !alwaysRequiredCategoryIds.includes(job.categoryId) &&
       // Only show staffOnly jobs to staff and admin users
-      (!job.staffOnly || (user?.role && ['staff', 'admin'].includes(user.role)))
+      (!job.staffOnly || isStaffOrAdmin(user))
     );
   };
 
@@ -270,7 +271,7 @@ export default function RegistrationPage() {
     
     // Filter jobs based on user role first
     const filteredJobs = jobList.filter(job => 
-      !job.staffOnly || (user?.role && ['staff', 'admin'].includes(user.role))
+      !job.staffOnly || isStaffOrAdmin(user)
     );
     
     filteredJobs.forEach(job => {

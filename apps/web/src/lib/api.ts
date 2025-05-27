@@ -49,8 +49,17 @@ export const initializeAuthFromStorage = (): Promise<boolean> => {
           
           // Also ensure the auth cookie is set if we have a token
           if (!cookieService.isAuthenticated()) {
-            cookieService.setAuthenticatedState();
-            console.log('Auth cookie set based on JWT token presence');
+            // Handle the async operation with .then() instead of await
+            cookieService.setAuthenticatedState()
+              .then(() => {
+                console.log('Auth cookie set based on JWT token presence');
+                resolve(true);
+              })
+              .catch((e) => {
+                console.error('Error setting auth cookie', e);
+                resolve(true); // Still resolve as true since token is valid
+              });
+            return; // Return early as resolve will be called in the promise chain
           }
           
           resolve(true);
@@ -650,7 +659,7 @@ export const auth = {
       // If the API check succeeded but the cookie is missing, set it now
       if (_lastAuthResult && !cookieService.isAuthenticated()) {
         console.log('API check succeeded but cookie missing - restoring cookie');
-        cookieService.setAuthenticatedState();
+        await cookieService.setAuthenticatedState();
       }
       
       return _lastAuthResult;
