@@ -24,6 +24,8 @@ import PaymentCancelPage from '../pages/payment/PaymentCancelPage.tsx';
 import NotFoundPage from '../pages/NotFoundPage.tsx';
 import { ReportsPage } from '../pages/ReportsPage.tsx';
 import { RegistrationReportsPage } from '../pages/RegistrationReportsPage.tsx';
+import { PaymentReportsPage } from '../pages/PaymentReportsPage.tsx';
+import { UserReportsPage } from '../pages/UserReportsPage.tsx';
 import { ROLES } from '../types/auth.ts';
 
 /**
@@ -57,6 +59,12 @@ const AppRouter: React.FC = () => {
       <Route element={<ProtectedRoute requiresAuth={true} allowedRoles={[ROLES.STAFF, ROLES.ADMIN]} />}>
         <Route path={ROUTES.REPORTS.path} element={<ReportsPage />} />
         <Route path={ROUTES.REPORTS_REGISTRATIONS.path} element={<RegistrationReportsPage />} />
+        <Route path={ROUTES.REPORTS_USERS.path} element={<UserReportsPage />} />
+      </Route>
+      
+      {/* Admin-only reports */}
+      <Route element={<ProtectedRoute requiresAuth={true} allowedRoles={[ROLES.ADMIN]} />}>
+        <Route path={ROUTES.REPORTS_PAYMENTS.path} element={<PaymentReportsPage />} />
       </Route>
       
       {/* Protected routes that require specific roles */}
