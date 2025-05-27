@@ -1,4 +1,3 @@
-import React from 'react';
 import { CreditCardIcon, Loader2Icon } from 'lucide-react';
 import { usePayment, PaymentOptions } from '../../hooks/usePayment';
 

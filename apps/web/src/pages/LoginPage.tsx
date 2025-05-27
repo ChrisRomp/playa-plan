@@ -1,4 +1,4 @@
-import React from 'react';
+import { useEffect, lazy, Suspense } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../store/authUtils';
 import { PATHS } from '../routes';
@@ -17,7 +17,7 @@ const LoginPage: React.FC = () => {
   const returnTo = searchParams.get('returnTo');
   
   // Redirect to dashboard or requested page if already authenticated
-  React.useEffect(() => {
+  useEffect(() => {
     if (isAuthenticated) {
       // Navigate to the returnTo path if available, or to dashboard
       navigate(returnTo ? decodeURIComponent(returnTo) : PATHS.DASHBOARD, { replace: true });
@@ -25,13 +25,13 @@ const LoginPage: React.FC = () => {
   }, [isAuthenticated, navigate, returnTo]);
 
   // Import the original LoginForm dynamically to avoid potential circular dependencies
-  const LoginForm = React.lazy(() => import('../components/auth/LoginForm'));
+  const LoginForm = lazy(() => import('../components/auth/LoginForm'));
   
   return (
     <div className="container mx-auto px-4 py-8">
-      <React.Suspense fallback={<div>Loading...</div>}>
+      <Suspense fallback={<div>Loading...</div>}>
         <LoginForm />
-      </React.Suspense>
+      </Suspense>
     </div>
   );
 };

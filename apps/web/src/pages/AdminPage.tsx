@@ -1,4 +1,3 @@
-import React from 'react';
 import { useAuth } from '../store/authUtils';
 import { Link } from 'react-router-dom';
 import { ROUTES } from '../routes';

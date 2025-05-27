@@ -1,6 +1,5 @@
 // React is needed for JSX even if not directly referenced
 // @ts-expect-error - React is used in JSX transformations
-import React from 'react';
 import '@testing-library/jest-dom';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, act } from '@testing-library/react';

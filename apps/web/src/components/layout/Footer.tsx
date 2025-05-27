@@ -1,4 +1,3 @@
-import React from 'react';
 import { useConfig } from '../../store/ConfigContext';
 
 const Footer: React.FC = () => {
