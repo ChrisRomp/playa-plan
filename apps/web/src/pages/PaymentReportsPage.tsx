@@ -30,10 +30,18 @@ export function PaymentReportsPage() {
     setError(null);
     try {
       const data = await reports.getPayments();
-      setPayments(data);
+      // Ensure data is an array before setting it
+      if (Array.isArray(data)) {
+        setPayments(data);
+      } else {
+        console.error('Payments data is not an array:', data);
+        setPayments([]);
+        setError('Received invalid payment data format');
+      }
     } catch (err) {
       setError('Failed to fetch payments data');
       console.error('Error fetching payments:', err);
+      setPayments([]);
     } finally {
       setLoading(false);
     }
@@ -55,6 +63,18 @@ export function PaymentReportsPage() {
 
   // Calculate summary statistics
   const summaryStats = useMemo(() => {
+    // Make sure payments is an array
+    if (!Array.isArray(payments)) {
+      return {
+        total: 0,
+        completed: 0,
+        pending: 0,
+        failed: 0,
+        refunded: 0,
+        totalAmount: 0
+      };
+    }
+    
     const total = payments.length;
     const completed = payments.filter(payment => payment.status === 'COMPLETED').length;
     const pending = payments.filter(payment => payment.status === 'PENDING').length;

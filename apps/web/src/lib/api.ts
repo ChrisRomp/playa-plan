@@ -1109,8 +1109,21 @@ export const reports = {
       if (filters?.provider) params.append('provider', filters.provider);
       
       const url = `/payments${params.toString() ? `?${params.toString()}` : ''}`;
-      const response = await api.get<Payment[]>(url);
-      return response.data;
+      const response = await api.get(url);
+      
+      // Check if the response has a payments array property (matches backend format)
+      if (response.data && response.data.payments && Array.isArray(response.data.payments)) {
+        return response.data.payments;
+      } 
+      
+      // Fallback if the data is already an array
+      if (Array.isArray(response.data)) {
+        return response.data;
+      }
+      
+      // If we can't find a valid array, return an empty one
+      console.error('Unexpected response format from payments API:', response.data);
+      return [];
     } catch (error) {
       console.error('Error fetching payments report:', error);
       throw error;
