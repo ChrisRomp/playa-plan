@@ -46,6 +46,13 @@ export const initializeAuthFromStorage = (): Promise<boolean> => {
           // Set the token in the Authorization header
           api.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
           console.log('JWT token loaded from localStorage and set in Authorization header');
+          
+          // Also ensure the auth cookie is set if we have a token
+          if (!cookieService.isAuthenticated()) {
+            cookieService.setAuthenticatedState();
+            console.log('Auth cookie set based on JWT token presence');
+          }
+          
           resolve(true);
           return;
         }
@@ -600,12 +607,22 @@ export const auth = {
    * First checks for the authenticated state before making an API call
    */
   checkAuth: async () => {
-    // First check if user is authenticated according to client-side state
-    if (!cookieService.isAuthenticated()) {
-      console.log('Skip auth check - no auth cookie');
+    // First check if we have a JWT token in localStorage
+    const hasToken = localStorage.getItem(JWT_TOKEN_STORAGE_KEY) !== null;
+    
+    // If no token in localStorage, not authenticated
+    if (!hasToken) {
+      console.log('Skip auth check - no JWT token in localStorage');
       _lastAuthResult = false;
       _lastAuthCheckTime = Date.now();
       return false;
+    }
+    
+    // Check if user is authenticated according to client-side state
+    if (!cookieService.isAuthenticated()) {
+      console.log('Auth cookie missing but JWT token exists - will verify with server');
+      // Continue to API check below instead of returning false
+      // We'll set the cookie if the API check succeeds
     }
     
     // Check if we have a recent auth result to use instead of making another API call
@@ -629,6 +646,13 @@ export const auth = {
       const response = await api.get<{ message: string }>('/auth/test');
       _lastAuthResult = response.data.message === 'Authentication is working';
       _lastAuthCheckTime = Date.now();
+      
+      // If the API check succeeded but the cookie is missing, set it now
+      if (_lastAuthResult && !cookieService.isAuthenticated()) {
+        console.log('API check succeeded but cookie missing - restoring cookie');
+        cookieService.setAuthenticatedState();
+      }
+      
       return _lastAuthResult;
     } catch (e) {
       // Log error details for debugging
