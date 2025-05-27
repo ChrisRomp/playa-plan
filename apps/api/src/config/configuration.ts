@@ -36,7 +36,7 @@ export default () => ({
     methods: process.env.CORS_METHODS || 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     allowedHeaders: process.env.CORS_ALLOWED_HEADERS || 'Content-Type,Accept,Authorization',
     exposedHeaders: process.env.CORS_EXPOSED_HEADERS || '',
-    credentials: process.env.CORS_CREDENTIALS !== 'false', // Default to true unless explicitly set to false
+    credentials: process.env.CORS_CREDENTIALS === undefined ? true : process.env.CORS_CREDENTIALS !== 'false',
     maxAge: parseInt(process.env.CORS_MAX_AGE || '3600', 10) || 3600,
   },
 
