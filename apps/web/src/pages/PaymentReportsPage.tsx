@@ -53,13 +53,18 @@ export function PaymentReportsPage() {
 
   // Get unique years for filter dropdown
   const availableYears = useMemo(() => {
-    const currentYear = new Date().getFullYear();
-    const years = [];
-    for (let i = currentYear - 5; i <= currentYear + 1; i++) {
-      years.push(i);
+    // Extract years from payment dates
+    if (!Array.isArray(payments) || payments.length === 0) {
+      return []; // Return empty array if no payments data
     }
-    return years.sort((a, b) => b - a);
-  }, []);
+    
+    // Extract unique years from payment data
+    const years = [...new Set(
+      payments.map(payment => new Date(payment.createdAt).getFullYear())
+    )];
+    
+    return years.sort((a, b) => b - a); // Sort descending
+  }, [payments]);
 
   // Calculate summary statistics
   const summaryStats = useMemo(() => {
@@ -90,16 +95,24 @@ export function PaymentReportsPage() {
   // Define table columns
   const columns: DataTableColumn<Payment>[] = [
     {
-      id: 'id',
-      header: 'Payment ID',
-      accessor: (row) => row.id,
+      id: 'userName',
+      header: 'Name',
+      accessor: (row) => row.user ? `${row.user.firstName} ${row.user.lastName}` : 'Unknown',
       sortable: true,
-      hideOnMobile: true,
+    },
+    {
+      id: 'createdAt',
+      header: 'Date/Time',
+      accessor: (row) => {
+        const date = new Date(row.createdAt);
+        return `${date.toLocaleDateString()} ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+      },
+      sortable: true,
     },
     {
       id: 'amount',
       header: 'Amount',
-      accessor: (row) => `$${(row.amount / 100).toFixed(2)}`,
+      accessor: (row) => `$${row.amount.toFixed(2)}`,
       sortable: true,
     },
     {
@@ -136,12 +149,6 @@ export function PaymentReportsPage() {
       sortable: true,
       hideOnMobile: true,
     },
-    {
-      id: 'createdAt',
-      header: 'Date',
-      accessor: (row) => new Date(row.createdAt).toLocaleDateString(),
-      sortable: true,
-    },
   ];
 
   const handleFilterChange = (key: keyof PaymentReportFilters, value: string) => {
@@ -158,26 +165,29 @@ export function PaymentReportsPage() {
   const exportData = () => {
     // Convert payments data to CSV format
     const headers = [
-      'Payment ID',
+      'Name',
+      'Date/Time',
       'Amount',
       'Status',
       'Provider',
       'Reference ID',
-      'User ID',
-      'Registration ID',
-      'Date'
+      'Registration ID'
     ];
 
-    const csvData = payments.map(payment => [
-      payment.id,
-      `$${(payment.amount / 100).toFixed(2)}`,
-      payment.status,
-      payment.provider,
-      payment.providerRefId || 'N/A',
-      payment.userId,
-      payment.registrationId || 'N/A',
-      new Date(payment.createdAt).toLocaleDateString()
-    ]);
+    const csvData = payments.map(payment => {
+      const date = new Date(payment.createdAt);
+      const dateTime = `${date.toLocaleDateString()} ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+      
+      return [
+        payment.user ? `${payment.user.firstName} ${payment.user.lastName}` : 'Unknown',
+        dateTime,
+        `$${payment.amount.toFixed(2)}`,
+        payment.status,
+        payment.provider,
+        payment.providerRefId || 'N/A',
+        payment.registrationId || 'N/A'
+      ];
+    });
 
     // Create CSV content
     const csvContent = [
@@ -325,7 +335,7 @@ export function PaymentReportsPage() {
               <div className="flex items-center">
                 <div className="flex-shrink-0">
                   <div className="text-lg font-medium text-gray-900">
-                    ${(summaryStats.totalAmount / 100).toFixed(2)}
+                    ${summaryStats.totalAmount.toFixed(2)}
                   </div>
                 </div>
               </div>

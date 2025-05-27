@@ -47,7 +47,7 @@ const mockConsoleLog = vi.spyOn(console, 'log').mockImplementation(() => {});
 const mockPayments: Payment[] = [
   {
     id: 'payment1',
-    amount: 15000, // Amount in cents
+    amount: 150, // Corrected amount
     currency: 'USD',
     status: 'COMPLETED',
     provider: 'STRIPE',
@@ -56,10 +56,16 @@ const mockPayments: Payment[] = [
     updatedAt: '2024-01-15T10:00:00Z',
     userId: 'user1',
     registrationId: 'reg1',
+    user: {
+      id: 'user1',
+      firstName: 'John',
+      lastName: 'Doe',
+      email: 'john@example.com'
+    }
   },
   {
     id: 'payment2',
-    amount: 20000, // Amount in cents
+    amount: 200, // Corrected amount
     currency: 'USD',
     status: 'PENDING',
     provider: 'PAYPAL',
@@ -68,10 +74,16 @@ const mockPayments: Payment[] = [
     updatedAt: '2024-01-16T10:00:00Z',
     userId: 'user2',
     registrationId: 'reg2',
+    user: {
+      id: 'user2',
+      firstName: 'Jane',
+      lastName: 'Smith',
+      email: 'jane@example.com'
+    }
   },
   {
     id: 'payment3',
-    amount: 10000, // Amount in cents
+    amount: 100, // Corrected amount
     currency: 'USD',
     status: 'FAILED',
     provider: 'STRIPE',
@@ -80,12 +92,24 @@ const mockPayments: Payment[] = [
     updatedAt: '2024-01-17T10:00:00Z',
     userId: 'user3',
     registrationId: 'reg3',
+    user: {
+      id: 'user3',
+      firstName: 'Mike',
+      lastName: 'Johnson',
+      email: 'mike@example.com'
+    }
   },
   {
     id: 'payment4',
-    amount: 7500, // Amount in cents
+    amount: 75, // Corrected amount
     currency: 'USD',
     status: 'REFUNDED',
+    user: {
+      id: 'user4',
+      firstName: 'Sarah',
+      lastName: 'Williams',
+      email: 'sarah@example.com'
+    },
     provider: 'STRIPE',
     providerRefId: 'stripe_98765',
     createdAt: '2024-01-18T10:00:00Z',
@@ -484,13 +508,19 @@ describe('PaymentReportsPage', () => {
       const paymentsWithMissingFields: Payment[] = [
         {
           id: 'payment-minimal',
-          amount: 10000, // Amount in cents
+          amount: 100, // Corrected amount
           currency: 'USD',
           status: 'COMPLETED',
           provider: 'STRIPE',
           createdAt: '2024-01-15T10:00:00Z',
           updatedAt: '2024-01-15T10:00:00Z',
           userId: 'user1',
+          user: {
+            id: 'user1',
+            firstName: 'Test',
+            lastName: 'User',
+            email: 'test@example.com'
+          }
           // Missing optional fields: providerRefId, registrationId
         },
       ];
@@ -516,13 +546,19 @@ describe('PaymentReportsPage', () => {
       const paymentsWithDifferentCurrencies: Payment[] = [
         {
           id: 'payment-eur',
-          amount: 8550, // Amount in cents
+          amount: 85.50, // Corrected amount
           currency: 'EUR',
           status: 'COMPLETED',
           provider: 'STRIPE',
           createdAt: '2024-01-15T10:00:00Z',
           updatedAt: '2024-01-15T10:00:00Z',
           userId: 'user1',
+          user: {
+            id: 'user1',
+            firstName: 'Euro',
+            lastName: 'User',
+            email: 'euro@example.com'
+          }
         },
       ];
 
