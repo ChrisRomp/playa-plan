@@ -31,7 +31,7 @@
         "docker:build:versioned": "npm run docker:build:api:versioned && npm run docker:build:web:versioned",
         "docker:build:api:versioned": "docker build --build-arg IMAGE_VERSION=$(node -p \"require('./apps/api/package.json').version\") --build-arg BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ') --build-arg GIT_COMMIT=$(git rev-parse HEAD 2>/dev/null || echo 'unknown') -t playaplan-api:$(node -p \"require('./apps/api/package.json').version\") -t playaplan-api:latest -f apps/api/Dockerfile .",
         "docker:build:web:versioned": "docker build --build-arg IMAGE_VERSION=$(node -p \"require('./apps/web/package.json').version\") --build-arg BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ') --build-arg GIT_COMMIT=$(git rev-parse HEAD 2>/dev/null || echo 'unknown') -t playaplan-web:$(node -p \"require('./apps/web/package.json').version\") -t playaplan-web:latest -f apps/web/Dockerfile .",
-        "docker:run:api": "docker run --rm -p 3000:3000 --env-file .env playaplan-api",
+        "docker:run:api": "docker run -p 3000:3000 --env-file .env playaplan-api",
         "docker:run:web": "docker run -p 5173:5173 -e NODE_ENV=${NODE_ENV:-development} -e VITE_API_URL=${VITE_API_URL:-http://localhost:3000} playaplan-web",
         "docker:run:web:dev": "docker run -p 5173:5173 -e VITE_API_URL=${VITE_API_URL:-http://localhost:3000} playaplan-web:dev",
         "docker:run:web:prod": "docker run -p 5173:5173 -e VITE_API_URL=${VITE_API_URL:-http://localhost:3000} playaplan-web:prod"

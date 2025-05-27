@@ -1,0 +1,189 @@
+# API Dockerfile for local development
+# Pin to specific patch version for better reproducibility
+FROM node:22.12.0-alpine3.20
+
+# Add build arguments for dynamic versioning
+ARG IMAGE_VERSION=dev
+ARG BUILD_DATE
+ARG GIT_COMMIT
+
+# Add OCI labels with dynamic values
+LABEL org.opencontainers.image.title="PlayaPlan API"
+LABEL org.opencontainers.image.description="NestJS backend API for PlayaPlan camp registration system"
+LABEL org.opencontainers.image.source="https://github.com/ChrisRomp/playa-plan"
+LABEL org.opencontainers.image.authors="Chris Romp"
+LABEL org.opencontainers.image.licenses="MIT"
+LABEL org.opencontainers.image.version="${IMAGE_VERSION}"
+LABEL org.opencontainers.image.created="${BUILD_DATE}"
+LABEL org.opencontainers.image.revision="${GIT_COMMIT}"
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+COPY apps/api/package*.json ./apps/api/
+COPY libs/ ./libs/
+COPY tsconfig*.json ./
+
+# Install dependencies
+RUN npm install
+
+# Copy API source code
+COPY apps/api/ ./apps/api/
+
+# Copy shared libs if needed
+COPY libs/ ./libs/
+
+# Set working directory to API
+WORKDIR /app/apps/api
+
+# Generate Prisma client
+RUN npx prisma generate
+
+# Create entrypoint script
+COPY apps/api/docker-entrypoint.sh ./docker-entrypoint.sh
+RUN chmod +x ./docker-entrypoint.sh
+
+# Expose port
+EXPOSE 3000
+
+# Create a modified entrypoint for better Azure Container Apps compatibility
+RUN echo '#!/bin/sh\n\
+echo "Starting PlayaPlan API (Azure Container Apps)..."\n\
+\n\
+# Use PORT environment variable (Azure Container Apps sets this)\n\
+if [ -n "$PORT" ]; then\n\
+  echo "Using Azure Container Apps PORT: $PORT"\n\
+  export APP_PORT=$PORT\n\
+else\n\
+  export APP_PORT=3000\n\
+fi\n\
+\n\
+# Check DATABASE_URL configuration (without exposing sensitive info)\n\
+if [ -n "$DATABASE_URL" ]; then\n\
+  DB_HOST=$(echo "$DATABASE_URL" | sed -n '"'"'s/.*@\([^:]*\):.*/\1/p'"'"')\n\
+  DB_NAME=$(echo "$DATABASE_URL" | sed -n '"'"'s/.*\/\([^?\"]*\).*/\1/p'"'"')\n\
+  echo "DATABASE_URL configured - connecting to host: $DB_HOST, database: $DB_NAME"\n\
+  \n\
+  # Validate URL format\n\
+  if echo "$DATABASE_URL" | grep -q "^postgresql://\|^postgres://"; then\n\
+    echo "✓ DATABASE_URL format appears valid"\n\
+  else\n\
+    echo "✗ ERROR: DATABASE_URL does not start with postgresql:// or postgres://"\n\
+    echo "Current DATABASE_URL format: $(echo "$DATABASE_URL" | sed '"'"'s/:[^:@]*@/:***@/g'"'"')"\n\
+    exit 1\n\
+  fi\n\
+else\n\
+  echo "ERROR: DATABASE_URL environment variable is not set!"\n\
+  echo "Please provide a valid PostgreSQL connection string."\n\
+  echo "Example: DATABASE_URL=\"postgresql://user:password@host:5432/database\""\n\
+  exit 1\n\
+fi\n\
+\n\
+# Debug: Show environment variables (without passwords)\n\
+echo "Environment check:"\n\
+echo "  NODE_ENV: ${NODE_ENV:-not set}"\n\
+echo "  DATABASE_URL format: $(echo "$DATABASE_URL" | sed '"'"'s/:[^:@]*@/:***@/g'"'"')"\n\
+echo "  PORT: $APP_PORT"\n\
+\n\
+# Ensure we'"'"'re in the correct directory for Prisma\n\
+echo "Current working directory: $(pwd)"\n\
+echo "Looking for Prisma schema..."\n\
+if [ -f "prisma/schema.prisma" ]; then\n\
+  echo "✓ Found prisma/schema.prisma"\n\
+else\n\
+  echo "✗ prisma/schema.prisma not found, listing directory contents:"\n\
+  ls -la\n\
+  if [ -f "../prisma/schema.prisma" ]; then\n\
+    echo "Found schema in parent directory, changing to parent"\n\
+    cd ..\n\
+  else\n\
+    echo "ERROR: Cannot find prisma/schema.prisma"\n\
+    exit 1\n\
+  fi\n\
+fi\n\
+\n\
+# Extract port for connectivity testing\n\
+DB_PORT=$(echo "$DATABASE_URL" | sed -n '"'"'s/.*@[^:]*:\([^\/]*\)\/.*/\1/p'"'"')\n\
+\n\
+# Run database migrations if not skipped\n\
+if [ -z "$SKIP_MIGRATIONS" ] || [ "$SKIP_MIGRATIONS" != "true" ]; then\n\
+  echo "Running database migrations..."\n\
+  # Initialize database schema and connection\n\
+  echo "Initializing database connection and schema..."\n\
+  RETRY_COUNT=0\n\
+  MAX_RETRIES=30\n\
+  until npx prisma migrate deploy 2>/dev/null; do\n\
+    RETRY_COUNT=$((RETRY_COUNT + 1))\n\
+    echo "Database not ready (attempt $RETRY_COUNT/$MAX_RETRIES), waiting 2 seconds..."\n\
+    \n\
+    if [ $RETRY_COUNT -ge $MAX_RETRIES ]; then\n\
+      echo "ERROR: Failed to connect to database after $MAX_RETRIES attempts"\n\
+      echo "Connection details:"\n\
+      echo "  Host: $DB_HOST"\n\
+      echo "  Database: $DB_NAME"\n\
+      echo ""\n\
+      echo "Please verify:"\n\
+      echo "  - Database server is running and accessible"\n\
+      echo "  - Database '"'"'$DB_NAME'"'"' exists"\n\
+      echo "  - Credentials are correct"\n\
+      echo "  - Network connectivity (firewall, SSL settings)"\n\
+      echo "  - DATABASE_URL format: $(echo "$DATABASE_URL" | sed '"'"'s/:[^:@]*@/:***@/g'"'"')"\n\
+      echo ""\n\
+      echo "Last Prisma error:"\n\
+      npx prisma migrate deploy 2>&1\n\
+      exit 1\n\
+    fi\n\
+    \n\
+    sleep 2\n\
+  done\n\
+  \n\
+  echo "✓ Database connection established and schema migrated!"\n\
+  \n\
+  # Seed the database if needed (idempotent by default)\n\
+  echo "Checking if database needs seeding..."\n\
+  if [ "${FORCE_RESEED:-false}" = "true" ]; then\n\
+    echo "FORCE_RESEED=true detected, will perform forced re-seeding"\n\
+    if npm run seed:dev:force; then\n\
+      echo "Force database re-seeding completed!"\n\
+    else\n\
+      echo "WARNING: Force database re-seeding failed!"\n\
+      echo "Continuing with startup..."\n\
+    fi\n\
+  else\n\
+    echo "Running idempotent seed (will only seed if database is empty)..."\n\
+    if npm run seed:dev; then\n\
+      echo "Database seeding completed!"\n\
+    else\n\
+      echo "Database seeding failed or was skipped (data may already exist)."\n\
+      echo "Continuing with startup..."\n\
+    fi\n\
+  fi\n\
+  \n\
+  echo "Database initialization complete!"\n\
+fi\n\
+\n\
+# For production mode, ensure the application is built\n\
+if [ "${NODE_ENV}" = "production" ]; then\n\
+  echo "Production mode detected, ensuring application is built..."\n\
+  if [ ! -d "./dist" ] || [ -z "$(ls -A ./dist)" ]; then\n\
+    echo "Building application for production..."\n\
+    npm run build\n\
+  else\n\
+    echo "Application build detected, skipping build step."\n\
+  fi\n\
+  \n\
+  # Start the production server on the configured port\n\
+  echo "Starting in PRODUCTION mode on port $APP_PORT"\n\
+  exec npm run start:prod -- --port $APP_PORT\n\
+else\n\
+  # Start the development server on the configured port\n\
+  echo "Starting in DEVELOPMENT mode on port $APP_PORT"\n\
+  exec npm run dev -- --port $APP_PORT\n\
+fi' > /app/apps/api/azure-entrypoint.sh && chmod +x /app/apps/api/azure-entrypoint.sh
+
+# Expose port (will be overridden by PORT env var in Azure Container Apps)
+EXPOSE ${PORT:-3000}
+
+# Use the Azure-optimized entrypoint
+ENTRYPOINT ["/app/apps/api/azure-entrypoint.sh"]

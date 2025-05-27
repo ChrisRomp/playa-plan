@@ -1,0 +1,154 @@
+name: Azure Deployment
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'test'
+        type: choice
+        options:
+          - test
+          - prod
+
+permissions:
+  id-token: write
+  contents: read
+  packages: write
+
+# Define environment-specific variables
+env:
+  AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+  AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+  AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+  AZURE_ENV_NAME: ${{ vars.AZURE_ENV_NAME }}
+  AZURE_LOCATION: ${{ vars.AZURE_LOCATION }}
+  POSTGRES_ADMIN_USERNAME: ${{ secrets.POSTGRES_ADMIN_USERNAME }}
+  POSTGRES_ADMIN_PASSWORD: ${{ secrets.POSTGRES_ADMIN_PASSWORD }}
+  WEB_DOMAIN_NAME: ${{ vars.WEB_DOMAIN_NAME }}
+  API_DOMAIN_NAME: ${{ vars.API_DOMAIN_NAME }}
+  GITHUB_USERNAME: ${{ github.repository_owner }}
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    # Determine environment based on workflow dispatch input or default to 'test' for branch pushes
+    environment: ${{ github.event.inputs.environment || 'test' }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Build metadata
+        id: meta
+        run: |
+          echo "BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_ENV
+          echo "GIT_COMMIT=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+        
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Extract Docker metadata for API
+        id: meta-api
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/playaplan-api
+          tags: |
+            type=raw,value=latest
+            type=ref,event=branch
+            type=sha,format=short
+      
+      - name: Build and push API image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./apps/api/Dockerfile
+          push: true
+          tags: ${{ steps.meta-api.outputs.tags }}
+          labels: ${{ steps.meta-api.outputs.labels }}
+          build-args: |
+            IMAGE_VERSION=${{ github.ref_name }}-${{ github.run_id }}
+            BUILD_DATE=${{ env.BUILD_DATE }}
+            GIT_COMMIT=${{ env.GIT_COMMIT }}
+      
+      - name: Extract Docker metadata for Web
+        id: meta-web
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/playaplan-web
+          tags: |
+            type=raw,value=latest
+            type=ref,event=branch
+            type=sha,format=short
+      
+      - name: Build and push Web image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./apps/web/Dockerfile
+          push: true
+          tags: ${{ steps.meta-web.outputs.tags }}
+          labels: ${{ steps.meta-web.outputs.labels }}
+          target: production
+          build-args: |
+            IMAGE_VERSION=${{ github.ref_name }}-${{ github.run_id }}
+            BUILD_DATE=${{ env.BUILD_DATE }}
+            GIT_COMMIT=${{ env.GIT_COMMIT }}
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'test' }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Azure CLI
+        uses: azure/login@v2
+        with:
+          client-id: ${{ env.AZURE_CLIENT_ID }}
+          tenant-id: ${{ env.AZURE_TENANT_ID }}
+          subscription-id: ${{ env.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Install Azure Developer CLI
+        run: |
+          curl -fsSL https://aka.ms/install-azd.sh | bash
+
+      - name: Azure Developer CLI Deploy
+        run: |
+          azd auth login
+          azd env new ${{ env.AZURE_ENV_NAME }} --no-prompt || azd env select ${{ env.AZURE_ENV_NAME }}
+          
+          # Set environment variables
+          azd env set AZURE_LOCATION ${{ env.AZURE_LOCATION }}
+          azd env set POSTGRES_ADMIN_USERNAME ${{ env.POSTGRES_ADMIN_USERNAME }}
+          azd env set POSTGRES_ADMIN_PASSWORD ${{ env.POSTGRES_ADMIN_PASSWORD }}
+          azd env set WEB_DOMAIN_NAME ${{ env.WEB_DOMAIN_NAME }}
+          azd env set API_DOMAIN_NAME ${{ env.API_DOMAIN_NAME }}
+          azd env set GITHUB_USERNAME ${{ env.GITHUB_USERNAME }}
+          azd env set GITHUB_TOKEN ${{ secrets.GITHUB_TOKEN }}
+          
+          # We're using GitHub Container Registry instead of ACR
+          azd env set SKIP_CONTAINER_BUILD true
+          
+          # Deploy infrastructure only (containers are already pushed to GHCR)
+          azd provision --no-prompt
+
+      - name: Show deployment outputs
+        run: |
+          echo "API URL: $(azd env get-values | grep API_URI | cut -d '=' -f2)"
+          echo "API Generated URL: $(azd env get-values | grep API_GENERATED_URI | cut -d '=' -f2)"
+          echo "Web URL: $(azd env get-values | grep WEB_URI | cut -d '=' -f2)" 
+          echo "Web Generated URL: $(azd env get-values | grep WEB_GENERATED_URI | cut -d '=' -f2)"

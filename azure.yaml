@@ -1,0 +1,29 @@
+name: playaplan
+services:
+  api:
+    project: ./apps/api
+    language: typescript
+    host: containerapp
+    docker:
+      path: ./apps/api/Dockerfile
+      context: .
+      image: ghcr.io/${GITHUB_USERNAME}/playaplan-api:latest
+    bindings:
+      - port: 3000
+        targetPort: 3000
+        protocol: http
+        external: true
+  web:
+    project: ./apps/web
+    language: typescript
+    host: containerapp
+    docker:
+      path: ./apps/web/Dockerfile
+      context: .
+      target: production
+      image: ghcr.io/${GITHUB_USERNAME}/playaplan-web:latest
+    bindings:
+      - port: 80
+        targetPort: 5173
+        protocol: http
+        external: true

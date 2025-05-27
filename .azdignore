@@ -1,0 +1,46 @@
+# .azdignore
+# Ignore files and directories for Azure Developer CLI
+
+# Build outputs
+**/dist
+**/build
+**/.output
+**/node_modules
+**/.vite
+
+# Development and local environment
+**/.git
+**/.github
+**/.vscode
+**/.idea
+**/.DS_Store
+**/.env*
+**/.env.local
+
+# Test files
+**/*.test.js
+**/*.test.ts
+**/*.spec.js
+**/*.spec.ts
+**/coverage
+**/__tests__
+**/__mocks__
+
+# Documentation and config files
+**/*.md
+**/README*
+**/LICENSE*
+**/.gitignore
+**/.npmignore
+**/tsconfig.json
+
+# Temporary files
+**/*.log
+**/tmp
+**/temp
+
+# Specific for this project
+**/scripts
+http-test
+swagger
+**/*.sql
