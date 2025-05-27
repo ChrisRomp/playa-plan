@@ -17,7 +17,7 @@ interface PaymentButtonProps {
  * PaymentButton component
  * Handles payment processing with Stripe integration
  */
-const PaymentButton: React.FC<PaymentButtonProps> = ({
+const PaymentButton: React.FC<PaymentButtonProps> & { actualRegistrationId?: string } = ({
   amount,
   registrationId,
   description,
@@ -55,15 +55,23 @@ const PaymentButton: React.FC<PaymentButtonProps> = ({
 
     const paymentOptions: PaymentOptions = {
       amount,
-      registrationId,
+      // Use the actual registration ID if available (from onPaymentStart), otherwise use the prop
+      registrationId: PaymentButton.actualRegistrationId || registrationId,
       description,
     };
+    
+    // Log the registration ID being used for payment
+    console.log('Using registrationId for payment:', paymentOptions.registrationId);
 
     try {
       await processStripePayment(paymentOptions);
+      // Reset the static property after use
+      PaymentButton.actualRegistrationId = undefined;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Payment failed';
       onPaymentError?.(errorMessage);
+      // Also reset on error
+      PaymentButton.actualRegistrationId = undefined;
     }
   };
 

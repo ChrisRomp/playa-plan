@@ -1189,15 +1189,17 @@ export default function RegistrationPage() {
             
             <PaymentButton
               amount={totalCost}
-              registrationId={registrationId || undefined}
+              registrationId={registrationId === null ? undefined : registrationId}
               description={`${config?.name || 'Camp'} Dues Payment ${config?.currentYear || new Date().getFullYear()}`}
               onPaymentStart={async () => {
                 // Create registration if it doesn't exist yet
-                if (!registrationId) {
+                let actualRegistrationId: string | undefined = registrationId === null ? undefined : registrationId;
+                if (!actualRegistrationId) {
                   try {
                     const result = await submitRegistration(formData);
                     if (result?.jobRegistration?.id) {
-                      setRegistrationId(result.jobRegistration.id);
+                      actualRegistrationId = result.jobRegistration.id;
+                      setRegistrationId(result.jobRegistration.id); // Update state for future reference
                     }
                   } catch (err) {
                     console.error('Registration creation failed:', err);
@@ -1205,7 +1207,9 @@ export default function RegistrationPage() {
                     throw err; // Prevent payment from proceeding
                   }
                 }
-                console.log('Payment started with registrationId:', registrationId);
+                console.log('Payment started with registrationId:', actualRegistrationId);
+                // Override the registrationId prop with our actual value to ensure it's passed correctly
+                PaymentButton.actualRegistrationId = actualRegistrationId;
               }}
               onPaymentError={(error) => {
                 setFormErrors(prev => ({ ...prev, payment: error }));
