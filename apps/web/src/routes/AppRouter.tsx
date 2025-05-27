@@ -26,6 +26,7 @@ import { ReportsPage } from '../pages/ReportsPage.tsx';
 import { RegistrationReportsPage } from '../pages/RegistrationReportsPage.tsx';
 import { PaymentReportsPage } from '../pages/PaymentReportsPage.tsx';
 import { UserReportsPage } from '../pages/UserReportsPage.tsx';
+import { WorkScheduleReportPage } from '../pages/WorkScheduleReportPage.tsx';
 import { ROLES } from '../types/auth.ts';
 
 /**
@@ -60,6 +61,7 @@ const AppRouter: React.FC = () => {
         <Route path={ROUTES.REPORTS.path} element={<ReportsPage />} />
         <Route path={ROUTES.REPORTS_REGISTRATIONS.path} element={<RegistrationReportsPage />} />
         <Route path={ROUTES.REPORTS_USERS.path} element={<UserReportsPage />} />
+        <Route path={ROUTES.REPORTS_WORK_SCHEDULE.path} element={<WorkScheduleReportPage />} />
       </Route>
       
       {/* Admin-only reports */}

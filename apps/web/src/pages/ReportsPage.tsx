@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { FileText, Users, CreditCard } from 'lucide-react';
+import { FileText, Users, CreditCard, Calendar } from 'lucide-react';
 import { useAuth } from '../store/authUtils';
 import { PATHS } from '../routes';
 
@@ -17,6 +17,13 @@ export function ReportsPage() {
       icon: <FileText size={24} />,
       title: 'Registration Reports',
       description: 'View and analyze camp registrations',
+      allowedRoles: ['staff', 'admin'],
+    },
+    {
+      to: PATHS.REPORTS_WORK_SCHEDULE,
+      icon: <Calendar size={24} />,
+      title: 'Work Schedule Report',
+      description: 'View all shifts with assigned workers',
       allowedRoles: ['staff', 'admin'],
     },
     {

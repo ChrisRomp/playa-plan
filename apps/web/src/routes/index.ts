@@ -124,6 +124,12 @@ export const ROUTES = {
     requiresAuth: true,
     allowedRoles: [ROLES.STAFF, ROLES.ADMIN],
   },
+  REPORTS_WORK_SCHEDULE: {
+    path: '/reports/work-schedule',
+    name: 'Work Schedule Report',
+    requiresAuth: true,
+    allowedRoles: [ROLES.STAFF, ROLES.ADMIN],
+  },
   REPORTS_PAYMENTS: {
     path: '/reports/payments',
     name: 'Payment Reports',

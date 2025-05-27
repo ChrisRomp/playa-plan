@@ -1129,4 +1129,44 @@ export const reports = {
       throw error;
     }
   },
+
+  /**
+   * Get work schedule data organized by shifts, jobs, and user signups
+   * @returns A promise that resolves to work schedule data
+   */
+  getWorkSchedule: async (): Promise<{
+    shifts: Array<{
+      id: string;
+      name: string;
+      dayOfWeek: string;
+      startTime: string;
+      endTime: string;
+      jobs: Array<{
+        id: string;
+        name: string;
+        location: string;
+        maxRegistrations: number;
+        categoryId: string;
+        category: { id: string; name: string };
+        registrations: Array<{
+          id: string;
+          user: {
+            id: string;
+            firstName: string;
+            lastName: string;
+            playaName: string | null;
+          };
+        }>;
+      }>;
+    }>;
+  }> => {
+    try {
+      // Get shifts with their jobs and job registrations
+      const response = await api.get('/shifts/with-jobs-and-registrations');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching work schedule data:', error);
+      throw error;
+    }
+  },
 };
