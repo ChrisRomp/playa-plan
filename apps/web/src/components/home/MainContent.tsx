@@ -1,12 +1,11 @@
-import React from 'react';
-import { useAuth } from '../../store/AuthContext';
+import { useAuth } from '../../store/authUtils';
 import { useConfig } from '../../store/ConfigContext';
 import { useProfile } from '../../hooks/useProfile';
 import LoginFormReset from '../auth/LoginFormReset';
 import UserDashboard from './UserDashboard';
 import ProfilePage from '../profile/ProfilePage';
 
-const MainContent: React.FC = () => {
+const MainContent = () => {
   const { user } = useAuth();
   const { config, isLoading: configLoading } = useConfig();
   const { isProfileComplete, isLoading: profileLoading } = useProfile();
