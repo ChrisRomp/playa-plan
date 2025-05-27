@@ -36,7 +36,7 @@ export default () => ({
     methods: process.env.CORS_METHODS || 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     allowedHeaders: process.env.CORS_ALLOWED_HEADERS || 'Content-Type,Accept,Authorization',
     exposedHeaders: process.env.CORS_EXPOSED_HEADERS || '',
-    credentials: process.env.CORS_CREDENTIALS === 'true',
+    credentials: process.env.CORS_CREDENTIALS !== 'false', // Default to true unless explicitly set to false
     maxAge: parseInt(process.env.CORS_MAX_AGE || '3600', 10) || 3600,
   },
 
@@ -65,23 +65,9 @@ export default () => ({
     },
   },
 
-  // Payment providers
-  payment: {
-    stripe: {
-      secretKey: process.env.STRIPE_SECRET_KEY,
-      publicKey: process.env.STRIPE_PUBLIC_KEY,
-      webhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
-    },
-    paypal: {
-      clientId: process.env.PAYPAL_CLIENT_ID,
-      clientSecret: process.env.PAYPAL_CLIENT_SECRET,
-      mode: process.env.PAYPAL_MODE || 'sandbox',
-    },
-  },
+  // Payment providers are configured in the CoreConfig database table
+  // and managed through the admin interface, not through environment variables
 
-  // Default admin settings
-  defaults: {
-    adminEmail: process.env.DEFAULT_ADMIN_EMAIL || 'webadmin@example.playaplan.app',
-    adminPassword: process.env.DEFAULT_ADMIN_PASSWORD,
-  },
+  // No default admin settings needed - admin users are created through
+  // registration process or seeded in the database
 });
