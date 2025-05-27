@@ -43,6 +43,9 @@ FROM nginx:alpine AS runtime
 # Create a separate nginx configuration file
 COPY --from=build /app/apps/web/dist /usr/share/nginx/html
 
+# Copy runtime config template
+COPY --from=build /app/apps/web/public/runtime-config.js /usr/share/nginx/html/
+
 # Create nginx configuration
 RUN echo 'server { \
     listen 5173; \
@@ -66,9 +69,13 @@ RUN echo 'server { \
     } \
 }' > /etc/nginx/conf.d/default.conf
 
-# Create a custom entrypoint script - we need line breaks after each command
+# Create a custom entrypoint script with environment variable substitution
 RUN echo '#!/bin/sh' > /usr/local/bin/entrypoint.sh && \
-    echo 'echo "Starting nginx server with NODE_ENV=$NODE_ENV..."' >> /usr/local/bin/entrypoint.sh && \
+    echo 'API_URL=${API_URL:-http://localhost:3000}' >> /usr/local/bin/entrypoint.sh && \
+    echo 'echo "Configuring web app with API_URL=$API_URL"' >> /usr/local/bin/entrypoint.sh && \
+    echo 'envsubst < /usr/share/nginx/html/runtime-config.js > /usr/share/nginx/html/runtime-config.js.tmp' >> /usr/local/bin/entrypoint.sh && \
+    echo 'mv /usr/share/nginx/html/runtime-config.js.tmp /usr/share/nginx/html/runtime-config.js' >> /usr/local/bin/entrypoint.sh && \
+    echo 'echo "Starting nginx server..."' >> /usr/local/bin/entrypoint.sh && \
     echo 'nginx -g "daemon off;"' >> /usr/local/bin/entrypoint.sh && \
     chmod +x /usr/local/bin/entrypoint.sh
 

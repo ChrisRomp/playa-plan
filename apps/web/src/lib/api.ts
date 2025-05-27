@@ -14,7 +14,8 @@ declare module 'axios' {
   }
 }
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+// Prioritize runtime config over build-time env vars
+const API_URL = window.RUNTIME_CONFIG?.API_URL || import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 // API client instance
 export const api = axios.create({
