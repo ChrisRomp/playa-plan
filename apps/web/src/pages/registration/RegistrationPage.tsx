@@ -1207,9 +1207,8 @@ export default function RegistrationPage() {
                     throw err; // Prevent payment from proceeding
                   }
                 }
-                console.log('Payment started with registrationId:', actualRegistrationId);
-                // Override the registrationId prop with our actual value to ensure it's passed correctly
-                PaymentButton.actualRegistrationId = actualRegistrationId;
+                // Return the registrationId for PaymentButton to use
+                return { registrationId: actualRegistrationId };
               }}
               onPaymentError={(error) => {
                 setFormErrors(prev => ({ ...prev, payment: error }));

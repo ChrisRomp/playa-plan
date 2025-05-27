@@ -5,7 +5,7 @@ interface PaymentButtonProps {
   amount: number;
   registrationId?: string;
   description?: string;
-  onPaymentStart?: () => void | Promise<void>;
+  onPaymentStart?: () => void | Promise<void | { registrationId?: string }>;
   onPaymentError?: (error: string) => void;
   disabled?: boolean;
   className?: string;
@@ -16,7 +16,7 @@ interface PaymentButtonProps {
  * PaymentButton component
  * Handles payment processing with Stripe integration
  */
-const PaymentButton: React.FC<PaymentButtonProps> & { actualRegistrationId?: string } = ({
+const PaymentButton: React.FC<PaymentButtonProps> = ({
   amount,
   registrationId,
   description,
@@ -43,9 +43,15 @@ const PaymentButton: React.FC<PaymentButtonProps> & { actualRegistrationId?: str
 
     clearError();
     
+    let actualRegistrationId = registrationId;
+    
     try {
       // Call onPaymentStart and wait if it's async
-      await onPaymentStart?.();
+      const result = await onPaymentStart?.();
+      // If onPaymentStart returns an object with registrationId, use it
+      if (result && typeof result === 'object' && 'registrationId' in result) {
+        actualRegistrationId = result.registrationId || registrationId;
+      }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to prepare payment';
       onPaymentError?.(errorMessage);
@@ -54,20 +60,16 @@ const PaymentButton: React.FC<PaymentButtonProps> & { actualRegistrationId?: str
 
     const paymentOptions: PaymentOptions = {
       amount,
-      // Use the actual registration ID if available (from onPaymentStart), otherwise use the prop
-      registrationId: PaymentButton.actualRegistrationId || registrationId,
+      // Use the actual registration ID from onPaymentStart result, otherwise use the prop
+      registrationId: actualRegistrationId,
       description,
     };
     
     try {
       await processStripePayment(paymentOptions);
-      // Reset the static property after use
-      PaymentButton.actualRegistrationId = undefined;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Payment failed';
       onPaymentError?.(errorMessage);
-      // Also reset on error
-      PaymentButton.actualRegistrationId = undefined;
     }
   };
 
