@@ -198,8 +198,11 @@ export default function RegistrationPage() {
       .map(cat => cat.id);
 
     // Return jobs from always required categories
+    // Filter out staffOnly jobs for participants
     return jobs.filter(job => 
-      alwaysRequiredCategoryIds.includes(job.categoryId)
+      alwaysRequiredCategoryIds.includes(job.categoryId) &&
+      // Only show staffOnly jobs to staff and admin users
+      (!job.staffOnly || (user?.role && ['staff', 'admin'].includes(user.role)))
     );
   };
 
@@ -211,7 +214,9 @@ export default function RegistrationPage() {
       .map(cat => cat.id);
 
     return jobs.filter(job => 
-      !alwaysRequiredCategoryIds.includes(job.categoryId)
+      !alwaysRequiredCategoryIds.includes(job.categoryId) &&
+      // Only show staffOnly jobs to staff and admin users
+      (!job.staffOnly || (user?.role && ['staff', 'admin'].includes(user.role)))
     );
   };
 
@@ -263,7 +268,12 @@ export default function RegistrationPage() {
   const groupJobsByCategory = (jobList: Job[]): Record<string, { category: JobCategory; jobs: Job[] }> => {
     const grouped: Record<string, { category: JobCategory; jobs: Job[] }> = {};
     
-    jobList.forEach(job => {
+    // Filter jobs based on user role first
+    const filteredJobs = jobList.filter(job => 
+      !job.staffOnly || (user?.role && ['staff', 'admin'].includes(user.role))
+    );
+    
+    filteredJobs.forEach(job => {
       const category = jobCategories.find(cat => cat.id === job.categoryId);
       if (category) {
         if (!grouped[category.id]) {
