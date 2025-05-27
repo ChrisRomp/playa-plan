@@ -24,12 +24,6 @@ export class UpdatePaymentDto {
   @IsString()
   providerRefId?: string;
 
-  @ApiProperty({
-    description: 'Additional notes about the payment',
-    example: 'Payment was processed manually after system error',
-    required: false,
-  })
-  @IsOptional()
-  @IsString()
-  notes?: string;
+  // Note: 'notes' field has been removed as it's not present in the Prisma Payment model
+  // If notes functionality is needed, add the field to the Prisma schema first
 } 

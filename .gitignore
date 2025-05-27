@@ -26,10 +26,12 @@ Thumbs.db
 # VSCode settings (optional, if personal)
 #.vscode/
 
-# Prisma
+# Prisma - SQLite database files (if using SQLite)
 **/prisma/dev.db
 **/prisma/dev.db-journal
-**/prisma/migrations/
+
+# Note: prisma/migrations/ should be committed to source control
+# Only exclude if using shadow database or other temp files
 
 # Output from build or tooling
 coverage/

@@ -1,13 +1,14 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { PaymentsController } from './payments.controller';
 import { PaymentsService, StripeService, PaypalService } from '../services';
-import { PaymentStatus, PaymentProvider } from '@prisma/client';
+import { PaymentStatus, PaymentProvider, UserRole } from '@prisma/client';
 
 // Mock implementations
 const mockPaymentsService = {
   create: jest.fn(),
   findAll: jest.fn(),
   findOne: jest.fn(),
+  findOneWithOwnershipCheck: jest.fn(),
   update: jest.fn(),
   recordManualPayment: jest.fn(),
   initiateStripePayment: jest.fn(),
@@ -29,7 +30,6 @@ const mockPaypalService = {
 
 describe('PaymentsController', () => {
   let controller: PaymentsController;
-  let paymentsService: PaymentsService;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -42,7 +42,6 @@ describe('PaymentsController', () => {
     }).compile();
 
     controller = module.get<PaymentsController>(PaymentsController);
-    paymentsService = module.get<PaymentsService>(PaymentsService);
 
     // Reset all mocks before each test
     jest.clearAllMocks();
@@ -135,14 +134,21 @@ describe('PaymentsController', () => {
         status: PaymentStatus.COMPLETED,
       };
 
+      const mockRequest = {
+        user: { 
+          id: 'user-id', 
+          role: UserRole.ADMIN 
+        }
+      } as unknown as Parameters<typeof controller.findOne>[1];
+
       // Setup mocks
-      mockPaymentsService.findOne.mockResolvedValue(mockPayment);
+      mockPaymentsService.findOneWithOwnershipCheck.mockResolvedValue(mockPayment);
 
       // Execute
-      const result = await controller.findOne(paymentId);
+      const result = await controller.findOne(paymentId, mockRequest);
 
       // Assert
-      expect(mockPaymentsService.findOne).toHaveBeenCalledWith(paymentId);
+      expect(mockPaymentsService.findOneWithOwnershipCheck).toHaveBeenCalledWith(paymentId, 'user-id', UserRole.ADMIN);
       expect(result).toEqual(mockPayment);
     });
   });

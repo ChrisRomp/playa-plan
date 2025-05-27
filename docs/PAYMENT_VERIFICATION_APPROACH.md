@@ -38,12 +38,6 @@ The Playa Plan payment system now uses **session verification** instead of webho
 4. **Simpler Setup**: Only requires Stripe API keys, no webhook secrets
 5. **Better UX**: User sees real-time status instead of generic success page
 
-## Backwards Compatibility
-
-Webhook endpoints are still available for users who prefer that approach:
-- `POST /payments/webhook/stripe` - Stripe webhook handler (optional)
-- `POST /payments/webhook/paypal` - PayPal webhook handler (optional)
-
 ## API Endpoints
 
 ### Session Verification

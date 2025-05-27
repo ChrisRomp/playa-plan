@@ -1,4 +1,4 @@
-import React from 'react';
+import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { XCircleIcon } from 'lucide-react';
 import { handleStripeCancel } from '../../lib/stripe';
@@ -8,10 +8,10 @@ import { PATHS } from '../../routes';
  * PaymentCancelPage component
  * Displays when user cancels payment or payment fails
  */
-const PaymentCancelPage: React.FC = () => {
+const PaymentCancelPage = () => {
   const navigate = useNavigate();
 
-  React.useEffect(() => {
+  useEffect(() => {
     // Handle the payment cancellation
     handleStripeCancel();
   }, []);

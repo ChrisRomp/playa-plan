@@ -1,4 +1,3 @@
-import React from 'react';
 import { Routes, Route } from 'react-router-dom';
 import ProtectedRoute from './ProtectedRoute';
 import { ROUTES } from './index';
@@ -22,6 +21,11 @@ import RegistrationProtectedRoute from './RegistrationProtectedRoute.tsx';
 import PaymentSuccessPage from '../pages/payment/PaymentSuccessPage.tsx';
 import PaymentCancelPage from '../pages/payment/PaymentCancelPage.tsx';
 import NotFoundPage from '../pages/NotFoundPage.tsx';
+import { ReportsPage } from '../pages/ReportsPage.tsx';
+import { RegistrationReportsPage } from '../pages/RegistrationReportsPage.tsx';
+import { PaymentReportsPage } from '../pages/PaymentReportsPage.tsx';
+import { UserReportsPage } from '../pages/UserReportsPage.tsx';
+import { WorkScheduleReportPage } from '../pages/WorkScheduleReportPage.tsx';
 import { ROLES } from '../types/auth.ts';
 
 /**
@@ -49,6 +53,19 @@ const AppRouter: React.FC = () => {
       {/* Registration route with specialized protection */}
       <Route element={<RegistrationProtectedRoute />}>
         <Route path={ROUTES.REGISTRATION.path} element={<RegistrationPage />} />
+      </Route>
+      
+      {/* Reports routes for staff and admin */}
+      <Route element={<ProtectedRoute requiresAuth={true} allowedRoles={[ROLES.STAFF, ROLES.ADMIN]} />}>
+        <Route path={ROUTES.REPORTS.path} element={<ReportsPage />} />
+        <Route path={ROUTES.REPORTS_REGISTRATIONS.path} element={<RegistrationReportsPage />} />
+        <Route path={ROUTES.REPORTS_USERS.path} element={<UserReportsPage />} />
+        <Route path={ROUTES.REPORTS_WORK_SCHEDULE.path} element={<WorkScheduleReportPage />} />
+      </Route>
+      
+      {/* Admin-only reports */}
+      <Route element={<ProtectedRoute requiresAuth={true} allowedRoles={[ROLES.ADMIN]} />}>
+        <Route path={ROUTES.REPORTS_PAYMENTS.path} element={<PaymentReportsPage />} />
       </Route>
       
       {/* Protected routes that require specific roles */}

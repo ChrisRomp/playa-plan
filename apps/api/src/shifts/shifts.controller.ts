@@ -32,6 +32,74 @@ export class ShiftsController {
   async findAll() {
     return this.shiftsService.findAll();
   }
+  
+  @Get('with-jobs-and-registrations')
+  @Roles(UserRole.ADMIN, UserRole.STAFF)
+  @ApiOperation({ summary: 'Get all shifts with jobs and registrations' })
+  @ApiOkResponse({ description: 'Returns all shifts with jobs and user registrations.' })
+  async findAllWithJobsAndRegistrations() {
+    // Get all shifts with their associated jobs and job registrations
+    const shifts = await this.prisma.shift.findMany({
+      include: {
+        jobs: {
+          include: {
+            category: true,
+            registrations: {
+              include: {
+                registration: {
+                  include: {
+                    user: {
+                      select: {
+                        id: true,
+                        firstName: true,
+                        lastName: true,
+                        playaName: true,
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      orderBy: [
+        { dayOfWeek: 'asc' },
+        { startTime: 'asc' }
+      ]
+    });
+
+    // Transform the data to match the expected format in the frontend
+    return {
+      shifts: shifts.map(shift => ({
+        id: shift.id,
+        name: shift.name,
+        dayOfWeek: shift.dayOfWeek,
+        startTime: shift.startTime,
+        endTime: shift.endTime,
+        jobs: shift.jobs.map(job => ({
+          id: job.id,
+          name: job.name,
+          location: job.location,
+          maxRegistrations: job.maxRegistrations,
+          categoryId: job.categoryId,
+          category: {
+            id: job.category.id,
+            name: job.category.name
+          },
+          registrations: job.registrations.map(regJob => ({
+            id: regJob.id,
+            user: {
+              id: regJob.registration.user.id,
+              firstName: regJob.registration.user.firstName,
+              lastName: regJob.registration.user.lastName,
+              playaName: regJob.registration.user.playaName
+            }
+          }))
+        }))
+      }))
+    };
+  }
 
   @Get(':id')
   @ApiOperation({ summary: 'Get a shift by id' })
@@ -55,4 +123,4 @@ export class ShiftsController {
   async remove(@Param('id') id: string) {
     return this.shiftsService.remove(id);
   }
-} 
+}

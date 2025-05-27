@@ -1,4 +1,3 @@
-import React from 'react';
 import { CreditCardIcon, Loader2Icon } from 'lucide-react';
 import { usePayment, PaymentOptions } from '../../hooks/usePayment';
 
@@ -6,7 +5,7 @@ interface PaymentButtonProps {
   amount: number;
   registrationId?: string;
   description?: string;
-  onPaymentStart?: () => void | Promise<void>;
+  onPaymentStart?: () => void | Promise<void | { registrationId?: string }>;
   onPaymentError?: (error: string) => void;
   disabled?: boolean;
   className?: string;
@@ -44,9 +43,15 @@ const PaymentButton: React.FC<PaymentButtonProps> = ({
 
     clearError();
     
+    let actualRegistrationId = registrationId;
+    
     try {
       // Call onPaymentStart and wait if it's async
-      await onPaymentStart?.();
+      const result = await onPaymentStart?.();
+      // If onPaymentStart returns an object with registrationId, use it
+      if (result && typeof result === 'object' && 'registrationId' in result) {
+        actualRegistrationId = result.registrationId || registrationId;
+      }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to prepare payment';
       onPaymentError?.(errorMessage);
@@ -55,10 +60,14 @@ const PaymentButton: React.FC<PaymentButtonProps> = ({
 
     const paymentOptions: PaymentOptions = {
       amount,
-      registrationId,
+      // CRITICAL: registrationId is essential for associating Stripe payment with camp registration
+      // This ID is sent to the backend /payments/stripe endpoint and stored in the Stripe session metadata
+      // When payment succeeds, the backend uses this ID to update the registration payment status
+      // Without this ID, we cannot link completed payments back to registrations!
+      registrationId: actualRegistrationId,
       description,
     };
-
+    
     try {
       await processStripePayment(paymentOptions);
     } catch (err) {

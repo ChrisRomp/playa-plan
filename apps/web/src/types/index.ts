@@ -139,6 +139,12 @@ export interface Payment {
   updatedAt: string;
   userId: string;
   registrationId?: string;
+  user?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+  };
 }
 
 // Stripe Payment Types

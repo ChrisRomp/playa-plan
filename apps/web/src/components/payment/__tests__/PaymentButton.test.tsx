@@ -340,4 +340,174 @@ describe('PaymentButton', () => {
 
     expect(mockProcessStripePayment).not.toHaveBeenCalled();
   });
+
+  // CRITICAL: Test coverage for registration ID scenarios
+  describe('Registration ID Handling (CRITICAL for payment-registration association)', () => {
+    it('should use registrationId prop when provided', async () => {
+      const mockProcessStripePayment = vi.fn().mockResolvedValue(undefined);
+      vi.mocked(usePayment).mockReturnValue({
+        ...mockUsePayment,
+        processStripePayment: mockProcessStripePayment,
+      });
+
+      render(
+        <PaymentButton 
+          amount={100} 
+          registrationId="reg-prop-123"
+        />
+      );
+
+      const button = screen.getByRole('button');
+      fireEvent.click(button);
+
+      await waitFor(() => {
+        expect(mockProcessStripePayment).toHaveBeenCalledWith({
+          amount: 100,
+          registrationId: 'reg-prop-123',
+          description: undefined,
+        });
+      });
+    });
+
+    it('should use registrationId from onPaymentStart return value when provided', async () => {
+      const mockProcessStripePayment = vi.fn().mockResolvedValue(undefined);
+      const onPaymentStart = vi.fn().mockResolvedValue({ registrationId: 'reg-from-callback-456' });
+
+      vi.mocked(usePayment).mockReturnValue({
+        ...mockUsePayment,
+        processStripePayment: mockProcessStripePayment,
+      });
+
+      render(
+        <PaymentButton 
+          amount={100} 
+          registrationId="reg-prop-123"
+          onPaymentStart={onPaymentStart}
+        />
+      );
+
+      const button = screen.getByRole('button');
+      fireEvent.click(button);
+
+      await waitFor(() => {
+        expect(onPaymentStart).toHaveBeenCalled();
+        expect(mockProcessStripePayment).toHaveBeenCalledWith({
+          amount: 100,
+          registrationId: 'reg-from-callback-456', // Should use callback value, not prop
+          description: undefined,
+        });
+      });
+    });
+
+    it('should fallback to prop registrationId when onPaymentStart returns undefined registrationId', async () => {
+      const mockProcessStripePayment = vi.fn().mockResolvedValue(undefined);
+      const onPaymentStart = vi.fn().mockResolvedValue({ registrationId: undefined });
+
+      vi.mocked(usePayment).mockReturnValue({
+        ...mockUsePayment,
+        processStripePayment: mockProcessStripePayment,
+      });
+
+      render(
+        <PaymentButton 
+          amount={100} 
+          registrationId="reg-prop-fallback"
+          onPaymentStart={onPaymentStart}
+        />
+      );
+
+      const button = screen.getByRole('button');
+      fireEvent.click(button);
+
+      await waitFor(() => {
+        expect(mockProcessStripePayment).toHaveBeenCalledWith({
+          amount: 100,
+          registrationId: 'reg-prop-fallback', // Should fallback to prop value
+          description: undefined,
+        });
+      });
+    });
+
+    it('should handle onPaymentStart returning void without breaking registrationId', async () => {
+      const mockProcessStripePayment = vi.fn().mockResolvedValue(undefined);
+      const onPaymentStart = vi.fn().mockResolvedValue(undefined);
+
+      vi.mocked(usePayment).mockReturnValue({
+        ...mockUsePayment,
+        processStripePayment: mockProcessStripePayment,
+      });
+
+      render(
+        <PaymentButton 
+          amount={100} 
+          registrationId="reg-prop-void-test"
+          onPaymentStart={onPaymentStart}
+        />
+      );
+
+      const button = screen.getByRole('button');
+      fireEvent.click(button);
+
+      await waitFor(() => {
+        expect(mockProcessStripePayment).toHaveBeenCalledWith({
+          amount: 100,
+          registrationId: 'reg-prop-void-test', // Should still use prop value
+          description: undefined,
+        });
+      });
+    });
+
+    it('should handle missing registrationId gracefully (but this is a critical issue)', async () => {
+      const mockProcessStripePayment = vi.fn().mockResolvedValue(undefined);
+      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      vi.mocked(usePayment).mockReturnValue({
+        ...mockUsePayment,
+        processStripePayment: mockProcessStripePayment,
+      });
+
+      render(<PaymentButton amount={100} />);
+
+      const button = screen.getByRole('button');
+      fireEvent.click(button);
+
+      await waitFor(() => {
+        expect(mockProcessStripePayment).toHaveBeenCalledWith({
+          amount: 100,
+          registrationId: undefined, // This would be a critical issue in production
+          description: undefined,
+        });
+      });
+
+      consoleSpy.mockRestore();
+    });
+
+    it('should not proceed with payment if onPaymentStart throws error', async () => {
+      const mockProcessStripePayment = vi.fn();
+      const onPaymentStart = vi.fn().mockRejectedValue(new Error('Registration creation failed'));
+      const onPaymentError = vi.fn();
+
+      vi.mocked(usePayment).mockReturnValue({
+        ...mockUsePayment,
+        processStripePayment: mockProcessStripePayment,
+      });
+
+      render(
+        <PaymentButton 
+          amount={100} 
+          onPaymentStart={onPaymentStart}
+          onPaymentError={onPaymentError}
+        />
+      );
+
+      const button = screen.getByRole('button');
+      fireEvent.click(button);
+
+      await waitFor(() => {
+        expect(onPaymentStart).toHaveBeenCalled();
+        expect(onPaymentError).toHaveBeenCalledWith('Registration creation failed');
+        expect(mockProcessStripePayment).not.toHaveBeenCalled(); // Should not proceed to payment
+      });
+    });
+  });
 }); 

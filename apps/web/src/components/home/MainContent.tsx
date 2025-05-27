@@ -1,5 +1,4 @@
-import React from 'react';
-import { useAuth } from '../../store/AuthContext';
+import { useAuth } from '../../store/authUtils';
 import { useConfig } from '../../store/ConfigContext';
 import { useProfile } from '../../hooks/useProfile';
 import LoginFormReset from '../auth/LoginFormReset';

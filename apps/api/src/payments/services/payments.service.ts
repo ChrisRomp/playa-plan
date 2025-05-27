@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { CreatePaymentDto, UpdatePaymentDto, CreateRefundDto, RecordManualPaymentDto, CreateStripePaymentDto, CreatePaypalPaymentDto } from '../dto';
-import { Payment, PaymentProvider, PaymentStatus, Registration } from '@prisma/client';
+import { Payment, PaymentProvider, PaymentStatus, Registration, UserRole } from '@prisma/client';
 import { StripeService } from './stripe.service';
 import { PaypalService } from './paypal.service';
 
@@ -175,6 +175,41 @@ export class PaymentsService {
   }
 
   /**
+   * Find one payment by ID with ownership check
+   * @param id - Payment ID
+   * @param userId - Current user ID
+   * @param userRole - Current user role
+   * @returns The payment, if found and user has access
+   */
+  async findOneWithOwnershipCheck(id: string, userId: string, userRole: UserRole): Promise<PaymentWithRelations> {
+    const payment = await this.prisma.payment.findUnique({
+      where: { id },
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+        },
+        registration: true,
+      },
+    });
+    
+    if (!payment) {
+      throw new NotFoundException(`Payment with ID ${id} not found`);
+    }
+    
+    // Check ownership - only admins/staff can view any payment, others can only view their own
+    if (userRole !== UserRole.ADMIN && userRole !== UserRole.STAFF && payment.userId !== userId) {
+      throw new NotFoundException(`Payment with ID ${id} not found`); // Don't reveal that payment exists
+    }
+    
+    return payment;
+  }
+
+  /**
    * Update a payment
    * @param id - Payment ID
    * @param updatePaymentDto - Data to update
@@ -274,10 +309,10 @@ export class PaymentsService {
       status: data.status || PaymentStatus.COMPLETED,
     };
     
-    // Only add notes if there's a reference
-    if (data.reference) {
-      updateDto.notes = data.reference;
-    }
+    // Note: Previous code stored a reference as notes, but notes field is not present in schema
+    // if (data.reference) {
+    //   updateDto.notes = data.reference;
+    // }
     
     return this.update(payment.id, updateDto);
   }
@@ -429,7 +464,7 @@ export class PaymentsService {
       // Update payment status
       await this.update(payment.id, {
         status: PaymentStatus.REFUNDED,
-        notes: `Refunded ${refundAmount} ${payment.currency}. Reason: ${data.reason || 'No reason provided'}`,
+        // notes field removed as it's not in the Prisma schema
       });
       
       // If there's a registration, update its status
@@ -488,25 +523,69 @@ export class PaymentsService {
       let updatedPaymentStatus = payment.status;
       let updatedRegistrationStatus = payment.registration?.status;
       
-      if (stripeSession.payment_status === 'paid' && payment.status !== PaymentStatus.COMPLETED) {
-        // Payment was successful, update our records
-        this.logger.log(`Updating payment ${payment.id} status to COMPLETED based on Stripe session verification`);
-        
-        await this.update(payment.id, {
-          status: PaymentStatus.COMPLETED,
-        });
-        
+      if (stripeSession.payment_status === 'paid') {
+        // Payment was successful - mark payment and registration as complete
         updatedPaymentStatus = PaymentStatus.COMPLETED;
         
-        // If there's a registration, update its status to confirmed
         if (payment.registration) {
-          this.logger.log(`Updating registration ${payment.registration.id} status to CONFIRMED`);
-          await this.prisma.registration.update({
-            where: { id: payment.registration.id },
-            data: { status: 'CONFIRMED' },
-          });
           updatedRegistrationStatus = 'CONFIRMED';
-          this.logger.log(`Successfully updated registration ${payment.registration.id} status to CONFIRMED`);
+
+          // If either the payment or registration status needs updating
+          if (payment.status !== PaymentStatus.COMPLETED || payment.registration.status !== 'CONFIRMED') {
+            try {
+              this.logger.log(`Updating payment ${payment.id} to COMPLETED and registration ${payment.registration.id} to CONFIRMED`);
+              
+              try {
+                // Use transaction to ensure atomicity between payment and registration updates
+                const transactionResults = await this.prisma.$transaction([
+                  this.prisma.payment.update({
+                    where: { id: payment.id },
+                    data: { status: PaymentStatus.COMPLETED },
+                  }),
+                  this.prisma.registration.update({
+                    where: { id: payment.registration.id },
+                    data: { status: 'CONFIRMED' },
+                  }),
+                ]);
+                
+                this.logger.log(`Successfully updated payment and registration statuses`);
+                this.logger.debug(`Transaction results: ${JSON.stringify({
+                  payment: transactionResults[0].id,
+                  registration: transactionResults[1].id
+                })}`);
+              } catch (transactionError) {
+                // If the transaction fails, at least try to update the payment status
+                // This ensures we record the successful Stripe payment even if registration update fails
+                this.logger.warn(`Transaction failed, falling back to payment-only update: ${transactionError instanceof Error ? transactionError.message : 'Unknown error'}`);
+                
+                if (payment.status !== PaymentStatus.COMPLETED) {
+                  await this.prisma.payment.update({
+                    where: { id: payment.id },
+                    data: { 
+                      status: PaymentStatus.COMPLETED
+                    },
+                  });
+                  this.logger.log(`Updated payment ${payment.id} to COMPLETED (registration update failed: ${transactionError instanceof Error ? transactionError.message : 'Unknown error'})`);
+                }
+              }
+            } catch (error) {
+              const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+              this.logger.error(`Failed to update statuses: ${errorMessage}`, error instanceof Error ? error.stack : undefined);
+              throw new BadRequestException(`Failed to update payment or registration status: ${errorMessage}`);
+            }
+          } else {
+            this.logger.log(`Both payment and registration already have correct statuses, no update needed`);
+          }
+        } else {
+          // No registration linked, just update the payment if needed
+          if (payment.status !== PaymentStatus.COMPLETED) {
+            await this.update(payment.id, {
+              status: PaymentStatus.COMPLETED,
+            });
+            this.logger.log(`Updated payment ${payment.id} to COMPLETED (no registration)`);
+          } else {
+            this.logger.log(`Payment ${payment.id} already marked as COMPLETED (no registration)`);
+          }
         }
       } else if (stripeSession.payment_status === 'unpaid' && payment.status === PaymentStatus.PENDING) {
         // Payment is still pending or failed
@@ -515,7 +594,7 @@ export class PaymentsService {
           
           await this.update(payment.id, {
             status: PaymentStatus.FAILED,
-            notes: 'Checkout session expired',
+            // notes field removed as it's not in the Prisma schema
           });
           
           updatedPaymentStatus = PaymentStatus.FAILED;
@@ -538,4 +617,4 @@ export class PaymentsService {
       throw new BadRequestException('Failed to verify Stripe session');
     }
   }
-} 
+}

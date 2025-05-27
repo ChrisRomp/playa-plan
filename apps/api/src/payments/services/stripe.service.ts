@@ -99,7 +99,7 @@ export class StripeService {
    */
   async createCheckoutSession(paymentData: CreateStripePaymentDto): Promise<Stripe.Checkout.Session> {
     try {
-      this.logger.log(`Creating checkout session for user ${paymentData.userId} for amount ${paymentData.amount}`);
+      this.logger.log(`Creating checkout session for user ${paymentData.userId} for amount ${paymentData.amount}, registrationId: ${paymentData.registrationId || 'none'}`);
       
       const stripe = await this.getStripe();
       
@@ -134,7 +134,10 @@ export class StripeService {
 
       const session = await stripe.checkout.sessions.create(sessionParams);
       
-      this.logger.log(`Created checkout session ${session.id}`);
+      this.logger.log(`Created checkout session ${session.id} with metadata:`, {
+        userId: sessionParams.metadata?.userId,
+        registrationId: sessionParams.metadata?.registrationId
+      });
       return session;
     } catch (error: unknown) {
       const sanitizedMessage = this.sanitizeErrorMessage(error);

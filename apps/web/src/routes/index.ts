@@ -106,6 +106,36 @@ export const ROUTES = {
     name: 'Shifts',
     requiresAuth: true,
   },
+  REPORTS: {
+    path: '/reports',
+    name: 'Reports',
+    requiresAuth: true,
+    allowedRoles: [ROLES.STAFF, ROLES.ADMIN],
+  },
+  REPORTS_REGISTRATIONS: {
+    path: '/reports/registrations',
+    name: 'Registration Reports',
+    requiresAuth: true,
+    allowedRoles: [ROLES.STAFF, ROLES.ADMIN],
+  },
+  REPORTS_USERS: {
+    path: '/reports/users',
+    name: 'User Reports',
+    requiresAuth: true,
+    allowedRoles: [ROLES.STAFF, ROLES.ADMIN],
+  },
+  REPORTS_WORK_SCHEDULE: {
+    path: '/reports/work-schedule',
+    name: 'Work Schedule Report',
+    requiresAuth: true,
+    allowedRoles: [ROLES.STAFF, ROLES.ADMIN],
+  },
+  REPORTS_PAYMENTS: {
+    path: '/reports/payments',
+    name: 'Payment Reports',
+    requiresAuth: true,
+    allowedRoles: [ROLES.ADMIN],
+  },
   NOT_FOUND: {
     path: '*',
     name: 'Not Found',
