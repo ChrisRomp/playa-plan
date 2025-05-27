@@ -71,25 +71,13 @@ export function RegistrationReportsPage() {
       sortable: true,
     },
     {
-      id: 'job',
-      header: 'Jobs',
+      id: 'shift',
+      header: 'Shift',
       accessor: (row) => {
-        if (row.jobs.length === 0) return 'No jobs assigned';
-        if (row.jobs.length === 1) return row.jobs[0].job.name;
-        return `${row.jobs.length} jobs assigned`;
+        if (row.jobs.length === 0) return 'No shifts assigned';
+        return row.jobs.map(j => j.job.name).join(', ');
       },
       sortable: true,
-    },
-    {
-      id: 'jobCategory',
-      header: 'Category',
-      accessor: (row) => {
-        if (row.jobs.length === 0) return 'N/A';
-        const categories = [...new Set(row.jobs.map(j => j.job.category?.name).filter(Boolean))];
-        return categories.join(', ') || 'N/A';
-      },
-      sortable: true,
-      hideOnMobile: true,
     },
     {
       id: 'status',
@@ -134,8 +122,7 @@ export function RegistrationReportsPage() {
     const headers = [
       'User Name',
       'Email',
-      'Jobs',
-      'Job Categories',
+      'Shift',
       'Status',
       'Year',
       'Registered Date'
@@ -145,7 +132,6 @@ export function RegistrationReportsPage() {
       registration.user ? `${registration.user.firstName} ${registration.user.lastName}` : 'Unknown User',
       registration.user?.email || '',
       registration.jobs.map(rj => rj.job.name).join('; ') || '',
-      registration.jobs.map(rj => rj.job.category?.name || '').filter(Boolean).join('; ') || '',
       registration.status,
       registration.year.toString(),
       new Date(registration.createdAt).toLocaleDateString()
