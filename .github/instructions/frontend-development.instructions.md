@@ -21,3 +21,4 @@ Keeping simplicity in mind, we'll use:
 - Use [frontend-tasks.md](../../docs/frontend-tasks.md) to track work, checking off items as we progress.
 - Unit test modules before completing the tasks
 - Create git commits after each task; do not push; Do not bypass signing commits
+- Don't use `import React from 'react';` in new files; it's not needed with React 17+ and Vite

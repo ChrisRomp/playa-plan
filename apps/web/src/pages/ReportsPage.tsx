@@ -1,4 +1,3 @@
-import React from 'react';
 import { Link } from 'react-router-dom';
 import { FileText, Users, CreditCard, Calendar } from 'lucide-react';
 import { useAuth } from '../store/authUtils';

@@ -90,6 +90,7 @@ Repository: https://github.com/ChrisRomp/playa-plan
 - Frontend: React with TypeScript and Tailwind CSS
   - Source in `apps/web`
   - Refer to [frontend-development](./instructions/frontend-development.instructions.md)
+  - Don't use `import React from 'react';` in files, as it is not needed with React 17+ and TypeScript.
 - Backend API: NestJS with TypeScript
   - Source in `apps/api`
   - Refer to [api-nestjs-development](./instructions/api-nestjs-development.instructions.md)
