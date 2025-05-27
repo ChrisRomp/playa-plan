@@ -1,6 +1,6 @@
 import React, { useState, useEffect, ReactNode } from 'react';
 import { User } from '../types';
-import { auth, clearJwtToken } from '../lib/api';
+import { auth, clearJwtToken, JWT_TOKEN_STORAGE_KEY } from '../lib/api';
 import cookieService from '../lib/cookieService';
 import { AuthContext, mapApiRoleToClientRole } from './authUtils';
 
@@ -31,9 +31,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setIsLoading(true);
       
       try {
-        // Check if the JWT token exists in localStorage
-        // This is done via the API client's initializeAuthFromStorage function
-        // which is called when the module loads, but we can explicitly check here
+        // Check if the JWT token exists in localStorage directly first
+        const hasTokenInStorage = localStorage.getItem(JWT_TOKEN_STORAGE_KEY) !== null;
+        
+        // Set the auth cookie if token exists but cookie doesn't
+        if (hasTokenInStorage && !cookieService.isAuthenticated()) {
+          console.log('Found JWT token but no auth cookie - restoring cookie state');
+          await cookieService.setAuthenticatedState();
+        }
+        
+        // Check authentication with the API
         const isAuthValid = await auth.checkAuth();
         setIsAuthenticated(isAuthValid);
         

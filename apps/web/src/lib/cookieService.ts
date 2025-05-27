@@ -15,7 +15,8 @@ const DEFAULT_COOKIE_OPTIONS = {
   // It can only be set by the server in HTTP responses
   // Only sent over HTTPS (except in development)
   secure: process.env.NODE_ENV === 'production',
-  // Reasonable CSRF protection while allowing redirects
+  // Use lax setting to allow cookies on cross-domain requests
+  // This is important when API and frontend are on different domains/ports
   sameSite: 'lax' as const,
   // Domain scoped to application domain
   domain: window.location.hostname === 'localhost' ? 'localhost' : window.location.hostname,
@@ -127,7 +128,13 @@ export function deleteCookie(name: string, options: CookieOptions = {}): void {
 export const setAuthenticatedState = async (): Promise<void> => {
   // We use a regular cookie to track auth state on the client
   // This is safe because it contains no sensitive information
-  setCookie(AUTH_STATUS_COOKIE, 'authenticated');
+  // Set it to expire in 30 days (similar to typical JWT expiration)
+  const thirtyDaysInSeconds = 30 * 24 * 60 * 60;
+  setCookie(AUTH_STATUS_COOKIE, 'authenticated', {
+    maxAge: thirtyDaysInSeconds,
+    // Make sure it's accessible in the root path
+    path: '/',
+  });
 };
 
 /**

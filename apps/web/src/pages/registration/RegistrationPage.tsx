@@ -9,6 +9,7 @@ import { AuthContext } from '../../store/authUtils';
 import { JobCategory, Job, CampingOptionField } from '../../lib/api';
 import { getFriendlyDayName, formatTime } from '../../utils/shiftUtils';
 import { canUserRegister, getRegistrationStatusMessage } from '../../utils/registrationUtils';
+import { isStaffOrAdmin } from '../../utils/userUtils';
 import { PATHS } from '../../routes';
 import PaymentButton from '../../components/payment/PaymentButton';
 
@@ -198,8 +199,11 @@ export default function RegistrationPage() {
       .map(cat => cat.id);
 
     // Return jobs from always required categories
+    // Filter out staffOnly jobs for participants
     return jobs.filter(job => 
-      alwaysRequiredCategoryIds.includes(job.categoryId)
+      alwaysRequiredCategoryIds.includes(job.categoryId) &&
+      // Only show staffOnly jobs to staff and admin users
+      (!job.staffOnly || isStaffOrAdmin(user))
     );
   };
 
@@ -211,7 +215,9 @@ export default function RegistrationPage() {
       .map(cat => cat.id);
 
     return jobs.filter(job => 
-      !alwaysRequiredCategoryIds.includes(job.categoryId)
+      !alwaysRequiredCategoryIds.includes(job.categoryId) &&
+      // Only show staffOnly jobs to staff and admin users
+      (!job.staffOnly || isStaffOrAdmin(user))
     );
   };
 
@@ -263,7 +269,12 @@ export default function RegistrationPage() {
   const groupJobsByCategory = (jobList: Job[]): Record<string, { category: JobCategory; jobs: Job[] }> => {
     const grouped: Record<string, { category: JobCategory; jobs: Job[] }> = {};
     
-    jobList.forEach(job => {
+    // Filter jobs based on user role first
+    const filteredJobs = jobList.filter(job => 
+      !job.staffOnly || isStaffOrAdmin(user)
+    );
+    
+    filteredJobs.forEach(job => {
       const category = jobCategories.find(cat => cat.id === job.categoryId);
       if (category) {
         if (!grouped[category.id]) {
