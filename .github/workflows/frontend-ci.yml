@@ -26,6 +26,7 @@ on:
 
 jobs:
   build-and-test:
+    name: Build and Test Web Frontend
     runs-on: ubuntu-latest
 
     strategy:
@@ -54,6 +55,7 @@ jobs:
       run: npm run test
       
   build-and-publish-container:
+    name: Build and Publish Web Docker Image
     needs: build-and-test
     runs-on: ubuntu-latest
     
@@ -114,7 +116,10 @@ jobs:
     - name: Build and push Web Docker image
       uses: docker/build-push-action@v6
       with:
-        context: ./apps/web
+        # Use repository root as context to have access to all files
+        context: .
+        # Specify the Dockerfile location relative to the context
+        file: ./apps/web/Dockerfile
         # Only push to registry on main branch or version tags
         push: ${{ github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')) }}
         platforms: linux/amd64,linux/arm64

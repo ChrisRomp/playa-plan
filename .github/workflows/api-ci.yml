@@ -26,6 +26,7 @@ on:
 
 jobs:
   build-and-test:
+    name: Build and Test API
     runs-on: ubuntu-latest
 
     strategy:
@@ -83,6 +84,7 @@ jobs:
         JWT_EXPIRES_IN: 7d
 
   build-and-publish-container:
+    name: Build and Publish API Container
     needs: build-and-test
     runs-on: ubuntu-latest
     
@@ -143,7 +145,10 @@ jobs:
     - name: Build and push API Docker image
       uses: docker/build-push-action@v6
       with:
-        context: ./apps/api
+        # Use repository root as context to have access to all files
+        context: .
+        # Specify the Dockerfile location relative to the context
+        file: ./apps/api/Dockerfile
         # Only push to registry on main branch or version tags
         push: ${{ github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')) }}
         platforms: linux/amd64,linux/arm64
