@@ -37,42 +37,40 @@ WORKDIR /app/apps/web
 FROM base AS build
 RUN npm run build
 
-# Development stage - for development mode
-FROM base AS development
-EXPOSE 5173
-CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
+# Runtime stage - serves built files using nginx
+FROM nginx:alpine AS runtime
 
-# Production stage - serves built files
-FROM node:22.12.0-alpine3.20 AS production
+# Create a separate nginx configuration file
+COPY --from=build /app/apps/web/dist /usr/share/nginx/html
 
-WORKDIR /app/apps/web
+# Create nginx configuration
+RUN echo 'server { \
+    listen 5173; \
+    server_name localhost; \
+    gzip on; \
+    gzip_types text/css application/javascript application/json image/svg+xml; \
+    gzip_comp_level 9; \
+    \
+    root /usr/share/nginx/html; \
+    index index.html; \
+    \
+    # Handle SPA routing - redirect all non-file requests to index.html \
+    location / { \
+        try_files $uri $uri/ /index.html; \
+    } \
+    \
+    # Caching settings for static assets \
+    location ~* \\.(css|js|jpg|jpeg|png|gif|ico|svg|woff2)$ { \
+        expires 30d; \
+        add_header Cache-Control "public, max-age=2592000"; \
+    } \
+}' > /etc/nginx/conf.d/default.conf
 
-# Copy package.json for preview server
-COPY apps/web/package*.json ./
-
-# Install only production dependencies + vite for preview server
-RUN npm install --production && npm install vite
-
-# Copy built application from build stage
-COPY --from=build /app/apps/web/dist ./dist
-
-EXPOSE 5173
-CMD ["npx", "vite", "preview", "--host", "0.0.0.0", "--port", "5173"]
-
-# Default stage - runtime decision between dev and prod
-FROM base AS runtime
-
-# Create entrypoint script to handle dev/prod modes
-RUN echo '#!/bin/sh\n\
-if [ "$NODE_ENV" = "production" ]; then\n\
-  echo "Building for production..."\n\
-  npm run build\n\
-  echo "Starting production server..."\n\
-  npm run preview -- --host 0.0.0.0 --port 5173\n\
-else\n\
-  echo "Starting development server..."\n\
-  npm run dev -- --host 0.0.0.0\n\
-fi' > /app/apps/web/entrypoint.sh && chmod +x /app/apps/web/entrypoint.sh
+# Create a custom entrypoint script - we need line breaks after each command
+RUN echo '#!/bin/sh' > /usr/local/bin/entrypoint.sh && \
+    echo 'echo "Starting nginx server with NODE_ENV=$NODE_ENV..."' >> /usr/local/bin/entrypoint.sh && \
+    echo 'nginx -g "daemon off;"' >> /usr/local/bin/entrypoint.sh && \
+    chmod +x /usr/local/bin/entrypoint.sh
 
 EXPOSE 5173
-ENTRYPOINT ["./entrypoint.sh"]
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
