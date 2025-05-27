@@ -10,11 +10,15 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
   private readonly logger = new Logger(PrismaService.name);
   
   constructor(private readonly configService: ConfigService) {
+    // For tests, use an in-memory SQLite database if no DATABASE_URL is provided
+    const databaseUrl = configService.get<string>('DATABASE_URL') || 
+      (process.env.NODE_ENV === 'test' ? 'file:./test.db?connection_limit=1' : undefined);
+    
     super({
       log: process.env.NODE_ENV === 'development' ? ['query', 'info', 'warn', 'error'] : ['error'],
       datasources: {
         db: {
-          url: configService.get<string>('DATABASE_URL'),
+          url: databaseUrl,
         },
       },
     });
