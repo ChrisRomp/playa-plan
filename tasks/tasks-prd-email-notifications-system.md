@@ -4,8 +4,8 @@ Based on: `prd-email-notifications-system.md`
 
 ## Relevant Files
 
-- `apps/api/prisma/schema.prisma` - Add email_audit table and emailEnabled field to CoreConfig
-- `apps/api/prisma/migrations/` - Database migration files for schema changes
+- `apps/api/prisma/schema.prisma` - Add email_audit table and emailEnabled field to CoreConfig (emailEnabled field added, EmailAudit model created, NotificationType enum updated)
+- `apps/api/prisma/migrations/20250529190906_add_email_audit_and_toggle/` - Database migration for schema changes (created and applied)
 - `apps/api/src/config/configuration.ts` - Remove email-related environment configuration
 - `apps/api/src/notifications/services/email.service.ts` - Update to use database configuration and add audit trail
 - `apps/api/src/notifications/services/notifications.service.ts` - Enhanced notification templates and audit logging
@@ -29,13 +29,13 @@ Based on: `prd-email-notifications-system.md`
 
 ## Tasks
 
-- [ ] 1.0 Database Schema Updates
-  - [ ] 1.1 Add `emailEnabled` boolean field (default false) to CoreConfig model in `schema.prisma`
-  - [ ] 1.2 Create EmailAudit model with fields: id (UUID), recipientEmail, ccEmails, bccEmails, subject, notificationType, status, errorMessage, sentAt (UTC), userId, createdAt (UTC)
-  - [ ] 1.3 Add EmailAuditStatus enum with values: SENT, FAILED, DISABLED
-  - [ ] 1.4 Update NotificationType enum to include: EMAIL_AUTHENTICATION, EMAIL_CHANGE, REGISTRATION_CONFIRMATION, REGISTRATION_ERROR
-  - [ ] 1.5 Create and run database migration: `npx prisma migrate dev --name add-email-audit-and-toggle`
-  - [ ] 1.6 Generate updated Prisma client: `npx prisma generate`
+- [x] 1.0 Database Schema Updates
+  - [x] 1.1 Add `emailEnabled` boolean field (default false) to CoreConfig model in `schema.prisma`
+  - [x] 1.2 Create EmailAudit model with fields: id (UUID), recipientEmail, ccEmails, bccEmails, subject, notificationType, status, errorMessage, sentAt (UTC), userId, createdAt (UTC)
+  - [x] 1.3 Add EmailAuditStatus enum with values: SENT, FAILED, DISABLED
+  - [x] 1.4 Update NotificationType enum to include: EMAIL_AUTHENTICATION, EMAIL_CHANGE, REGISTRATION_CONFIRMATION, REGISTRATION_ERROR
+  - [x] 1.5 Create and run database migration: `npx prisma migrate dev --name add-email-audit-and-toggle`
+  - [x] 1.6 Generate updated Prisma client: `npx prisma generate`
 
 - [ ] 2.0 Configuration Migration and Service Updates
   - [ ] 2.1 Remove email section from `apps/api/src/config/configuration.ts` (provider, defaultFrom, sendgrid, smtp config)
