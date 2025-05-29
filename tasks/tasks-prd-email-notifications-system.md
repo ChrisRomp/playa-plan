@@ -64,10 +64,63 @@ Based on: `prd-email-notifications-system.md`
   - [ ] 4.8 Add unit tests for new notification templates and service integrations
   - [ ] 4.9 Verify that all email triggers are internal to backend services only - no API endpoints allow frontend to directly trigger emails except admin-only test endpoints (if any)
 
-- [ ] 5.0 Admin UI Updates for Email Toggle
-  - [ ] 5.1 Add `emailEnabled` checkbox to Email Configuration section in AdminConfigPage.tsx
-  - [ ] 5.2 Update form state to include emailEnabled field
-  - [ ] 5.3 Update form submission to include emailEnabled in API payload
-  - [ ] 5.4 Add visual indicators when email is disabled (grayed out SMTP fields or warning message)
-  - [ ] 5.5 Update form validation to handle emailEnabled toggle appropriately
-  - [ ] 5.6 Test admin UI changes to ensure toggle works correctly with existing SMTP configuration 
+- [ ] 5.0 Unit Testing and Quality Assurance
+  - [ ] 5.1 EmailAuditService Unit Tests (uses mocked PrismaService)
+    - [ ] 5.1.1 Test logEmailAttempt() with all audit data fields
+    - [ ] 5.1.2 Test logEmailSent() creates SENT audit record with sentAt timestamp
+    - [ ] 5.1.3 Test logEmailFailed() creates FAILED audit record with error message
+    - [ ] 5.1.4 Test logEmailDisabled() creates DISABLED audit record
+    - [ ] 5.1.5 Test getEmailStatistics() returns correct counts and breakdown by notification type
+    - [ ] 5.1.6 Test audit logging handles database errors gracefully (doesn't throw)
+    - [ ] 5.1.7 Test CC/BCC email arrays are properly serialized as comma-separated strings
+  - [ ] 5.2 EmailService Unit Tests (uses mocked CoreConfigService and EmailAuditService, mocked nodemailer)
+    - [ ] 5.2.1 Test getEmailConfig() caching mechanism with TTL expiry
+    - [ ] 5.2.2 Test refreshConfiguration() forces cache refresh and reinitializes SMTP
+    - [ ] 5.2.3 Test sendEmail() with emailEnabled=false logs DISABLED status
+    - [ ] 5.2.4 Test sendEmail() with incomplete SMTP config logs FAILED status
+    - [ ] 5.2.5 Test sendEmail() successful send logs SENT status with audit trail
+    - [ ] 5.2.6 Test sendEmail() SMTP failure logs FAILED status with error message
+    - [ ] 5.2.7 Test onModuleInit() initializes service on startup
+    - [ ] 5.2.8 Test development mode console output includes all debug information
+    - [ ] 5.2.9 Test SMTP transporter initialization with database configuration
+    - [ ] 5.2.10 Test EmailOptions interface requires notificationType and handles optional audit fields
+  - [ ] 5.3 CoreConfigService Unit Tests (uses mocked PrismaService)
+    - [ ] 5.3.1 Test getEmailConfiguration() returns all email config fields from database
+    - [ ] 5.3.2 Test getEmailConfiguration() returns safe defaults on database error
+    - [ ] 5.3.3 Test getEmailConfiguration() handles missing configuration gracefully
+    - [ ] 5.3.4 Test email configuration field mapping between entity and database
+  - [ ] 5.4 NotificationsService Unit Tests (uses mocked EmailService - upcoming)
+    - [ ] 5.4.1 Test sendLoginCodeEmail() template and audit logging
+    - [ ] 5.4.2 Test sendEmailChangeNotification() to old and new email addresses
+    - [ ] 5.4.3 Test sendRegistrationConfirmation() with camping options and payment details
+    - [ ] 5.4.4 Test sendRegistrationError() with error details and next steps
+    - [ ] 5.4.5 Test all notification methods handle EmailService failures gracefully
+    - [ ] 5.4.6 Test template generation includes all required dynamic content
+  - [ ] 5.5 Service Integration Unit Tests (uses mocked NotificationsService - upcoming)
+    - [ ] 5.5.1 Test AuthService login code generation triggers email notification
+    - [ ] 5.5.2 Test UserService email change triggers notifications to both addresses
+    - [ ] 5.5.3 Test registration services trigger appropriate confirmation/error emails
+    - [ ] 5.5.4 Test all service integrations handle notification failures without blocking main operations
+    - [ ] 5.5.5 Test notification calls include correct user context and notification types
+  - [ ] 5.6 Integration Tests (uses test database + mock SMTP server like Ethereal Email or Docker mailhog)
+    - [ ] 5.6.1 Test complete email flow from service call to audit log creation
+    - [ ] 5.6.2 Test email configuration changes are reflected in email sending
+    - [ ] 5.6.3 Test global email toggle affects all notification types
+    - [ ] 5.6.4 Test email audit statistics endpoint returns accurate data
+    - [ ] 5.6.5 Test SMTP configuration validation and connection testing (uses nodemailer test account)
+    - [ ] 5.6.6 Test concurrent email sending with cache coherency
+  - [ ] 5.7 Error Handling and Edge Cases (uses mocks to simulate error conditions)
+    - [ ] 5.7.1 Test database connection failures during email operations
+    - [ ] 5.7.2 Test malformed email addresses and content validation
+    - [ ] 5.7.3 Test SMTP timeout and connection failure scenarios
+    - [ ] 5.7.4 Test large attachment handling and size limits
+    - [ ] 5.7.5 Test email queue backpressure and rate limiting scenarios
+    - [ ] 5.7.6 Test configuration cache invalidation on service restart
+
+- [ ] 6.0 Admin UI Updates for Email Toggle
+  - [ ] 6.1 Add `emailEnabled` checkbox to Email Configuration section in AdminConfigPage.tsx
+  - [ ] 6.2 Update form state to include emailEnabled field
+  - [ ] 6.3 Update form submission to include emailEnabled in API payload
+  - [ ] 6.4 Add visual indicators when email is disabled (grayed out SMTP fields or warning message)
+  - [ ] 6.5 Update form validation to handle emailEnabled toggle appropriately
+  - [ ] 6.6 Test admin UI changes to ensure toggle works correctly with existing SMTP configuration 
