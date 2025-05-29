@@ -152,10 +152,10 @@
      - [x] Job management interface for creating and editing jobs
    - [x] Shift management
      - [x] Create and manage job shifts
-   - [ ] Payment management (including manual payments)
    - [ ] Refund processing
      - [ ] Interface for admins to initiate refunds
      - [ ] Support automated refunds via payment processors
+     - [ ] Manual payment recording
      - [ ] Manual refund recording
      - [ ] Registration status update after refund
 
@@ -328,18 +328,11 @@ Note: Components marked with "NEEDED" should be created as part of the implement
   - [x] Payment integration
   - [x] Confirmation page
 
-- [x] Volunteer Shift Management
-  - [x] Available shifts view
-  - [x] Shift signup functionality
-  - [ ] Shift calendar view
-  - [ ] Volunteer hours tracking
-  - [x] Department-specific views
 
 - [x] Responsive Design
   - [x] Mobile-friendly layouts
   - [x] Responsive navigation
   - [x] Touch-friendly interface elements
-  - [ ] Offline support
 
 - [x] Testing
   - [x] Unit tests for components
