@@ -37,13 +37,13 @@ Based on: `prd-email-notifications-system.md`
   - [x] 1.5 Create and run database migration: `npx prisma migrate dev --name add-email-audit-and-toggle`
   - [x] 1.6 Generate updated Prisma client: `npx prisma generate`
 
-- [ ] 2.0 Configuration Migration and Service Updates
+- [x] 2.0 Configuration Migration and Service Updates
   - [x] 2.1 Remove email section from `apps/api/src/config/configuration.ts` (provider, defaultFrom, sendgrid, smtp config)
   - [x] 2.2 Update EmailService constructor to inject CoreConfigService instead of ConfigService
   - [x] 2.3 Create method in CoreConfigService to retrieve current email configuration from database
-  - [ ] 2.4 Add configuration caching mechanism in EmailService to avoid database queries on every email
-  - [ ] 2.5 Update EmailService initialization to fetch SMTP config from database on startup
-  - [ ] 2.6 Remove SendGrid provider logic - keep only SMTP implementation
+  - [x] 2.4 Add configuration caching mechanism in EmailService to avoid database queries on every email
+  - [x] 2.5 Update EmailService initialization to fetch SMTP config from database on startup
+  - [x] 2.6 Remove SendGrid provider logic - keep only SMTP implementation
 
 - [ ] 3.0 Email Service Enhancement with Audit Trail
   - [ ] 3.1 Create EmailAuditService to handle audit trail logging

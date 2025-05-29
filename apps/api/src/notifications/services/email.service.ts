@@ -1,7 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { CoreConfigService } from '../../core-config/services/core-config.service';
-import sgMail from '@sendgrid/mail';
 import * as nodemailer from 'nodemailer';
 
 export interface EmailOptions {
@@ -18,49 +17,136 @@ export interface EmailOptions {
   }>;
 }
 
+interface EmailConfiguration {
+  emailEnabled: boolean;
+  smtpHost: string | null;
+  smtpPort: number | null;
+  smtpUsername: string | null;
+  smtpPassword: string | null;
+  smtpUseSsl: boolean;
+  senderEmail: string | null;
+  senderName: string | null;
+}
+
 /**
- * Service for sending emails through SendGrid or SMTP
+ * Service for sending emails through SMTP
  */
 @Injectable()
-export class EmailService {
+export class EmailService implements OnModuleInit {
   private readonly logger = new Logger(EmailService.name);
   private transporter: nodemailer.Transporter | null = null;
+  private configCache: EmailConfiguration | null = null;
+  private cacheExpiry: number = 0;
+  private readonly CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes cache TTL
 
-  constructor(private readonly configService: ConfigService, private readonly coreConfigService: CoreConfigService) {
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly coreConfigService: CoreConfigService
+  ) {
     // ConfigService is only kept for NODE_ENV checking
-    // Email configuration now comes from database via CoreConfigService
-    // SMTP transporter will be initialized when needed
+    // Email configuration now comes from database via CoreConfigService with caching
   }
 
   /**
-   * Initialize SMTP transporter with configuration
+   * Initialize service when module starts
    */
-  private initSmtpTransporter(): void {
-    const host = this.configService.get<string>('email.smtp.host');
-    const port = this.configService.get<number>('email.smtp.port', 587);
-    const user = this.configService.get<string>('email.smtp.user');
-    const pass = this.configService.get<string>('email.smtp.password');
+  async onModuleInit(): Promise<void> {
+    try {
+      this.logger.log('Initializing EmailService with database configuration...');
+      await this.refreshConfiguration();
+      this.logger.log('EmailService initialization completed');
+    } catch (error) {
+      this.logger.error('Failed to initialize EmailService', error);
+      // Don't throw - service should still be available even if initial config fails
+    }
+  }
 
-    if (!host || !user || !pass) {
-      this.logger.warn('SMTP configuration incomplete, email sending will be disabled');
+  /**
+   * Get email configuration with caching
+   * @param forceRefresh - Force refresh the cache
+   */
+  private async getEmailConfig(forceRefresh = false): Promise<EmailConfiguration> {
+    const now = Date.now();
+    
+    // Return cached config if valid and not forcing refresh
+    if (!forceRefresh && this.configCache && now < this.cacheExpiry) {
+      return this.configCache;
+    }
+
+    try {
+      // Fetch fresh configuration from database
+      this.configCache = await this.coreConfigService.getEmailConfiguration();
+      this.cacheExpiry = now + this.CACHE_TTL_MS;
+      
+      this.logger.debug('Email configuration refreshed from database');
+      return this.configCache;
+    } catch (error) {
+      this.logger.error('Failed to refresh email configuration from database', error);
+      
+      // Return cached config if available, otherwise return disabled state
+      if (this.configCache) {
+        this.logger.warn('Using stale email configuration cache due to database error');
+        return this.configCache;
+      }
+      
+      // Return safe defaults
+      const fallbackConfig: EmailConfiguration = {
+        emailEnabled: false,
+        smtpHost: null,
+        smtpPort: null,
+        smtpUsername: null,
+        smtpPassword: null,
+        smtpUseSsl: false,
+        senderEmail: null,
+        senderName: null,
+      };
+      
+      this.configCache = fallbackConfig;
+      this.cacheExpiry = now + this.CACHE_TTL_MS;
+      return fallbackConfig;
+    }
+  }
+
+  /**
+   * Initialize or refresh SMTP transporter with current configuration
+   */
+  private async initSmtpTransporter(): Promise<void> {
+    const config = await this.getEmailConfig();
+
+    if (!config.emailEnabled || !config.smtpHost || !config.smtpUsername || !config.smtpPassword) {
+      this.transporter = null;
+      this.logger.debug('SMTP transporter disabled - email configuration incomplete or disabled');
       return;
     }
 
-    this.transporter = nodemailer.createTransport({
-      host,
-      port,
-      secure: port === 465,
-      auth: {
-        user,
-        pass,
-      },
-    });
+    try {
+      this.transporter = nodemailer.createTransport({
+        host: config.smtpHost,
+        port: config.smtpPort || 587,
+        secure: config.smtpUseSsl,
+        auth: {
+          user: config.smtpUsername,
+          pass: config.smtpPassword,
+        },
+      });
 
-    this.logger.log('SMTP email service initialized');
+      this.logger.log(`SMTP email service initialized for ${config.smtpHost}:${config.smtpPort || 587}`);
+    } catch (error) {
+      this.logger.error('Failed to initialize SMTP transporter', error);
+      this.transporter = null;
+    }
   }
 
   /**
-   * Send an email using the configured provider
+   * Force refresh of email configuration cache
+   */
+  async refreshConfiguration(): Promise<void> {
+    await this.getEmailConfig(true);
+    await this.initSmtpTransporter();
+  }
+
+  /**
+   * Send an email using SMTP
    * @param options EmailOptions with recipient, subject, and content
    * @returns Promise resolving to true if email was sent
    */
@@ -68,81 +154,69 @@ export class EmailService {
     try {
       const { to, subject, text, html, from, replyTo, attachments } = options;
       const isDebugMode = this.configService.get('NODE_ENV') === 'development';
-      const isSendgridConfigured = !!this.configService.get('email.sendgrid.apiKey');
-      const isSmtpConfigured = !!this.transporter;
+      
+      // Get current email configuration
+      const config = await this.getEmailConfig();
       
       // In debug mode, always log the email content to console
       if (isDebugMode) {
-        // Only output the text content in debug mode
         console.log('\n====== EMAIL CONTENT (DEBUG MODE) ======');
         console.log(`To: ${Array.isArray(to) ? to.join(', ') : to}`);
         console.log(`Subject: ${subject}`);
+        console.log(`Email Enabled: ${config.emailEnabled}`);
         console.log('\n----- Text Content -----');
         console.log(text || 'No text content provided');
         console.log('================================\n');
         
-        // If email isn't configured, pretend it was sent successfully
-        if (!isSendgridConfigured && !isSmtpConfigured) {
+        // If email isn't enabled or configured, pretend it was sent successfully in debug mode
+        if (!config.emailEnabled || !config.smtpHost) {
+          this.logger.debug('Email disabled or not configured - simulating successful send in debug mode');
           return true;
         }
       }
       
-      // If not in debug mode and email isn't configured, silently return without sending
-      if (!isSendgridConfigured && !isSmtpConfigured) {
-        this.logger.debug('Email not configured, skipping send');
+      // If email is disabled globally, return false
+      if (!config.emailEnabled) {
+        this.logger.debug('Email sending disabled globally');
         return false;
       }
       
-      // Set default from if not provided
-      const emailFrom = from || this.defaultFrom;
-      
-      if (this.emailProvider === 'sendgrid' && isSendgridConfigured) {
-        return this.sendViaSendGrid({
-          to,
-          from: emailFrom,
-          subject,
-          text: text || '',
-          html,
-          replyTo: replyTo || emailFrom,
-          attachments: attachments?.map(att => ({
-            filename: att.filename,
-            content: typeof att.content === 'string' ? att.content : att.content.toString('base64'),
-            type: att.contentType,
-            disposition: 'attachment',
-          })),
-        });
-      } else if (this.emailProvider === 'smtp' && isSmtpConfigured) {
-        return this.sendViaSmtp({
-          to,
-          from: emailFrom,
-          subject,
-          text: text || '',
-          html,
-          replyTo: replyTo || emailFrom,
-          attachments,
-        });
+      // If SMTP not configured, return false
+      if (!config.smtpHost || !config.smtpUsername || !config.smtpPassword) {
+        this.logger.debug('SMTP not configured, skipping send');
+        return false;
       }
       
-      this.logger.warn('No email provider configured or enabled');
-      return false;
+      // Ensure SMTP transporter is initialized
+      if (!this.transporter) {
+        await this.initSmtpTransporter();
+      }
+      
+      if (!this.transporter) {
+        this.logger.warn('SMTP transporter failed to initialize');
+        return false;
+      }
+      
+      // Determine sender
+      const defaultFrom = config.senderEmail 
+        ? (config.senderName ? `${config.senderName} <${config.senderEmail}>` : config.senderEmail)
+        : 'noreply@example.com';
+      const emailFrom = from || defaultFrom;
+      
+      // Send via SMTP
+      return this.sendViaSmtp({
+        to,
+        from: emailFrom,
+        subject,
+        text: text || '',
+        html,
+        replyTo: replyTo || emailFrom,
+        attachments,
+      });
+      
     } catch (error: unknown) {
       const err = error as Error;
       this.logger.error(`Failed to send email: ${err.message}`, err.stack);
-      return false;
-    }
-  }
-
-  /**
-   * Send email via SendGrid
-   */
-  private async sendViaSendGrid(mailOptions: sgMail.MailDataRequired): Promise<boolean> {
-    try {
-      await sgMail.send(mailOptions);
-      this.logger.log(`Email sent via SendGrid to ${Array.isArray(mailOptions.to) ? mailOptions.to.join(', ') : mailOptions.to}`);
-      return true;
-    } catch (error: unknown) {
-      const err = error as Error;
-      this.logger.error(`SendGrid email error: ${err.message}`, err.stack);
       return false;
     }
   }
