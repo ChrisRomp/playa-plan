@@ -1,6 +1,8 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { CoreConfigService } from '../../core-config/services/core-config.service';
+import { EmailAuditService } from './email-audit.service';
+import { NotificationType } from '@prisma/client';
 import * as nodemailer from 'nodemailer';
 
 export interface EmailOptions {
@@ -15,6 +17,11 @@ export interface EmailOptions {
     content: string | Buffer;
     contentType?: string;
   }>;
+  // Audit trail fields
+  notificationType: NotificationType;
+  userId?: string;
+  ccEmails?: string[];
+  bccEmails?: string[];
 }
 
 interface EmailConfiguration {
@@ -41,7 +48,8 @@ export class EmailService implements OnModuleInit {
 
   constructor(
     private readonly configService: ConfigService,
-    private readonly coreConfigService: CoreConfigService
+    private readonly coreConfigService: CoreConfigService,
+    private readonly emailAuditService: EmailAuditService
   ) {
     // ConfigService is only kept for NODE_ENV checking
     // Email configuration now comes from database via CoreConfigService with caching
@@ -151,10 +159,25 @@ export class EmailService implements OnModuleInit {
    * @returns Promise resolving to true if email was sent
    */
   async sendEmail(options: EmailOptions): Promise<boolean> {
+    const {
+      to,
+      subject,
+      text,
+      html,
+      from,
+      replyTo,
+      attachments,
+      notificationType,
+      userId,
+      ccEmails,
+      bccEmails
+    } = options;
+
+    // Get primary recipient for logging (use first if array)
+    const primaryRecipient = Array.isArray(to) ? to[0] : to;
+    const isDebugMode = this.configService.get('NODE_ENV') === 'development';
+
     try {
-      const { to, subject, text, html, from, replyTo, attachments } = options;
-      const isDebugMode = this.configService.get('NODE_ENV') === 'development';
-      
       // Get current email configuration
       const config = await this.getEmailConfig();
       
@@ -164,27 +187,45 @@ export class EmailService implements OnModuleInit {
         console.log(`To: ${Array.isArray(to) ? to.join(', ') : to}`);
         console.log(`Subject: ${subject}`);
         console.log(`Email Enabled: ${config.emailEnabled}`);
+        console.log(`Notification Type: ${notificationType}`);
         console.log('\n----- Text Content -----');
         console.log(text || 'No text content provided');
         console.log('================================\n');
-        
-        // If email isn't enabled or configured, pretend it was sent successfully in debug mode
-        if (!config.emailEnabled || !config.smtpHost) {
-          this.logger.debug('Email disabled or not configured - simulating successful send in debug mode');
-          return true;
-        }
       }
       
-      // If email is disabled globally, return false
+      // If email is disabled globally, log as disabled and return false
       if (!config.emailEnabled) {
+        await this.emailAuditService.logEmailDisabled(
+          primaryRecipient,
+          subject,
+          notificationType,
+          userId,
+          ccEmails,
+          bccEmails
+        );
+        
         this.logger.debug('Email sending disabled globally');
-        return false;
+        
+        // In debug mode, pretend it was sent successfully even when disabled
+        return isDebugMode;
       }
       
-      // If SMTP not configured, return false
+      // If SMTP not configured, log as failed and return false
       if (!config.smtpHost || !config.smtpUsername || !config.smtpPassword) {
+        await this.emailAuditService.logEmailFailed(
+          primaryRecipient,
+          subject,
+          notificationType,
+          'SMTP configuration incomplete',
+          userId,
+          ccEmails,
+          bccEmails
+        );
+        
         this.logger.debug('SMTP not configured, skipping send');
-        return false;
+        
+        // In debug mode, pretend it was sent successfully even when not configured
+        return isDebugMode;
       }
       
       // Ensure SMTP transporter is initialized
@@ -193,7 +234,19 @@ export class EmailService implements OnModuleInit {
       }
       
       if (!this.transporter) {
-        this.logger.warn('SMTP transporter failed to initialize');
+        const errorMessage = 'SMTP transporter failed to initialize';
+        
+        await this.emailAuditService.logEmailFailed(
+          primaryRecipient,
+          subject,
+          notificationType,
+          errorMessage,
+          userId,
+          ccEmails,
+          bccEmails
+        );
+        
+        this.logger.warn(errorMessage);
         return false;
       }
       
@@ -203,8 +256,8 @@ export class EmailService implements OnModuleInit {
         : 'noreply@example.com';
       const emailFrom = from || defaultFrom;
       
-      // Send via SMTP
-      return this.sendViaSmtp({
+      // Attempt to send via SMTP
+      const emailSent = await this.sendViaSmtp({
         to,
         from: emailFrom,
         subject,
@@ -212,11 +265,50 @@ export class EmailService implements OnModuleInit {
         html,
         replyTo: replyTo || emailFrom,
         attachments,
+        cc: ccEmails,
+        bcc: bccEmails,
       });
+      
+      // Log the result
+      if (emailSent) {
+        await this.emailAuditService.logEmailSent(
+          primaryRecipient,
+          subject,
+          notificationType,
+          userId,
+          ccEmails,
+          bccEmails
+        );
+      } else {
+        await this.emailAuditService.logEmailFailed(
+          primaryRecipient,
+          subject,
+          notificationType,
+          'SMTP send operation returned false',
+          userId,
+          ccEmails,
+          bccEmails
+        );
+      }
+      
+      return emailSent;
       
     } catch (error: unknown) {
       const err = error as Error;
-      this.logger.error(`Failed to send email: ${err.message}`, err.stack);
+      const errorMessage = `Failed to send email: ${err.message}`;
+      
+      // Log the failure
+      await this.emailAuditService.logEmailFailed(
+        primaryRecipient,
+        subject,
+        notificationType,
+        errorMessage,
+        userId,
+        ccEmails,
+        bccEmails
+      );
+      
+      this.logger.error(errorMessage, err.stack);
       return false;
     }
   }

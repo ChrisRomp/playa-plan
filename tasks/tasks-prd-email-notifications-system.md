@@ -45,13 +45,13 @@ Based on: `prd-email-notifications-system.md`
   - [x] 2.5 Update EmailService initialization to fetch SMTP config from database on startup
   - [x] 2.6 Remove SendGrid provider logic - keep only SMTP implementation
 
-- [ ] 3.0 Email Service Enhancement with Audit Trail
-  - [ ] 3.1 Create EmailAuditService to handle audit trail logging
-  - [ ] 3.2 Update EmailService.sendEmail() to log all attempts to email_audit table
-  - [ ] 3.3 Add logic to respect global `emailEnabled` toggle - log but don't send when disabled
-  - [ ] 3.4 Enhance error handling to capture detailed error messages in audit trail
-  - [ ] 3.5 Update development mode console output to show when emails are disabled
-  - [ ] 3.6 Ensure audit logging works for both successful and failed email attempts
+- [x] 3.0 Email Service Enhancement with Audit Trail
+  - [x] 3.1 Create EmailAuditService to handle audit trail logging
+  - [x] 3.2 Update EmailService.sendEmail() to log all attempts to email_audit table
+  - [x] 3.3 Add logic to respect global `emailEnabled` toggle - log but don't send when disabled
+  - [x] 3.4 Enhance error handling to capture detailed error messages in audit trail
+  - [x] 3.5 Update development mode console output to show when emails are disabled
+  - [x] 3.6 Ensure audit logging works for both successful and failed email attempts
 
 - [ ] 4.0 Service Integration for Notifications
   - [ ] 4.1 Update AuthService to call NotificationsService.sendLoginCodeEmail() when login codes are generated
