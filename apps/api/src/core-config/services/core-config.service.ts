@@ -50,6 +50,7 @@ export class CoreConfigService {
       smtpUseSsl: config.smtpSecure,
       senderEmail: config.senderEmail,
       senderName: config.senderName,
+      emailEnabled: config.emailEnabled,
       timeZone: config.timeZone,
       createdAt: config.createdAt,
       updatedAt: config.updatedAt,
@@ -98,6 +99,7 @@ export class CoreConfigService {
           smtpSecure: createCoreConfigDto.smtpUseSsl ?? false,
           senderEmail: createCoreConfigDto.senderEmail ?? null,
           senderName: createCoreConfigDto.senderName ?? null,
+          emailEnabled: createCoreConfigDto.emailEnabled ?? false,
           timeZone: createCoreConfigDto.timeZone ?? 'UTC',
         },
       });
@@ -165,6 +167,7 @@ export class CoreConfigService {
       smtpUseSsl: false,
       senderEmail: null,
       senderName: null,
+      emailEnabled: false,
       timeZone: 'UTC',
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -253,6 +256,7 @@ export class CoreConfigService {
       if (updateCoreConfigDto.smtpUseSsl !== undefined) data.smtpSecure = updateCoreConfigDto.smtpUseSsl;
       if (updateCoreConfigDto.senderEmail !== undefined) data.senderEmail = updateCoreConfigDto.senderEmail;
       if (updateCoreConfigDto.senderName !== undefined) data.senderName = updateCoreConfigDto.senderName;
+      if (updateCoreConfigDto.emailEnabled !== undefined) data.emailEnabled = updateCoreConfigDto.emailEnabled;
       if (updateCoreConfigDto.timeZone !== undefined) data.timeZone = updateCoreConfigDto.timeZone;
 
       // Always update the updatedAt field
@@ -309,5 +313,49 @@ export class CoreConfigService {
    */
   adminTest(): string {
     return 'Core Config module is working!';
+  }
+
+  /**
+   * Get current email configuration from database
+   * @returns Email configuration object with SMTP settings and global toggle
+   */
+  async getEmailConfiguration(): Promise<{
+    emailEnabled: boolean;
+    smtpHost: string | null;
+    smtpPort: number | null;
+    smtpUsername: string | null;
+    smtpPassword: string | null;
+    smtpUseSsl: boolean;
+    senderEmail: string | null;
+    senderName: string | null;
+  }> {
+    try {
+      const config = await this.findCurrent();
+      
+      return {
+        emailEnabled: config.emailEnabled,
+        smtpHost: config.smtpHost,
+        smtpPort: config.smtpPort,
+        smtpUsername: config.smtpUsername,
+        smtpPassword: config.smtpPassword,
+        smtpUseSsl: config.smtpUseSsl,
+        senderEmail: config.senderEmail,
+        senderName: config.senderName,
+      };
+    } catch (error: unknown) {
+      this.logger.warn('Failed to retrieve email configuration, returning disabled state');
+      
+      // Return safe defaults if configuration retrieval fails
+      return {
+        emailEnabled: false,
+        smtpHost: null,
+        smtpPort: null,
+        smtpUsername: null,
+        smtpPassword: null,
+        smtpUseSsl: false,
+        senderEmail: null,
+        senderName: null,
+      };
+    }
   }
 } 

@@ -6,7 +6,7 @@ Based on: `prd-email-notifications-system.md`
 
 - `apps/api/prisma/schema.prisma` - Add email_audit table and emailEnabled field to CoreConfig (emailEnabled field added, EmailAudit model created, NotificationType enum updated)
 - `apps/api/prisma/migrations/20250529190906_add_email_audit_and_toggle/` - Database migration for schema changes (created and applied)
-- `apps/api/src/config/configuration.ts` - Remove email-related environment configuration
+- `apps/api/src/config/configuration.ts` - Remove email-related environment configuration (email section removed)
 - `apps/api/src/notifications/services/email.service.ts` - Update to use database configuration and add audit trail
 - `apps/api/src/notifications/services/notifications.service.ts` - Enhanced notification templates and audit logging
 - `apps/api/src/core-config/services/core-config.service.ts` - Service for retrieving email configuration from database
@@ -38,9 +38,9 @@ Based on: `prd-email-notifications-system.md`
   - [x] 1.6 Generate updated Prisma client: `npx prisma generate`
 
 - [ ] 2.0 Configuration Migration and Service Updates
-  - [ ] 2.1 Remove email section from `apps/api/src/config/configuration.ts` (provider, defaultFrom, sendgrid, smtp config)
-  - [ ] 2.2 Update EmailService constructor to inject CoreConfigService instead of ConfigService
-  - [ ] 2.3 Create method in CoreConfigService to retrieve current email configuration from database
+  - [x] 2.1 Remove email section from `apps/api/src/config/configuration.ts` (provider, defaultFrom, sendgrid, smtp config)
+  - [x] 2.2 Update EmailService constructor to inject CoreConfigService instead of ConfigService
+  - [x] 2.3 Create method in CoreConfigService to retrieve current email configuration from database
   - [ ] 2.4 Add configuration caching mechanism in EmailService to avoid database queries on every email
   - [ ] 2.5 Update EmailService initialization to fetch SMTP config from database on startup
   - [ ] 2.6 Remove SendGrid provider logic - keep only SMTP implementation

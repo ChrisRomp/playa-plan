@@ -260,6 +260,15 @@ export class CoreConfig {
   senderName!: string | null;
 
   /**
+   * Whether email sending is enabled globally
+   */
+  @ApiProperty({
+    description: 'Whether email sending is enabled globally',
+    example: false
+  })
+  emailEnabled!: boolean;
+
+  /**
    * Site time zone
    */
   @ApiProperty({

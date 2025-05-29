@@ -46,25 +46,6 @@ export default () => ({
     expirationTime: process.env.JWT_EXPIRATION_TIME || '24h',
   },
 
-  // Email service configuration
-  email: {
-    provider: process.env.EMAIL_PROVIDER || 'sendgrid', // 'sendgrid' or 'smtp'
-    defaultFrom: process.env.EMAIL_FROM || 'noreply@example.playaplan.app',
-    sendgrid: {
-      apiKey: process.env.SENDGRID_API_KEY,
-    },
-    smtp: {
-      host: process.env.MAIL_HOST,
-      port: parseInt(process.env.MAIL_PORT || '587', 10) || 587,
-      user: process.env.MAIL_USER,
-      password: process.env.MAIL_PASSWORD,
-      secure: process.env.MAIL_SECURE === 'true',
-      ignoreTLS: process.env.MAIL_IGNORE_TLS === 'true',
-      requireTLS: process.env.MAIL_REQUIRE_TLS === 'true',
-      debug: process.env.MAIL_DEBUG === 'true',
-    },
-  },
-
   // Payment providers are configured in the CoreConfig database table
   // and managed through the admin interface, not through environment variables
 

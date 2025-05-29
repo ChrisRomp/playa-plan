@@ -351,6 +351,19 @@ export class UpdateCoreConfigDto {
   senderName?: string;
 
   /**
+   * Whether email sending is enabled globally
+   */
+  @ApiProperty({
+    description: 'Whether email sending is enabled globally',
+    example: false,
+    required: false
+  })
+  @IsBoolean()
+  @IsOptional()
+  @Type(() => Boolean)
+  emailEnabled?: boolean;
+
+  /**
    * Site time zone
    */
   @ApiProperty({

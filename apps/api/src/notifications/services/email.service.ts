@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { CoreConfigService } from '../../core-config/services/core-config.service';
 import sgMail from '@sendgrid/mail';
 import * as nodemailer from 'nodemailer';
 
@@ -23,25 +24,12 @@ export interface EmailOptions {
 @Injectable()
 export class EmailService {
   private readonly logger = new Logger(EmailService.name);
-  private readonly defaultFrom: string;
-  private readonly emailProvider: 'sendgrid' | 'smtp';
   private transporter: nodemailer.Transporter | null = null;
 
-  constructor(private readonly configService: ConfigService) {
-    this.defaultFrom = this.configService.get<string>('email.defaultFrom') || 'noreply@example.playaplan.app';
-    this.emailProvider = this.configService.get<'sendgrid' | 'smtp'>('email.provider', 'sendgrid');
-
-    if (this.emailProvider === 'sendgrid') {
-      const sendgridApiKey = this.configService.get<string>('email.sendgrid.apiKey');
-      if (sendgridApiKey) {
-        sgMail.setApiKey(sendgridApiKey);
-        this.logger.log('SendGrid email service initialized');
-      } else {
-        this.logger.warn('SendGrid API key not provided, email sending will be disabled');
-      }
-    } else if (this.emailProvider === 'smtp') {
-      this.initSmtpTransporter();
-    }
+  constructor(private readonly configService: ConfigService, private readonly coreConfigService: CoreConfigService) {
+    // ConfigService is only kept for NODE_ENV checking
+    // Email configuration now comes from database via CoreConfigService
+    // SMTP transporter will be initialized when needed
   }
 
   /**
