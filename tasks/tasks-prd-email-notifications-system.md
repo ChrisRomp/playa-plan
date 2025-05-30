@@ -140,11 +140,11 @@ Based on: `prd-email-notifications-system.md`
     - [x] 6.7.3.2 Include option to send test email to multiple recipients
     - [x] 6.7.3.3 Show preview of email content before sending
     - [x] 6.7.3.4 Add quick-select buttons for common test scenarios (HTML vs plain text)
-  - [ ] 6.7.4 Test email monitoring and troubleshooting
-    - [ ] 6.7.4.1 Display recent test email history in admin panel
-    - [ ] 6.7.4.2 Add "Test SMTP Connection" button that validates configuration without sending email
-    - [ ] 6.7.4.3 Show detailed error messages for SMTP connection failures
-    - [ ] 6.7.4.4 Add tooltips explaining common email configuration issues
+  - [x] 6.7.4 Test email monitoring and troubleshooting
+    - [x] 6.7.4.1 Display recent test email history in admin panel
+    - [x] 6.7.4.2 Add "Test SMTP Connection" button that validates configuration without sending email
+    - [x] 6.7.4.3 Show detailed error messages for SMTP connection failures
+    - [x] 6.7.4.4 Add tooltips explaining common email configuration issues
   - [ ] 6.7.5 Unit and integration tests for test email feature
     - [ ] 6.7.5.1 Test enhanced backend test email endpoint
     - [ ] 6.7.5.2 Test admin UI test email component rendering and interactions

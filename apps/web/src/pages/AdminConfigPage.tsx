@@ -42,6 +42,39 @@ const AdminConfigPage: React.FC = () => {
     format: string;
   } | null>(null);
   
+  // Test email monitoring state for 6.7.4.x features
+  const [showTestEmailHistory, setShowTestEmailHistory] = useState(false);
+  const [testEmailHistory, setTestEmailHistory] = useState<Array<{
+    id: string;
+    recipientEmail: string;
+    subject: string;
+    status: string;
+    errorMessage?: string;
+    sentAt?: string;
+    createdAt: string;
+  }>>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  const [isTestingConnection, setIsTestingConnection] = useState(false);
+  const [connectionTestResult, setConnectionTestResult] = useState<{
+    success: boolean;
+    message: string;
+    details?: {
+      host: string;
+      port: number;
+      secure: boolean;
+      authenticated: boolean;
+      connectionTime?: number;
+    };
+    errorDetails?: {
+      code?: string;
+      errno?: number;
+      address?: string;
+      port?: number;
+      response?: string;
+    };
+  } | null>(null);
+  
   // Form state
   const [formData, setFormData] = useState({
     campName: '',
@@ -292,6 +325,74 @@ This is an automated test email from PlayaPlan.
         setIncludeSmtpDetails(true);
         break;
     }
+  };
+  
+  // Load test email history
+  const loadTestEmailHistory = async () => {
+    setIsLoadingHistory(true);
+    setHistoryError(null);
+    
+    try {
+      const response = await api.get('/notifications/email/test/history?limit=10');
+      setTestEmailHistory(response.data.testEmails || []);
+    } catch (err) {
+      console.error('Failed to load test email history:', err);
+      
+      interface ApiError {
+        response?: {
+          data?: {
+            message?: string;
+          };
+        };
+      }
+      
+      const errorMessage = (err as ApiError)?.response?.data?.message || 'Failed to load test email history';
+      setHistoryError(errorMessage);
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  };
+  
+  // Test SMTP connection
+  const handleTestSmtpConnection = async () => {
+    setIsTestingConnection(true);
+    setConnectionTestResult(null);
+    
+    try {
+      const response = await api.post('/notifications/email/test-connection');
+      setConnectionTestResult(response.data);
+    } catch (err) {
+      console.error('Failed to test SMTP connection:', err);
+      
+      interface ApiError {
+        response?: {
+          data?: {
+            message?: string;
+          };
+        };
+      }
+      
+      const errorMessage = (err as ApiError)?.response?.data?.message || 'Failed to test SMTP connection';
+      setConnectionTestResult({
+        success: false,
+        message: errorMessage,
+      });
+    } finally {
+      setIsTestingConnection(false);
+    }
+  };
+  
+  // Clear connection test result
+  const clearConnectionTestResult = () => {
+    setConnectionTestResult(null);
+  };
+  
+  // Toggle test email history visibility
+  const toggleTestEmailHistory = () => {
+    if (!showTestEmailHistory && testEmailHistory.length === 0) {
+      loadTestEmailHistory();
+    }
+    setShowTestEmailHistory(!showTestEmailHistory);
   };
   
   // Enhanced test email sending with custom content
@@ -1286,6 +1387,284 @@ This is an automated test email from PlayaPlan.
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+          
+          <div className="mb-8">
+            <h2 className="text-xl font-semibold mb-4 pb-2 border-b">Email Monitoring and Troubleshooting</h2>
+            
+            {!formData.emailEnabled && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+                <div className="flex">
+                  <div className="ml-3">
+                    <h3 className="text-sm font-medium text-yellow-800">
+                      Email Monitoring Disabled
+                    </h3>
+                    <p className="mt-1 text-sm text-yellow-700">
+                      Email notifications are currently disabled. Please enable email notifications above to access monitoring features.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            <div className={`${!formData.emailEnabled ? 'opacity-50 pointer-events-none' : ''}`}>
+              {/* SMTP Connection Test */}
+              <div className="mb-6">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-lg font-medium">SMTP Connection Test</h3>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleTestSmtpConnection}
+                      disabled={!formData.emailEnabled || isTestingConnection}
+                      className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
+                    >
+                      {isTestingConnection ? 'Testing...' : 'Test SMTP Connection'}
+                    </button>
+                    {connectionTestResult && (
+                      <button
+                        type="button"
+                        onClick={clearConnectionTestResult}
+                        className="px-3 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors"
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                </div>
+                
+                <p className="text-gray-600 mb-4">
+                  Test your SMTP connection without sending an email. This validates your server settings, authentication, and network connectivity.
+                  <span className="ml-2 inline-flex items-center text-sm text-blue-600 cursor-help" title="Common Issues:
+• Check firewall settings for SMTP ports (587, 465, 25)
+• Verify username/password are correct
+• Some providers require app-specific passwords
+• Ensure the correct port and security settings
+• Check if your hosting provider blocks SMTP">
+                    ❓ Help
+                  </span>
+                </p>
+                
+                {/* Connection Test Results */}
+                {connectionTestResult && (
+                  <div className={`mt-4 rounded-lg p-4 ${
+                    connectionTestResult.success 
+                      ? 'bg-green-50 border border-green-200' 
+                      : 'bg-red-50 border border-red-200'
+                  }`}>
+                    <div className="flex">
+                      <div className="ml-3 w-full">
+                        <h4 className={`text-sm font-medium ${
+                          connectionTestResult.success ? 'text-green-800' : 'text-red-800'
+                        }`}>
+                          {connectionTestResult.success ? '✅ Connection Successful' : '❌ Connection Failed'}
+                        </h4>
+                        <p className={`mt-1 text-sm ${
+                          connectionTestResult.success ? 'text-green-700' : 'text-red-700'
+                        }`}>
+                          {connectionTestResult.message}
+                        </p>
+                        
+                        {connectionTestResult.details && (
+                          <div className="mt-3 text-xs font-mono bg-white border rounded p-2">
+                            <div className="grid grid-cols-2 gap-2">
+                              <div><strong>Host:</strong> {connectionTestResult.details.host}</div>
+                              <div><strong>Port:</strong> {connectionTestResult.details.port}</div>
+                              <div><strong>Secure:</strong> {connectionTestResult.details.secure ? 'Yes' : 'No'}</div>
+                              <div><strong>Authenticated:</strong> {connectionTestResult.details.authenticated ? 'Yes' : 'No'}</div>
+                              {connectionTestResult.details.connectionTime && (
+                                <div><strong>Response Time:</strong> {connectionTestResult.details.connectionTime}ms</div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                        
+                        {connectionTestResult.errorDetails && (
+                          <div className="mt-3 text-xs font-mono bg-white border rounded p-2">
+                            <div><strong>Error Details:</strong></div>
+                            {connectionTestResult.errorDetails.code && <div>Code: {connectionTestResult.errorDetails.code}</div>}
+                            {connectionTestResult.errorDetails.response && <div>Response: {connectionTestResult.errorDetails.response}</div>}
+                            {connectionTestResult.errorDetails.address && <div>Address: {connectionTestResult.errorDetails.address}</div>}
+                            {connectionTestResult.errorDetails.port && <div>Port: {connectionTestResult.errorDetails.port}</div>}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+              
+              {/* Test Email History */}
+              <div className="mb-6">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-lg font-medium">Recent Test Email History</h3>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={toggleTestEmailHistory}
+                      disabled={!formData.emailEnabled}
+                      className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
+                    >
+                      {showTestEmailHistory ? 'Hide History' : 'Show History'}
+                    </button>
+                    {showTestEmailHistory && (
+                      <button
+                        type="button"
+                        onClick={loadTestEmailHistory}
+                        disabled={isLoadingHistory}
+                        className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors disabled:bg-gray-300"
+                      >
+                        {isLoadingHistory ? 'Loading...' : 'Refresh'}
+                      </button>
+                    )}
+                  </div>
+                </div>
+                
+                <p className="text-gray-600 mb-4">
+                  View recent test email attempts to troubleshoot delivery issues and monitor email system health.
+                </p>
+                
+                {/* History Display */}
+                {showTestEmailHistory && (
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                    {isLoadingHistory && (
+                      <div className="flex justify-center py-4">
+                        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+                      </div>
+                    )}
+                    
+                    {historyError && (
+                      <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
+                        <p className="text-red-700 text-sm">
+                          <strong>Error loading history:</strong> {historyError}
+                        </p>
+                      </div>
+                    )}
+                    
+                    {!isLoadingHistory && !historyError && testEmailHistory.length === 0 && (
+                      <p className="text-gray-500 text-center py-4">
+                        No test emails found. Send a test email to see history here.
+                      </p>
+                    )}
+                    
+                    {!isLoadingHistory && !historyError && testEmailHistory.length > 0 && (
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-gray-200">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Recipient
+                              </th>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Subject
+                              </th>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Status
+                              </th>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Sent At
+                              </th>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Error
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-gray-200">
+                            {testEmailHistory.map((email) => (
+                              <tr key={email.id} className="hover:bg-gray-50">
+                                <td className="px-3 py-2 text-sm text-gray-900">
+                                  {email.recipientEmail}
+                                </td>
+                                <td className="px-3 py-2 text-sm text-gray-900">
+                                  {email.subject}
+                                </td>
+                                <td className="px-3 py-2 text-sm">
+                                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                    email.status === 'SENT' 
+                                      ? 'bg-green-100 text-green-800'
+                                      : email.status === 'FAILED'
+                                      ? 'bg-red-100 text-red-800' 
+                                      : 'bg-yellow-100 text-yellow-800'
+                                  }`}>
+                                    {email.status}
+                                  </span>
+                                </td>
+                                <td className="px-3 py-2 text-sm text-gray-500">
+                                  {email.sentAt 
+                                    ? new Date(email.sentAt).toLocaleString()
+                                    : new Date(email.createdAt).toLocaleString()
+                                  }
+                                </td>
+                                <td className="px-3 py-2 text-sm text-red-600">
+                                  {email.errorMessage && (
+                                    <span 
+                                      className="cursor-help" 
+                                      title={email.errorMessage}
+                                    >
+                                      ⚠️ Error
+                                    </span>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+              
+              {/* Troubleshooting Tips */}
+              <div className="mb-6">
+                <h3 className="text-lg font-medium mb-3">Common Email Configuration Issues</h3>
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <h4 className="font-medium text-blue-900 mb-2">Authentication Problems</h4>
+                      <ul className="text-blue-800 space-y-1">
+                        <li>• Check username and password are correct</li>
+                        <li>• Use app-specific passwords for Gmail/Outlook</li>
+                        <li>• Enable "Less secure app access" if required</li>
+                        <li>• Verify 2FA settings don't block SMTP</li>
+                      </ul>
+                    </div>
+                    <div>
+                      <h4 className="font-medium text-blue-900 mb-2">Connection Issues</h4>
+                      <ul className="text-blue-800 space-y-1">
+                        <li>• Check firewall allows SMTP ports (587, 465, 25)</li>
+                        <li>• Verify correct host and port settings</li>
+                        <li>• Use port 587 with STARTTLS (recommended)</li>
+                        <li>• Check hosting provider SMTP restrictions</li>
+                      </ul>
+                    </div>
+                  </div>
+                  <div className="mt-4 pt-4 border-t border-blue-200">
+                    <h4 className="font-medium text-blue-900 mb-2">Popular SMTP Settings</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs font-mono">
+                      <div>
+                        <strong>Gmail:</strong><br/>
+                        Host: smtp.gmail.com<br/>
+                        Port: 587<br/>
+                        Security: STARTTLS
+                      </div>
+                      <div>
+                        <strong>Outlook:</strong><br/>
+                        Host: smtp-mail.outlook.com<br/>
+                        Port: 587<br/>
+                        Security: STARTTLS
+                      </div>
+                      <div>
+                        <strong>SendGrid:</strong><br/>
+                        Host: smtp.sendgrid.net<br/>
+                        Port: 587<br/>
+                        Security: STARTTLS
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
           

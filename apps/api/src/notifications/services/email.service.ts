@@ -338,4 +338,121 @@ export class EmailService implements OnModuleInit {
       return false;
     }
   }
+
+  /**
+   * Test SMTP connection without sending an email
+   * @returns Promise with connection test result
+   */
+  async testSmtpConnection(): Promise<{
+    success: boolean;
+    message: string;
+    errorDetails?: {
+      code?: string;
+      errno?: number;
+      address?: string;
+      port?: number;
+      response?: string;
+    };
+  }> {
+    try {
+      // Get current configuration
+      const config = await this.getEmailConfig();
+      
+      if (!config.emailEnabled) {
+        return {
+          success: false,
+          message: 'Email notifications are disabled',
+        };
+      }
+
+      if (!config.smtpHost || !config.smtpUsername || !config.smtpPassword) {
+        return {
+          success: false,
+          message: 'SMTP configuration is incomplete',
+        };
+      }
+
+      // Create a temporary transporter for testing
+      const testTransporter = nodemailer.createTransport({
+        host: config.smtpHost,
+        port: config.smtpPort || 587,
+        secure: config.smtpUseSsl,
+        auth: {
+          user: config.smtpUsername,
+          pass: config.smtpPassword,
+        },
+        connectionTimeout: 10000, // 10 seconds
+        greetingTimeout: 5000,    // 5 seconds
+        socketTimeout: 10000,     // 10 seconds
+      });
+
+      // Test the connection
+      await testTransporter.verify();
+      
+      return {
+        success: true,
+        message: 'SMTP connection verified successfully',
+      };
+    } catch (error: unknown) {
+      const err = error as Error & {
+        code?: string;
+        errno?: number;
+        address?: string;
+        port?: number;
+        response?: string;
+        responseCode?: number;
+      };
+
+      let message = 'SMTP connection failed';
+      const errorDetails: {
+        code?: string;
+        errno?: number;
+        address?: string;
+        port?: number;
+        response?: string;
+      } = {};
+
+      // Extract detailed error information
+      if (err.code) {
+        errorDetails.code = err.code;
+        
+        switch (err.code) {
+          case 'ECONNREFUSED':
+            message = 'Connection refused. Check SMTP host and port.';
+            break;
+          case 'ENOTFOUND':
+            message = 'SMTP host not found. Check the hostname.';
+            break;
+          case 'ETIMEDOUT':
+            message = 'Connection timed out. Check host and firewall settings.';
+            break;
+          case 'EAUTH':
+            message = 'Authentication failed. Check username and password.';
+            break;
+          case 'ESOCKET':
+            message = 'Socket error. Check network connectivity.';
+            break;
+          default:
+            message = `SMTP error: ${err.code}`;
+        }
+      } else if (err.responseCode === 535) {
+        message = 'Authentication failed. Check username and password.';
+      } else if (err.response) {
+        message = `SMTP server error: ${err.response}`;
+        errorDetails.response = err.response;
+      }
+
+      if (err.errno) errorDetails.errno = err.errno;
+      if (err.address) errorDetails.address = err.address;
+      if (err.port) errorDetails.port = err.port;
+
+      this.logger.error(`SMTP connection test failed: ${err.message}`, err.stack);
+
+      return {
+        success: false,
+        message,
+        errorDetails,
+      };
+    }
+  }
 }

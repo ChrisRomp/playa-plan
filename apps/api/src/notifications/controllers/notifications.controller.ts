@@ -282,4 +282,173 @@ export class NotificationsController {
 
     return await this.emailAuditService.getEmailStatistics(start, end);
   }
+
+  /**
+   * Get recent test email history (admin only)
+   */
+  @Get('email/test/history')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get recent test email history' })
+  @ApiQuery({ name: 'limit', required: false, description: 'Number of records to return (default 10, max 50)' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Test email history retrieved successfully' })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, description: 'Unauthorized' })
+  @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Forbidden - requires admin role' })
+  async getTestEmailHistory(
+    @Query('limit') limitStr?: string,
+  ): Promise<{
+    testEmails: Array<{
+      id: string;
+      recipientEmail: string;
+      subject: string;
+      status: string;
+      errorMessage?: string;
+      sentAt?: string;
+      createdAt: string;
+      userId?: string;
+    }>;
+    total: number;
+  }> {
+    const limit = Math.min(parseInt(limitStr || '10', 10), 50);
+    
+    try {
+      const testEmails = await this.prismaService.emailAudit.findMany({
+        where: {
+          notificationType: NotificationType.EMAIL_TEST,
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+        take: limit,
+        select: {
+          id: true,
+          recipientEmail: true,
+          subject: true,
+          status: true,
+          errorMessage: true,
+          sentAt: true,
+          createdAt: true,
+          userId: true,
+        },
+      });
+
+      const total = await this.prismaService.emailAudit.count({
+        where: {
+          notificationType: NotificationType.EMAIL_TEST,
+        },
+      });
+
+      return {
+        testEmails: testEmails.map(email => ({
+          id: email.id,
+          recipientEmail: email.recipientEmail,
+          subject: email.subject,
+          status: email.status.toString(),
+          errorMessage: email.errorMessage || undefined,
+          sentAt: email.sentAt?.toISOString(),
+          createdAt: email.createdAt.toISOString(),
+          userId: email.userId || undefined,
+        })),
+        total,
+      };
+    } catch (error) {
+      throw new Error(`Failed to retrieve test email history: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Test SMTP connection without sending email (admin only)
+   */
+  @Post('email/test-connection')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Test SMTP connection without sending email' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'SMTP connection test completed' })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, description: 'Unauthorized' })
+  @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Forbidden - requires admin role' })
+  async testSmtpConnection(): Promise<{
+    success: boolean;
+    message: string;
+    details?: {
+      host: string;
+      port: number;
+      secure: boolean;
+      authenticated: boolean;
+      connectionTime?: number;
+    };
+    errorDetails?: {
+      code?: string;
+      errno?: number;
+      address?: string;
+      port?: number;
+      response?: string;
+    };
+  }> {
+    try {
+      // Get current email configuration
+      const emailConfig = await this.coreConfigService.getEmailConfiguration();
+      
+      // Check if email is enabled
+      if (!emailConfig.emailEnabled) {
+        return {
+          success: false,
+          message: 'Email notifications are currently disabled. Please enable email notifications first.',
+        };
+      }
+
+      // Check if SMTP is properly configured
+      if (!emailConfig.smtpHost || !emailConfig.smtpUsername || !emailConfig.smtpPassword || !emailConfig.senderEmail) {
+        return {
+          success: false,
+          message: 'SMTP configuration is incomplete. Please ensure all SMTP settings are configured.',
+          details: {
+            host: emailConfig.smtpHost || '',
+            port: emailConfig.smtpPort || 587,
+            secure: emailConfig.smtpUseSsl,
+            authenticated: false,
+          },
+        };
+      }
+
+      // Test the SMTP connection
+      const startTime = Date.now();
+      const result = await this.emailService.testSmtpConnection();
+      const connectionTime = Date.now() - startTime;
+
+      if (result.success) {
+        return {
+          success: true,
+          message: 'SMTP connection successful! Your email configuration is working correctly.',
+          details: {
+            host: emailConfig.smtpHost,
+            port: emailConfig.smtpPort || 587,
+            secure: emailConfig.smtpUseSsl,
+            authenticated: true,
+            connectionTime,
+          },
+        };
+      } else {
+        return {
+          success: false,
+          message: result.message || 'SMTP connection failed. Please check your configuration.',
+          details: {
+            host: emailConfig.smtpHost,
+            port: emailConfig.smtpPort || 587,
+            secure: emailConfig.smtpUseSsl,
+            authenticated: false,
+            connectionTime,
+          },
+          errorDetails: result.errorDetails,
+        };
+      }
+    } catch (error) {
+      return {
+        success: false,
+        message: `Error testing SMTP connection: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      };
+    }
+  }
 } 
