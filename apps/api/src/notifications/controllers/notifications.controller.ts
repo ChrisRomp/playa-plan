@@ -5,7 +5,7 @@ import { EmailService } from '../services/email.service';
 import { EmailAuditService } from '../services/email-audit.service';
 import { CoreConfigService } from '../../core-config/services/core-config.service';
 import { PrismaService } from '../../common/prisma/prisma.service';
-import { SendEmailDto, SendEmailToMultipleRecipientsDto } from '../dto/send-email.dto';
+import { SendEmailDto, SendEmailToMultipleRecipientsDto, SendTestEmailDto } from '../dto/send-email.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
@@ -113,19 +113,25 @@ export class NotificationsController {
   @ApiResponse({ status: HttpStatus.UNAUTHORIZED, description: 'Unauthorized' })
   @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Forbidden - requires admin role' })
   async sendTestEmail(
-    @Body('email') email: string,
+    @Body() testEmailDto: SendTestEmailDto,
     @Request() req: AuthRequest
   ): Promise<{
     success: boolean;
     message: string;
     auditRecordId?: string;
     timestamp: string;
+    recipients?: string[];
     smtpConfiguration?: {
       host: string;
       port: number;
       secure: boolean;
       senderEmail: string;
       senderName: string;
+    };
+    emailPreview?: {
+      subject: string;
+      format: string;
+      includeSmtpDetails: boolean;
     };
   }> {
     try {
@@ -167,16 +173,25 @@ export class NotificationsController {
 
       // Send the test email
       const result = await this.notificationsService.sendTestEmail(
-        email,
+        testEmailDto.email,
         testEmailDetails,
-        req.user.id
+        req.user.id,
+        {
+          subject: testEmailDto.subject,
+          message: testEmailDto.message,
+          format: testEmailDto.format,
+          includeSmtpDetails: testEmailDto.includeSmtpDetails,
+        }
       );
 
       if (result) {
+        // Parse recipients to get all email addresses
+        const recipients = testEmailDto.email.split(',').map(e => e.trim()).filter(e => e.length > 0);
+        
         // Get the latest audit record for this test email
         const auditRecords = await this.prismaService.emailAudit.findMany({
           where: {
-            recipientEmail: email,
+            recipientEmail: { in: recipients },
             notificationType: NotificationType.EMAIL_TEST,
             status: EmailAuditStatus.SENT,
           },
@@ -190,9 +205,10 @@ export class NotificationsController {
 
         return {
           success: true,
-          message: 'Test email sent successfully! Check the recipient\'s inbox.',
+          message: `Test email sent successfully to ${recipients.length} recipient(s)!`,
           auditRecordId,
           timestamp: timestamp.toISOString(),
+          recipients,
           smtpConfiguration: {
             host: emailConfig.smtpHost,
             port: emailConfig.smtpPort || 587,
@@ -200,18 +216,31 @@ export class NotificationsController {
             senderEmail: emailConfig.senderEmail,
             senderName: emailConfig.senderName || 'PlayaPlan',
           },
+          emailPreview: {
+            subject: testEmailDto.subject || 'Test Email from PlayaPlan',
+            format: testEmailDto.format || 'html',
+            includeSmtpDetails: testEmailDto.includeSmtpDetails !== false,
+          },
         };
       } else {
+        const recipients = testEmailDto.email.split(',').map(e => e.trim()).filter(e => e.length > 0);
+        
         return {
           success: false,
           message: 'Failed to send test email. Please check your SMTP configuration and try again.',
           timestamp: timestamp.toISOString(),
+          recipients,
           smtpConfiguration: {
             host: emailConfig.smtpHost,
             port: emailConfig.smtpPort || 587,
             secure: emailConfig.smtpUseSsl,
             senderEmail: emailConfig.senderEmail,
             senderName: emailConfig.senderName || 'PlayaPlan',
+          },
+          emailPreview: {
+            subject: testEmailDto.subject || 'Test Email from PlayaPlan',
+            format: testEmailDto.format || 'html',
+            includeSmtpDetails: testEmailDto.includeSmtpDetails !== false,
           },
         };
       }

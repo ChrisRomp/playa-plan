@@ -5,7 +5,7 @@ import { EmailService } from '../services/email.service';
 import { EmailAuditService } from '../services/email-audit.service';
 import { CoreConfigService } from '../../core-config/services/core-config.service';
 import { PrismaService } from '../../common/prisma/prisma.service';
-import { SendEmailDto, SendEmailToMultipleRecipientsDto } from '../dto/send-email.dto';
+import { SendEmailDto, SendEmailToMultipleRecipientsDto, SendTestEmailDto } from '../dto/send-email.dto';
 import { NotificationType, UserRole } from '@prisma/client';
 
 describe('NotificationsController', () => {
@@ -179,7 +179,7 @@ describe('NotificationsController', () => {
       mockPrismaService.emailAudit.findMany.mockResolvedValue([mockAuditRecord]);
 
       // Act
-      const result = await controller.sendTestEmail('test@example.playaplan.app', mockRequest as any);
+      const result = await controller.sendTestEmail({ email: 'test@example.playaplan.app' }, mockRequest as any);
 
       // Assert
       expect(result.success).toBe(true);
@@ -204,7 +204,13 @@ describe('NotificationsController', () => {
           adminEmail: 'admin@example.com',
           timestamp: expect.any(Date),
         }),
-        'user-123'
+        'user-123',
+        {
+          subject: undefined,
+          message: undefined,
+          format: undefined,
+          includeSmtpDetails: undefined,
+        }
       );
     });
 
@@ -234,7 +240,7 @@ describe('NotificationsController', () => {
       mockCoreConfigService.getEmailConfiguration.mockResolvedValue(mockEmailConfig);
 
       // Act
-      const result = await controller.sendTestEmail('test@example.playaplan.app', mockRequest as any);
+      const result = await controller.sendTestEmail({ email: 'test@example.playaplan.app' }, mockRequest as any);
 
       // Assert
       expect(result.success).toBe(false);

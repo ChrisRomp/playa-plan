@@ -66,6 +66,12 @@ export interface TemplateData {
     adminUserName: string;
     adminEmail: string;
     timestamp: Date;
+    customContent?: {
+      subject?: string;
+      message?: string;
+      format?: 'html' | 'text';
+      includeSmtpDetails?: boolean;
+    };
   };
   userId?: string;
   [key: string]: unknown;
@@ -294,9 +300,10 @@ export class NotificationsService {
 
   /**
    * Send test email with SMTP configuration details and admin info
-   * @param email Email address to send test email to
+   * @param email Email address(es) to send test email to
    * @param testEmailDetails SMTP configuration and admin details
-   * @param userId Optional user ID for audit trail
+   * @param userId User ID for audit trail
+   * @param customContent Optional custom subject and message content
    * @returns Promise resolving to true if email was sent successfully
    */
   async sendTestEmail(
@@ -311,12 +318,52 @@ export class NotificationsService {
       adminEmail: string;
       timestamp: Date;
     },
-    userId?: string
+    userId: string,
+    customContent?: {
+      subject?: string;
+      message?: string;
+      format?: 'html' | 'text';
+      includeSmtpDetails?: boolean;
+    }
   ): Promise<boolean> {
-    return this.sendNotification(email, NotificationType.EMAIL_TEST, { 
-      testEmailDetails, 
-      userId 
-    });
+    // Parse multiple email addresses if comma-separated
+    const recipients = email.split(',').map(e => e.trim()).filter(e => e.length > 0);
+    
+    // Validate all email addresses
+    for (const recipient of recipients) {
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient)) {
+        throw new Error(`Invalid email address: ${recipient}`);
+      }
+    }
+
+    let successful = true;
+
+    // Send to each recipient
+    for (const recipient of recipients) {
+      try {
+        const result = await this.sendNotification(
+          recipient, 
+          NotificationType.EMAIL_TEST, 
+          { 
+            testEmailDetails: {
+              ...testEmailDetails,
+              customContent,
+            }, 
+            userId 
+          }
+        );
+        
+        if (!result) {
+          successful = false;
+        }
+      } catch (error) {
+        successful = false;
+        // Log the error but continue with other recipients
+        console.error(`Failed to send test email to ${recipient}:`, error);
+      }
+    }
+
+    return successful;
   }
 
   /**
@@ -751,6 +798,12 @@ export class NotificationsService {
     adminUserName: string;
     adminEmail: string;
     timestamp: Date;
+    customContent?: {
+      subject?: string;
+      message?: string;
+      format?: 'html' | 'text';
+      includeSmtpDetails?: boolean;
+    };
   }): NotificationTemplate {
     const { 
       smtpHost, 
@@ -760,8 +813,18 @@ export class NotificationsService {
       senderName, 
       adminUserName, 
       adminEmail, 
-      timestamp 
+      timestamp,
+      customContent 
     } = testEmailDetails;
+    
+    // Use custom subject if provided, otherwise use default
+    const subject = customContent?.subject || 'Test Email from PlayaPlan';
+    
+    // Use custom message if provided, otherwise use default
+    const customMessage = customContent?.message || 'This is a test email to verify your SMTP configuration is working correctly.';
+    
+    // Determine if SMTP details should be included
+    const includeSmtpDetails = customContent?.includeSmtpDetails !== false; // Default to true
     
     const formattedTimestamp = new Date(timestamp).toLocaleString('en-US', {
       weekday: 'long',
@@ -773,98 +836,102 @@ export class NotificationsService {
       second: '2-digit',
       timeZoneName: 'short'
     });
-    
-    const subject = 'PlayaPlan Email Configuration Test - Success!';
-    const text = `
-Hello!
 
-This is a test email from PlayaPlan to verify your email configuration is working correctly.
+    // Build email content based on format preference
+    const isHtmlFormat = customContent?.format !== 'text'; // Default to HTML
 
-=== Test Email Details ===
-Sent at: ${formattedTimestamp}
-Sent by: ${adminUserName} (${adminEmail})
+    if (isHtmlFormat) {
+      // HTML format
+      const smtpDetailsHtml = includeSmtpDetails ? `
+        <div style="margin-top: 24px; padding: 16px; background-color: #f8f9fa; border-left: 4px solid #007bff; border-radius: 4px;">
+          <h3 style="margin-top: 0; color: #495057; font-size: 16px;">SMTP Configuration</h3>
+          <table style="width: 100%; font-family: monospace; font-size: 14px;">
+            <tr><td style="padding: 4px 8px; font-weight: bold;">Host:</td><td style="padding: 4px 8px;">${smtpHost}</td></tr>
+            <tr><td style="padding: 4px 8px; font-weight: bold;">Port:</td><td style="padding: 4px 8px;">${smtpPort}</td></tr>
+            <tr><td style="padding: 4px 8px; font-weight: bold;">Secure:</td><td style="padding: 4px 8px;">${smtpSecure ? 'Yes (SSL/TLS)' : 'No'}</td></tr>
+            <tr><td style="padding: 4px 8px; font-weight: bold;">Sender:</td><td style="padding: 4px 8px;">${senderName} &lt;${senderEmail}&gt;</td></tr>
+          </table>
+        </div>` : '';
 
-=== SMTP Configuration ===
-Host: ${smtpHost}
-Port: ${smtpPort}
-Security: ${smtpSecure ? 'SSL/TLS Enabled' : 'No SSL/TLS'}
-Sender Email: ${senderEmail}
-Sender Name: ${senderName}
-
-If you received this email, your email configuration is working properly!
-
-Best regards,
-The PlayaPlan Team
-    `;
-    
-    const html = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
-        <div style="background-color: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-          <div style="text-align: center; margin-bottom: 30px;">
-            <h1 style="color: #4CAF50; margin: 0; font-size: 28px;">✅ Email Test Successful!</h1>
-            <p style="color: #666; margin: 10px 0 0 0; font-size: 18px;">Your email configuration is working correctly</p>
+      const html = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #ffffff;">
+          <div style="text-align: center; margin-bottom: 32px;">
+            <h1 style="color: #343a40; margin-bottom: 8px;">${subject}</h1>
+            <p style="color: #6c757d; margin: 0;">Sent at ${formattedTimestamp}</p>
           </div>
           
-          <div style="background-color: #e8f5e8; padding: 20px; border-radius: 6px; margin-bottom: 25px;">
-            <h3 style="color: #2e7d32; margin: 0 0 15px 0; font-size: 16px;">📧 Test Email Details</h3>
-            <table style="width: 100%; border-collapse: collapse;">
-              <tr>
-                <td style="padding: 8px 0; color: #555; font-weight: bold; width: 120px;">Sent at:</td>
-                <td style="padding: 8px 0; color: #333;">${formattedTimestamp}</td>
-              </tr>
-              <tr>
-                <td style="padding: 8px 0; color: #555; font-weight: bold;">Sent by:</td>
-                <td style="padding: 8px 0; color: #333;">${adminUserName} (${adminEmail})</td>
-              </tr>
-            </table>
+          <div style="background-color: #d4edda; border: 1px solid #c3e6cb; border-radius: 4px; padding: 16px; margin-bottom: 24px;">
+            <h2 style="color: #155724; margin-top: 0; font-size: 18px;">✅ Test Email Successful!</h2>
+            <p style="color: #155724; margin-bottom: 0;">${customMessage}</p>
           </div>
-          
-          <div style="background-color: #f5f5f5; padding: 20px; border-radius: 6px; margin-bottom: 25px;">
-            <h3 style="color: #333; margin: 0 0 15px 0; font-size: 16px;">⚙️ SMTP Configuration</h3>
-            <table style="width: 100%; border-collapse: collapse;">
-              <tr>
-                <td style="padding: 8px 0; color: #555; font-weight: bold; width: 120px;">Host:</td>
-                <td style="padding: 8px 0; color: #333; font-family: monospace;">${smtpHost}</td>
-              </tr>
-              <tr>
-                <td style="padding: 8px 0; color: #555; font-weight: bold;">Port:</td>
-                <td style="padding: 8px 0; color: #333; font-family: monospace;">${smtpPort}</td>
-              </tr>
-              <tr>
-                <td style="padding: 8px 0; color: #555; font-weight: bold;">Security:</td>
-                <td style="padding: 8px 0; color: #333;">
-                  <span style="background-color: ${smtpSecure ? '#4CAF50' : '#ff9800'}; color: white; padding: 2px 8px; border-radius: 4px; font-size: 12px;">
-                    ${smtpSecure ? '🔒 SSL/TLS Enabled' : '⚠️ No SSL/TLS'}
-                  </span>
-                </td>
-              </tr>
-              <tr>
-                <td style="padding: 8px 0; color: #555; font-weight: bold;">Sender Email:</td>
-                <td style="padding: 8px 0; color: #333; font-family: monospace;">${senderEmail}</td>
-              </tr>
-              <tr>
-                <td style="padding: 8px 0; color: #555; font-weight: bold;">Sender Name:</td>
-                <td style="padding: 8px 0; color: #333;">${senderName}</td>
-              </tr>
-            </table>
+
+          ${smtpDetailsHtml}
+
+          <div style="margin-top: 24px; padding: 16px; background-color: #f8f9fa; border-radius: 4px;">
+            <h3 style="margin-top: 0; color: #495057; font-size: 16px;">Test Details</h3>
+            <p style="margin: 8px 0; font-size: 14px;"><strong>Sent by:</strong> ${adminUserName} (${adminEmail})</p>
+            <p style="margin: 8px 0; font-size: 14px;"><strong>Timestamp:</strong> ${formattedTimestamp}</p>
+            <p style="margin: 8px 0; font-size: 14px;"><strong>Application:</strong> PlayaPlan Email System</p>
           </div>
-          
-          <div style="text-align: center; padding: 20px; background-color: #e3f2fd; border-radius: 6px;">
-            <p style="margin: 0; color: #1976d2; font-size: 16px; font-weight: bold;">
-              🎉 Congratulations! Your email system is ready to send notifications.
-            </p>
-          </div>
-          
-          <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;">
-            <p style="color: #666; margin: 0; font-size: 14px;">
-              Best regards,<br>
-              <strong>The PlayaPlan Team</strong>
-            </p>
+
+          <div style="margin-top: 32px; text-align: center; color: #6c757d; font-size: 12px;">
+            <p>This is an automated test email from PlayaPlan. If you received this unexpectedly, please contact your administrator.</p>
           </div>
         </div>
-      </div>
-    `;
-    
-    return { subject, text, html };
+      `;
+
+      const text = `
+${subject}
+Sent at ${formattedTimestamp}
+
+✅ Test Email Successful!
+${customMessage}
+
+${includeSmtpDetails ? `
+SMTP Configuration:
+- Host: ${smtpHost}
+- Port: ${smtpPort}
+- Secure: ${smtpSecure ? 'Yes (SSL/TLS)' : 'No'}
+- Sender: ${senderName} <${senderEmail}>
+` : ''}
+
+Test Details:
+- Sent by: ${adminUserName} (${adminEmail})
+- Timestamp: ${formattedTimestamp}
+- Application: PlayaPlan Email System
+
+This is an automated test email from PlayaPlan. If you received this unexpectedly, please contact your administrator.
+      `.trim();
+
+      return { subject, html, text };
+    } else {
+      // Plain text format only
+      const smtpDetailsText = includeSmtpDetails ? `
+
+SMTP Configuration:
+- Host: ${smtpHost}
+- Port: ${smtpPort}
+- Secure: ${smtpSecure ? 'Yes (SSL/TLS)' : 'No'}
+- Sender: ${senderName} <${senderEmail}>
+` : '';
+
+      const text = `
+${subject}
+Sent at ${formattedTimestamp}
+
+✅ Test Email Successful!
+${customMessage}
+${smtpDetailsText}
+
+Test Details:
+- Sent by: ${adminUserName} (${adminEmail})
+- Timestamp: ${formattedTimestamp}
+- Application: PlayaPlan Email System
+
+This is an automated test email from PlayaPlan. If you received this unexpectedly, please contact your administrator.
+      `.trim();
+
+      return { subject, html: text, text };
+    }
   }
 } 

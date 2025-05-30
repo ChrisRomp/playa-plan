@@ -135,11 +135,11 @@ Based on: `prd-email-notifications-system.md`
     - [x] 6.7.2.3 Add "Send Test Email" button with loading state
     - [x] 6.7.2.4 Display success/failure status with detailed feedback messages
     - [x] 6.7.2.5 Show email audit record link for successful test emails
-  - [ ] 6.7.3 Enhance test email functionality
-    - [ ] 6.7.3.1 Add ability to test with custom subject and message content
-    - [ ] 6.7.3.2 Include option to send test email to multiple recipients
-    - [ ] 6.7.3.3 Show preview of email content before sending
-    - [ ] 6.7.3.4 Add quick-select buttons for common test scenarios (HTML vs plain text)
+  - [x] 6.7.3 Enhance test email functionality
+    - [x] 6.7.3.1 Add ability to test with custom subject and message content
+    - [x] 6.7.3.2 Include option to send test email to multiple recipients
+    - [x] 6.7.3.3 Show preview of email content before sending
+    - [x] 6.7.3.4 Add quick-select buttons for common test scenarios (HTML vs plain text)
   - [ ] 6.7.4 Test email monitoring and troubleshooting
     - [ ] 6.7.4.1 Display recent test email history in admin panel
     - [ ] 6.7.4.2 Add "Test SMTP Connection" button that validates configuration without sending email

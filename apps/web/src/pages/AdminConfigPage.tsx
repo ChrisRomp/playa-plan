@@ -29,6 +29,19 @@ const AdminConfigPage: React.FC = () => {
     subject: string;
   } | null>(null);
   
+  // Enhanced test email state for 6.7.3.x features
+  const [testEmailSubject, setTestEmailSubject] = useState('');
+  const [testEmailMessage, setTestEmailMessage] = useState('');
+  const [testEmailFormat, setTestEmailFormat] = useState<'html' | 'text'>('html');
+  const [includeSmtpDetails, setIncludeSmtpDetails] = useState(true);
+  const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
+  const [showEmailPreview, setShowEmailPreview] = useState(false);
+  const [emailPreview, setEmailPreview] = useState<{
+    subject: string;
+    content: string;
+    format: string;
+  } | null>(null);
+  
   // Form state
   const [formData, setFormData] = useState({
     campName: '',
@@ -210,10 +223,90 @@ const AdminConfigPage: React.FC = () => {
     setTestEmailAuditRecord(null);
   };
   
-  // Handle test email sending
+  // Generate email preview
+  const generateEmailPreview = () => {
+    const subject = testEmailSubject || 'Test Email from PlayaPlan';
+    const message = testEmailMessage || 'This is a test email to verify your SMTP configuration is working correctly.';
+    
+    if (testEmailFormat === 'html') {
+      const content = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <h1 style="color: #343a40;">${subject}</h1>
+          <div style="background-color: #d4edda; border: 1px solid #c3e6cb; border-radius: 4px; padding: 16px; margin: 24px 0;">
+            <p style="color: #155724; margin: 0;">${message}</p>
+          </div>
+          ${includeSmtpDetails ? `
+          <div style="margin-top: 24px; padding: 16px; background-color: #f8f9fa; border-left: 4px solid #007bff; border-radius: 4px;">
+            <h3 style="margin-top: 0; color: #495057;">SMTP Configuration</h3>
+            <p style="font-family: monospace; font-size: 14px; color: #6c757d;">
+              Host: ${formData.smtpHost || 'Not configured'}<br>
+              Port: ${formData.smtpPort || 'Not configured'}<br>
+              Secure: ${formData.smtpUseSsl ? 'Yes (SSL/TLS)' : 'No'}<br>
+              Sender: ${formData.senderName || 'Not configured'} &lt;${formData.senderEmail || 'Not configured'}&gt;
+            </p>
+          </div>
+          ` : ''}
+        </div>
+      `;
+      setEmailPreview({ subject, content, format: 'HTML' });
+    } else {
+      const content = `
+${subject}
+
+${message}
+
+${includeSmtpDetails ? `
+SMTP Configuration:
+- Host: ${formData.smtpHost || 'Not configured'}
+- Port: ${formData.smtpPort || 'Not configured'}
+- Secure: ${formData.smtpUseSsl ? 'Yes (SSL/TLS)' : 'No'}
+- Sender: ${formData.senderName || 'Not configured'} <${formData.senderEmail || 'Not configured'}>
+` : ''}
+
+This is an automated test email from PlayaPlan.
+      `.trim();
+      setEmailPreview({ subject, content, format: 'Plain Text' });
+    }
+    setShowEmailPreview(true);
+  };
+  
+  // Quick-select button handlers for task 6.7.3.4
+  const applyQuickTemplate = (templateType: 'basic' | 'detailed' | 'plain') => {
+    switch (templateType) {
+      case 'basic':
+        setTestEmailSubject('Basic Test Email');
+        setTestEmailMessage('This is a basic test to verify email delivery.');
+        setTestEmailFormat('html');
+        setIncludeSmtpDetails(false);
+        break;
+      case 'detailed':
+        setTestEmailSubject('Detailed SMTP Configuration Test');
+        setTestEmailMessage('This detailed test includes all SMTP configuration information for troubleshooting purposes.');
+        setTestEmailFormat('html');
+        setIncludeSmtpDetails(true);
+        break;
+      case 'plain':
+        setTestEmailSubject('Plain Text Test Email');
+        setTestEmailMessage('This is a plain text test email without HTML formatting.');
+        setTestEmailFormat('text');
+        setIncludeSmtpDetails(true);
+        break;
+    }
+  };
+  
+  // Enhanced test email sending with custom content
   const handleSendTestEmail = async () => {
-    if (!testEmailAddress || !isValidEmail(testEmailAddress)) {
-      setTestEmailError('Please enter a valid email address');
+    // Validate email addresses (support comma-separated)
+    const emails = testEmailAddress.split(',').map(e => e.trim()).filter(e => e.length > 0);
+    const invalidEmails = emails.filter(email => !isValidEmail(email));
+    
+    if (emails.length === 0) {
+      setTestEmailError('Please enter at least one email address');
+      return;
+    }
+    
+    if (invalidEmails.length > 0) {
+      setTestEmailError(`Invalid email address(es): ${invalidEmails.join(', ')}`);
       return;
     }
     
@@ -222,17 +315,24 @@ const AdminConfigPage: React.FC = () => {
     
     try {
       const response = await api.post('/notifications/email/test', {
-        email: testEmailAddress
+        email: testEmailAddress,
+        subject: testEmailSubject || undefined,
+        message: testEmailMessage || undefined,
+        format: testEmailFormat,
+        includeSmtpDetails: includeSmtpDetails,
       });
       
       if (response.data.success) {
-        setTestEmailSuccess(`Test email sent successfully to ${testEmailAddress}!`);
+        const recipientCount = emails.length;
+        setTestEmailSuccess(
+          `Test email sent successfully to ${recipientCount} recipient${recipientCount > 1 ? 's' : ''}!`
+        );
         setTestEmailAddress(''); // Clear the input on success
         setTestEmailAuditRecord({
           id: response.data.auditRecordId || '',
-          recipientEmail: testEmailAddress,
+          recipientEmail: emails.join(', '),
           timestamp: response.data.timestamp || new Date().toISOString(),
-          subject: 'Test Email from PlayaPlan'
+          subject: response.data.emailPreview?.subject || 'Test Email from PlayaPlan'
         });
       } else {
         setTestEmailError(response.data.message || 'Failed to send test email');
@@ -940,37 +1040,161 @@ const AdminConfigPage: React.FC = () => {
             <div className={`${!formData.emailEnabled ? 'opacity-50 pointer-events-none' : ''}`}>
               <p className="text-gray-600 mb-4">
                 Send a test email to verify your SMTP configuration is working correctly. 
-                The test email will include details about your current SMTP settings and timestamp information.
+                You can customize the content, send to multiple recipients, and preview the email before sending.
               </p>
               
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+              {/* Quick Template Buttons */}
+              <div className="mb-4">
+                <h3 className="text-lg font-medium mb-2">Quick Templates</h3>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => applyQuickTemplate('basic')}
+                    disabled={!formData.emailEnabled}
+                    className="px-3 py-1 bg-blue-100 text-blue-700 rounded text-sm hover:bg-blue-200 transition-colors disabled:bg-gray-100 disabled:text-gray-400"
+                  >
+                    Basic Test
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => applyQuickTemplate('detailed')}
+                    disabled={!formData.emailEnabled}
+                    className="px-3 py-1 bg-green-100 text-green-700 rounded text-sm hover:bg-green-200 transition-colors disabled:bg-gray-100 disabled:text-gray-400"
+                  >
+                    Detailed SMTP Test
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => applyQuickTemplate('plain')}
+                    disabled={!formData.emailEnabled}
+                    className="px-3 py-1 bg-purple-100 text-purple-700 rounded text-sm hover:bg-purple-200 transition-colors disabled:bg-gray-100 disabled:text-gray-400"
+                  >
+                    Plain Text Test
+                  </button>
+                </div>
+              </div>
+              
+              {/* Advanced Options Toggle */}
+              <div className="mb-4">
+                <button
+                  type="button"
+                  onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
+                  disabled={!formData.emailEnabled}
+                  className="flex items-center text-sm text-blue-600 hover:text-blue-800 disabled:text-gray-400"
+                >
+                  {showAdvancedOptions ? '▼' : '▶'} Advanced Options
+                </button>
+              </div>
+              
+              {/* Advanced Options Panel */}
+              {showAdvancedOptions && (
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label htmlFor="testEmailSubject" className="block text-gray-700 font-medium mb-2">
+                        Custom Subject
+                      </label>
+                      <input
+                        type="text"
+                        id="testEmailSubject"
+                        value={testEmailSubject}
+                        onChange={(e) => setTestEmailSubject(e.target.value)}
+                        placeholder="Leave blank for default subject"
+                        disabled={!formData.emailEnabled}
+                        className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label htmlFor="testEmailFormat" className="block text-gray-700 font-medium mb-2">
+                        Email Format
+                      </label>
+                      <select
+                        id="testEmailFormat"
+                        value={testEmailFormat}
+                        onChange={(e) => setTestEmailFormat(e.target.value as 'html' | 'text')}
+                        disabled={!formData.emailEnabled}
+                        className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                      >
+                        <option value="html">HTML Format</option>
+                        <option value="text">Plain Text</option>
+                      </select>
+                    </div>
+                  </div>
+                  
+                  <div className="mt-4">
+                    <label htmlFor="testEmailMessage" className="block text-gray-700 font-medium mb-2">
+                      Custom Message Content
+                    </label>
+                    <textarea
+                      id="testEmailMessage"
+                      value={testEmailMessage}
+                      onChange={(e) => setTestEmailMessage(e.target.value)}
+                      placeholder="Leave blank for default test message"
+                      rows={3}
+                      disabled={!formData.emailEnabled}
+                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    />
+                  </div>
+                  
+                  <div className="mt-4">
+                    <div className="flex items-center">
+                      <input
+                        type="checkbox"
+                        id="includeSmtpDetails"
+                        checked={includeSmtpDetails}
+                        onChange={(e) => setIncludeSmtpDetails(e.target.checked)}
+                        disabled={!formData.emailEnabled}
+                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded disabled:cursor-not-allowed"
+                      />
+                      <label htmlFor="includeSmtpDetails" className="ml-2 block text-gray-700">
+                        Include SMTP Configuration Details in Email
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {/* Email Address and Actions */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end mb-4">
                 <div className="md:col-span-2">
                   <label htmlFor="testEmailAddress" className="block text-gray-700 font-medium mb-2">
-                    Test Email Address
+                    Email Address(es)
                   </label>
                   <input
-                    type="email"
+                    type="text"
                     id="testEmailAddress"
                     value={testEmailAddress}
                     onChange={(e) => setTestEmailAddress(e.target.value)}
-                    placeholder="Enter email address to send test email"
+                    placeholder="email@example.com or email1@example.com, email2@example.com"
                     disabled={!formData.emailEnabled || isTestEmailLoading}
                     className={`w-full px-3 py-2 border ${
-                      testEmailAddress && !isValidEmail(testEmailAddress)
+                      testEmailAddress && testEmailAddress.split(',').some(email => !isValidEmail(email.trim()))
                         ? 'border-red-500'
                         : 'border-gray-300'
                     } rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed`}
                   />
-                  {testEmailAddress && !isValidEmail(testEmailAddress) && (
-                    <p className="text-red-500 text-sm mt-1">Please enter a valid email address</p>
-                  )}
+                  <p className="text-sm text-gray-500 mt-1">
+                    Separate multiple emails with commas
+                  </p>
+                </div>
+                
+                <div>
+                  <button
+                    type="button"
+                    onClick={generateEmailPreview}
+                    disabled={!formData.emailEnabled || !testEmailAddress}
+                    className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
+                  >
+                    Preview Email
+                  </button>
                 </div>
                 
                 <div>
                   <button
                     type="button"
                     onClick={handleSendTestEmail}
-                    disabled={!formData.emailEnabled || isTestEmailLoading || !testEmailAddress || !isValidEmail(testEmailAddress)}
+                    disabled={!formData.emailEnabled || isTestEmailLoading || !testEmailAddress}
                     className="w-full px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
                   >
                     {isTestEmailLoading ? 'Sending...' : 'Send Test Email'}
@@ -978,6 +1202,44 @@ const AdminConfigPage: React.FC = () => {
                 </div>
               </div>
               
+              {/* Email Preview Modal */}
+              {showEmailPreview && emailPreview && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                  <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden">
+                    <div className="bg-gray-50 px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                      <h3 className="text-lg font-medium text-gray-900">Email Preview - {emailPreview.format}</h3>
+                      <button
+                        onClick={() => setShowEmailPreview(false)}
+                        className="text-gray-400 hover:text-gray-600"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
+                      <div className="mb-4">
+                        <strong>Subject:</strong> {emailPreview.subject}
+                      </div>
+                      <div className="border border-gray-200 rounded p-4 bg-gray-50">
+                        {emailPreview.format === 'HTML' ? (
+                          <div dangerouslySetInnerHTML={{ __html: emailPreview.content }} />
+                        ) : (
+                          <pre className="whitespace-pre-wrap font-sans text-sm">{emailPreview.content}</pre>
+                        )}
+                      </div>
+                    </div>
+                    <div className="bg-gray-50 px-6 py-4 border-t border-gray-200 flex justify-end">
+                      <button
+                        onClick={() => setShowEmailPreview(false)}
+                        className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors"
+                      >
+                        Close
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {/* Error and Success Messages */}
               {testEmailError && (
                 <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-4">
                   <div className="flex">
