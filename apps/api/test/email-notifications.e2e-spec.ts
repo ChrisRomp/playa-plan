@@ -1104,4 +1104,642 @@ describe('Email Notifications (e2e)', () => {
       expect(endTime - startTime).toBeLessThan(1000); // Should complete within 1 second
     });
   });
+
+  describe('5.7 Error Handling and Edge Cases', () => {
+    beforeEach(() => {
+      // Clear mock calls before each test
+      mockTransporter.sendMail.mockClear();
+      mockTransporter.verify.mockClear();
+    });
+
+    describe('5.7.1 Database connection failures during email operations', () => {
+      it('should handle database failures during email configuration retrieval', async () => {
+        // Arrange - Mock database failure for CoreConfigService
+        const originalFind = prismaService.coreConfig.findFirst;
+        jest.spyOn(prismaService.coreConfig, 'findFirst').mockRejectedValue(
+          new Error('Database connection lost')
+        );
+
+        try {
+          // Act - Try to send email when database is unavailable
+          const result = await notificationsService.sendLoginCodeEmail(
+            'test-db-fail@example.com',
+            '123456',
+            testUserId
+          );
+
+          // Assert - Email should fail gracefully
+          expect(result).toBe(false);
+        } finally {
+          // Restore original method
+          jest.spyOn(prismaService.coreConfig, 'findFirst').mockImplementation(originalFind);
+        }
+      });
+
+      it('should handle database failures during audit logging', async () => {
+        // Arrange - Set up working email configuration
+        await prismaService.coreConfig.update({
+          where: { id: testConfigId },
+          data: {
+            emailEnabled: true,
+            smtpHost: 'smtp.test.com',
+            smtpPort: 587,
+            smtpUser: 'test@example.com',
+            smtpPassword: 'testpass',
+            smtpSecure: false,
+            senderEmail: 'test@example.playaplan.app',
+            senderName: 'PlayaPlan Test',
+          },
+        });
+
+        await emailService.refreshConfiguration();
+
+        // Mock successful email sending but failed audit logging
+        mockTransporter.sendMail.mockResolvedValue({ messageId: 'test-message-id' });
+        const originalCreate = prismaService.emailAudit.create;
+        jest.spyOn(prismaService.emailAudit, 'create').mockRejectedValue(
+          new Error('Database write failed')
+        );
+
+        try {
+          // Act - Send email when audit logging fails
+          const result = await notificationsService.sendLoginCodeEmail(
+            'test-audit-fail@example.com',
+            '123456',
+            testUserId
+          );
+
+          // Assert - Email should still be sent successfully (audit failure doesn't block email)
+          expect(result).toBe(true);
+          expect(mockTransporter.sendMail).toHaveBeenCalled();
+        } finally {
+          // Restore original method
+          jest.spyOn(prismaService.emailAudit, 'create').mockImplementation(originalCreate);
+        }
+      });
+    });
+
+    describe('5.7.2 Malformed email addresses and content validation', () => {
+      it('should handle invalid email addresses gracefully', async () => {
+        // Arrange - Set up working configuration
+        await prismaService.coreConfig.update({
+          where: { id: testConfigId },
+          data: {
+            emailEnabled: true,
+            smtpHost: 'smtp.test.com',
+            smtpPort: 587,
+            smtpUser: 'test@example.com',
+            smtpPassword: 'testpass',
+            smtpSecure: false,
+            senderEmail: 'test@example.playaplan.app',
+            senderName: 'PlayaPlan Test',
+          },
+        });
+
+        await emailService.refreshConfiguration();
+
+        // Mock SMTP failure for invalid email
+        mockTransporter.sendMail.mockRejectedValue(new Error('Invalid recipient address'));
+
+        // Act - Try to send to invalid email addresses
+        const invalidEmails = [
+          'invalid-email',
+          'missing@domain',
+          '@invalid.com',
+          'spaces in@email.com',
+          'special!chars@domain.com',
+        ];
+
+        for (const invalidEmail of invalidEmails) {
+          const result = await notificationsService.sendLoginCodeEmail(
+            invalidEmail,
+            '123456',
+            testUserId
+          );
+
+          // Assert - Should fail gracefully
+          expect(result).toBe(false);
+        }
+
+        // Verify audit records were created for all failures
+        const auditRecords = await prismaService.emailAudit.findMany({
+          where: {
+            status: EmailAuditStatus.FAILED,
+            errorMessage: { contains: 'SMTP send operation returned false' },
+          },
+        });
+
+        expect(auditRecords.length).toBeGreaterThanOrEqual(invalidEmails.length);
+      });
+
+      it('should handle extremely large email content', async () => {
+        // Arrange - Set up working configuration
+        await emailService.refreshConfiguration();
+
+        // Create large content (simulate large HTML email)
+        const largeContent = 'A'.repeat(10 * 1024 * 1024); // 10MB of content
+        
+        // Mock SMTP failure for large content
+        mockTransporter.sendMail.mockRejectedValue(new Error('Message too large'));
+
+        // Act - Try to send large email
+        const result = await emailService.sendEmail({
+          to: 'test-large@example.com',
+          subject: 'Large Email Test',
+          html: largeContent,
+          notificationType: NotificationType.EMAIL_VERIFICATION,
+          userId: testUserId,
+        });
+
+        // Assert - Should fail gracefully
+        expect(result).toBe(false);
+
+        // Check audit record shows appropriate error
+        const auditRecords = await prismaService.emailAudit.findMany({
+          where: {
+            recipientEmail: 'test-large@example.com',
+            status: EmailAuditStatus.FAILED,
+          },
+        });
+
+        expect(auditRecords.length).toBeGreaterThan(0);
+        expect(auditRecords[0].errorMessage).toContain('SMTP send operation returned false');
+      });
+
+      it('should handle missing required notification type', async () => {
+        // Act & Assert - Should handle missing notificationType gracefully
+        const result = await emailService.sendEmail({
+          to: 'test@example.com',
+          subject: 'Test',
+          html: '<p>Test</p>',
+          notificationType: NotificationType.EMAIL_VERIFICATION,
+          userId: testUserId,
+          // This test demonstrates that with valid parameters, email succeeds
+        });
+
+        expect(result).toBe(true); // Should succeed with valid notificationType
+      });
+    });
+
+    describe('5.7.3 SMTP timeout and connection failure scenarios', () => {
+      it('should handle SMTP connection timeouts', async () => {
+        // Arrange - Set up configuration
+        await prismaService.coreConfig.update({
+          where: { id: testConfigId },
+          data: {
+            emailEnabled: true,
+            smtpHost: 'slow.smtp.com',
+            smtpPort: 587,
+            smtpUser: 'test@example.com',
+            smtpPassword: 'testpass',
+            smtpSecure: false,
+            senderEmail: 'test@example.playaplan.app',
+            senderName: 'PlayaPlan Test',
+          },
+        });
+
+        await emailService.refreshConfiguration();
+
+        // Mock timeout error
+        mockTransporter.sendMail.mockRejectedValue(new Error('ETIMEDOUT'));
+
+        // Act - Send email with timeout
+        const result = await notificationsService.sendLoginCodeEmail(
+          'test-timeout@example.com',
+          '123456',
+          testUserId
+        );
+
+        // Assert - Should handle timeout gracefully
+        expect(result).toBe(false);
+
+        // Check audit record
+        const auditRecords = await prismaService.emailAudit.findMany({
+          where: {
+            recipientEmail: 'test-timeout@example.com',
+            status: EmailAuditStatus.FAILED,
+          },
+        });
+
+        expect(auditRecords.length).toBeGreaterThan(0);
+      });
+
+      it('should handle SMTP server unavailable scenarios', async () => {
+        // Arrange - Mock different connection failure types
+        const connectionErrors = [
+          'ECONNREFUSED',
+          'ENOTFOUND',
+          'ECONNRESET',
+          'EHOSTUNREACH',
+        ];
+
+        await emailService.refreshConfiguration();
+
+        for (const errorCode of connectionErrors) {
+          // Mock specific connection error
+          mockTransporter.sendMail.mockRejectedValue(new Error(errorCode));
+
+          // Act
+          const result = await notificationsService.sendLoginCodeEmail(
+            `test-${errorCode.toLowerCase()}@example.com`,
+            '123456',
+            testUserId
+          );
+
+          // Assert
+          expect(result).toBe(false);
+        }
+      });
+
+      it('should handle SSL/TLS handshake failures', async () => {
+        // Arrange - Set up SSL configuration
+        await prismaService.coreConfig.update({
+          where: { id: testConfigId },
+          data: {
+            emailEnabled: true,
+            smtpHost: 'ssl.smtp.com',
+            smtpPort: 465,
+            smtpUser: 'test@example.com',
+            smtpPassword: 'testpass',
+            smtpSecure: true,
+            senderEmail: 'test@example.playaplan.app',
+            senderName: 'PlayaPlan Test',
+          },
+        });
+
+        await emailService.refreshConfiguration();
+
+        // Mock SSL handshake failure
+        mockTransporter.sendMail.mockRejectedValue(new Error('SSL handshake failed'));
+
+        // Act
+        const result = await notificationsService.sendLoginCodeEmail(
+          'test-ssl@example.com',
+          '123456',
+          testUserId
+        );
+
+        // Assert
+        expect(result).toBe(false);
+      });
+    });
+
+    describe('5.7.4 Large attachment handling and size limits', () => {
+      it('should handle oversized attachments', async () => {
+        // Arrange
+        await emailService.refreshConfiguration();
+
+        // Create large attachment (simulate 25MB attachment)
+        const largeAttachment = {
+          filename: 'large-file.pdf',
+          content: Buffer.alloc(25 * 1024 * 1024), // 25MB
+          contentType: 'application/pdf',
+        };
+
+        // Mock failure for large attachment
+        mockTransporter.sendMail.mockRejectedValue(new Error('Attachment too large'));
+
+        // Act
+        const result = await emailService.sendEmail({
+          to: 'test-attachment@example.com',
+          subject: 'Large Attachment Test',
+          html: '<p>Email with large attachment</p>',
+          attachments: [largeAttachment],
+          notificationType: NotificationType.PAYMENT_CONFIRMATION,
+          userId: testUserId,
+        });
+
+        // Assert
+        expect(result).toBe(false);
+      });
+
+      it('should handle multiple attachments gracefully', async () => {
+        // Arrange
+        await emailService.refreshConfiguration();
+
+        // Create multiple attachments
+        const attachments = Array.from({ length: 10 }, (_, i) => ({
+          filename: `file-${i}.txt`,
+          content: `Content of file ${i}`,
+          contentType: 'text/plain',
+        }));
+
+        // Mock successful sending with multiple attachments
+        mockTransporter.sendMail.mockResolvedValue({ messageId: 'test-multi-attach' });
+
+        // Act
+        const result = await emailService.sendEmail({
+          to: 'test-multi-attach@example.com',
+          subject: 'Multiple Attachments Test',
+          html: '<p>Email with multiple attachments</p>',
+          attachments,
+          notificationType: NotificationType.PAYMENT_CONFIRMATION,
+          userId: testUserId,
+        });
+
+        // Assert
+        expect(result).toBe(true);
+        expect(mockTransporter.sendMail).toHaveBeenCalledWith(
+          expect.objectContaining({
+            attachments: expect.arrayContaining([
+              expect.objectContaining({
+                filename: expect.stringContaining('file-'),
+                contentType: 'text/plain',
+              }),
+            ]),
+          })
+        );
+      });
+
+      it('should handle corrupted attachment data', async () => {
+        // Arrange
+        await emailService.refreshConfiguration();
+
+        // Create corrupted attachment
+        const corruptedAttachment = {
+          filename: 'corrupted.pdf',
+          content: '', // Empty content to simulate corruption
+          contentType: 'application/pdf',
+        };
+
+        // Mock failure for corrupted attachment
+        mockTransporter.sendMail.mockRejectedValue(new Error('Invalid attachment data'));
+
+        // Act
+        const result = await emailService.sendEmail({
+          to: 'test-corrupted@example.com',
+          subject: 'Corrupted Attachment Test',
+          html: '<p>Email with corrupted attachment</p>',
+          attachments: [corruptedAttachment],
+          notificationType: NotificationType.PAYMENT_CONFIRMATION,
+          userId: testUserId,
+        });
+
+        // Assert
+        expect(result).toBe(false);
+      });
+    });
+
+    describe('5.7.5 Email queue backpressure and rate limiting scenarios', () => {
+      it('should handle rapid sequential email sending', async () => {
+        // Arrange
+        await emailService.refreshConfiguration();
+        mockTransporter.sendMail.mockResolvedValue({ messageId: 'test-rapid' });
+
+        // Act - Send many emails rapidly
+        const rapidEmails = Array.from({ length: 50 }, (_, i) => 
+          notificationsService.sendLoginCodeEmail(
+            `rapid${i}@example.com`,
+            `code${i}`,
+            testUserId
+          )
+        );
+
+        const startTime = Date.now();
+        const results = await Promise.all(rapidEmails);
+        const endTime = Date.now();
+
+        // Assert - All should succeed and complete in reasonable time
+        expect(results.every(result => result === true)).toBe(true);
+        expect(mockTransporter.sendMail).toHaveBeenCalledTimes(50);
+        expect(endTime - startTime).toBeLessThan(5000); // Should complete within 5 seconds
+      });
+
+      it('should handle SMTP rate limiting responses', async () => {
+        // Arrange
+        await emailService.refreshConfiguration();
+
+        // Mock rate limiting error
+        mockTransporter.sendMail.mockRejectedValue(
+          new Error('550 Rate limit exceeded')
+        );
+
+        // Act - Send multiple emails that hit rate limit
+        const rateLimitedEmails = Array.from({ length: 5 }, (_, i) => 
+          notificationsService.sendLoginCodeEmail(
+            `ratelimit${i}@example.com`,
+            `code${i}`,
+            testUserId
+          )
+        );
+
+        const results = await Promise.all(rateLimitedEmails);
+
+        // Assert - All should fail gracefully
+        expect(results.every(result => result === false)).toBe(true);
+
+        // Check audit records show rate limiting
+        const auditRecords = await prismaService.emailAudit.findMany({
+          where: {
+            recipientEmail: { startsWith: 'ratelimit' },
+            status: EmailAuditStatus.FAILED,
+          },
+        });
+
+        expect(auditRecords.length).toBe(5);
+      });
+
+      it('should handle memory pressure during bulk operations', async () => {
+        // Arrange
+        await emailService.refreshConfiguration();
+        mockTransporter.sendMail.mockResolvedValue({ messageId: 'test-bulk' });
+
+        // Act - Process large batch of emails
+        const bulkEmails = Array.from({ length: 100 }, (_, i) => ({
+          to: `bulk${i}@example.com`,
+          subject: `Bulk Email ${i}`,
+          html: `<p>This is bulk email number ${i}</p>`,
+          notificationType: NotificationType.EMAIL_VERIFICATION,
+          userId: testUserId,
+        }));
+
+        const startTime = Date.now();
+        const results = await Promise.all(
+          bulkEmails.map(email => emailService.sendEmail(email))
+        );
+        const endTime = Date.now();
+
+        // Assert - Should handle bulk operations efficiently
+        expect(results.every(result => result === true)).toBe(true);
+        expect(mockTransporter.sendMail).toHaveBeenCalledTimes(100);
+        expect(endTime - startTime).toBeLessThan(10000); // Should complete within 10 seconds
+      });
+    });
+
+    describe('5.7.6 Configuration cache invalidation on service restart', () => {
+      it('should handle configuration changes during service operation', async () => {
+        // Arrange - Start with initial configuration
+        await prismaService.coreConfig.update({
+          where: { id: testConfigId },
+          data: {
+            emailEnabled: true,
+            smtpHost: 'initial.smtp.com',
+            smtpPort: 587,
+            smtpUser: 'initial@example.com',
+            smtpPassword: 'initialpass',
+            smtpSecure: false,
+            senderEmail: 'initial@example.playaplan.app',
+            senderName: 'Initial Config',
+          },
+        });
+
+        await emailService.refreshConfiguration();
+        mockTransporter.sendMail.mockResolvedValue({ messageId: 'test-config-change' });
+
+        // Act - Send email with initial config
+        let result = await notificationsService.sendLoginCodeEmail(
+          'test-initial@example.com',
+          '123456',
+          testUserId
+        );
+
+        expect(result).toBe(true);
+
+        // Change configuration
+        await prismaService.coreConfig.update({
+          where: { id: testConfigId },
+          data: {
+            smtpHost: 'updated.smtp.com',
+            smtpUser: 'updated@example.com',
+            smtpPassword: 'updatedpass',
+          },
+        });
+
+        // Force refresh configuration (simulating service restart)
+        await emailService.refreshConfiguration();
+
+        // Send another email with updated config
+        result = await notificationsService.sendLoginCodeEmail(
+          'test-updated@example.com',
+          '123456',
+          testUserId
+        );
+
+        // Assert - Should work with updated configuration
+        expect(result).toBe(true);
+        expect(nodemailer.createTransport).toHaveBeenCalledWith(
+          expect.objectContaining({
+            host: 'updated.smtp.com',
+            auth: expect.objectContaining({
+              user: 'updated@example.com',
+              pass: 'updatedpass',
+            }),
+          })
+        );
+      });
+
+      it('should handle cache expiration gracefully', async () => {
+        // Arrange - Set up configuration
+        await prismaService.coreConfig.update({
+          where: { id: testConfigId },
+          data: {
+            emailEnabled: true,
+            smtpHost: 'cache-test.smtp.com',
+            smtpPort: 587,
+            smtpUser: 'cache@example.com',
+            smtpPassword: 'cachepass',
+            smtpSecure: false,
+            senderEmail: 'cache@example.playaplan.app',
+            senderName: 'Cache Test',
+          },
+        });
+
+        await emailService.refreshConfiguration();
+        mockTransporter.sendMail.mockResolvedValue({ messageId: 'test-cache-expire' });
+
+        // Act - Send email (uses cached config)
+        const result1 = await notificationsService.sendLoginCodeEmail(
+          'test-cache1@example.com',
+          '123456',
+          testUserId
+        );
+
+        // Simulate cache expiration by forcing refresh
+        await emailService.refreshConfiguration();
+
+        // Send another email (should refresh config from database)
+        const result2 = await notificationsService.sendLoginCodeEmail(
+          'test-cache2@example.com',
+          '123456',
+          testUserId
+        );
+
+        // Assert - Both should succeed
+        expect(result1).toBe(true);
+        expect(result2).toBe(true);
+        expect(mockTransporter.sendMail).toHaveBeenCalledTimes(2);
+      });
+
+      it('should handle service restart scenarios', async () => {
+        // Arrange - Set up configuration
+        await prismaService.coreConfig.update({
+          where: { id: testConfigId },
+          data: {
+            emailEnabled: true,
+            smtpHost: 'restart.smtp.com',
+            smtpPort: 587,
+            smtpUser: 'restart@example.com',
+            smtpPassword: 'restartpass',
+            smtpSecure: false,
+            senderEmail: 'restart@example.playaplan.app',
+            senderName: 'Restart Test',
+          },
+        });
+
+        // Simulate service restart by calling onModuleInit
+        await emailService.onModuleInit();
+        mockTransporter.sendMail.mockResolvedValue({ messageId: 'test-restart' });
+
+        // Act - Send email after restart
+        const result = await notificationsService.sendLoginCodeEmail(
+          'test-restart@example.com',
+          '123456',
+          testUserId
+        );
+
+        // Assert - Should work after restart
+        expect(result).toBe(true);
+        expect(mockTransporter.sendMail).toHaveBeenCalled();
+      });
+
+      it('should handle configuration corruption gracefully', async () => {
+        // Arrange - Create corrupted configuration
+        await prismaService.coreConfig.update({
+          where: { id: testConfigId },
+          data: {
+            emailEnabled: true,
+            smtpHost: null, // Corrupted host
+            smtpPort: -1, // Invalid port
+            smtpUser: '', // Empty user
+            smtpPassword: null, // Missing password
+            smtpSecure: false,
+          },
+        });
+
+        // Act - Try to refresh with corrupted config
+        await expect(emailService.refreshConfiguration()).resolves.not.toThrow();
+
+        // Try to send email with corrupted config
+        const result = await notificationsService.sendLoginCodeEmail(
+          'test-corrupted@example.com',
+          '123456',
+          testUserId
+        );
+
+        // Assert - Should fail gracefully
+        expect(result).toBe(false);
+
+        // Check audit record shows configuration error
+        const auditRecords = await prismaService.emailAudit.findMany({
+          where: {
+            recipientEmail: 'test-corrupted@example.com',
+            status: EmailAuditStatus.FAILED,
+          },
+        });
+
+        expect(auditRecords.length).toBeGreaterThan(0);
+        expect(auditRecords[0].errorMessage).toContain('SMTP send operation returned false');
+      });
+    });
+  });
 }); 

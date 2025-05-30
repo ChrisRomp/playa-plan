@@ -107,13 +107,13 @@ Based on: `prd-email-notifications-system.md`
     - [x] 5.6.4 Test email audit statistics endpoint returns accurate data
     - [x] 5.6.5 Test SMTP configuration validation and connection testing (uses nodemailer test account)
     - [x] 5.6.6 Test concurrent email sending with cache coherency
-  - [ ] 5.7 Error Handling and Edge Cases (uses mocks to simulate error conditions)
-    - [ ] 5.7.1 Test database connection failures during email operations
-    - [ ] 5.7.2 Test malformed email addresses and content validation
-    - [ ] 5.7.3 Test SMTP timeout and connection failure scenarios
-    - [ ] 5.7.4 Test large attachment handling and size limits
-    - [ ] 5.7.5 Test email queue backpressure and rate limiting scenarios
-    - [ ] 5.7.6 Test configuration cache invalidation on service restart
+  - [x] 5.7 Error Handling and Edge Cases (uses mocks to simulate error conditions)
+    - [x] 5.7.1 Test database connection failures during email operations
+    - [x] 5.7.2 Test malformed email addresses and content validation
+    - [x] 5.7.3 Test SMTP timeout and connection failure scenarios
+    - [x] 5.7.4 Test large attachment handling and size limits
+    - [x] 5.7.5 Test email queue backpressure and rate limiting scenarios
+    - [x] 5.7.6 Test configuration cache invalidation on service restart
 
 - [ ] 6.0 Admin UI Updates for Email Toggle
   - [ ] 6.1 Add `emailEnabled` checkbox to Email Configuration section in AdminConfigPage.tsx
