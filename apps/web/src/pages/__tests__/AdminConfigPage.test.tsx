@@ -30,6 +30,7 @@ vi.mock('../../lib/api', () => ({
 // Type the mocked API functions
 const mockApiGet = api.api.get as ReturnType<typeof vi.fn>;
 const mockApiPatch = api.api.patch as ReturnType<typeof vi.fn>;
+const mockApiPost = api.api.post as ReturnType<typeof vi.fn>;
 
 // Mock console methods to capture debug logs
 const mockConsoleLog = vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -596,5 +597,396 @@ describe('AdminConfigPage - Email Toggle Functionality', () => {
     // Verify SMTP password is not included (preserves existing)
     expect(payload).not.toHaveProperty('smtpPassword');
     expect(payload).toHaveProperty('emailEnabled', true);
+  });
+});
+
+describe('Email Configuration Form Submission', () => {
+  beforeEach(() => {
+    mockApiGet.mockResolvedValue({
+      data: mockConfig,
+    });
+
+    mockApiPatch.mockResolvedValue({
+      status: 200,
+      data: mockConfig,
+    });
+  });
+
+  it('should submit email configuration changes', async () => {
+    render(<AdminConfigPage />);
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('PlayaPlan 2024')).toBeInTheDocument();
+    });
+
+    // Enable email notifications
+    const emailEnabledCheckbox = screen.getByLabelText('Enable Email Notifications');
+    fireEvent.click(emailEnabledCheckbox);
+
+    // Fill in SMTP settings
+    fireEvent.change(screen.getByLabelText('SMTP Host'), {
+      target: { value: 'smtp.test.com' },
+    });
+    fireEvent.change(screen.getByLabelText('SMTP Port'), {
+      target: { value: '587' },
+    });
+    fireEvent.change(screen.getByLabelText('Sender Email'), {
+      target: { value: 'test@example.com' },
+    });
+
+    // Submit form
+    fireEvent.click(screen.getByText('Save Configuration'));
+
+    await waitFor(() => {
+      expect(mockApiPatch).toHaveBeenCalledWith(
+        '/core-config/current',
+        expect.objectContaining({
+          emailEnabled: true,
+          smtpHost: 'smtp.test.com',
+          smtpPort: 587,
+          senderEmail: 'test@example.com',
+        })
+      );
+    });
+  });
+});
+
+describe('Test Email Functionality', () => {
+  beforeEach(() => {
+    mockApiGet.mockResolvedValue({
+      data: {
+        ...mockConfig,
+        emailEnabled: true,
+        smtpHost: 'smtp.test.com',
+        smtpPort: 587,
+        smtpUsername: 'test@example.com',
+        senderEmail: 'sender@example.com',
+        senderName: 'Test Sender',
+      },
+    });
+  });
+
+  describe('Basic Test Email Sending', () => {
+    it('should send a basic test email successfully', async () => {
+      const mockTestEmailResponse = {
+        data: {
+          success: true,
+          message: 'Test email sent successfully to 1 recipient!',
+          auditRecordId: 'audit-123',
+          timestamp: '2023-12-01T10:00:00Z',
+          recipients: ['test@example.com'],
+        },
+      };
+
+      mockApiPost.mockResolvedValue(mockTestEmailResponse);
+
+      render(<AdminConfigPage />);
+
+      await waitFor(() => {
+        expect(screen.getByDisplayValue('PlayaPlan 2024')).toBeInTheDocument();
+      });
+
+      // Find and fill test email input
+      const emailInput = screen.getByPlaceholderText(/email@example.com/);
+      fireEvent.change(emailInput, { target: { value: 'test@example.com' } });
+
+      // Click send test email button
+      const sendButton = screen.getByText('Send Test Email');
+      fireEvent.click(sendButton);
+
+      await waitFor(() => {
+        expect(mockApiPost).toHaveBeenCalledWith('/notifications/email/test', {
+          email: 'test@example.com',
+          subject: undefined,
+          message: undefined,
+          format: 'html',
+          includeSmtpDetails: true,
+        });
+      });
+
+      // Check success message appears
+      await waitFor(() => {
+        expect(screen.getByText(/Test email sent successfully to 1 recipient/)).toBeInTheDocument();
+      });
+
+      // Check audit record link appears
+      expect(screen.getByText('audit-123')).toBeInTheDocument();
+    });
+
+    it('should handle test email failure gracefully', async () => {
+      const mockError = {
+        response: {
+          data: {
+            message: 'SMTP connection failed',
+          },
+        },
+      };
+
+      mockApiPost.mockRejectedValue(mockError);
+
+      render(<AdminConfigPage />);
+
+      await waitFor(() => {
+        expect(screen.getByDisplayValue('PlayaPlan 2024')).toBeInTheDocument();
+      });
+
+      // Fill test email input
+      const emailInput = screen.getByPlaceholderText(/email@example.com/);
+      fireEvent.change(emailInput, { target: { value: 'test@example.com' } });
+
+      // Click send test email button
+      const sendButton = screen.getByText('Send Test Email');
+      fireEvent.click(sendButton);
+
+      await waitFor(() => {
+        expect(screen.getByText(/SMTP connection failed/)).toBeInTheDocument();
+      });
+    });
+
+    it('should validate email format before sending', async () => {
+      render(<AdminConfigPage />);
+
+      await waitFor(() => {
+        expect(screen.getByDisplayValue('PlayaPlan 2024')).toBeInTheDocument();
+      });
+
+      // Fill invalid email
+      const emailInput = screen.getByPlaceholderText(/email@example.com/);
+      fireEvent.change(emailInput, { target: { value: 'invalid-email' } });
+
+      // Try to send
+      const sendButton = screen.getByText('Send Test Email');
+      fireEvent.click(sendButton);
+
+      // Should not make API call
+      expect(mockApiPost).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Advanced Test Email Features', () => {
+    it('should show and hide advanced options', async () => {
+      render(<AdminConfigPage />);
+
+      await waitFor(() => {
+        expect(screen.getByDisplayValue('PlayaPlan 2024')).toBeInTheDocument();
+      });
+
+      // Advanced options should be hidden initially
+      expect(screen.queryByLabelText('Custom Subject')).not.toBeInTheDocument();
+
+      // Click to show advanced options
+      const advancedToggle = screen.getByText('▶ Advanced Options');
+      fireEvent.click(advancedToggle);
+
+      // Advanced options should now be visible
+      expect(screen.getByLabelText('Custom Subject')).toBeInTheDocument();
+      expect(screen.getByLabelText('Email Format')).toBeInTheDocument();
+      expect(screen.getByLabelText('Custom Message Content')).toBeInTheDocument();
+    });
+
+    it('should apply quick templates correctly', async () => {
+      render(<AdminConfigPage />);
+
+      await waitFor(() => {
+        expect(screen.getByDisplayValue('PlayaPlan 2024')).toBeInTheDocument();
+      });
+
+      // Show advanced options first
+      const advancedToggle = screen.getByText('▶ Advanced Options');
+      fireEvent.click(advancedToggle);
+
+      // Click basic test template
+      const basicTemplate = screen.getByText('Basic Test');
+      fireEvent.click(basicTemplate);
+
+      // Check values are set
+      expect(screen.getByDisplayValue('Basic Test Email')).toBeInTheDocument();
+      expect(screen.getByDisplayValue('This is a basic test to verify email delivery.')).toBeInTheDocument();
+
+      // Click detailed template
+      const detailedTemplate = screen.getByText('Detailed SMTP Test');
+      fireEvent.click(detailedTemplate);
+
+      // Check values changed
+      expect(screen.getByDisplayValue('Detailed SMTP Configuration Test')).toBeInTheDocument();
+      expect(screen.getByDisplayValue(/This detailed test includes all SMTP configuration/)).toBeInTheDocument();
+
+      // Click plain text template
+      const plainTemplate = screen.getByText('Plain Text Test');
+      fireEvent.click(plainTemplate);
+
+      // Check format changed to text
+      const formatSelect = screen.getByDisplayValue('Plain Text');
+      expect(formatSelect).toBeInTheDocument();
+    });
+
+    it('should generate and show email preview', async () => {
+      render(<AdminConfigPage />);
+
+      await waitFor(() => {
+        expect(screen.getByDisplayValue('PlayaPlan 2024')).toBeInTheDocument();
+      });
+
+      // Fill email input
+      const emailInput = screen.getByPlaceholderText(/email@example.com/);
+      fireEvent.change(emailInput, { target: { value: 'test@example.com' } });
+
+      // Click preview button
+      const previewButton = screen.getByText('Preview Email');
+      fireEvent.click(previewButton);
+
+      // Check preview modal appears
+      await waitFor(() => {
+        expect(screen.getByText('Email Preview - HTML')).toBeInTheDocument();
+      });
+
+      // Check preview content
+      expect(screen.getByText('Subject:')).toBeInTheDocument();
+      expect(screen.getByText('Test Email from PlayaPlan')).toBeInTheDocument();
+
+      // Close preview
+      const closeButton = screen.getByText('Close');
+      fireEvent.click(closeButton);
+
+      // Modal should be hidden
+      await waitFor(() => {
+        expect(screen.queryByText('Email Preview - HTML')).not.toBeInTheDocument();
+      });
+    });
+
+    it('should handle multiple email recipients', async () => {
+      const mockTestEmailResponse = {
+        data: {
+          success: true,
+          message: 'Test email sent successfully to 2 recipients!',
+          recipients: ['test1@example.com', 'test2@example.com'],
+        },
+      };
+
+      mockApiPost.mockResolvedValue(mockTestEmailResponse);
+
+      render(<AdminConfigPage />);
+
+      await waitFor(() => {
+        expect(screen.getByDisplayValue('PlayaPlan 2024')).toBeInTheDocument();
+      });
+
+      // Fill multiple emails
+      const emailInput = screen.getByPlaceholderText(/email@example.com/);
+      fireEvent.change(emailInput, { target: { value: 'test1@example.com, test2@example.com' } });
+
+      // Send test email
+      const sendButton = screen.getByText('Send Test Email');
+      fireEvent.click(sendButton);
+
+      await waitFor(() => {
+        expect(mockApiPost).toHaveBeenCalledWith('/notifications/email/test', {
+          email: 'test1@example.com, test2@example.com',
+          subject: undefined,
+          message: undefined,
+          format: 'html',
+          includeSmtpDetails: true,
+        });
+      });
+
+      // Check success message for multiple recipients
+      await waitFor(() => {
+        expect(screen.getByText(/Test email sent successfully to 2 recipients/)).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('SMTP Connection Testing', () => {
+    it('should test SMTP connection successfully', async () => {
+      const mockConnectionResponse = {
+        data: {
+          success: true,
+          message: 'SMTP connection successful! Your email configuration is working correctly.',
+          details: {
+            host: 'smtp.test.com',
+            port: 587,
+            secure: false,
+            authenticated: true,
+            connectionTime: 234,
+          },
+        },
+      };
+
+      mockApiPost.mockResolvedValue(mockConnectionResponse);
+
+      render(<AdminConfigPage />);
+
+      await waitFor(() => {
+        expect(screen.getByDisplayValue('PlayaPlan 2024')).toBeInTheDocument();
+      });
+
+      // Click test SMTP connection button
+      const testButton = screen.getByText('Test SMTP Connection');
+      fireEvent.click(testButton);
+
+      await waitFor(() => {
+        expect(mockApiPost).toHaveBeenCalledWith('/notifications/email/test-connection');
+      });
+
+      // Check success message and details
+      await waitFor(() => {
+        expect(screen.getByText(/SMTP connection successful/)).toBeInTheDocument();
+        expect(screen.getByText('Host: smtp.test.com')).toBeInTheDocument();
+        expect(screen.getByText('Port: 587')).toBeInTheDocument();
+        expect(screen.getByText('Authenticated: Yes')).toBeInTheDocument();
+        expect(screen.getByText('Response Time: 234ms')).toBeInTheDocument();
+      });
+    });
+
+    it('should handle SMTP connection failure with detailed error info', async () => {
+      const mockConnectionResponse = {
+        data: {
+          success: false,
+          message: 'Connection refused. Check SMTP host and port.',
+          errorDetails: {
+            code: 'ECONNREFUSED',
+            errno: -111,
+            address: '192.168.1.1',
+            port: 587,
+          },
+        },
+      };
+
+      mockApiPost.mockResolvedValue(mockConnectionResponse);
+
+      render(<AdminConfigPage />);
+
+      await waitFor(() => {
+        expect(screen.getByDisplayValue('PlayaPlan 2024')).toBeInTheDocument();
+      });
+
+      // Click test SMTP connection button
+      const testButton = screen.getByText('Test SMTP Connection');
+      fireEvent.click(testButton);
+
+      // Check error message and details
+      await waitFor(() => {
+        expect(screen.getByText(/Connection refused/)).toBeInTheDocument();
+        expect(screen.getByText('Code: ECONNREFUSED')).toBeInTheDocument();
+        expect(screen.getByText('Address: 192.168.1.1')).toBeInTheDocument();
+      });
+    });
+
+    it('should clear connection test results', async () => {
+      const mockConnectionResponse = {
+        data: {
+          success: true,
+          message: 'SMTP connection successful!',
+        },
+      };
+
+      mockApiPost.mockResolvedValue(mockConnectionResponse);
+
+      render(<AdminConfigPage />);
+
+      await waitFor(() => {
+        expect(screen.getByDisplayValue('PlayaPlan 2024')).toBeInTheDocument();
+      });
+    });
   });
 });

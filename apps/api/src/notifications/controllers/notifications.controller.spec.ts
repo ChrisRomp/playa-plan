@@ -6,7 +6,17 @@ import { EmailAuditService } from '../services/email-audit.service';
 import { CoreConfigService } from '../../core-config/services/core-config.service';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { SendEmailDto, SendEmailToMultipleRecipientsDto, SendTestEmailDto } from '../dto/send-email.dto';
-import { NotificationType, UserRole } from '@prisma/client';
+import { NotificationType, UserRole, EmailAuditStatus } from '@prisma/client';
+
+interface MockAuthRequest {
+  user: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    role: UserRole;
+  };
+}
 
 describe('NotificationsController', () => {
   let controller: NotificationsController;
@@ -23,6 +33,7 @@ describe('NotificationsController', () => {
 
   const mockEmailService = {
     sendEmail: jest.fn(),
+    testSmtpConnection: jest.fn(),
   };
 
   const mockEmailAuditService = {
@@ -36,6 +47,7 @@ describe('NotificationsController', () => {
   const mockPrismaService = {
     emailAudit: {
       findMany: jest.fn(),
+      count: jest.fn(),
     },
   };
 
@@ -179,6 +191,7 @@ describe('NotificationsController', () => {
       mockPrismaService.emailAudit.findMany.mockResolvedValue([mockAuditRecord]);
 
       // Act
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const result = await controller.sendTestEmail({ email: 'test@example.playaplan.app' }, mockRequest as any);
 
       // Assert
@@ -298,6 +311,259 @@ describe('NotificationsController', () => {
         new Date(startDate),
         new Date(endDate),
       );
+    });
+  });
+
+  describe('getTestEmailHistory', () => {
+    it('should return test email history with default limit', async () => {
+      const mockHistory = [
+        {
+          id: 'test-1',
+          recipientEmail: 'test1@example.com',
+          subject: 'Test Email 1',
+          status: EmailAuditStatus.SENT,
+          errorMessage: null,
+          sentAt: new Date('2023-12-01T10:00:00Z'),
+          createdAt: new Date('2023-12-01T10:00:00Z'),
+          userId: 'user-1',
+        },
+        {
+          id: 'test-2',
+          recipientEmail: 'test2@example.com',
+          subject: 'Test Email 2',
+          status: EmailAuditStatus.FAILED,
+          errorMessage: 'SMTP error',
+          sentAt: null,
+          createdAt: new Date('2023-12-01T09:00:00Z'),
+          userId: 'user-1',
+        },
+      ];
+
+      mockPrismaService.emailAudit.findMany.mockResolvedValueOnce(mockHistory);
+      mockPrismaService.emailAudit.count.mockResolvedValueOnce(2);
+
+      const result = await controller.getTestEmailHistory();
+
+      expect(result).toEqual({
+        testEmails: [
+          {
+            id: 'test-1',
+            recipientEmail: 'test1@example.com',
+            subject: 'Test Email 1',
+            status: 'SENT',
+            errorMessage: undefined,
+            sentAt: '2023-12-01T10:00:00.000Z',
+            createdAt: '2023-12-01T10:00:00.000Z',
+            userId: 'user-1',
+          },
+          {
+            id: 'test-2',
+            recipientEmail: 'test2@example.com',
+            subject: 'Test Email 2',
+            status: 'FAILED',
+            errorMessage: 'SMTP error',
+            sentAt: undefined,
+            createdAt: '2023-12-01T09:00:00.000Z',
+            userId: 'user-1',
+          },
+        ],
+        total: 2,
+      });
+
+      expect(mockPrismaService.emailAudit.findMany).toHaveBeenCalledWith({
+        where: { notificationType: NotificationType.EMAIL_TEST },
+        orderBy: { createdAt: 'desc' },
+        take: 10,
+        select: {
+          id: true,
+          recipientEmail: true,
+          subject: true,
+          status: true,
+          errorMessage: true,
+          sentAt: true,
+          createdAt: true,
+          userId: true,
+        },
+      });
+    });
+
+    it('should return test email history with custom limit', async () => {
+      mockPrismaService.emailAudit.findMany.mockResolvedValueOnce([]);
+      mockPrismaService.emailAudit.count.mockResolvedValueOnce(0);
+
+      const result = await controller.getTestEmailHistory('25');
+
+      expect(result).toEqual({
+        testEmails: [],
+        total: 0,
+      });
+
+      expect(mockPrismaService.emailAudit.findMany).toHaveBeenCalledWith({
+        where: { notificationType: NotificationType.EMAIL_TEST },
+        orderBy: { createdAt: 'desc' },
+        take: 25,
+        select: {
+          id: true,
+          recipientEmail: true,
+          subject: true,
+          status: true,
+          errorMessage: true,
+          sentAt: true,
+          createdAt: true,
+          userId: true,
+        },
+      });
+    });
+
+    it('should enforce maximum limit of 50', async () => {
+      mockPrismaService.emailAudit.findMany.mockResolvedValueOnce([]);
+      mockPrismaService.emailAudit.count.mockResolvedValueOnce(0);
+
+      await controller.getTestEmailHistory('100');
+
+      expect(mockPrismaService.emailAudit.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          take: 50, // Should be capped at 50
+        }),
+      );
+    });
+
+    it('should handle database errors gracefully', async () => {
+      mockPrismaService.emailAudit.findMany.mockRejectedValueOnce(new Error('Database error'));
+
+      await expect(controller.getTestEmailHistory()).rejects.toThrow(
+        'Failed to retrieve test email history: Database error'
+      );
+    });
+  });
+
+  describe('testSmtpConnection', () => {
+    it('should test SMTP connection successfully', async () => {
+      const mockEmailConfig = {
+        emailEnabled: true,
+        smtpHost: 'smtp.test.com',
+        smtpPort: 587,
+        smtpUsername: 'test@example.com',
+        smtpPassword: 'password123',
+        smtpUseSsl: false,
+        senderEmail: 'test@example.playaplan.app',
+        senderName: 'PlayaPlan Test',
+      };
+
+      const mockConnectionResult = {
+        success: true,
+        message: 'SMTP connection verified successfully',
+      };
+
+      mockCoreConfigService.getEmailConfiguration.mockResolvedValue(mockEmailConfig);
+      mockEmailService.testSmtpConnection.mockResolvedValue(mockConnectionResult);
+
+      const result = await controller.testSmtpConnection();
+
+      expect(result.success).toBe(true);
+      expect(result.message).toContain('SMTP connection successful');
+      expect(result.details).toEqual({
+        host: 'smtp.test.com',
+        port: 587,
+        secure: false,
+        authenticated: true,
+        connectionTime: expect.any(Number),
+      });
+    });
+
+    it('should return error when email is disabled', async () => {
+      const mockEmailConfig = {
+        emailEnabled: false,
+        smtpHost: 'smtp.test.com',
+        smtpPort: 587,
+        smtpUsername: 'test@example.com',
+        smtpPassword: 'password123',
+        smtpUseSsl: false,
+        senderEmail: 'test@example.playaplan.app',
+        senderName: 'PlayaPlan Test',
+      };
+
+      mockCoreConfigService.getEmailConfiguration.mockResolvedValue(mockEmailConfig);
+
+      const result = await controller.testSmtpConnection();
+
+      expect(result.success).toBe(false);
+      expect(result.message).toContain('Email notifications are currently disabled');
+      expect(mockEmailService.testSmtpConnection).not.toHaveBeenCalled();
+    });
+
+    it('should return error when SMTP configuration is incomplete', async () => {
+      const mockEmailConfig = {
+        emailEnabled: true,
+        smtpHost: 'smtp.test.com',
+        smtpPort: 587,
+        smtpUsername: '',
+        smtpPassword: '',
+        smtpUseSsl: false,
+        senderEmail: '',
+        senderName: 'PlayaPlan Test',
+      };
+
+      mockCoreConfigService.getEmailConfiguration.mockResolvedValue(mockEmailConfig);
+
+      const result = await controller.testSmtpConnection();
+
+      expect(result.success).toBe(false);
+      expect(result.message).toContain('SMTP configuration is incomplete');
+      expect(result.details).toEqual({
+        host: 'smtp.test.com',
+        port: 587,
+        secure: false,
+        authenticated: false,
+      });
+      expect(mockEmailService.testSmtpConnection).not.toHaveBeenCalled();
+    });
+
+    it('should handle SMTP connection failure with detailed error information', async () => {
+      const mockEmailConfig = {
+        emailEnabled: true,
+        smtpHost: 'smtp.test.com',
+        smtpPort: 587,
+        smtpUsername: 'test@example.com',
+        smtpPassword: 'password123',
+        smtpUseSsl: false,
+        senderEmail: 'test@example.playaplan.app',
+        senderName: 'PlayaPlan Test',
+      };
+
+      const mockConnectionResult = {
+        success: false,
+        message: 'Connection refused. Check SMTP host and port.',
+        errorDetails: {
+          code: 'ECONNREFUSED',
+          errno: -111,
+          address: '192.168.1.1',
+          port: 587,
+        },
+      };
+
+      mockCoreConfigService.getEmailConfiguration.mockResolvedValue(mockEmailConfig);
+      mockEmailService.testSmtpConnection.mockResolvedValue(mockConnectionResult);
+
+      const result = await controller.testSmtpConnection();
+
+      expect(result.success).toBe(false);
+      expect(result.message).toContain('Connection refused');
+      expect(result.errorDetails).toEqual({
+        code: 'ECONNREFUSED',
+        errno: -111,
+        address: '192.168.1.1',
+        port: 587,
+      });
+    });
+
+    it('should handle unexpected errors gracefully', async () => {
+      mockCoreConfigService.getEmailConfiguration.mockRejectedValue(new Error('Database connection failed'));
+
+      const result = await controller.testSmtpConnection();
+
+      expect(result.success).toBe(false);
+      expect(result.message).toContain('Error testing SMTP connection');
     });
   });
 }); 

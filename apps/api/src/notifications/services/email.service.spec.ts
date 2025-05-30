@@ -48,7 +48,8 @@ describe('EmailService', () => {
     } as any;
 
     // Mock nodemailer.createTransport
-    (nodemailer.createTransport as jest.Mock).mockReturnValue(mockTransporter);
+    const createTransportSpy = jest.spyOn(nodemailer, 'createTransport')
+      .mockReturnValue(mockTransporter);
 
     // Mock services
     mockCoreConfigService = {
@@ -579,6 +580,353 @@ describe('EmailService', () => {
         undefined, // ccEmails
         undefined, // bccEmails
       );
+    });
+  });
+
+  describe('testSmtpConnection', () => {
+    it('should test SMTP connection successfully', async () => {
+      const mockConfig = {
+        emailEnabled: true,
+        smtpHost: 'smtp.test.com',
+        smtpPort: 587,
+        smtpUsername: 'test@example.com',
+        smtpPassword: 'password123',
+        smtpUseSsl: false,
+        senderEmail: 'sender@example.com',
+        senderName: 'Test Sender',
+      };
+
+      mockCoreConfigService.getEmailConfiguration.mockResolvedValue(mockConfig);
+
+      // Mock nodemailer verify method
+      const mockVerify = jest.fn().mockResolvedValue(true);
+      const mockTransporter = { verify: mockVerify };
+      
+      // Mock nodemailer.createTransport
+      const createTransportSpy = jest.spyOn(nodemailer, 'createTransport')
+        .mockReturnValue(mockTransporter);
+
+      const result = await service.testSmtpConnection();
+
+      expect(result.success).toBe(true);
+      expect(result.message).toBe('SMTP connection verified successfully');
+      expect(createTransportSpy).toHaveBeenCalledWith({
+        host: 'smtp.test.com',
+        port: 587,
+        secure: false,
+        auth: {
+          user: 'test@example.com',
+          pass: 'password123',
+        },
+        connectionTimeout: 10000,
+        greetingTimeout: 5000,
+        socketTimeout: 10000,
+      });
+      expect(mockVerify).toHaveBeenCalled();
+
+      createTransportSpy.mockRestore();
+    });
+
+    it('should return error when email is disabled', async () => {
+      const mockConfig = {
+        emailEnabled: false,
+        smtpHost: 'smtp.test.com',
+        smtpPort: 587,
+        smtpUsername: 'test@example.com',
+        smtpPassword: 'password123',
+        smtpUseSsl: false,
+        senderEmail: 'sender@example.com',
+        senderName: 'Test Sender',
+      };
+
+      mockCoreConfigService.getEmailConfiguration.mockResolvedValue(mockConfig);
+
+      const result = await service.testSmtpConnection();
+
+      expect(result.success).toBe(false);
+      expect(result.message).toBe('Email notifications are disabled');
+    });
+
+    it('should return error when SMTP configuration is incomplete', async () => {
+      const mockConfig = {
+        emailEnabled: true,
+        smtpHost: '',
+        smtpPort: 587,
+        smtpUsername: '',
+        smtpPassword: '',
+        smtpUseSsl: false,
+        senderEmail: 'sender@example.com',
+        senderName: 'Test Sender',
+      };
+
+      mockCoreConfigService.getEmailConfiguration.mockResolvedValue(mockConfig);
+
+      const result = await service.testSmtpConnection();
+
+      expect(result.success).toBe(false);
+      expect(result.message).toBe('SMTP configuration is incomplete');
+    });
+
+    it('should handle ECONNREFUSED error', async () => {
+      const mockConfig = {
+        emailEnabled: true,
+        smtpHost: 'smtp.test.com',
+        smtpPort: 587,
+        smtpUsername: 'test@example.com',
+        smtpPassword: 'password123',
+        smtpUseSsl: false,
+        senderEmail: 'sender@example.com',
+        senderName: 'Test Sender',
+      };
+
+      mockCoreConfigService.getEmailConfiguration.mockResolvedValue(mockConfig);
+
+      const mockError = new Error('Connection refused');
+      (mockError as any).code = 'ECONNREFUSED';
+      (mockError as any).errno = -111;
+      (mockError as any).address = '192.168.1.1';
+      (mockError as any).port = 587;
+
+      const mockVerify = jest.fn().mockRejectedValue(mockError);
+      const mockTransporter = { verify: mockVerify };
+      
+      const createTransportSpy = jest.spyOn(nodemailer, 'createTransport')
+        .mockReturnValue(mockTransporter);
+
+      const result = await service.testSmtpConnection();
+
+      expect(result.success).toBe(false);
+      expect(result.message).toBe('Connection refused. Check SMTP host and port.');
+      expect(result.errorDetails).toEqual({
+        code: 'ECONNREFUSED',
+        errno: -111,
+        address: '192.168.1.1',
+        port: 587,
+      });
+
+      createTransportSpy.mockRestore();
+    });
+
+    it('should handle ENOTFOUND error', async () => {
+      const mockConfig = {
+        emailEnabled: true,
+        smtpHost: 'invalid.smtp.com',
+        smtpPort: 587,
+        smtpUsername: 'test@example.com',
+        smtpPassword: 'password123',
+        smtpUseSsl: false,
+        senderEmail: 'sender@example.com',
+        senderName: 'Test Sender',
+      };
+
+      mockCoreConfigService.getEmailConfiguration.mockResolvedValue(mockConfig);
+
+      const mockError = new Error('Host not found');
+      (mockError as any).code = 'ENOTFOUND';
+      (mockError as any).hostname = 'invalid.smtp.com';
+
+      const mockVerify = jest.fn().mockRejectedValue(mockError);
+      const mockTransporter = { verify: mockVerify };
+      
+      const createTransportSpy = jest.spyOn(nodemailer, 'createTransport')
+        .mockReturnValue(mockTransporter);
+
+      const result = await service.testSmtpConnection();
+
+      expect(result.success).toBe(false);
+      expect(result.message).toBe('SMTP host not found. Check the hostname.');
+      expect(result.errorDetails?.code).toBe('ENOTFOUND');
+
+      createTransportSpy.mockRestore();
+    });
+
+    it('should handle ETIMEDOUT error', async () => {
+      const mockConfig = {
+        emailEnabled: true,
+        smtpHost: 'smtp.test.com',
+        smtpPort: 587,
+        smtpUsername: 'test@example.com',
+        smtpPassword: 'password123',
+        smtpUseSsl: false,
+        senderEmail: 'sender@example.com',
+        senderName: 'Test Sender',
+      };
+
+      mockCoreConfigService.getEmailConfiguration.mockResolvedValue(mockConfig);
+
+      const mockError = new Error('Connection timed out');
+      (mockError as any).code = 'ETIMEDOUT';
+
+      const mockVerify = jest.fn().mockRejectedValue(mockError);
+      const mockTransporter = { verify: mockVerify };
+      
+      const createTransportSpy = jest.spyOn(require('nodemailer'), 'createTransport')
+        .mockReturnValue(mockTransporter);
+
+      const result = await service.testSmtpConnection();
+
+      expect(result.success).toBe(false);
+      expect(result.message).toBe('Connection timed out. Check host and firewall settings.');
+      expect(result.errorDetails?.code).toBe('ETIMEDOUT');
+
+      createTransportSpy.mockRestore();
+    });
+
+    it('should handle EAUTH error', async () => {
+      const mockConfig = {
+        emailEnabled: true,
+        smtpHost: 'smtp.test.com',
+        smtpPort: 587,
+        smtpUsername: 'test@example.com',
+        smtpPassword: 'wrongpassword',
+        smtpUseSsl: false,
+        senderEmail: 'sender@example.com',
+        senderName: 'Test Sender',
+      };
+
+      mockCoreConfigService.getEmailConfiguration.mockResolvedValue(mockConfig);
+
+      const mockError = new Error('Authentication failed');
+      (mockError as any).code = 'EAUTH';
+
+      const mockVerify = jest.fn().mockRejectedValue(mockError);
+      const mockTransporter = { verify: mockVerify };
+      
+      const createTransportSpy = jest.spyOn(require('nodemailer'), 'createTransport')
+        .mockReturnValue(mockTransporter);
+
+      const result = await service.testSmtpConnection();
+
+      expect(result.success).toBe(false);
+      expect(result.message).toBe('Authentication failed. Check username and password.');
+      expect(result.errorDetails?.code).toBe('EAUTH');
+
+      createTransportSpy.mockRestore();
+    });
+
+    it('should handle authentication response code 535', async () => {
+      const mockConfig = {
+        emailEnabled: true,
+        smtpHost: 'smtp.test.com',
+        smtpPort: 587,
+        smtpUsername: 'test@example.com',
+        smtpPassword: 'wrongpassword',
+        smtpUseSsl: false,
+        senderEmail: 'sender@example.com',
+        senderName: 'Test Sender',
+      };
+
+      mockCoreConfigService.getEmailConfiguration.mockResolvedValue(mockConfig);
+
+      const mockError = new Error('535 Authentication failed');
+      (mockError as any).responseCode = 535;
+
+      const mockVerify = jest.fn().mockRejectedValue(mockError);
+      const mockTransporter = { verify: mockVerify };
+      
+      const createTransportSpy = jest.spyOn(require('nodemailer'), 'createTransport')
+        .mockReturnValue(mockTransporter);
+
+      const result = await service.testSmtpConnection();
+
+      expect(result.success).toBe(false);
+      expect(result.message).toBe('Authentication failed. Check username and password.');
+
+      createTransportSpy.mockRestore();
+    });
+
+    it('should handle SMTP server response error', async () => {
+      const mockConfig = {
+        emailEnabled: true,
+        smtpHost: 'smtp.test.com',
+        smtpPort: 587,
+        smtpUsername: 'test@example.com',
+        smtpPassword: 'password123',
+        smtpUseSsl: false,
+        senderEmail: 'sender@example.com',
+        senderName: 'Test Sender',
+      };
+
+      mockCoreConfigService.getEmailConfiguration.mockResolvedValue(mockConfig);
+
+      const mockError = new Error('SMTP error');
+      (mockError as any).response = '550 Mailbox unavailable';
+
+      const mockVerify = jest.fn().mockRejectedValue(mockError);
+      const mockTransporter = { verify: mockVerify };
+      
+      const createTransportSpy = jest.spyOn(require('nodemailer'), 'createTransport')
+        .mockReturnValue(mockTransporter);
+
+      const result = await service.testSmtpConnection();
+
+      expect(result.success).toBe(false);
+      expect(result.message).toBe('SMTP server error: 550 Mailbox unavailable');
+      expect(result.errorDetails?.response).toBe('550 Mailbox unavailable');
+
+      createTransportSpy.mockRestore();
+    });
+
+    it('should handle unknown error codes', async () => {
+      const mockConfig = {
+        emailEnabled: true,
+        smtpHost: 'smtp.test.com',
+        smtpPort: 587,
+        smtpUsername: 'test@example.com',
+        smtpPassword: 'password123',
+        smtpUseSsl: false,
+        senderEmail: 'sender@example.com',
+        senderName: 'Test Sender',
+      };
+
+      mockCoreConfigService.getEmailConfiguration.mockResolvedValue(mockConfig);
+
+      const mockError = new Error('Unknown error');
+      (mockError as any).code = 'EUNKNOWN';
+
+      const mockVerify = jest.fn().mockRejectedValue(mockError);
+      const mockTransporter = { verify: mockVerify };
+      
+      const createTransportSpy = jest.spyOn(require('nodemailer'), 'createTransport')
+        .mockReturnValue(mockTransporter);
+
+      const result = await service.testSmtpConnection();
+
+      expect(result.success).toBe(false);
+      expect(result.message).toBe('SMTP error: EUNKNOWN');
+      expect(result.errorDetails?.code).toBe('EUNKNOWN');
+
+      createTransportSpy.mockRestore();
+    });
+
+    it('should handle generic error without specific code', async () => {
+      const mockConfig = {
+        emailEnabled: true,
+        smtpHost: 'smtp.test.com',
+        smtpPort: 587,
+        smtpUsername: 'test@example.com',
+        smtpPassword: 'password123',
+        smtpUseSsl: false,
+        senderEmail: 'sender@example.com',
+        senderName: 'Test Sender',
+      };
+
+      mockCoreConfigService.getEmailConfiguration.mockResolvedValue(mockConfig);
+
+      const mockError = new Error('Generic error');
+
+      const mockVerify = jest.fn().mockRejectedValue(mockError);
+      const mockTransporter = { verify: mockVerify };
+      
+      const createTransportSpy = jest.spyOn(require('nodemailer'), 'createTransport')
+        .mockReturnValue(mockTransporter);
+
+      const result = await service.testSmtpConnection();
+
+      expect(result.success).toBe(false);
+      expect(result.message).toBe('SMTP connection failed');
+
+      createTransportSpy.mockRestore();
     });
   });
 }); 

@@ -145,9 +145,9 @@ Based on: `prd-email-notifications-system.md`
     - [x] 6.7.4.2 Add "Test SMTP Connection" button that validates configuration without sending email
     - [x] 6.7.4.3 Show detailed error messages for SMTP connection failures
     - [x] 6.7.4.4 Add tooltips explaining common email configuration issues
-  - [ ] 6.7.5 Unit and integration tests for test email feature
-    - [ ] 6.7.5.1 Test enhanced backend test email endpoint
-    - [ ] 6.7.5.2 Test admin UI test email component rendering and interactions
-    - [ ] 6.7.5.3 Test email validation and error handling in UI
-    - [ ] 6.7.5.4 Test integration between frontend and backend for test emails
-    - [ ] 6.7.5.5 Test SMTP connection validation functionality 
+  - [x] 6.7.5 Unit and integration tests for test email feature
+    - [x] 6.7.5.1 Test enhanced sendTestEmail method with custom content options
+    - [x] 6.7.5.2 Test test email history endpoint and UI components
+    - [x] 6.7.5.3 Test SMTP connection testing functionality
+    - [x] 6.7.5.4 Test email preview generation and display
+    - [x] 6.7.5.5 Test error handling and validation for all test email features 
