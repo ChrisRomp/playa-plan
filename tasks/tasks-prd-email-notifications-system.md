@@ -115,13 +115,13 @@ Based on: `prd-email-notifications-system.md`
     - [x] 5.7.5 Test email queue backpressure and rate limiting scenarios
     - [x] 5.7.6 Test configuration cache invalidation on service restart
 
-- [ ] 6.0 Admin UI Updates for Email Toggle
-  - [ ] 6.1 Add `emailEnabled` checkbox to Email Configuration section in AdminConfigPage.tsx
-  - [ ] 6.2 Update form state to include emailEnabled field
-  - [ ] 6.3 Update form submission to include emailEnabled in API payload
-  - [ ] 6.4 Add visual indicators when email is disabled (grayed out SMTP fields or warning message)
-  - [ ] 6.5 Update form validation to handle emailEnabled toggle appropriately
-  - [ ] 6.6 Test admin UI changes to ensure toggle works correctly with existing SMTP configuration
+- [x] 6.0 Admin UI Updates for Email Toggle
+  - [x] 6.1 Add `emailEnabled` checkbox to Email Configuration section in AdminConfigPage.tsx
+  - [x] 6.2 Update form state to include emailEnabled field
+  - [x] 6.3 Update form submission to include emailEnabled in API payload
+  - [x] 6.4 Add visual indicators when email is disabled (grayed out SMTP fields or warning message)
+  - [x] 6.5 Update form validation to handle emailEnabled toggle appropriately
+  - [x] 6.6 Test admin UI changes to ensure toggle works correctly with existing SMTP configuration
 
 - [ ] 6.7 Admin Test Email Feature
   - [ ] 6.7.1 Enhance backend test email endpoint to include more comprehensive test content

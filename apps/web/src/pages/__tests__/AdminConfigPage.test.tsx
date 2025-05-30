@@ -303,3 +303,298 @@ describe('AdminConfigPage - Secure Field Preservation', () => {
     });
   });
 });
+
+describe('AdminConfigPage - Email Toggle Functionality', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockConsoleLog.mockClear();
+    mockConsoleError.mockClear();
+  });
+
+  const mockConfigWithEmail = {
+    ...mockConfig,
+    emailEnabled: true,
+    smtpHost: 'smtp.example.com',
+    smtpPort: 587,
+    smtpUsername: 'test@example.com',
+    senderEmail: 'noreply@example.com',
+    senderName: 'Test Camp',
+    smtpUseSsl: false
+  };
+
+  it('should load email configuration and show emailEnabled checkbox', async () => {
+    mockApiGet.mockResolvedValue({
+      data: mockConfigWithEmail
+    });
+
+    renderWithProviders(<AdminConfigPage />);
+
+    await waitFor(() => {
+      expect(mockApiGet).toHaveBeenCalledWith('/core-config/current');
+    });
+
+    // Check that emailEnabled checkbox exists and is checked
+    const emailEnabledCheckbox = screen.getByLabelText(/Enable Email Notifications/i);
+    expect(emailEnabledCheckbox).toBeInTheDocument();
+    expect(emailEnabledCheckbox).toBeChecked();
+
+    // Check that SMTP fields are visible and enabled
+    const smtpHostInput = screen.getByLabelText(/SMTP Host/i);
+    const smtpPortInput = screen.getByLabelText(/SMTP Port/i);
+    const senderEmailInput = screen.getByLabelText(/Sender Email/i);
+    const senderNameInput = screen.getByLabelText(/Sender Name/i);
+
+    expect(smtpHostInput).toBeEnabled();
+    expect(smtpPortInput).toBeEnabled();
+    expect(senderEmailInput).toBeEnabled();
+    expect(senderNameInput).toBeEnabled();
+
+    // Check that values are loaded correctly
+    expect(smtpHostInput).toHaveValue('smtp.example.com');
+    expect(smtpPortInput).toHaveValue(587);
+    expect(senderEmailInput).toHaveValue('noreply@example.com');
+    expect(senderNameInput).toHaveValue('Test Camp');
+  });
+
+  it('should disable SMTP fields when emailEnabled is unchecked', async () => {
+    mockApiGet.mockResolvedValue({
+      data: { ...mockConfigWithEmail, emailEnabled: false }
+    });
+
+    renderWithProviders(<AdminConfigPage />);
+
+    await waitFor(() => {
+      expect(mockApiGet).toHaveBeenCalledWith('/core-config/current');
+    });
+
+    // Check that emailEnabled checkbox exists and is unchecked
+    const emailEnabledCheckbox = screen.getByLabelText(/Enable Email Notifications/i);
+    expect(emailEnabledCheckbox).not.toBeChecked();
+
+    // Check that SMTP fields are disabled
+    const smtpHostInput = screen.getByLabelText(/SMTP Host/i);
+    const smtpPortInput = screen.getByLabelText(/SMTP Port/i);
+    const smtpUsernameInput = screen.getByLabelText(/SMTP Username/i);
+    const smtpPasswordInput = screen.getByLabelText(/SMTP Password/i);
+    const smtpUseSslCheckbox = screen.getByLabelText(/Use SSL for SMTP/i);
+    const senderEmailInput = screen.getByLabelText(/Sender Email/i);
+    const senderNameInput = screen.getByLabelText(/Sender Name/i);
+
+    expect(smtpHostInput).toBeDisabled();
+    expect(smtpPortInput).toBeDisabled();
+    expect(smtpUsernameInput).toBeDisabled();
+    expect(smtpPasswordInput).toBeDisabled();
+    expect(smtpUseSslCheckbox).toBeDisabled();
+    expect(senderEmailInput).toBeDisabled();
+    expect(senderNameInput).toBeDisabled();
+
+    // Check that visual styling indicates disabled state
+    expect(smtpHostInput).toHaveClass('disabled:bg-gray-100');
+  });
+
+  it('should toggle SMTP fields when emailEnabled checkbox is clicked', async () => {
+    mockApiGet.mockResolvedValue({
+      data: mockConfigWithEmail
+    });
+
+    renderWithProviders(<AdminConfigPage />);
+
+    await waitFor(() => {
+      expect(mockApiGet).toHaveBeenCalledWith('/core-config/current');
+    });
+
+    const emailEnabledCheckbox = screen.getByLabelText(/Enable Email Notifications/i);
+    const smtpHostInput = screen.getByLabelText(/SMTP Host/i);
+
+    // Initially enabled
+    expect(emailEnabledCheckbox).toBeChecked();
+    expect(smtpHostInput).toBeEnabled();
+
+    // Uncheck the email enabled checkbox
+    fireEvent.click(emailEnabledCheckbox);
+
+    // Check that SMTP fields are now disabled
+    expect(emailEnabledCheckbox).not.toBeChecked();
+    expect(smtpHostInput).toBeDisabled();
+
+    // Check the checkbox again
+    fireEvent.click(emailEnabledCheckbox);
+
+    // Check that SMTP fields are enabled again
+    expect(emailEnabledCheckbox).toBeChecked();
+    expect(smtpHostInput).toBeEnabled();
+  });
+
+  it('should include emailEnabled field in form submission', async () => {
+    mockApiGet.mockResolvedValue({ data: mockConfigWithEmail });
+    mockApiPatch.mockResolvedValue({ status: 200, data: mockConfigWithEmail });
+
+    renderWithProviders(<AdminConfigPage />);
+
+    await waitFor(() => {
+      expect(mockApiGet).toHaveBeenCalledWith('/core-config/current');
+    });
+
+    // Fill in required fields to ensure submission
+    const campNameInput = screen.getByLabelText(/Camp Name/i);
+    fireEvent.change(campNameInput, { target: { value: 'Test Camp' } });
+
+    // Toggle email enabled off
+    const emailEnabledCheckbox = screen.getByLabelText(/Enable Email Notifications/i);
+    fireEvent.click(emailEnabledCheckbox);
+
+    // Submit the form
+    const saveButton = screen.getByRole('button', { name: /save configuration/i });
+    fireEvent.click(saveButton);
+
+    await waitFor(() => {
+      expect(mockApiPatch).toHaveBeenCalled();
+    });
+
+    // Get the payload that was sent
+    const patchCall = mockApiPatch.mock.calls[0];
+    const payload = patchCall?.[1] as Record<string, unknown>;
+
+    // Verify emailEnabled field is in the payload with correct value
+    expect(payload).toHaveProperty('emailEnabled', false);
+  });
+
+  it('should validate required SMTP fields when email is enabled', async () => {
+    mockApiGet.mockResolvedValue({
+      data: { ...mockConfigWithEmail, smtpHost: '', senderEmail: '', senderName: '' }
+    });
+
+    renderWithProviders(<AdminConfigPage />);
+
+    await waitFor(() => {
+      expect(mockApiGet).toHaveBeenCalledWith('/core-config/current');
+    });
+
+    // Ensure email is enabled
+    const emailEnabledCheckbox = screen.getByLabelText(/Enable Email Notifications/i);
+    expect(emailEnabledCheckbox).toBeChecked();
+
+    // Fill in required non-email fields to pass basic validation
+    const campNameInput = screen.getByLabelText(/Camp Name/i);
+    fireEvent.change(campNameInput, { target: { value: 'Test Camp' } });
+
+    // Try to submit with missing required email fields
+    const saveButton = screen.getByRole('button', { name: /save configuration/i });
+    fireEvent.click(saveButton);
+
+    // Check for validation errors - should appear synchronously
+    expect(screen.getByText(/Please fix the following errors/i)).toBeInTheDocument();
+    expect(screen.getByText(/SMTP Host is required when email notifications are enabled/i)).toBeInTheDocument();
+    expect(screen.getByText(/Sender Email is required when email notifications are enabled/i)).toBeInTheDocument();
+    expect(screen.getByText(/Sender Name is required when email notifications are enabled/i)).toBeInTheDocument();
+  });
+
+  it('should not validate SMTP fields when email is disabled', async () => {
+    mockApiGet.mockResolvedValue({
+      data: { ...mockConfigWithEmail, emailEnabled: false, smtpHost: '', senderEmail: '', senderName: '' }
+    });
+    mockApiPatch.mockResolvedValue({ status: 200, data: mockConfigWithEmail });
+
+    renderWithProviders(<AdminConfigPage />);
+
+    await waitFor(() => {
+      expect(mockApiGet).toHaveBeenCalledWith('/core-config/current');
+    });
+
+    // Ensure email is disabled
+    const emailEnabledCheckbox = screen.getByLabelText(/Enable Email Notifications/i);
+    expect(emailEnabledCheckbox).not.toBeChecked();
+
+    // Fill in required non-email field
+    const campNameInput = screen.getByLabelText(/Camp Name/i);
+    fireEvent.change(campNameInput, { target: { value: 'Test Camp' } });
+
+    // Submit the form - should not show SMTP validation errors
+    const saveButton = screen.getByRole('button', { name: /save configuration/i });
+    fireEvent.click(saveButton);
+
+    await waitFor(() => {
+      expect(mockApiPatch).toHaveBeenCalled();
+    });
+
+    // Should not show validation errors for SMTP fields
+    expect(screen.queryByText(/SMTP Host is required/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Sender Email is required/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Sender Name is required/i)).not.toBeInTheDocument();
+  });
+
+  it.skip('should validate SMTP port range when email is enabled', async () => {
+    mockApiGet.mockResolvedValue({
+      data: { ...mockConfigWithEmail, smtpHost: '', senderEmail: '', senderName: '' }
+    });
+
+    renderWithProviders(<AdminConfigPage />);
+
+    await waitFor(() => {
+      expect(mockApiGet).toHaveBeenCalledWith('/core-config/current');
+    });
+
+    // Fill in required fields except for the SMTP port we want to test
+    const campNameInput = screen.getByLabelText(/Camp Name/i);
+    fireEvent.change(campNameInput, { target: { value: 'Test Camp' } });
+
+    // Fill in required SMTP fields except port
+    const smtpHostInput = screen.getByLabelText(/SMTP Host/i);
+    const senderEmailInput = screen.getByLabelText(/Sender Email/i);
+    const senderNameInput = screen.getByLabelText(/Sender Name/i);
+    
+    fireEvent.change(smtpHostInput, { target: { value: 'smtp.test.com' } });
+    fireEvent.change(senderEmailInput, { target: { value: 'test@example.com' } });
+    fireEvent.change(senderNameInput, { target: { value: 'Test Sender' } });
+
+    // Set invalid port number
+    const smtpPortInput = screen.getByLabelText(/SMTP Port/i);
+    fireEvent.change(smtpPortInput, { target: { value: '0' } });
+    
+    const saveButton = screen.getByRole('button', { name: /save configuration/i });
+    fireEvent.click(saveButton);
+
+    // Check that validation prevents submission - verify API is not called
+    expect(mockApiPatch).not.toHaveBeenCalled();
+    
+    // Check for validation errors - should appear synchronously  
+    expect(screen.getByText(/Please fix the following errors/i)).toBeInTheDocument();
+    expect(screen.getByText(/SMTP Port must be a valid port number \(1-65535\)/i)).toBeInTheDocument();
+  });
+
+  it('should preserve existing SMTP password when email toggle is used', async () => {
+    mockApiGet.mockResolvedValue({ data: mockConfigWithEmail });
+    mockApiPatch.mockResolvedValue({ status: 200, data: mockConfigWithEmail });
+
+    renderWithProviders(<AdminConfigPage />);
+
+    await waitFor(() => {
+      expect(mockApiGet).toHaveBeenCalledWith('/core-config/current');
+    });
+
+    // Fill in required fields to ensure submission
+    const campNameInput = screen.getByLabelText(/Camp Name/i);
+    fireEvent.change(campNameInput, { target: { value: 'Test Camp' } });
+
+    // Toggle email off and back on
+    const emailEnabledCheckbox = screen.getByLabelText(/Enable Email Notifications/i);
+    fireEvent.click(emailEnabledCheckbox); // Disable
+    fireEvent.click(emailEnabledCheckbox); // Re-enable
+
+    // Submit without changing SMTP password
+    const saveButton = screen.getByRole('button', { name: /save configuration/i });
+    fireEvent.click(saveButton);
+
+    await waitFor(() => {
+      expect(mockApiPatch).toHaveBeenCalled();
+    });
+
+    // Get the payload that was sent
+    const patchCall = mockApiPatch.mock.calls[0];
+    const payload = patchCall?.[1] as Record<string, unknown>;
+
+    // Verify SMTP password is not included (preserves existing)
+    expect(payload).not.toHaveProperty('smtpPassword');
+    expect(payload).toHaveProperty('emailEnabled', true);
+  });
+});

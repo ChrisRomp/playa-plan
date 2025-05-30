@@ -38,6 +38,7 @@ const AdminConfigPage: React.FC = () => {
     paypalClientId: '',
     paypalClientSecret: '',
     paypalMode: 'sandbox',
+    emailEnabled: false,
     smtpHost: '',
     smtpPort: 587,
     smtpUsername: '',
@@ -84,6 +85,7 @@ const AdminConfigPage: React.FC = () => {
             paypalClientId: response.data.paypalClientId || '',
             paypalClientSecret: '', // Always empty - excluded from API response for security
             paypalMode: response.data.paypalMode || 'sandbox',
+            emailEnabled: response.data.emailEnabled || false,
             smtpHost: response.data.smtpHost || '',
             smtpPort: response.data.smtpPort || 587,
             smtpUsername: response.data.smtpUsername || '',
@@ -153,6 +155,25 @@ const AdminConfigPage: React.FC = () => {
       errors.push('Sender Email must be a valid email address');
     }
     
+    // Email configuration validation when email is enabled
+    if (formData.emailEnabled) {
+      if (!formData.smtpHost || formData.smtpHost.trim() === '') {
+        errors.push('SMTP Host is required when email notifications are enabled');
+      }
+      
+      if (!formData.smtpPort || formData.smtpPort <= 0 || formData.smtpPort > 65535) {
+        errors.push('SMTP Port must be a valid port number (1-65535) when email notifications are enabled');
+      }
+      
+      if (!formData.senderEmail || formData.senderEmail.trim() === '') {
+        errors.push('Sender Email is required when email notifications are enabled');
+      }
+      
+      if (!formData.senderName || formData.senderName.trim() === '') {
+        errors.push('Sender Name is required when email notifications are enabled');
+      }
+    }
+    
     return errors;
   };
   
@@ -195,6 +216,7 @@ const AdminConfigPage: React.FC = () => {
       paypalClientId: formData.paypalClientId,
       // Note: paypalClientSecret excluded - will be conditionally added below
       paypalMode: formData.paypalMode,
+      emailEnabled: formData.emailEnabled,
       smtpHost: formData.smtpHost,
       smtpPort: formData.smtpPort,
       smtpUsername: formData.smtpUsername,
@@ -677,120 +699,143 @@ const AdminConfigPage: React.FC = () => {
           <div className="mb-8">
             <h2 className="text-xl font-semibold mb-4 pb-2 border-b">Email Configuration</h2>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="mb-4">
-                <label htmlFor="smtpHost" className="block text-gray-700 font-medium mb-2">
-                  SMTP Host
-                </label>
-                <input
-                  type="text"
-                  id="smtpHost"
-                  name="smtpHost"
-                  value={formData.smtpHost}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              
-              <div className="mb-4">
-                <label htmlFor="smtpPort" className="block text-gray-700 font-medium mb-2">
-                  SMTP Port
-                </label>
-                <input
-                  type="number"
-                  id="smtpPort"
-                  name="smtpPort"
-                  value={formData.smtpPort}
-                  onChange={handleInputChange}
-                  min={1}
-                  max={65535}
-                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="mb-4">
-                <label htmlFor="smtpUsername" className="block text-gray-700 font-medium mb-2">
-                  SMTP Username
-                </label>
-                <input
-                  type="text"
-                  id="smtpUsername"
-                  name="smtpUsername"
-                  value={formData.smtpUsername}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              
-              <div className="mb-4">
-                <label htmlFor="smtpPassword" className="block text-gray-700 font-medium mb-2">
-                  SMTP Password
-                </label>
-                <input
-                  type="password"
-                  id="smtpPassword"
-                  name="smtpPassword"
-                  value={formData.smtpPassword}
-                  onChange={handleInputChange}
-                  placeholder={formData.smtpPassword === '' ? 'Leave blank to keep existing password' : ''}
-                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                <p className="text-sm text-gray-500 mt-1">
-                  Leave blank to keep the existing password. Only enter a new password if you want to change it.
-                </p>
-              </div>
-            </div>
-            
-            <div className="flex items-center mb-4">
+            <div className="flex items-center mb-6">
               <input
                 type="checkbox"
-                id="smtpUseSsl"
-                name="smtpUseSsl"
-                checked={formData.smtpUseSsl}
+                id="emailEnabled"
+                name="emailEnabled"
+                checked={formData.emailEnabled}
                 onChange={handleInputChange}
                 className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
               />
-              <label htmlFor="smtpUseSsl" className="ml-2 block text-gray-700">
-                Use SSL for SMTP
+              <label htmlFor="emailEnabled" className="ml-2 block text-gray-700 font-medium">
+                Enable Email Notifications
               </label>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="mb-4">
-                <label htmlFor="senderEmail" className="block text-gray-700 font-medium mb-2">
-                  Sender Email
-                </label>
-                <input
-                  type="email"
-                  id="senderEmail"
-                  name="senderEmail"
-                  value={formData.senderEmail}
-                  onChange={handleInputChange}
-                  className={`w-full px-3 py-2 border ${
-                    formData.senderEmail && !isValidEmail(formData.senderEmail)
-                      ? 'border-red-500'
-                      : 'border-gray-300'
-                  } rounded focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                />
-                {formData.senderEmail && !isValidEmail(formData.senderEmail) && (
-                  <p className="text-red-500 text-sm mt-1">Please enter a valid email address</p>
-                )}
+            <div className={`${!formData.emailEnabled ? 'opacity-50' : ''}`}>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="mb-4">
+                  <label htmlFor="smtpHost" className="block text-gray-700 font-medium mb-2">
+                    SMTP Host
+                  </label>
+                  <input
+                    type="text"
+                    id="smtpHost"
+                    name="smtpHost"
+                    value={formData.smtpHost}
+                    onChange={handleInputChange}
+                    disabled={!formData.emailEnabled}
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  />
+                </div>
+                
+                <div className="mb-4">
+                  <label htmlFor="smtpPort" className="block text-gray-700 font-medium mb-2">
+                    SMTP Port
+                  </label>
+                  <input
+                    type="number"
+                    id="smtpPort"
+                    name="smtpPort"
+                    value={formData.smtpPort}
+                    onChange={handleInputChange}
+                    min={1}
+                    max={65535}
+                    disabled={!formData.emailEnabled}
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  />
+                </div>
               </div>
               
-              <div className="mb-4">
-                <label htmlFor="senderName" className="block text-gray-700 font-medium mb-2">
-                  Sender Name
-                </label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="mb-4">
+                  <label htmlFor="smtpUsername" className="block text-gray-700 font-medium mb-2">
+                    SMTP Username
+                  </label>
+                  <input
+                    type="text"
+                    id="smtpUsername"
+                    name="smtpUsername"
+                    value={formData.smtpUsername}
+                    onChange={handleInputChange}
+                    disabled={!formData.emailEnabled}
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  />
+                </div>
+                
+                <div className="mb-4">
+                  <label htmlFor="smtpPassword" className="block text-gray-700 font-medium mb-2">
+                    SMTP Password
+                  </label>
+                  <input
+                    type="password"
+                    id="smtpPassword"
+                    name="smtpPassword"
+                    value={formData.smtpPassword}
+                    onChange={handleInputChange}
+                    disabled={!formData.emailEnabled}
+                    placeholder={formData.smtpPassword === '' ? 'Leave blank to keep existing password' : ''}
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  />
+                  <p className="text-sm text-gray-500 mt-1">
+                    Leave blank to keep the existing password. Only enter a new password if you want to change it.
+                  </p>
+                </div>
+              </div>
+              
+              <div className="flex items-center mb-4">
                 <input
-                  type="text"
-                  id="senderName"
-                  name="senderName"
-                  value={formData.senderName}
+                  type="checkbox"
+                  id="smtpUseSsl"
+                  name="smtpUseSsl"
+                  checked={formData.smtpUseSsl}
                   onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  disabled={!formData.emailEnabled}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded disabled:cursor-not-allowed"
                 />
+                <label htmlFor="smtpUseSsl" className="ml-2 block text-gray-700">
+                  Use SSL for SMTP
+                </label>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="mb-4">
+                  <label htmlFor="senderEmail" className="block text-gray-700 font-medium mb-2">
+                    Sender Email
+                  </label>
+                  <input
+                    type="email"
+                    id="senderEmail"
+                    name="senderEmail"
+                    value={formData.senderEmail}
+                    onChange={handleInputChange}
+                    disabled={!formData.emailEnabled}
+                    className={`w-full px-3 py-2 border ${
+                      formData.senderEmail && !isValidEmail(formData.senderEmail)
+                        ? 'border-red-500'
+                        : 'border-gray-300'
+                    } rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed`}
+                  />
+                  {formData.senderEmail && !isValidEmail(formData.senderEmail) && (
+                    <p className="text-red-500 text-sm mt-1">Please enter a valid email address</p>
+                  )}
+                </div>
+                
+                <div className="mb-4">
+                  <label htmlFor="senderName" className="block text-gray-700 font-medium mb-2">
+                    Sender Name
+                  </label>
+                  <input
+                    type="text"
+                    id="senderName"
+                    name="senderName"
+                    value={formData.senderName}
+                    onChange={handleInputChange}
+                    disabled={!formData.emailEnabled}
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  />
+                </div>
               </div>
             </div>
           </div>
