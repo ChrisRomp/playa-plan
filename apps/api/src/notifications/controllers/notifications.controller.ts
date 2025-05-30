@@ -1,12 +1,13 @@
-import { Body, Controller, Post, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { Body, Controller, Post, Get, Query, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { NotificationsService } from '../services/notifications.service';
 import { EmailService } from '../services/email.service';
+import { EmailAuditService } from '../services/email-audit.service';
 import { SendEmailDto, SendEmailToMultipleRecipientsDto } from '../dto/send-email.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
-import { UserRole } from '@prisma/client';
+import { UserRole, NotificationType } from '@prisma/client';
 
 /**
  * Controller for managing notifications and email sending
@@ -17,6 +18,7 @@ export class NotificationsController {
   constructor(
     private readonly notificationsService: NotificationsService,
     private readonly emailService: EmailService,
+    private readonly emailAuditService: EmailAuditService,
   ) {}
 
   /**
@@ -38,6 +40,7 @@ export class NotificationsController {
       subject: sendEmailDto.subject,
       html: sendEmailDto.html,
       text: sendEmailDto.text,
+      notificationType: NotificationType.EMAIL_VERIFICATION,
       attachments: sendEmailDto.attachments?.map(att => ({
         filename: att.filename,
         content: att.content,
@@ -69,6 +72,7 @@ export class NotificationsController {
       subject: dto.subject,
       html: dto.html,
       text: dto.text,
+      notificationType: NotificationType.EMAIL_VERIFICATION,
       attachments: dto.attachments?.map(att => ({
         filename: att.filename,
         content: att.content,
@@ -92,7 +96,37 @@ export class NotificationsController {
   @ApiResponse({ status: HttpStatus.UNAUTHORIZED, description: 'Unauthorized' })
   @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Forbidden - requires admin role' })
   async sendTestEmail(@Body('email') email: string): Promise<{ success: boolean }> {
-    const result = await this.notificationsService.sendWelcomeEmail(email, 'Test User');
+    const result = await this.notificationsService.sendEmailVerificationEmail(email, 'test-token');
     return { success: result };
+  }
+
+  /**
+   * Get email audit statistics (admin only)
+   */
+  @Get('email/statistics')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get email audit statistics' })
+  @ApiQuery({ name: 'startDate', required: false, description: 'Start date for statistics (ISO string)' })
+  @ApiQuery({ name: 'endDate', required: false, description: 'End date for statistics (ISO string)' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Email statistics retrieved successfully' })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, description: 'Unauthorized' })
+  @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Forbidden - requires admin role' })
+  async getEmailStatistics(
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ): Promise<{
+    totalEmails: number;
+    sentEmails: number;
+    failedEmails: number;
+    disabledEmails: number;
+    byNotificationType: Record<string, number>;
+  }> {
+    // Default to last 30 days if no dates provided
+    const start = startDate ? new Date(startDate) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const end = endDate ? new Date(endDate) : new Date();
+
+    return await this.emailAuditService.getEmailStatistics(start, end);
   }
 } 

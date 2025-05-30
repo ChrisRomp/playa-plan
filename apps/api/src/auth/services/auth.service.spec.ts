@@ -177,7 +177,8 @@ describe('AuthService', () => {
       
       expect(notificationsService.sendEmailVerificationEmail).toHaveBeenCalledWith(
         'new@example.playaplan.app',
-        'mocked-uuid-token'
+        'mocked-uuid-token',
+        undefined
       );
     });
 
@@ -423,7 +424,8 @@ describe('AuthService', () => {
       });
       expect(notificationsService.sendLoginCodeEmail).toHaveBeenCalledWith(
         'test@example.playaplan.app',
-        expect.any(String)
+        expect.any(String),
+        'user-id-1'
       );
       
 
@@ -462,7 +464,8 @@ describe('AuthService', () => {
       });
       expect(notificationsService.sendLoginCodeEmail).toHaveBeenCalledWith(
         'new@example.playaplan.app',
-        expect.any(String)
+        expect.any(String),
+        undefined
       );
     });
 
@@ -500,7 +503,8 @@ describe('AuthService', () => {
       });
       expect(notificationsService.sendLoginCodeEmail).toHaveBeenCalledWith(
         'admin@example.playaplan.app',
-        expect.any(String)
+        expect.any(String),
+        undefined
       );
     });
 
@@ -545,7 +549,8 @@ describe('AuthService', () => {
       });
       expect(notificationsService.sendLoginCodeEmail).toHaveBeenCalledWith(
         'test@example.playaplan.app',
-        '123456'
+        '123456',
+        'user-id-1'
       );
     });
 
@@ -579,7 +584,8 @@ describe('AuthService', () => {
       });
       expect(notificationsService.sendLoginCodeEmail).toHaveBeenCalledWith(
         'test@example.playaplan.app',
-        expect.stringMatching(/^\d{6}$/)
+        expect.stringMatching(/^\d{6}$/),
+        'user-id-1'
       );
     });
   });

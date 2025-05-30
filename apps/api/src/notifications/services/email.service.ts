@@ -173,6 +173,12 @@ export class EmailService implements OnModuleInit {
       bccEmails
     } = options;
 
+    // Validate required fields
+    if (!notificationType) {
+      this.logger.error('EmailService.sendEmail called without required notificationType field');
+      return false;
+    }
+
     // Get primary recipient for logging (use first if array)
     const primaryRecipient = Array.isArray(to) ? to[0] : to;
     const isDebugMode = this.configService.get('NODE_ENV') === 'development';

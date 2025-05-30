@@ -36,6 +36,7 @@ describe('CoreConfigService', () => {
     smtpUseSsl: false,
     senderEmail: 'noreply@example.playaplan.app',
     senderName: 'Test Camp',
+    emailEnabled: false,
     timeZone: 'America/Los_Angeles',
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -251,6 +252,115 @@ describe('CoreConfigService', () => {
       await expect(service.remove(mockCoreConfig.id as string)).rejects.toThrow(BadRequestException);
       expect(mockPrismaService.coreConfig.findUnique).toHaveBeenCalled();
       expect(mockPrismaService.coreConfig.delete).toHaveBeenCalled();
+    });
+  });
+
+  describe('getEmailConfiguration', () => {
+    it('should return all email config fields from database', async () => {
+      // Arrange
+      const configWithEmail = {
+        ...mockCoreConfig,
+        emailEnabled: true,
+        smtpHost: 'smtp.test.com',
+        smtpPort: 587,
+        smtpUser: 'test@example.com', // Database field name
+        smtpPassword: 'password123',
+        smtpSecure: false, // Database field name
+        senderEmail: 'noreply@test.com',
+        senderName: 'Test Camp',
+      };
+      mockPrismaService.coreConfig.findMany.mockResolvedValueOnce([configWithEmail]);
+
+      // Act
+      const result = await service.getEmailConfiguration();
+
+      // Assert
+      expect(result).toEqual({
+        emailEnabled: true,
+        smtpHost: 'smtp.test.com',
+        smtpPort: 587,
+        smtpUsername: 'test@example.com', // Entity field name
+        smtpPassword: 'password123',
+        smtpUseSsl: false, // Entity field name
+        senderEmail: 'noreply@test.com',
+        senderName: 'Test Camp',
+      });
+      expect(mockPrismaService.coreConfig.findMany).toHaveBeenCalled();
+    });
+
+    it('should return safe defaults on database error', async () => {
+      // Arrange
+      mockPrismaService.coreConfig.findMany.mockRejectedValueOnce(new Error('Database error'));
+
+      // Act
+      const result = await service.getEmailConfiguration();
+
+      // Assert
+      expect(result).toEqual({
+        emailEnabled: false,
+        smtpHost: null,
+        smtpPort: null,
+        smtpUsername: null,
+        smtpPassword: null,
+        smtpUseSsl: false,
+        senderEmail: null,
+        senderName: null,
+      });
+      expect(mockPrismaService.coreConfig.findMany).toHaveBeenCalled();
+    });
+
+    it('should handle missing configuration gracefully', async () => {
+      // Arrange - Return empty array to trigger default config behavior
+      mockPrismaService.coreConfig.findMany.mockResolvedValueOnce([]);
+
+      // Act
+      const result = await service.getEmailConfiguration();
+
+      // Assert - Should return default config values (emailEnabled: false)
+      expect(result).toEqual({
+        emailEnabled: false,
+        smtpHost: null,
+        smtpPort: null,
+        smtpUsername: null,
+        smtpPassword: null,
+        smtpUseSsl: false,
+        senderEmail: null,
+        senderName: null,
+      });
+      expect(mockPrismaService.coreConfig.findMany).toHaveBeenCalled();
+    });
+
+    it('should handle email configuration field mapping between entity and database', async () => {
+      // Arrange - Test the DB field mapping (smtpUser -> smtpUsername, smtpSecure -> smtpUseSsl)
+      const dbConfig = {
+        ...mockCoreConfig,
+        emailEnabled: true,
+        smtpHost: 'smtp.mapped.com',
+        smtpPort: 465,
+        smtpUser: 'mapped@example.com', // DB field name
+        smtpPassword: 'mappedpass',
+        smtpSecure: true, // DB field name (boolean)
+        senderEmail: 'sender@mapped.com',
+        senderName: 'Mapped Camp',
+      };
+      
+      // Mock what Prisma returns (database field names)
+      mockPrismaService.coreConfig.findMany.mockResolvedValueOnce([dbConfig]);
+
+      // Act
+      const result = await service.getEmailConfiguration();
+
+      // Assert - Should return entity field names
+      expect(result).toEqual({
+        emailEnabled: true,
+        smtpHost: 'smtp.mapped.com',
+        smtpPort: 465,
+        smtpUsername: 'mapped@example.com', // Entity field name
+        smtpPassword: 'mappedpass',
+        smtpUseSsl: true, // Entity field name
+        senderEmail: 'sender@mapped.com',
+        senderName: 'Mapped Camp',
+      });
     });
   });
 

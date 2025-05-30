@@ -61,52 +61,50 @@ Based on: `prd-email-notifications-system.md`
   - [x] 4.5 Create registration error notification template with error details and next steps
   - [x] 4.6 Update registration services to trigger appropriate confirmation/error notifications
   - [x] 4.7 Ensure all notification calls are wrapped in try-catch to prevent blocking main operations
-  - [ ] 4.8 Add unit tests for new notification templates and service integrations
+  - [x] 4.8 Add unit tests for new notification templates and service integrations
   - [x] 4.9 Verify that all email triggers are internal to backend services only - no API endpoints allow frontend to directly trigger emails except admin-only test endpoints (if any)
 
-- [ ] 5.0 Unit Testing and Quality Assurance
-  - [ ] 5.1 EmailAuditService Unit Tests (uses mocked PrismaService)
-    - [ ] 5.1.1 Test logEmailAttempt() with all audit data fields
-    - [ ] 5.1.2 Test logEmailSent() creates SENT audit record with sentAt timestamp
-    - [ ] 5.1.3 Test logEmailFailed() creates FAILED audit record with error message
-    - [ ] 5.1.4 Test logEmailDisabled() creates DISABLED audit record
-    - [ ] 5.1.5 Test getEmailStatistics() returns correct counts and breakdown by notification type
-    - [ ] 5.1.6 Test audit logging handles database errors gracefully (doesn't throw)
-    - [ ] 5.1.7 Test CC/BCC email arrays are properly serialized as comma-separated strings
-  - [ ] 5.2 EmailService Unit Tests (uses mocked CoreConfigService and EmailAuditService, mocked nodemailer)
-    - [ ] 5.2.1 Test getEmailConfig() caching mechanism with TTL expiry
-    - [ ] 5.2.2 Test refreshConfiguration() forces cache refresh and reinitializes SMTP
-    - [ ] 5.2.3 Test sendEmail() with emailEnabled=false logs DISABLED status
-    - [ ] 5.2.4 Test sendEmail() with incomplete SMTP config logs FAILED status
-    - [ ] 5.2.5 Test sendEmail() successful send logs SENT status with audit trail
-    - [ ] 5.2.6 Test sendEmail() SMTP failure logs FAILED status with error message
-    - [ ] 5.2.7 Test onModuleInit() initializes service on startup
-    - [ ] 5.2.8 Test development mode console output includes all debug information
-    - [ ] 5.2.9 Test SMTP transporter initialization with database configuration
-    - [ ] 5.2.10 Test EmailOptions interface requires notificationType and handles optional audit fields
-  - [ ] 5.3 CoreConfigService Unit Tests (uses mocked PrismaService)
-    - [ ] 5.3.1 Test getEmailConfiguration() returns all email config fields from database
-    - [ ] 5.3.2 Test getEmailConfiguration() returns safe defaults on database error
-    - [ ] 5.3.3 Test getEmailConfiguration() handles missing configuration gracefully
-    - [ ] 5.3.4 Test email configuration field mapping between entity and database
-  - [ ] 5.4 NotificationsService Unit Tests (uses mocked EmailService - upcoming)
-    - [ ] 5.4.1 Test sendLoginCodeEmail() template and audit logging
-    - [ ] 5.4.2 Test sendEmailChangeNotification() to old and new email addresses
-    - [ ] 5.4.3 Test sendRegistrationConfirmation() with camping options and payment details
-    - [ ] 5.4.4 Test sendRegistrationError() with error details and next steps
-    - [ ] 5.4.5 Test all notification methods handle EmailService failures gracefully
-    - [ ] 5.4.6 Test template generation includes all required dynamic content
-  - [ ] 5.5 Service Integration Unit Tests (uses mocked NotificationsService - upcoming)
-    - [ ] 5.5.1 Test AuthService login code generation triggers email notification
-    - [ ] 5.5.2 Test UserService email change triggers notifications to both addresses
-    - [ ] 5.5.3 Test registration services trigger appropriate confirmation/error emails
-    - [ ] 5.5.4 Test all service integrations handle notification failures without blocking main operations
-    - [ ] 5.5.5 Test notification calls include correct user context and notification types
-  - [ ] 5.6 Integration Tests (uses test database + mock SMTP server like Ethereal Email or Docker mailhog)
-    - [ ] 5.6.1 Test complete email flow from service call to audit log creation
-    - [ ] 5.6.2 Test email configuration changes are reflected in email sending
-    - [ ] 5.6.3 Test global email toggle affects all notification types
-    - [ ] 5.6.4 Test email audit statistics endpoint returns accurate data
+- [x] 5.0 Unit Testing and Quality Assurance
+  - [x] 5.1 EmailAuditService Unit Tests (uses mocked PrismaService)
+    - [x] 5.1.1 Test logEmailAttempt() with all audit data fields
+    - [x] 5.1.2 Test logEmailSent() creates SENT audit record with sentAt timestamp
+    - [x] 5.1.3 Test logEmailFailed() creates FAILED audit record with error message
+    - [x] 5.1.4 Test logEmailDisabled() creates DISABLED audit record
+    - [x] 5.1.5 Test getEmailStatistics() returns correct counts and breakdown by notification type
+    - [x] 5.1.6 Test audit logging handles database errors gracefully (doesn't throw)
+    - [x] 5.1.7 Test CC/BCC email arrays are properly serialized as comma-separated strings
+  - [x] 5.2 EmailService Unit Tests (uses mocked CoreConfigService and EmailAuditService)
+    - [x] 5.2.1 Test sendEmail() successfully sends email and logs SENT audit record
+    - [x] 5.2.2 Test sendEmail() logs FAILED audit record on SMTP error
+    - [x] 5.2.3 Test sendEmail() logs DISABLED audit record when emailEnabled=false
+    - [x] 5.2.4 Test sendEmail() handles incomplete SMTP configuration (missing fields)
+    - [x] 5.2.5 Test refreshConfiguration() updates SMTP transport with database config
+    - [x] 5.2.6 Test configuration caching behavior (5-minute cache)
+    - [x] 5.2.7 Test OnModuleInit lifecycle hook initializes SMTP config from database
+    - [x] 5.2.8 Test email validation and required fields (notificationType required)
+  - [x] 5.3 CoreConfigService Unit Tests (uses mocked PrismaService)
+    - [x] 5.3.1 Test getEmailConfiguration() returns all email config fields from database
+    - [x] 5.3.2 Test getEmailConfiguration() returns safe defaults on database error
+    - [x] 5.3.3 Test getEmailConfiguration() handles missing configuration gracefully
+    - [x] 5.3.4 Test email configuration field mapping between entity and database
+  - [x] 5.4 NotificationsService Unit Tests (uses mocked EmailService - completed)
+    - [x] 5.4.1 Test sendLoginCodeEmail() template and audit logging
+    - [x] 5.4.2 Test sendEmailChangeNotification() to old and new email addresses
+    - [x] 5.4.3 Test sendRegistrationConfirmation() with camping options and payment details
+    - [x] 5.4.4 Test sendRegistrationError() with error details and next steps
+    - [x] 5.4.5 Test all notification methods handle EmailService failures gracefully
+    - [x] 5.4.6 Test template generation includes all required dynamic content
+  - [x] 5.5 Service Integration Unit Tests (uses mocked NotificationsService - completed)
+    - [x] 5.5.1 Test AuthService login code generation triggers email notification
+    - [x] 5.5.2 Test UserService email change triggers notifications to both addresses
+    - [x] 5.5.3 Test registration services trigger appropriate confirmation/error emails
+    - [x] 5.5.4 Test all service integrations handle notification failures without blocking main operations
+    - [x] 5.5.5 Test notification calls include correct user context and notification types
+  - [x] 5.6 Integration Tests (uses test database + mock SMTP server like Ethereal Email or Docker mailhog)
+    - [x] 5.6.1 Test complete email flow from service call to audit log creation
+    - [x] 5.6.2 Test email configuration changes are reflected in email sending
+    - [x] 5.6.3 Test global email toggle affects all notification types
+    - [x] 5.6.4 Test email audit statistics endpoint returns accurate data
     - [ ] 5.6.5 Test SMTP configuration validation and connection testing (uses nodemailer test account)
     - [ ] 5.6.6 Test concurrent email sending with cache coherency
   - [ ] 5.7 Error Handling and Edge Cases (uses mocks to simulate error conditions)
