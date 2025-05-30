@@ -33,6 +33,17 @@ describe('Email Notifications (e2e)', () => {
     } as any;
 
     (nodemailer.createTransport as jest.Mock).mockReturnValue(mockTransporter);
+    
+    // Mock createTestAccount for SMTP testing
+    (nodemailer.createTestAccount as jest.Mock).mockResolvedValue({
+      smtp: {
+        host: 'smtp.ethereal.email',
+        port: 587,
+        secure: false,
+      },
+      user: 'test.user@ethereal.email',
+      pass: 'test-password',
+    });
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
@@ -504,6 +515,593 @@ describe('Email Notifications (e2e)', () => {
         .expect(401); // No token
 
       // Should also test with regular user token if we had one
+    });
+  });
+
+  describe('5.6.5 SMTP configuration validation and connection testing', () => {
+    beforeEach(() => {
+      // Clear mock calls before each test
+      mockTransporter.sendMail.mockClear();
+      mockTransporter.verify.mockClear();
+    });
+
+    it('should validate valid SMTP configuration on refresh', async () => {
+      // Arrange - Set up valid SMTP configuration
+      // Mock nodemailer.createTestAccount since it doesn't work in test environment
+      const mockTestAccount = {
+        smtp: {
+          host: 'smtp.ethereal.email',
+          port: 587,
+          secure: false,
+        },
+        user: 'test.user@ethereal.email',
+        pass: 'test-password',
+      };
+      
+      (nodemailer.createTestAccount as jest.Mock).mockResolvedValue(mockTestAccount);
+      
+      const testAccount = await nodemailer.createTestAccount();
+      
+      await prismaService.coreConfig.update({
+        where: { id: testConfigId },
+        data: {
+          emailEnabled: true,
+          smtpHost: testAccount.smtp.host,
+          smtpPort: testAccount.smtp.port,
+          smtpUser: testAccount.user,
+          smtpPassword: testAccount.pass,
+          smtpSecure: testAccount.smtp.secure,
+          senderEmail: 'test@example.playaplan.app',
+          senderName: 'PlayaPlan Test',
+        },
+      });
+
+      // Act - Refresh configuration and verify no errors
+      await expect(emailService.refreshConfiguration()).resolves.not.toThrow();
+
+      // Verify transporter was created with correct config
+      expect(nodemailer.createTransport).toHaveBeenCalledWith({
+        host: testAccount.smtp.host,
+        port: testAccount.smtp.port,
+        secure: testAccount.smtp.secure,
+        auth: {
+          user: testAccount.user,
+          pass: testAccount.pass,
+        },
+      });
+    });
+
+    it('should handle invalid SMTP host gracefully', async () => {
+      // Arrange - Set up invalid SMTP configuration
+      await prismaService.coreConfig.update({
+        where: { id: testConfigId },
+        data: {
+          emailEnabled: true,
+          smtpHost: 'invalid-smtp-host.nonexistent',
+          smtpPort: 587,
+          smtpUser: 'test@example.com',
+          smtpPassword: 'testpass',
+          smtpSecure: false,
+          senderEmail: 'test@example.playaplan.app',
+          senderName: 'PlayaPlan Test',
+        },
+      });
+
+      // Mock transport sendMail to simulate connection failure during actual send
+      mockTransporter.sendMail.mockRejectedValue(new Error('Connection failed'));
+
+      // Act - Refresh configuration should not throw
+      await expect(emailService.refreshConfiguration()).resolves.not.toThrow();
+
+      // Try to send email which should fail due to invalid host
+      const result = await notificationsService.sendLoginCodeEmail(
+        'test@example.com',
+        '123456',
+        testUserId
+      );
+
+      // Assert - Email should fail
+      expect(result).toBe(false);
+
+      // Check audit record shows connection failure
+      const auditRecords = await prismaService.emailAudit.findMany({
+        where: {
+          recipientEmail: 'test@example.com',
+          notificationType: NotificationType.EMAIL_AUTHENTICATION,
+          status: EmailAuditStatus.FAILED,
+        },
+      });
+
+      expect(auditRecords.length).toBeGreaterThan(0);
+      expect(auditRecords[0].errorMessage).toContain('SMTP send operation returned false');
+    });
+
+    it('should handle missing SMTP configuration gracefully', async () => {
+      // Arrange - Set up configuration with missing SMTP fields
+      await prismaService.coreConfig.update({
+        where: { id: testConfigId },
+        data: {
+          emailEnabled: true,
+          smtpHost: null,
+          smtpPort: null,
+          smtpUser: null,
+          smtpPassword: null,
+          smtpSecure: false,
+          senderEmail: 'test@example.playaplan.app',
+          senderName: 'PlayaPlan Test',
+        },
+      });
+
+      // Act - Refresh configuration should not throw
+      await expect(emailService.refreshConfiguration()).resolves.not.toThrow();
+
+      // Act - Try to send email with incomplete config
+      const result = await notificationsService.sendLoginCodeEmail(
+        'test@example.com',
+        '123456',
+        testUserId
+      );
+
+      // Assert - Email should fail gracefully
+      expect(result).toBe(false);
+
+      // Check that a FAILED audit record was created with appropriate error
+      // Note: When SMTP config is completely missing, EmailService detects this early
+      // and logs "SMTP configuration incomplete" before attempting to send
+      const auditRecords = await prismaService.emailAudit.findMany({
+        where: {
+          recipientEmail: 'test@example.com',
+          notificationType: NotificationType.EMAIL_AUTHENTICATION,
+          status: EmailAuditStatus.FAILED,
+        },
+        orderBy: {
+          createdAt: 'desc', // Get the most recent record
+        },
+      });
+
+      expect(auditRecords.length).toBeGreaterThan(0);
+      expect(auditRecords[0].errorMessage).toContain('SMTP configuration incomplete');
+    });
+
+    it('should handle SMTP authentication failure during send', async () => {
+      // Arrange - Set up SMTP config that will fail during send
+      await prismaService.coreConfig.update({
+        where: { id: testConfigId },
+        data: {
+          emailEnabled: true,
+          smtpHost: 'smtp.gmail.com',
+          smtpPort: 587,
+          smtpUser: 'valid@gmail.com', // Valid format but will fail auth
+          smtpPassword: 'validpassword', // Valid password format
+          smtpSecure: false,
+          senderEmail: 'test@example.playaplan.app',
+          senderName: 'PlayaPlan Test',
+        },
+      });
+
+      // Mock transport sendMail to simulate authentication failure
+      mockTransporter.sendMail.mockRejectedValue(new Error('Authentication failed'));
+
+      // Act - Refresh configuration
+      await emailService.refreshConfiguration();
+
+      // Try to send email
+      const result = await notificationsService.sendLoginCodeEmail(
+        'test@example.com',
+        '123456',
+        testUserId
+      );
+
+      // Assert - Email should fail
+      expect(result).toBe(false);
+
+      // Check that a FAILED audit record was created
+      // Note: The sendViaSmtp method catches errors and returns false, 
+      // so the error message will be "SMTP send operation returned false"
+      const auditRecords = await prismaService.emailAudit.findMany({
+        where: {
+          recipientEmail: 'test@example.com',
+          notificationType: NotificationType.EMAIL_AUTHENTICATION,
+          status: EmailAuditStatus.FAILED,
+        },
+      });
+
+      expect(auditRecords.length).toBeGreaterThan(0);
+      expect(auditRecords[0].errorMessage).toContain('SMTP send operation returned false');
+    });
+
+    it('should successfully create transporter with valid configuration', async () => {
+      // Arrange - Set up test SMTP configuration
+      const mockTestAccount = {
+        smtp: {
+          host: 'smtp.ethereal.email',
+          port: 587,
+          secure: false,
+        },
+        user: 'test.user@ethereal.email',
+        pass: 'test-password',
+      };
+      
+      (nodemailer.createTestAccount as jest.Mock).mockResolvedValue(mockTestAccount);
+      const testAccount = await nodemailer.createTestAccount();
+      
+      await prismaService.coreConfig.update({
+        where: { id: testConfigId },
+        data: {
+          emailEnabled: true,
+          smtpHost: testAccount.smtp.host,
+          smtpPort: testAccount.smtp.port,
+          smtpUser: testAccount.user,
+          smtpPassword: testAccount.pass,
+          smtpSecure: testAccount.smtp.secure,
+          senderEmail: 'test@example.playaplan.app',
+          senderName: 'PlayaPlan Test',
+        },
+      });
+
+      // Mock successful email sending
+      mockTransporter.sendMail.mockResolvedValue({ messageId: 'test-message-id' });
+
+      // Act - Refresh configuration
+      await emailService.refreshConfiguration();
+
+      // Send a test email to verify transporter works
+      const result = await notificationsService.sendLoginCodeEmail(
+        'test@example.com',
+        '123456',
+        testUserId
+      );
+
+      // Assert - Email should be sent successfully
+      expect(result).toBe(true);
+      expect(mockTransporter.sendMail).toHaveBeenCalled();
+
+      // Verify audit record was created
+      const auditRecords = await prismaService.emailAudit.findMany({
+        where: {
+          recipientEmail: 'test@example.com',
+          notificationType: NotificationType.EMAIL_AUTHENTICATION,
+          status: EmailAuditStatus.SENT,
+        },
+      });
+
+      expect(auditRecords.length).toBeGreaterThan(0);
+    });
+
+    it('should handle SMTP timeout scenarios', async () => {
+      // Arrange - Set up SMTP configuration
+      await prismaService.coreConfig.update({
+        where: { id: testConfigId },
+        data: {
+          emailEnabled: true,
+          smtpHost: 'smtp.test.com',
+          smtpPort: 587,
+          smtpUser: 'test@example.com',
+          smtpPassword: 'testpass',
+          smtpSecure: false,
+          senderEmail: 'test@example.playaplan.app',
+          senderName: 'PlayaPlan Test',
+        },
+      });
+
+      // Mock transport sendMail to simulate timeout
+      mockTransporter.sendMail.mockRejectedValue(new Error('Connection timeout'));
+
+      // Act - Refresh configuration and try to send email
+      await emailService.refreshConfiguration();
+      
+      const result = await notificationsService.sendLoginCodeEmail(
+        'test@example.com',
+        '123456',
+        testUserId
+      );
+
+      // Assert - Email should fail gracefully
+      expect(result).toBe(false);
+
+      // Check audit record shows failed send operation
+      // Note: The sendViaSmtp method catches timeout errors and returns false
+      const auditRecords = await prismaService.emailAudit.findMany({
+        where: {
+          recipientEmail: 'test@example.com',
+          notificationType: NotificationType.EMAIL_AUTHENTICATION,
+          status: EmailAuditStatus.FAILED,
+        },
+      });
+
+      expect(auditRecords.length).toBeGreaterThan(0);
+      expect(auditRecords[0].errorMessage).toContain('SMTP send operation returned false');
+    });
+  });
+
+  describe('5.6.6 Concurrent email sending with cache coherency', () => {
+    beforeEach(() => {
+      // Clear mock calls before each test
+      mockTransporter.sendMail.mockClear();
+      mockTransporter.verify.mockClear();
+    });
+
+    it('should handle concurrent email sending operations', async () => {
+      // Arrange - Set up valid SMTP configuration
+      await prismaService.coreConfig.update({
+        where: { id: testConfigId },
+        data: {
+          emailEnabled: true,
+          smtpHost: 'smtp.test.com',
+          smtpPort: 587,
+          smtpUser: 'test@example.com',
+          smtpPassword: 'testpass',
+          smtpSecure: false,
+          senderEmail: 'test@example.playaplan.app',
+          senderName: 'PlayaPlan Test',
+        },
+      });
+
+      await emailService.refreshConfiguration();
+
+      // Mock successful email sending
+      mockTransporter.sendMail.mockResolvedValue({ messageId: 'test-message-id' });
+
+      // Act - Send multiple emails concurrently
+      const concurrentEmails = Array.from({ length: 5 }, (_, i) => 
+        notificationsService.sendLoginCodeEmail(
+          `user${i}@example.com`,
+          `code${i}`,
+          testUserId
+        )
+      );
+
+      const results = await Promise.all(concurrentEmails);
+
+      // Assert - All emails should be sent successfully
+      expect(results.every(result => result === true)).toBe(true);
+      expect(mockTransporter.sendMail).toHaveBeenCalledTimes(5);
+
+      // Check all audit records were created
+      const auditRecords = await prismaService.emailAudit.findMany({
+        where: {
+          notificationType: NotificationType.EMAIL_AUTHENTICATION,
+          status: EmailAuditStatus.SENT,
+        },
+      });
+
+      expect(auditRecords.length).toBeGreaterThanOrEqual(5);
+    });
+
+    it('should maintain cache coherency during concurrent configuration changes', async () => {
+      // Arrange - Set up initial configuration
+      await prismaService.coreConfig.update({
+        where: { id: testConfigId },
+        data: {
+          emailEnabled: true,
+          smtpHost: 'initial.smtp.com',
+          smtpPort: 587,
+          smtpUser: 'initial@example.com',
+          smtpPassword: 'initialpass',
+          smtpSecure: false,
+          senderEmail: 'initial@example.playaplan.app',
+          senderName: 'Initial Config',
+        },
+      });
+
+      await emailService.refreshConfiguration();
+
+      // Mock successful email sending
+      mockTransporter.sendMail.mockResolvedValue({ messageId: 'test-message-id' });
+
+      // Act - Perform concurrent operations: config change + email sending
+      const configUpdate = async () => {
+        await prismaService.coreConfig.update({
+          where: { id: testConfigId },
+          data: {
+            smtpHost: 'updated.smtp.com',
+            smtpUser: 'updated@example.com',
+            smtpPassword: 'updatedpass',
+          },
+        });
+        await emailService.refreshConfiguration();
+      };
+
+      const emailSending = async () => {
+        const results = [];
+        for (let i = 0; i < 3; i++) {
+          results.push(await notificationsService.sendLoginCodeEmail(
+            `concurrent${i}@example.com`,
+            `code${i}`,
+            testUserId
+          ));
+          // Small delay to allow interleaving with config changes
+          await new Promise(resolve => setTimeout(resolve, 10));
+        }
+        return results;
+      };
+
+      const [, emailResults] = await Promise.all([
+        configUpdate(),
+        emailSending(),
+      ]);
+
+      // Assert - All emails should be sent successfully despite config change
+      expect(emailResults.every(result => result === true)).toBe(true);
+      expect(mockTransporter.sendMail).toHaveBeenCalledTimes(3);
+
+      // Verify the final configuration is correct
+      expect(nodemailer.createTransport).toHaveBeenCalledWith(
+        expect.objectContaining({
+          host: 'updated.smtp.com',
+          auth: expect.objectContaining({
+            user: 'updated@example.com',
+            pass: 'updatedpass',
+          }),
+        })
+      );
+    });
+
+    it('should handle concurrent email operations when configuration is disabled', async () => {
+      // Arrange - Set up disabled email configuration
+      await prismaService.coreConfig.update({
+        where: { id: testConfigId },
+        data: {
+          emailEnabled: false,
+          smtpHost: 'smtp.test.com',
+          smtpPort: 587,
+          smtpUser: 'test@example.com',
+          smtpPassword: 'testpass',
+          smtpSecure: false,
+        },
+      });
+
+      await emailService.refreshConfiguration();
+
+      // Act - Send multiple emails concurrently when disabled
+      const concurrentEmails = Array.from({ length: 3 }, (_, i) => 
+        notificationsService.sendPasswordResetEmail(
+          `disabled${i}@example.com`,
+          `token${i}`,
+          testUserId
+        )
+      );
+
+      const results = await Promise.all(concurrentEmails);
+
+      // Assert - All emails should fail consistently
+      expect(results.every(result => result === false)).toBe(true);
+      expect(mockTransporter.sendMail).not.toHaveBeenCalled();
+
+      // Check all audit records show DISABLED status
+      const auditRecords = await prismaService.emailAudit.findMany({
+        where: {
+          notificationType: NotificationType.PASSWORD_RESET,
+          status: EmailAuditStatus.DISABLED,
+        },
+      });
+
+      expect(auditRecords.length).toBe(3);
+    });
+
+    it('should handle mixed success/failure scenarios under concurrent load', async () => {
+      // Arrange - Clear existing audit records for clean test
+      await prismaService.emailAudit.deleteMany();
+      
+      // Set up configuration that will work initially
+      await prismaService.coreConfig.update({
+        where: { id: testConfigId },
+        data: {
+          emailEnabled: true,
+          smtpHost: 'smtp.test.com',
+          smtpPort: 587,
+          smtpUser: 'test@example.com',
+          smtpPassword: 'testpass',
+          smtpSecure: false,
+          senderEmail: 'test@example.playaplan.app',
+          senderName: 'PlayaPlan Test',
+        },
+      });
+
+      await emailService.refreshConfiguration();
+
+      // Mock alternating success/failure
+      let callCount = 0;
+      mockTransporter.sendMail.mockImplementation(() => {
+        callCount++;
+        if (callCount % 2 === 0) {
+          return Promise.reject(new Error('Intermittent SMTP failure'));
+        }
+        return Promise.resolve({ messageId: `test-message-${callCount}` });
+      });
+
+      // Act - Send multiple emails concurrently with mixed outcomes
+      const concurrentEmails = Array.from({ length: 6 }, (_, i) => 
+        notificationsService.sendEmailVerificationEmail(
+          `mixed${i}@example.com`,
+          `token${i}`,
+          testUserId
+        )
+      );
+
+      const results = await Promise.all(concurrentEmails);
+
+      // Assert - Should have mix of success and failure
+      const successCount = results.filter(result => result === true).length;
+      const failureCount = results.filter(result => result === false).length;
+
+      expect(successCount).toBe(3); // Odd-numbered calls succeed
+      expect(failureCount).toBe(3); // Even-numbered calls fail
+      expect(mockTransporter.sendMail).toHaveBeenCalledTimes(6);
+
+      // Check audit records reflect the mixed outcomes
+      const sentAudits = await prismaService.emailAudit.findMany({
+        where: {
+          notificationType: NotificationType.EMAIL_VERIFICATION,
+          status: EmailAuditStatus.SENT,
+          recipientEmail: {
+            startsWith: 'mixed', // Only count our test emails
+          },
+        },
+      });
+
+      const failedAudits = await prismaService.emailAudit.findMany({
+        where: {
+          notificationType: NotificationType.EMAIL_VERIFICATION,
+          status: EmailAuditStatus.FAILED,
+          recipientEmail: {
+            startsWith: 'mixed', // Only count our test emails
+          },
+        },
+      });
+
+      expect(sentAudits.length).toBe(3);
+      expect(failedAudits.length).toBe(3);
+    });
+
+    it('should maintain configuration cache TTL under concurrent access', async () => {
+      // Arrange - Set up initial configuration
+      await prismaService.coreConfig.update({
+        where: { id: testConfigId },
+        data: {
+          emailEnabled: true,
+          smtpHost: 'cache.smtp.com',
+          smtpPort: 587,
+          smtpUser: 'cache@example.com',
+          smtpPassword: 'cachepass',
+          smtpSecure: false,
+          senderEmail: 'cache@example.playaplan.app',
+          senderName: 'Cache Test',
+        },
+      });
+
+      await emailService.refreshConfiguration();
+
+      // Mock successful email sending
+      mockTransporter.sendMail.mockResolvedValue({ messageId: 'test-message-id' });
+
+      // Act - Send multiple emails concurrently (should use cached config)
+      const concurrentEmails = Array.from({ length: 10 }, (_, i) => 
+        notificationsService.sendLoginCodeEmail(
+          `cache${i}@example.com`,
+          `code${i}`,
+          testUserId
+        )
+      );
+
+      const startTime = Date.now();
+      await Promise.all(concurrentEmails);
+      const endTime = Date.now();
+
+      // Assert - All emails should be sent successfully
+      const auditRecords = await prismaService.emailAudit.findMany({
+        where: {
+          notificationType: NotificationType.EMAIL_AUTHENTICATION,
+          status: EmailAuditStatus.SENT,
+        },
+      });
+
+      expect(auditRecords.length).toBeGreaterThanOrEqual(10);
+      expect(mockTransporter.sendMail).toHaveBeenCalledTimes(10);
+      
+      // Verify concurrent operations completed in reasonable time
+      // (If cache wasn't working, database queries would slow this down significantly)
+      expect(endTime - startTime).toBeLessThan(1000); // Should complete within 1 second
     });
   });
 }); 

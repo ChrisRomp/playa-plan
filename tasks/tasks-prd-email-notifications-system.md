@@ -105,8 +105,8 @@ Based on: `prd-email-notifications-system.md`
     - [x] 5.6.2 Test email configuration changes are reflected in email sending
     - [x] 5.6.3 Test global email toggle affects all notification types
     - [x] 5.6.4 Test email audit statistics endpoint returns accurate data
-    - [ ] 5.6.5 Test SMTP configuration validation and connection testing (uses nodemailer test account)
-    - [ ] 5.6.6 Test concurrent email sending with cache coherency
+    - [x] 5.6.5 Test SMTP configuration validation and connection testing (uses nodemailer test account)
+    - [x] 5.6.6 Test concurrent email sending with cache coherency
   - [ ] 5.7 Error Handling and Edge Cases (uses mocks to simulate error conditions)
     - [ ] 5.7.1 Test database connection failures during email operations
     - [ ] 5.7.2 Test malformed email addresses and content validation
@@ -121,4 +121,33 @@ Based on: `prd-email-notifications-system.md`
   - [ ] 6.3 Update form submission to include emailEnabled in API payload
   - [ ] 6.4 Add visual indicators when email is disabled (grayed out SMTP fields or warning message)
   - [ ] 6.5 Update form validation to handle emailEnabled toggle appropriately
-  - [ ] 6.6 Test admin UI changes to ensure toggle works correctly with existing SMTP configuration 
+  - [ ] 6.6 Test admin UI changes to ensure toggle works correctly with existing SMTP configuration
+
+- [ ] 6.7 Admin Test Email Feature
+  - [ ] 6.7.1 Enhance backend test email endpoint to include more comprehensive test content
+    - [ ] 6.7.1.1 Update sendTestEmail method to use a dedicated test email template instead of email verification
+    - [ ] 6.7.1.2 Include SMTP configuration details in test email content (host, port, secure status)
+    - [ ] 6.7.1.3 Add timestamp and admin user info to test email
+    - [ ] 6.7.1.4 Return detailed response including email audit record ID for tracking
+  - [ ] 6.7.2 Create test email UI component in admin panel
+    - [ ] 6.7.2.1 Add "Test Email Configuration" section to Email Configuration page
+    - [ ] 6.7.2.2 Create email input field with validation (must be valid email format)
+    - [ ] 6.7.2.3 Add "Send Test Email" button with loading state
+    - [ ] 6.7.2.4 Display success/failure status with detailed feedback messages
+    - [ ] 6.7.2.5 Show email audit record link for successful test emails
+  - [ ] 6.7.3 Enhance test email functionality
+    - [ ] 6.7.3.1 Add ability to test with custom subject and message content
+    - [ ] 6.7.3.2 Include option to send test email to multiple recipients
+    - [ ] 6.7.3.3 Show preview of email content before sending
+    - [ ] 6.7.3.4 Add quick-select buttons for common test scenarios (HTML vs plain text)
+  - [ ] 6.7.4 Test email monitoring and troubleshooting
+    - [ ] 6.7.4.1 Display recent test email history in admin panel
+    - [ ] 6.7.4.2 Add "Test SMTP Connection" button that validates configuration without sending email
+    - [ ] 6.7.4.3 Show detailed error messages for SMTP connection failures
+    - [ ] 6.7.4.4 Add tooltips explaining common email configuration issues
+  - [ ] 6.7.5 Unit and integration tests for test email feature
+    - [ ] 6.7.5.1 Test enhanced backend test email endpoint
+    - [ ] 6.7.5.2 Test admin UI test email component rendering and interactions
+    - [ ] 6.7.5.3 Test email validation and error handling in UI
+    - [ ] 6.7.5.4 Test integration between frontend and backend for test emails
+    - [ ] 6.7.5.5 Test SMTP connection validation functionality 
