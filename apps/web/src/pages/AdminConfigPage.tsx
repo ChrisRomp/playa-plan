@@ -17,6 +17,12 @@ const AdminConfigPage: React.FC = () => {
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [success, setSuccess] = useState<string | null>(null);
   
+  // Test email state
+  const [testEmailAddress, setTestEmailAddress] = useState('');
+  const [isTestEmailLoading, setIsTestEmailLoading] = useState(false);
+  const [testEmailError, setTestEmailError] = useState<string | null>(null);
+  const [testEmailSuccess, setTestEmailSuccess] = useState<string | null>(null);
+  
   // Form state
   const [formData, setFormData] = useState({
     campName: '',
@@ -175,6 +181,51 @@ const AdminConfigPage: React.FC = () => {
     }
     
     return errors;
+  };
+  
+  // Handle test email sending
+  const handleSendTestEmail = async () => {
+    if (!testEmailAddress || !isValidEmail(testEmailAddress)) {
+      setTestEmailError('Please enter a valid email address');
+      return;
+    }
+    
+    setIsTestEmailLoading(true);
+    setTestEmailError(null);
+    setTestEmailSuccess(null);
+    
+    try {
+      const response = await api.post('/notifications/email/test', {
+        email: testEmailAddress
+      });
+      
+      if (response.data.success) {
+        setTestEmailSuccess(
+          `Test email sent successfully to ${testEmailAddress}! ` +
+          `${response.data.message || ''} ` +
+          `${response.data.auditRecordId ? `(Audit ID: ${response.data.auditRecordId})` : ''}`
+        );
+        setTestEmailAddress(''); // Clear the input on success
+      } else {
+        setTestEmailError(response.data.message || 'Failed to send test email');
+      }
+    } catch (err) {
+      console.error('Failed to send test email:', err);
+      
+      // Type the error properly
+      interface ApiError {
+        response?: {
+          data?: {
+            message?: string;
+          };
+        };
+      }
+      
+      const errorMessage = (err as ApiError)?.response?.data?.message || 'Failed to send test email. Please try again.';
+      setTestEmailError(errorMessage);
+    } finally {
+      setIsTestEmailLoading(false);
+    }
   };
   
   // Handle form submission
@@ -837,6 +888,97 @@ const AdminConfigPage: React.FC = () => {
                   />
                 </div>
               </div>
+            </div>
+          </div>
+          
+          <div className="mb-8">
+            <h2 className="text-xl font-semibold mb-4 pb-2 border-b">Test Email Configuration</h2>
+            
+            {!formData.emailEnabled && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+                <div className="flex">
+                  <div className="ml-3">
+                    <h3 className="text-sm font-medium text-yellow-800">
+                      Email Testing Disabled
+                    </h3>
+                    <p className="mt-1 text-sm text-yellow-700">
+                      Email notifications are currently disabled. Please enable email notifications above to test your configuration.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            <div className={`${!formData.emailEnabled ? 'opacity-50 pointer-events-none' : ''}`}>
+              <p className="text-gray-600 mb-4">
+                Send a test email to verify your SMTP configuration is working correctly. 
+                The test email will include details about your current SMTP settings and timestamp information.
+              </p>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                <div className="md:col-span-2">
+                  <label htmlFor="testEmailAddress" className="block text-gray-700 font-medium mb-2">
+                    Test Email Address
+                  </label>
+                  <input
+                    type="email"
+                    id="testEmailAddress"
+                    value={testEmailAddress}
+                    onChange={(e) => setTestEmailAddress(e.target.value)}
+                    placeholder="Enter email address to send test email"
+                    disabled={!formData.emailEnabled || isTestEmailLoading}
+                    className={`w-full px-3 py-2 border ${
+                      testEmailAddress && !isValidEmail(testEmailAddress)
+                        ? 'border-red-500'
+                        : 'border-gray-300'
+                    } rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed`}
+                  />
+                  {testEmailAddress && !isValidEmail(testEmailAddress) && (
+                    <p className="text-red-500 text-sm mt-1">Please enter a valid email address</p>
+                  )}
+                </div>
+                
+                <div>
+                  <button
+                    type="button"
+                    onClick={handleSendTestEmail}
+                    disabled={!formData.emailEnabled || isTestEmailLoading || !testEmailAddress || !isValidEmail(testEmailAddress)}
+                    className="w-full px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
+                  >
+                    {isTestEmailLoading ? 'Sending...' : 'Send Test Email'}
+                  </button>
+                </div>
+              </div>
+              
+              {testEmailError && (
+                <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-4">
+                  <div className="flex">
+                    <div className="ml-3">
+                      <h3 className="text-sm font-medium text-red-800">
+                        Test Email Failed
+                      </h3>
+                      <p className="mt-1 text-sm text-red-700">
+                        {testEmailError}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {testEmailSuccess && (
+                <div className="mt-4 bg-green-50 border border-green-200 rounded-lg p-4">
+                  <div className="flex">
+                    <div className="ml-3">
+                      <h3 className="text-sm font-medium text-green-800">
+                        Test Email Sent Successfully
+                      </h3>
+                      <p className="mt-1 text-sm text-green-700">
+                        {testEmailSuccess}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
           
