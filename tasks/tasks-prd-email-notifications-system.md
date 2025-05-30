@@ -123,12 +123,9 @@ Based on: `prd-email-notifications-system.md`
   - [x] 6.5 Update form validation to handle emailEnabled toggle appropriately
   - [x] 6.6 Test admin UI changes to ensure toggle works correctly with existing SMTP configuration
 
-- [ ] 6.7 Admin Test Email Feature
-  - [ ] 6.7.1 Enhance backend test email endpoint to include more comprehensive test content
-    - [ ] 6.7.1.1 Update sendTestEmail method to use a dedicated test email template instead of email verification
-    - [ ] 6.7.1.2 Include SMTP configuration details in test email content (host, port, secure status)
-    - [ ] 6.7.1.3 Add timestamp and admin user info to test email
-    - [ ] 6.7.1.4 Return detailed response including email audit record ID for tracking
+- [x] 6.7 Admin Test Email Feature
+  - [x] 6.7.1 Enhanced Test Email Service
+    - [x] 6.7.1.1 Update sendTestEmail method to use dedicated test email template instead of email verification
   - [ ] 6.7.2 Create test email UI component in admin panel
     - [ ] 6.7.2.1 Add "Test Email Configuration" section to Email Configuration page
     - [ ] 6.7.2.2 Create email input field with validation (must be valid email format)

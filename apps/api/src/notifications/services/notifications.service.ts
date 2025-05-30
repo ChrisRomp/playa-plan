@@ -57,6 +57,16 @@ export interface TemplateData {
     message: string;
     suggestions?: string[];
   };
+  testEmailDetails?: {
+    smtpHost: string;
+    smtpPort: number;
+    smtpSecure: boolean;
+    senderEmail: string;
+    senderName: string;
+    adminUserName: string;
+    adminEmail: string;
+    timestamp: Date;
+  };
   userId?: string;
   [key: string]: unknown;
 }
@@ -283,6 +293,33 @@ export class NotificationsService {
   }
 
   /**
+   * Send test email with SMTP configuration details and admin info
+   * @param email Email address to send test email to
+   * @param testEmailDetails SMTP configuration and admin details
+   * @param userId Optional user ID for audit trail
+   * @returns Promise resolving to true if email was sent successfully
+   */
+  async sendTestEmail(
+    email: string,
+    testEmailDetails: {
+      smtpHost: string;
+      smtpPort: number;
+      smtpSecure: boolean;
+      senderEmail: string;
+      senderName: string;
+      adminUserName: string;
+      adminEmail: string;
+      timestamp: Date;
+    },
+    userId?: string
+  ): Promise<boolean> {
+    return this.sendNotification(email, NotificationType.EMAIL_TEST, { 
+      testEmailDetails, 
+      userId 
+    });
+  }
+
+  /**
    * Get template for specific notification type
    * @param type Notification type
    * @param data Template data
@@ -322,6 +359,11 @@ export class NotificationsService {
           throw new Error('Shift details are required for shift reminder template');
         }
         return this.getShiftReminderTemplate(data.shiftDetails);
+      case NotificationType.EMAIL_TEST:
+        if (!data.testEmailDetails) {
+          throw new Error('Test email details are required for test email template');
+        }
+        return this.getTestEmailTemplate(data.testEmailDetails);
       default:
         throw new Error(`Unknown notification type: ${type}`);
     }
@@ -691,6 +733,135 @@ export class NotificationsService {
         </p>
         <p>Please make sure to arrive on time.</p>
         <p>Best regards,<br>The PlayaPlan Team</p>
+      </div>
+    `;
+    
+    return { subject, text, html };
+  }
+
+  /**
+   * Get test email template
+   */
+  private getTestEmailTemplate(testEmailDetails: {
+    smtpHost: string;
+    smtpPort: number;
+    smtpSecure: boolean;
+    senderEmail: string;
+    senderName: string;
+    adminUserName: string;
+    adminEmail: string;
+    timestamp: Date;
+  }): NotificationTemplate {
+    const { 
+      smtpHost, 
+      smtpPort, 
+      smtpSecure, 
+      senderEmail, 
+      senderName, 
+      adminUserName, 
+      adminEmail, 
+      timestamp 
+    } = testEmailDetails;
+    
+    const formattedTimestamp = new Date(timestamp).toLocaleString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      timeZoneName: 'short'
+    });
+    
+    const subject = 'PlayaPlan Email Configuration Test - Success!';
+    const text = `
+Hello!
+
+This is a test email from PlayaPlan to verify your email configuration is working correctly.
+
+=== Test Email Details ===
+Sent at: ${formattedTimestamp}
+Sent by: ${adminUserName} (${adminEmail})
+
+=== SMTP Configuration ===
+Host: ${smtpHost}
+Port: ${smtpPort}
+Security: ${smtpSecure ? 'SSL/TLS Enabled' : 'No SSL/TLS'}
+Sender Email: ${senderEmail}
+Sender Name: ${senderName}
+
+If you received this email, your email configuration is working properly!
+
+Best regards,
+The PlayaPlan Team
+    `;
+    
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
+        <div style="background-color: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+          <div style="text-align: center; margin-bottom: 30px;">
+            <h1 style="color: #4CAF50; margin: 0; font-size: 28px;">✅ Email Test Successful!</h1>
+            <p style="color: #666; margin: 10px 0 0 0; font-size: 18px;">Your email configuration is working correctly</p>
+          </div>
+          
+          <div style="background-color: #e8f5e8; padding: 20px; border-radius: 6px; margin-bottom: 25px;">
+            <h3 style="color: #2e7d32; margin: 0 0 15px 0; font-size: 16px;">📧 Test Email Details</h3>
+            <table style="width: 100%; border-collapse: collapse;">
+              <tr>
+                <td style="padding: 8px 0; color: #555; font-weight: bold; width: 120px;">Sent at:</td>
+                <td style="padding: 8px 0; color: #333;">${formattedTimestamp}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 0; color: #555; font-weight: bold;">Sent by:</td>
+                <td style="padding: 8px 0; color: #333;">${adminUserName} (${adminEmail})</td>
+              </tr>
+            </table>
+          </div>
+          
+          <div style="background-color: #f5f5f5; padding: 20px; border-radius: 6px; margin-bottom: 25px;">
+            <h3 style="color: #333; margin: 0 0 15px 0; font-size: 16px;">⚙️ SMTP Configuration</h3>
+            <table style="width: 100%; border-collapse: collapse;">
+              <tr>
+                <td style="padding: 8px 0; color: #555; font-weight: bold; width: 120px;">Host:</td>
+                <td style="padding: 8px 0; color: #333; font-family: monospace;">${smtpHost}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 0; color: #555; font-weight: bold;">Port:</td>
+                <td style="padding: 8px 0; color: #333; font-family: monospace;">${smtpPort}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 0; color: #555; font-weight: bold;">Security:</td>
+                <td style="padding: 8px 0; color: #333;">
+                  <span style="background-color: ${smtpSecure ? '#4CAF50' : '#ff9800'}; color: white; padding: 2px 8px; border-radius: 4px; font-size: 12px;">
+                    ${smtpSecure ? '🔒 SSL/TLS Enabled' : '⚠️ No SSL/TLS'}
+                  </span>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 0; color: #555; font-weight: bold;">Sender Email:</td>
+                <td style="padding: 8px 0; color: #333; font-family: monospace;">${senderEmail}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 0; color: #555; font-weight: bold;">Sender Name:</td>
+                <td style="padding: 8px 0; color: #333;">${senderName}</td>
+              </tr>
+            </table>
+          </div>
+          
+          <div style="text-align: center; padding: 20px; background-color: #e3f2fd; border-radius: 6px;">
+            <p style="margin: 0; color: #1976d2; font-size: 16px; font-weight: bold;">
+              🎉 Congratulations! Your email system is ready to send notifications.
+            </p>
+          </div>
+          
+          <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;">
+            <p style="color: #666; margin: 0; font-size: 14px;">
+              Best regards,<br>
+              <strong>The PlayaPlan Team</strong>
+            </p>
+          </div>
+        </div>
       </div>
     `;
     

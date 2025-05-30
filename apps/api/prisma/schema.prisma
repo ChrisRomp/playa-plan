@@ -331,6 +331,7 @@ enum NotificationType {
   REGISTRATION_ERROR
   PAYMENT_CONFIRMATION
   SHIFT_REMINDER
+  EMAIL_TEST
 }
 
 enum NotificationStatus {
