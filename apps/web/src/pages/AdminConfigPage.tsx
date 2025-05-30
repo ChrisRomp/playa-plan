@@ -22,6 +22,12 @@ const AdminConfigPage: React.FC = () => {
   const [isTestEmailLoading, setIsTestEmailLoading] = useState(false);
   const [testEmailError, setTestEmailError] = useState<string | null>(null);
   const [testEmailSuccess, setTestEmailSuccess] = useState<string | null>(null);
+  const [testEmailAuditRecord, setTestEmailAuditRecord] = useState<{
+    id: string;
+    recipientEmail: string;
+    timestamp: string;
+    subject: string;
+  } | null>(null);
   
   // Form state
   const [formData, setFormData] = useState({
@@ -183,6 +189,27 @@ const AdminConfigPage: React.FC = () => {
     return errors;
   };
   
+  // Handle audit record link click
+  const handleAuditRecordClick = (auditRecord: { id: string; recipientEmail: string; timestamp: string; subject: string }) => {
+    // For now, show an alert with audit record details
+    // In the future, this could navigate to a dedicated audit page
+    const details = [
+      `Audit Record ID: ${auditRecord.id}`,
+      `Recipient: ${auditRecord.recipientEmail}`,
+      `Subject: ${auditRecord.subject}`,
+      `Timestamp: ${auditRecord.timestamp ? new Date(auditRecord.timestamp).toLocaleString() : 'Not available'}`
+    ].join('\n');
+    
+    alert(`Email Audit Record Details:\n\n${details}`);
+  };
+  
+  // Clear test email state
+  const clearTestEmailState = () => {
+    setTestEmailError(null);
+    setTestEmailSuccess(null);
+    setTestEmailAuditRecord(null);
+  };
+  
   // Handle test email sending
   const handleSendTestEmail = async () => {
     if (!testEmailAddress || !isValidEmail(testEmailAddress)) {
@@ -191,8 +218,7 @@ const AdminConfigPage: React.FC = () => {
     }
     
     setIsTestEmailLoading(true);
-    setTestEmailError(null);
-    setTestEmailSuccess(null);
+    clearTestEmailState();
     
     try {
       const response = await api.post('/notifications/email/test', {
@@ -200,12 +226,14 @@ const AdminConfigPage: React.FC = () => {
       });
       
       if (response.data.success) {
-        setTestEmailSuccess(
-          `Test email sent successfully to ${testEmailAddress}! ` +
-          `${response.data.message || ''} ` +
-          `${response.data.auditRecordId ? `(Audit ID: ${response.data.auditRecordId})` : ''}`
-        );
+        setTestEmailSuccess(`Test email sent successfully to ${testEmailAddress}!`);
         setTestEmailAddress(''); // Clear the input on success
+        setTestEmailAuditRecord({
+          id: response.data.auditRecordId || '',
+          recipientEmail: testEmailAddress,
+          timestamp: response.data.timestamp || new Date().toISOString(),
+          subject: 'Test Email from PlayaPlan'
+        });
       } else {
         setTestEmailError(response.data.message || 'Failed to send test email');
       }
@@ -968,13 +996,30 @@ const AdminConfigPage: React.FC = () => {
               {testEmailSuccess && (
                 <div className="mt-4 bg-green-50 border border-green-200 rounded-lg p-4">
                   <div className="flex">
-                    <div className="ml-3">
+                    <div className="ml-3 w-full">
                       <h3 className="text-sm font-medium text-green-800">
                         Test Email Sent Successfully
                       </h3>
                       <p className="mt-1 text-sm text-green-700">
                         {testEmailSuccess}
                       </p>
+                      {testEmailAuditRecord && testEmailAuditRecord.id && (
+                        <div className="mt-2 pt-2 border-t border-green-200">
+                          <p className="text-xs text-green-600">
+                            Audit Record: 
+                            <button
+                              type="button"
+                              onClick={() => handleAuditRecordClick(testEmailAuditRecord)}
+                              className="ml-1 text-blue-600 hover:text-blue-800 underline cursor-pointer"
+                            >
+                              {testEmailAuditRecord.id}
+                            </button>
+                          </p>
+                          <p className="text-xs text-green-600 mt-1">
+                            Sent at: {new Date(testEmailAuditRecord.timestamp).toLocaleString()}
+                          </p>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
