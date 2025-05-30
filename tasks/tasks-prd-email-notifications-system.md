@@ -53,16 +53,16 @@ Based on: `prd-email-notifications-system.md`
   - [x] 3.5 Update development mode console output to show when emails are disabled
   - [x] 3.6 Ensure audit logging works for both successful and failed email attempts
 
-- [ ] 4.0 Service Integration for Notifications
-  - [ ] 4.1 Update AuthService to call NotificationsService.sendLoginCodeEmail() when login codes are generated
-  - [ ] 4.2 Create email change notification methods in NotificationsService (old email and new email templates)
-  - [ ] 4.3 Update UserService email change flow to trigger email notifications to both old and new addresses
-  - [ ] 4.4 Create registration confirmation template in NotificationsService with camping options, shifts, and payment details
-  - [ ] 4.5 Create registration error notification template with error details and next steps
-  - [ ] 4.6 Update registration services to trigger appropriate confirmation/error notifications
-  - [ ] 4.7 Ensure all notification calls are wrapped in try-catch to prevent blocking main operations
+- [x] 4.0 Service Integration for Notifications
+  - [x] 4.1 Update AuthService to call NotificationsService.sendLoginCodeEmail() when login codes are generated
+  - [x] 4.2 Create email change notification methods in NotificationsService (old email and new email templates)
+  - [x] 4.3 Update UserService email change flow to trigger email notifications to both old and new addresses
+  - [x] 4.4 Create registration confirmation template in NotificationsService with camping options, shifts, and payment details
+  - [x] 4.5 Create registration error notification template with error details and next steps
+  - [x] 4.6 Update registration services to trigger appropriate confirmation/error notifications
+  - [x] 4.7 Ensure all notification calls are wrapped in try-catch to prevent blocking main operations
   - [ ] 4.8 Add unit tests for new notification templates and service integrations
-  - [ ] 4.9 Verify that all email triggers are internal to backend services only - no API endpoints allow frontend to directly trigger emails except admin-only test endpoints (if any)
+  - [x] 4.9 Verify that all email triggers are internal to backend services only - no API endpoints allow frontend to directly trigger emails except admin-only test endpoints (if any)
 
 - [ ] 5.0 Unit Testing and Quality Assurance
   - [ ] 5.1 EmailAuditService Unit Tests (uses mocked PrismaService)

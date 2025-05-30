@@ -1,15 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EmailService, EmailOptions } from './email.service';
-
-export enum NotificationType {
-  WELCOME = 'welcome',
-  PASSWORD_RESET = 'password_reset',
-  EMAIL_VERIFICATION = 'email_verification',
-  PAYMENT_CONFIRMATION = 'payment_confirmation',
-  SHIFT_CONFIRMATION = 'shift_confirmation',
-  LOGIN_CODE = 'login_code',
-}
+import { NotificationType } from '@prisma/client';
 
 export interface NotificationTemplate {
   subject: string;
@@ -22,6 +14,8 @@ export interface TemplateData {
   resetUrl?: string;
   verificationUrl?: string;
   loginCode?: string;
+  oldEmail?: string;
+  newEmail?: string;
   paymentDetails?: {
     id: string;
     amount: number;
@@ -36,6 +30,34 @@ export interface TemplateData {
     endTime: string;
     location: string;
   };
+  registrationDetails?: {
+    id: string;
+    year: number;
+    status: string;
+    campingOptions?: Array<{
+      name: string;
+      description?: string;
+    }>;
+    jobs?: Array<{
+      name: string;
+      category: string;
+      shift: {
+        name: string;
+        startTime: string;
+        endTime: string;
+        dayOfWeek: string;
+      };
+      location: string;
+    }>;
+    totalCost?: number;
+    currency?: string;
+  };
+  errorDetails?: {
+    error: string;
+    message: string;
+    suggestions?: string[];
+  };
+  userId?: string;
   [key: string]: unknown;
 }
 
@@ -78,19 +100,13 @@ export class NotificationsService {
         subject: template.subject,
         text: template.text,
         html: template.html,
+        notificationType: type,
+        userId: data.userId,
       };
       
       // Log notification to console in debug mode
       if (this.isDebugMode) {
         this.logNotificationToConsole(type, emailOptions);
-      }
-      
-      // If no email provider is configured but we're in debug mode, return success
-      // as the notification has been logged to console
-      const emailProviderConfigured = this.configService.get<string>('email.provider') !== undefined;
-      
-      if (!emailProviderConfigured && this.isDebugMode) {
-        return true;
       }
       
       return await this.emailService.sendEmail(emailOptions);
@@ -119,41 +135,34 @@ export class NotificationsService {
   }
 
   /**
-   * Send welcome email to new user
-   * @param email User email address
-   * @param name User name
-   * @returns Promise resolving to true if email was sent successfully
-   */
-  async sendWelcomeEmail(email: string, name: string): Promise<boolean> {
-    return this.sendNotification(email, NotificationType.WELCOME, { name });
-  }
-
-  /**
    * Send password reset email with token
    * @param email User email address
    * @param token Reset token
+   * @param userId Optional user ID for audit trail
    * @returns Promise resolving to true if email was sent successfully
    */
-  async sendPasswordResetEmail(email: string, token: string): Promise<boolean> {
+  async sendPasswordResetEmail(email: string, token: string, userId?: string): Promise<boolean> {
     const resetUrl = `${this.baseUrl}/reset-password?token=${token}`;
-    return this.sendNotification(email, NotificationType.PASSWORD_RESET, { resetUrl });
+    return this.sendNotification(email, NotificationType.PASSWORD_RESET, { resetUrl, userId });
   }
 
   /**
    * Send email verification email with token
    * @param email User email address
    * @param token Verification token
+   * @param userId Optional user ID for audit trail
    * @returns Promise resolving to true if email was sent successfully
    */
-  async sendEmailVerificationEmail(email: string, token: string): Promise<boolean> {
+  async sendEmailVerificationEmail(email: string, token: string, userId?: string): Promise<boolean> {
     const verificationUrl = `${this.baseUrl}/verify-email?token=${token}`;
-    return this.sendNotification(email, NotificationType.EMAIL_VERIFICATION, { verificationUrl });
+    return this.sendNotification(email, NotificationType.EMAIL_VERIFICATION, { verificationUrl, userId });
   }
 
   /**
    * Send payment confirmation email
    * @param email User email address
    * @param paymentDetails Payment details
+   * @param userId Optional user ID for audit trail
    * @returns Promise resolving to true if email was sent successfully
    */
   async sendPaymentConfirmationEmail(
@@ -163,39 +172,114 @@ export class NotificationsService {
       amount: number; 
       currency: string; 
       date: Date;
-    }
+    },
+    userId?: string
   ): Promise<boolean> {
-    return this.sendNotification(email, NotificationType.PAYMENT_CONFIRMATION, { paymentDetails });
-  }
-
-  /**
-   * Send shift confirmation email
-   * @param email User email address
-   * @param shiftDetails Shift details
-   * @returns Promise resolving to true if email was sent successfully
-   */
-  async sendShiftConfirmationEmail(
-    email: string,
-    shiftDetails: {
-      id: string;
-      jobName: string;
-      date: Date;
-      startTime: string;
-      endTime: string;
-      location: string;
-    }
-  ): Promise<boolean> {
-    return this.sendNotification(email, NotificationType.SHIFT_CONFIRMATION, { shiftDetails });
+    return this.sendNotification(email, NotificationType.PAYMENT_CONFIRMATION, { paymentDetails, userId });
   }
 
   /**
    * Send login verification code email
    * @param email User email address
    * @param code Verification code
+   * @param userId Optional user ID for audit trail
    * @returns Promise resolving to true if email was sent successfully
    */
-  async sendLoginCodeEmail(email: string, code: string): Promise<boolean> {
-    return this.sendNotification(email, NotificationType.LOGIN_CODE, { loginCode: code });
+  async sendLoginCodeEmail(email: string, code: string, userId?: string): Promise<boolean> {
+    return this.sendNotification(email, NotificationType.EMAIL_AUTHENTICATION, { loginCode: code, userId });
+  }
+
+  /**
+   * Send email change notification to old email address
+   * @param oldEmail Previous email address
+   * @param newEmail New email address that was set
+   * @param userId User ID for audit trail
+   * @returns Promise resolving to true if email was sent successfully
+   */
+  async sendEmailChangeNotificationToOldEmail(oldEmail: string, newEmail: string, userId: string): Promise<boolean> {
+    return this.sendNotification(oldEmail, NotificationType.EMAIL_CHANGE, { 
+      oldEmail, 
+      newEmail, 
+      userId,
+      isToOldEmail: true 
+    });
+  }
+
+  /**
+   * Send email change confirmation to new email address
+   * @param newEmail New email address
+   * @param oldEmail Previous email address
+   * @param userId User ID for audit trail
+   * @returns Promise resolving to true if email was sent successfully
+   */
+  async sendEmailChangeNotificationToNewEmail(newEmail: string, oldEmail: string, userId: string): Promise<boolean> {
+    return this.sendNotification(newEmail, NotificationType.EMAIL_CHANGE, { 
+      oldEmail, 
+      newEmail, 
+      userId,
+      isToOldEmail: false 
+    });
+  }
+
+  /**
+   * Send registration confirmation email
+   * @param email User email address
+   * @param registrationDetails Registration details including camping options, jobs, and payment
+   * @param userId User ID for audit trail
+   * @returns Promise resolving to true if email was sent successfully
+   */
+  async sendRegistrationConfirmationEmail(
+    email: string,
+    registrationDetails: {
+      id: string;
+      year: number;
+      status: string;
+      campingOptions?: Array<{
+        name: string;
+        description?: string;
+      }>;
+      jobs?: Array<{
+        name: string;
+        category: string;
+        shift: {
+          name: string;
+          startTime: string;
+          endTime: string;
+          dayOfWeek: string;
+        };
+        location: string;
+      }>;
+      totalCost?: number;
+      currency?: string;
+    },
+    userId: string
+  ): Promise<boolean> {
+    return this.sendNotification(email, NotificationType.REGISTRATION_CONFIRMATION, { 
+      registrationDetails, 
+      userId 
+    });
+  }
+
+  /**
+   * Send registration error notification email
+   * @param email User email address
+   * @param errorDetails Error details with message and suggestions
+   * @param userId User ID for audit trail
+   * @returns Promise resolving to true if email was sent successfully
+   */
+  async sendRegistrationErrorEmail(
+    email: string,
+    errorDetails: {
+      error: string;
+      message: string;
+      suggestions?: string[];
+    },
+    userId: string
+  ): Promise<boolean> {
+    return this.sendNotification(email, NotificationType.REGISTRATION_ERROR, { 
+      errorDetails, 
+      userId 
+    });
   }
 
   /**
@@ -206,24 +290,38 @@ export class NotificationsService {
    */
   private getNotificationTemplate(type: NotificationType, data: TemplateData): NotificationTemplate {
     switch (type) {
-      case NotificationType.WELCOME:
-        return this.getWelcomeTemplate(data.name || '');
       case NotificationType.PASSWORD_RESET:
         return this.getPasswordResetTemplate(data.resetUrl || '');
       case NotificationType.EMAIL_VERIFICATION:
         return this.getEmailVerificationTemplate(data.verificationUrl || '');
-      case NotificationType.LOGIN_CODE:
+      case NotificationType.EMAIL_AUTHENTICATION:
         return this.getLoginCodeTemplate(data.loginCode || '');
+      case NotificationType.EMAIL_CHANGE:
+        return this.getEmailChangeTemplate(
+          data.oldEmail || '', 
+          data.newEmail || '', 
+          Boolean(data.isToOldEmail)
+        );
       case NotificationType.PAYMENT_CONFIRMATION:
         if (!data.paymentDetails) {
           throw new Error('Payment details are required for payment confirmation template');
         }
         return this.getPaymentConfirmationTemplate(data.paymentDetails);
-      case NotificationType.SHIFT_CONFIRMATION:
-        if (!data.shiftDetails) {
-          throw new Error('Shift details are required for shift confirmation template');
+      case NotificationType.REGISTRATION_CONFIRMATION:
+        if (!data.registrationDetails) {
+          throw new Error('Registration details are required for registration confirmation template');
         }
-        return this.getShiftConfirmationTemplate(data.shiftDetails);
+        return this.getRegistrationConfirmationTemplate(data.registrationDetails);
+      case NotificationType.REGISTRATION_ERROR:
+        if (!data.errorDetails) {
+          throw new Error('Error details are required for registration error template');
+        }
+        return this.getRegistrationErrorTemplate(data.errorDetails);
+      case NotificationType.SHIFT_REMINDER:
+        if (!data.shiftDetails) {
+          throw new Error('Shift details are required for shift reminder template');
+        }
+        return this.getShiftReminderTemplate(data.shiftDetails);
       default:
         throw new Error(`Unknown notification type: ${type}`);
     }
@@ -394,17 +492,179 @@ export class NotificationsService {
   }
 
   /**
-   * Get shift confirmation template
+   * Get email change template
    */
-  private getShiftConfirmationTemplate(shiftDetails: { id: string; jobName: string; date: Date; startTime: string; endTime: string; location: string }): NotificationTemplate {
-    const { id, jobName, date, startTime, endTime, location } = shiftDetails;
-    const formattedDate = new Date(date).toLocaleDateString();
-    
-    const subject = 'Shift Confirmation';
+  private getEmailChangeTemplate(oldEmail: string, newEmail: string, isToOldEmail: boolean): NotificationTemplate {
+    const subject = isToOldEmail ? 'Email Change Notification' : 'Email Change Confirmation';
     const text = `
       Hi there,
       
-      Your shift has been confirmed:
+      Your email address has been changed.
+      
+      Old Email: ${oldEmail}
+      New Email: ${newEmail}
+      
+      If you did not request this change, please contact support immediately.
+      
+      Best regards,
+      The PlayaPlan Team
+    `;
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2>${subject}</h2>
+        <p>Hi there,</p>
+        <p>Your email address has been changed.</p>
+        <p><strong>Old Email:</strong> ${oldEmail}</p>
+        <p><strong>New Email:</strong> ${newEmail}</p>
+        <p>If you did not request this change, please contact support immediately.</p>
+        <p>Best regards,<br>The PlayaPlan Team</p>
+      </div>
+    `;
+    
+    return { subject, text, html };
+  }
+
+  /**
+   * Get registration confirmation template
+   */
+  private getRegistrationConfirmationTemplate(registrationDetails: {
+    id: string;
+    year: number;
+    status: string;
+    campingOptions?: Array<{
+      name: string;
+      description?: string;
+    }>;
+    jobs?: Array<{
+      name: string;
+      category: string;
+      shift: {
+        name: string;
+        startTime: string;
+        endTime: string;
+        dayOfWeek: string;
+      };
+      location: string;
+    }>;
+    totalCost?: number;
+    currency?: string;
+  }): NotificationTemplate {
+    const { id, year, status, campingOptions, jobs, totalCost, currency } = registrationDetails;
+    const formattedDate = new Date(year, 0, 1).toLocaleDateString();
+    const formattedAmount = totalCost ? new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(totalCost / 100) : 'N/A';
+    
+    const subject = 'Registration Confirmation';
+    const text = `
+      Hi there,
+      
+      Your registration has been confirmed.
+      
+      Registration ID: ${id}
+      Status: ${status}
+      Date: ${formattedDate}
+      Total Cost: ${formattedAmount}
+      
+      Camping Options:
+      ${campingOptions ? campingOptions.map(option => `- ${option.name} (${option.description})`).join('\n') : 'N/A'}
+      
+      Jobs:
+      ${jobs ? jobs.map(job => `- ${job.name} (${job.category}, ${job.shift.name} - ${job.shift.endTime})`).join('\n') : 'N/A'}
+      
+      Thank you for registering with PlayaPlan!
+      
+      Best regards,
+      The PlayaPlan Team
+    `;
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2>${subject}</h2>
+        <p>Hi there,</p>
+        <p>Your registration has been confirmed.</p>
+        <p><strong>Registration ID:</strong> ${id}</p>
+        <p><strong>Status:</strong> ${status}</p>
+        <p><strong>Date:</strong> ${formattedDate}</p>
+        <p><strong>Total Cost:</strong> ${formattedAmount}</p>
+        <p><strong>Camping Options:</strong></p>
+        <ul>
+          ${campingOptions ? campingOptions.map(option => `<li>- ${option.name} (${option.description})</li>`).join('') : '<li>N/A</li>'}
+        </ul>
+        <p><strong>Jobs:</strong></p>
+        <ul>
+          ${jobs ? jobs.map(job => `<li>- ${job.name} (${job.category}, ${job.shift.name} - ${job.shift.endTime})</li>`).join('') : '<li>N/A</li>'}
+        </ul>
+        <p>Thank you for registering with PlayaPlan!</p>
+        <p>Best regards,<br>The PlayaPlan Team</p>
+      </div>
+    `;
+    
+    return { subject, text, html };
+  }
+
+  /**
+   * Get registration error template
+   */
+  private getRegistrationErrorTemplate(errorDetails: {
+    error: string;
+    message: string;
+    suggestions?: string[];
+  }): NotificationTemplate {
+    const { error, message, suggestions } = errorDetails;
+    
+    const subject = 'Registration Error Notification';
+    const text = `
+      Hi there,
+      
+      We're sorry, but there was an error processing your registration.
+      
+      Error: ${error}
+      Message: ${message}
+      
+      Suggestions:
+      ${suggestions ? suggestions.map(suggestion => `- ${suggestion}`).join('\n') : 'N/A'}
+      
+      Please try again later or contact support for assistance.
+      
+      Best regards,
+      The PlayaPlan Team
+    `;
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2>${subject}</h2>
+        <p>Hi there,</p>
+        <p>We're sorry, but there was an error processing your registration.</p>
+        <p><strong>Error:</strong> ${error}</p>
+        <p><strong>Message:</strong> ${message}</p>
+        <p><strong>Suggestions:</strong></p>
+        <ul>
+          ${suggestions ? suggestions.map(suggestion => `<li>- ${suggestion}</li>`).join('') : '<li>N/A</li>'}
+        </ul>
+        <p>Please try again later or contact support for assistance.</p>
+        <p>Best regards,<br>The PlayaPlan Team</p>
+      </div>
+    `;
+    
+    return { subject, text, html };
+  }
+
+  /**
+   * Get shift reminder template
+   */
+  private getShiftReminderTemplate(shiftDetails: {
+    id: string;
+    jobName: string;
+    date: Date;
+    startTime: string;
+    endTime: string;
+    location: string;
+  }): NotificationTemplate {
+    const { id, jobName, date, startTime, endTime, location } = shiftDetails;
+    const formattedDate = new Date(date).toLocaleDateString();
+    
+    const subject = 'Shift Reminder';
+    const text = `
+      Hi there,
+      
+      Your shift is coming up soon:
       
       Job: ${jobName}
       Date: ${formattedDate}
@@ -412,16 +672,16 @@ export class NotificationsService {
       Location: ${location}
       Shift ID: ${id}
       
-      Thank you for volunteering!
+      Please make sure to arrive on time.
       
       Best regards,
       The PlayaPlan Team
     `;
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2>Shift Confirmation</h2>
+        <h2>${subject}</h2>
         <p>Hi there,</p>
-        <p>Your shift has been confirmed:</p>
+        <p>Your shift is coming up soon:</p>
         <p style="background-color: #f5f5f5; padding: 15px; border-radius: 4px;">
           <strong>Job:</strong> ${jobName}<br>
           <strong>Date:</strong> ${formattedDate}<br>
@@ -429,7 +689,7 @@ export class NotificationsService {
           <strong>Location:</strong> ${location}<br>
           <strong>Shift ID:</strong> ${id}
         </p>
-        <p>Thank you for volunteering!</p>
+        <p>Please make sure to arrive on time.</p>
         <p>Best regards,<br>The PlayaPlan Team</p>
       </div>
     `;
