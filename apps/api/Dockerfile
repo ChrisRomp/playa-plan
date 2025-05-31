@@ -47,6 +47,10 @@ RUN chmod +x ./docker-entrypoint.sh
 # Expose port
 EXPOSE 3000
 
+# Add health check using the new /health endpoint
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+  CMD curl -f http://localhost:3000/health || exit 1
+
 # Use entrypoint script to handle database initialization
 ENTRYPOINT ["./docker-entrypoint.sh"]
 
