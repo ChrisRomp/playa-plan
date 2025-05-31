@@ -600,7 +600,9 @@ describe('EmailService', () => {
 
       // Mock nodemailer verify method
       const mockVerify = jest.fn().mockResolvedValue(true);
-      const mockTransporter = { verify: mockVerify };
+      const mockTransporter = { 
+        verify: mockVerify,
+      } as unknown as nodemailer.Transporter;
       
       // Mock nodemailer.createTransport
       const createTransportSpy = jest.spyOn(nodemailer, 'createTransport')
@@ -688,7 +690,9 @@ describe('EmailService', () => {
       (mockError as any).port = 587;
 
       const mockVerify = jest.fn().mockRejectedValue(mockError);
-      const mockTransporter = { verify: mockVerify };
+      const mockTransporter = { 
+        verify: mockVerify,
+      } as unknown as nodemailer.Transporter;
       
       const createTransportSpy = jest.spyOn(nodemailer, 'createTransport')
         .mockReturnValue(mockTransporter);
@@ -726,7 +730,9 @@ describe('EmailService', () => {
       (mockError as any).hostname = 'invalid.smtp.com';
 
       const mockVerify = jest.fn().mockRejectedValue(mockError);
-      const mockTransporter = { verify: mockVerify };
+      const mockTransporter = { 
+        verify: mockVerify,
+      } as unknown as nodemailer.Transporter;
       
       const createTransportSpy = jest.spyOn(nodemailer, 'createTransport')
         .mockReturnValue(mockTransporter);
@@ -758,9 +764,11 @@ describe('EmailService', () => {
       (mockError as any).code = 'ETIMEDOUT';
 
       const mockVerify = jest.fn().mockRejectedValue(mockError);
-      const mockTransporter = { verify: mockVerify };
+      const mockTransporter = { 
+        verify: mockVerify,
+      } as unknown as nodemailer.Transporter;
       
-      const createTransportSpy = jest.spyOn(require('nodemailer'), 'createTransport')
+      const createTransportSpy = jest.spyOn(nodemailer, 'createTransport')
         .mockReturnValue(mockTransporter);
 
       const result = await service.testSmtpConnection();
@@ -790,9 +798,11 @@ describe('EmailService', () => {
       (mockError as any).code = 'EAUTH';
 
       const mockVerify = jest.fn().mockRejectedValue(mockError);
-      const mockTransporter = { verify: mockVerify };
+      const mockTransporter = { 
+        verify: mockVerify,
+      } as unknown as nodemailer.Transporter;
       
-      const createTransportSpy = jest.spyOn(require('nodemailer'), 'createTransport')
+      const createTransportSpy = jest.spyOn(nodemailer, 'createTransport')
         .mockReturnValue(mockTransporter);
 
       const result = await service.testSmtpConnection();
@@ -822,9 +832,11 @@ describe('EmailService', () => {
       (mockError as any).responseCode = 535;
 
       const mockVerify = jest.fn().mockRejectedValue(mockError);
-      const mockTransporter = { verify: mockVerify };
+      const mockTransporter = { 
+        verify: mockVerify,
+      } as unknown as nodemailer.Transporter;
       
-      const createTransportSpy = jest.spyOn(require('nodemailer'), 'createTransport')
+      const createTransportSpy = jest.spyOn(nodemailer, 'createTransport')
         .mockReturnValue(mockTransporter);
 
       const result = await service.testSmtpConnection();
@@ -853,9 +865,11 @@ describe('EmailService', () => {
       (mockError as any).response = '550 Mailbox unavailable';
 
       const mockVerify = jest.fn().mockRejectedValue(mockError);
-      const mockTransporter = { verify: mockVerify };
+      const mockTransporter = { 
+        verify: mockVerify,
+      } as unknown as nodemailer.Transporter;
       
-      const createTransportSpy = jest.spyOn(require('nodemailer'), 'createTransport')
+      const createTransportSpy = jest.spyOn(nodemailer, 'createTransport')
         .mockReturnValue(mockTransporter);
 
       const result = await service.testSmtpConnection();
@@ -885,9 +899,11 @@ describe('EmailService', () => {
       (mockError as any).code = 'EUNKNOWN';
 
       const mockVerify = jest.fn().mockRejectedValue(mockError);
-      const mockTransporter = { verify: mockVerify };
+      const mockTransporter = { 
+        verify: mockVerify,
+      } as unknown as nodemailer.Transporter;
       
-      const createTransportSpy = jest.spyOn(require('nodemailer'), 'createTransport')
+      const createTransportSpy = jest.spyOn(nodemailer, 'createTransport')
         .mockReturnValue(mockTransporter);
 
       const result = await service.testSmtpConnection();
@@ -916,9 +932,11 @@ describe('EmailService', () => {
       const mockError = new Error('Generic error');
 
       const mockVerify = jest.fn().mockRejectedValue(mockError);
-      const mockTransporter = { verify: mockVerify };
+      const mockTransporter = { 
+        verify: mockVerify,
+      } as unknown as nodemailer.Transporter;
       
-      const createTransportSpy = jest.spyOn(require('nodemailer'), 'createTransport')
+      const createTransportSpy = jest.spyOn(nodemailer, 'createTransport')
         .mockReturnValue(mockTransporter);
 
       const result = await service.testSmtpConnection();
