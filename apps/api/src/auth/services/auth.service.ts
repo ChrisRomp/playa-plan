@@ -167,7 +167,13 @@ export class AuthService {
    */
   private async sendVerificationEmail(email: string, token: string): Promise<boolean> {
     try {
-      const result = await this.notificationsService.sendEmailVerificationEmail(email, token);
+      // Try to get user ID for audit trail
+      const user = await this.prisma.user.findUnique({
+        where: { email },
+        select: { id: true },
+      });
+      
+      const result = await this.notificationsService.sendEmailVerificationEmail(email, token, user?.id);
       if (!result) {
         this.logger.warn(`Failed to send verification email to ${email}`);
       }
@@ -254,7 +260,13 @@ export class AuthService {
    */
   private async sendLoginCodeEmail(email: string, code: string): Promise<boolean> {
     try {
-      const result = await this.notificationsService.sendLoginCodeEmail(email, code);
+      // Try to get user ID for audit trail
+      const user = await this.prisma.user.findUnique({
+        where: { email },
+        select: { id: true },
+      });
+      
+      const result = await this.notificationsService.sendLoginCodeEmail(email, code, user?.id);
       if (!result) {
         this.logger.warn(`Failed to send login code email to ${email}`);
       }

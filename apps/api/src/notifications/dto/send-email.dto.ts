@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEmail, IsNotEmpty, IsOptional, IsString, ArrayMinSize, ValidateNested, IsArray } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsOptional, IsString, ArrayMinSize, ValidateNested, IsArray, IsIn, IsBoolean, IsEnum } from 'class-validator';
 import { Type } from 'class-transformer';
+import { NotificationType } from '@prisma/client';
 
 export class AttachmentDto {
   @ApiProperty({ description: 'Filename of the attachment' })
@@ -39,6 +40,15 @@ export class SendEmailDto {
   @IsOptional()
   text?: string;
 
+  @ApiPropertyOptional({ 
+    description: 'Type of notification for audit purposes',
+    enum: NotificationType,
+    example: NotificationType.EMAIL_VERIFICATION
+  })
+  @IsOptional()
+  @IsEnum(NotificationType)
+  notificationType?: NotificationType;
+
   @ApiPropertyOptional({ description: 'Email attachments' })
   @IsOptional()
   @IsArray()
@@ -69,10 +79,61 @@ export class SendEmailToMultipleRecipientsDto {
   @IsOptional()
   text?: string;
 
+  @ApiPropertyOptional({ 
+    description: 'Type of notification for audit purposes',
+    enum: NotificationType,
+    example: NotificationType.EMAIL_VERIFICATION
+  })
+  @IsOptional()
+  @IsEnum(NotificationType)
+  notificationType?: NotificationType;
+
   @ApiPropertyOptional({ description: 'Email attachments' })
   @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => AttachmentDto)
   attachments?: AttachmentDto[];
+}
+
+export class SendTestEmailDto {
+  @ApiProperty({ 
+    description: 'Email address(es) to send test email to. Can be a single email or comma-separated list.',
+    example: 'test@example.com' 
+  })
+  @IsString()
+  email: string;
+
+  @ApiPropertyOptional({ 
+    description: 'Custom subject for the test email. If not provided, a default test subject will be used.',
+    example: 'Custom Test Email Subject' 
+  })
+  @IsOptional()
+  @IsString()
+  subject?: string;
+
+  @ApiPropertyOptional({ 
+    description: 'Custom message content for the test email. If not provided, default test content will be used.',
+    example: 'This is a custom test message content.' 
+  })
+  @IsOptional()
+  @IsString()
+  message?: string;
+
+  @ApiPropertyOptional({ 
+    description: 'Email format - HTML or plain text',
+    example: 'html',
+    enum: ['html', 'text']
+  })
+  @IsOptional()
+  @IsIn(['html', 'text'])
+  format?: 'html' | 'text';
+
+  @ApiPropertyOptional({ 
+    description: 'Whether to include SMTP configuration details in the email content',
+    example: true 
+  })
+  @IsOptional()
+  @IsBoolean()
+  includeSmtpDetails?: boolean;
 } 

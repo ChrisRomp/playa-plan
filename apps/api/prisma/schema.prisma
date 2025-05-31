@@ -37,6 +37,7 @@ model User {
   campingOptionRegistrations CampingOptionRegistration[]
   payments                   Payment[]
   registrations              Registration[]
+  emailAudit                 EmailAudit[]
 
   @@map("users")
 }
@@ -221,6 +222,23 @@ model Notification {
   @@map("notifications")
 }
 
+model EmailAudit {
+  id               String         @id @default(uuid())
+  recipientEmail   String
+  ccEmails         String?
+  bccEmails        String?
+  subject          String
+  notificationType NotificationType
+  status           EmailAuditStatus
+  errorMessage     String?
+  sentAt           DateTime?
+  userId           String?
+  createdAt        DateTime       @default(now())
+  user             User?          @relation(fields: [userId], references: [id])
+
+  @@map("email_audit")
+}
+
 model CoreConfig {
   id                       String     @id @default(uuid())
   campName                 String
@@ -249,6 +267,7 @@ model CoreConfig {
   smtpSecure               Boolean    @default(false)
   senderEmail              String?
   senderName               String?
+  emailEnabled             Boolean    @default(false)
   timeZone                 String     @default("UTC")
   createdAt                DateTime   @default(now())
   updatedAt                DateTime   @updatedAt
@@ -305,16 +324,26 @@ enum PaymentProvider {
 
 enum NotificationType {
   EMAIL_VERIFICATION
+  EMAIL_AUTHENTICATION
+  EMAIL_CHANGE
   PASSWORD_RESET
   REGISTRATION_CONFIRMATION
+  REGISTRATION_ERROR
   PAYMENT_CONFIRMATION
   SHIFT_REMINDER
+  EMAIL_TEST
 }
 
 enum NotificationStatus {
   PENDING
   SENT
   FAILED
+}
+
+enum EmailAuditStatus {
+  SENT
+  FAILED
+  DISABLED
 }
 
 enum PaypalMode {

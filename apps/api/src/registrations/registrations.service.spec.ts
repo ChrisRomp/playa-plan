@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { RegistrationsService } from './registrations.service';
 import { PrismaService } from '../common/prisma/prisma.service';
+import { NotificationsService } from '../notifications/services/notifications.service';
 import { NotFoundException, ConflictException } from '@nestjs/common';
 import { RegistrationStatus } from '@prisma/client';
 import { CreateRegistrationDto } from './dto';
@@ -42,6 +43,13 @@ describe('RegistrationsService', () => {
         {
           provide: PrismaService,
           useValue: mockPrismaService,
+        },
+        {
+          provide: NotificationsService,
+          useValue: {
+            sendRegistrationConfirmationEmail: jest.fn().mockResolvedValue(true),
+            sendRegistrationErrorEmail: jest.fn().mockResolvedValue(true),
+          },
         },
       ],
     }).compile();

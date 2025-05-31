@@ -19,6 +19,7 @@ import { RolesGuard } from '../../auth/guards/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
 import { Public } from '../../auth/decorators/public.decorator';
 import { CoreConfigService } from '../services/core-config.service';
+import { EmailService } from '../../notifications/services/email.service';
 import { CreateCoreConfigDto, UpdateCoreConfigDto, CoreConfigResponseDto, PublicCoreConfigDto } from '../dto';
 import { UserRole } from '@prisma/client';
 
@@ -34,7 +35,26 @@ import { UserRole } from '@prisma/client';
 @UseInterceptors(ClassSerializerInterceptor)
 @ApiBearerAuth()
 export class CoreConfigController {
-  constructor(private readonly coreConfigService: CoreConfigService) {}
+  constructor(
+    private readonly coreConfigService: CoreConfigService,
+    private readonly emailService: EmailService
+  ) {}
+
+  /**
+   * Helper method to check if email-related fields were updated
+   */
+  private hasEmailConfigurationChanges(updateDto: UpdateCoreConfigDto): boolean {
+    return !!(
+      updateDto.emailEnabled !== undefined ||
+      updateDto.smtpHost !== undefined ||
+      updateDto.smtpPort !== undefined ||
+      updateDto.smtpUsername !== undefined ||
+      updateDto.smtpPassword !== undefined ||
+      updateDto.smtpUseSsl !== undefined ||
+      updateDto.senderEmail !== undefined ||
+      updateDto.senderName !== undefined
+    );
+  }
 
   /**
    * Create a new core configuration (Admin only)
@@ -105,11 +125,20 @@ export class CoreConfigController {
   @UseGuards(RolesGuard)
   async updateCurrent(@Body() updateCoreConfigDto: UpdateCoreConfigDto): Promise<CoreConfigResponseDto> {
     try {
+      // Check if email configuration will be updated
+      const hasEmailChanges = this.hasEmailConfigurationChanges(updateCoreConfigDto);
+      
       // First try to get the current config to get its ID
       try {
         const currentConfig = await this.coreConfigService.findCurrent(false);
         // Update existing config
         const config = await this.coreConfigService.update(currentConfig.id, updateCoreConfigDto);
+        
+        // Refresh email service cache if email settings were changed
+        if (hasEmailChanges) {
+          await this.emailService.refreshConfiguration();
+        }
+        
         return new CoreConfigResponseDto(config);
       } catch (err) {
         if (err instanceof NotFoundException) {
@@ -127,6 +156,12 @@ export class CoreConfigController {
           };
           
           const newConfig = await this.coreConfigService.create(createDto);
+          
+          // Refresh email service cache if email settings were included in the new config
+          if (hasEmailChanges) {
+            await this.emailService.refreshConfiguration();
+          }
+          
           return new CoreConfigResponseDto(newConfig);
         }
         throw err;
@@ -211,7 +246,16 @@ export class CoreConfigController {
     @Body() updateCoreConfigDto: UpdateCoreConfigDto
   ): Promise<CoreConfigResponseDto> {
     try {
+      // Check if email configuration will be updated
+      const hasEmailChanges = this.hasEmailConfigurationChanges(updateCoreConfigDto);
+      
       const config = await this.coreConfigService.update(id, updateCoreConfigDto);
+      
+      // Refresh email service cache if email settings were changed
+      if (hasEmailChanges) {
+        await this.emailService.refreshConfiguration();
+      }
+      
       return new CoreConfigResponseDto(config);
     } catch (error) {
       if (error instanceof NotFoundException) {

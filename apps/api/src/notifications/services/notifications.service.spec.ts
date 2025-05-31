@@ -1,12 +1,18 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
-import { NotificationsService, NotificationType } from './notifications.service';
+import { NotificationsService } from './notifications.service';
 import { EmailService } from './email.service';
+import { CoreConfigService } from '../../core-config/services/core-config.service';
+import { NotificationType } from '@prisma/client';
 
 describe('NotificationsService', () => {
   let service: NotificationsService;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   let emailService: EmailService;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   let configService: ConfigService;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  let coreConfigService: CoreConfigService;
 
   const mockEmailService = {
     sendEmail: jest.fn(),
@@ -15,7 +21,14 @@ describe('NotificationsService', () => {
   const mockConfigService = {
     get: jest.fn((key: string, defaultValue?: unknown) => {
       if (key === 'app.baseUrl') return 'http://test.com';
+      if (key === 'nodeEnv') return 'test';
       return defaultValue;
+    }),
+  };
+
+  const mockCoreConfigService = {
+    findCurrent: jest.fn().mockResolvedValue({
+      campName: 'Test Camp',
     }),
   };
 
@@ -33,34 +46,21 @@ describe('NotificationsService', () => {
           provide: ConfigService,
           useValue: mockConfigService,
         },
+        {
+          provide: CoreConfigService,
+          useValue: mockCoreConfigService,
+        },
       ],
     }).compile();
 
     service = module.get<NotificationsService>(NotificationsService);
     emailService = module.get<EmailService>(EmailService);
     configService = module.get<ConfigService>(ConfigService);
+    coreConfigService = module.get<CoreConfigService>(CoreConfigService);
   });
 
   it('should be defined', () => {
     expect(service).toBeDefined();
-  });
-
-  describe('sendWelcomeEmail', () => {
-    it('should send welcome email', async () => {
-      mockEmailService.sendEmail.mockResolvedValueOnce(true);
-
-      const result = await service.sendWelcomeEmail('user@example.playaplan.app', 'Test User');
-
-      expect(result).toBeTruthy();
-      expect(mockEmailService.sendEmail).toHaveBeenCalledWith(
-        expect.objectContaining({
-          to: 'user@example.playaplan.app',
-          subject: expect.stringContaining('Welcome'),
-          html: expect.stringContaining('Test User'),
-          text: expect.stringContaining('Test User'),
-        }),
-      );
-    });
   });
 
   describe('sendPasswordResetEmail', () => {
@@ -76,6 +76,7 @@ describe('NotificationsService', () => {
           subject: expect.stringContaining('Reset'),
           html: expect.stringContaining('http://test.com/reset-password?token=reset-token-123'),
           text: expect.stringContaining('http://test.com/reset-password?token=reset-token-123'),
+          notificationType: NotificationType.PASSWORD_RESET,
         }),
       );
     });
@@ -94,6 +95,7 @@ describe('NotificationsService', () => {
           subject: expect.stringContaining('Verify'),
           html: expect.stringContaining('http://test.com/verify-email?token=verify-token-123'),
           text: expect.stringContaining('http://test.com/verify-email?token=verify-token-123'),
+          notificationType: NotificationType.EMAIL_VERIFICATION,
         }),
       );
     });
@@ -119,33 +121,99 @@ describe('NotificationsService', () => {
           subject: expect.stringContaining('Payment'),
           html: expect.stringContaining('payment-123'),
           text: expect.stringContaining('payment-123'),
+          notificationType: NotificationType.PAYMENT_CONFIRMATION,
         }),
       );
     });
   });
 
-  describe('sendShiftConfirmationEmail', () => {
-    it('should send shift confirmation email', async () => {
+  describe('sendLoginCodeEmail', () => {
+    it('should send login code email', async () => {
       mockEmailService.sendEmail.mockResolvedValueOnce(true);
 
-      const shiftDetails = {
-        id: 'shift-123',
-        jobName: 'Greeter',
-        date: new Date('2023-06-15'),
-        startTime: '9:00 AM',
-        endTime: '12:00 PM',
-        location: 'Main Gate',
-      };
-
-      const result = await service.sendShiftConfirmationEmail('user@example.playaplan.app', shiftDetails);
+      const result = await service.sendLoginCodeEmail('user@example.playaplan.app', '123456');
 
       expect(result).toBeTruthy();
       expect(mockEmailService.sendEmail).toHaveBeenCalledWith(
         expect.objectContaining({
           to: 'user@example.playaplan.app',
-          subject: expect.stringContaining('Shift'),
-          html: expect.stringContaining('Greeter'),
-          text: expect.stringContaining('Greeter'),
+          subject: expect.stringContaining('Login'),
+          html: expect.stringContaining('123456'),
+          text: expect.stringContaining('123456'),
+          notificationType: NotificationType.EMAIL_AUTHENTICATION,
+        }),
+      );
+    });
+  });
+
+  describe('sendRegistrationConfirmationEmail', () => {
+    it('should send registration confirmation email', async () => {
+      mockEmailService.sendEmail.mockResolvedValueOnce(true);
+
+      const registrationDetails = {
+        id: 'registration-123',
+        year: 2024,
+        status: 'CONFIRMED',
+        jobs: [{
+          name: 'Greeter',
+          category: 'Guest Services',
+          shift: {
+            name: 'Morning Shift',
+            startTime: '09:00',
+            endTime: '12:00',
+            dayOfWeek: 'MONDAY',
+          },
+          location: 'Main Gate',
+        }],
+        totalCost: 450,
+        currency: 'USD',
+      };
+
+      const result = await service.sendRegistrationConfirmationEmail(
+        'user@example.playaplan.app', 
+        registrationDetails,
+        'user-123'
+      );
+
+      expect(result).toBeTruthy();
+      expect(mockEmailService.sendEmail).toHaveBeenCalledWith(
+        expect.objectContaining({
+          to: 'user@example.playaplan.app',
+          subject: expect.stringContaining('Registration'),
+          html: expect.stringContaining('registration-123'),
+          text: expect.stringContaining('registration-123'),
+          notificationType: NotificationType.REGISTRATION_CONFIRMATION,
+          userId: 'user-123',
+        }),
+      );
+    });
+  });
+
+  describe('sendRegistrationErrorEmail', () => {
+    it('should send registration error email', async () => {
+      mockEmailService.sendEmail.mockResolvedValueOnce(true);
+
+      const errorDetails = {
+        error: 'PAYMENT_FAILED',
+        message: 'Your payment could not be processed',
+        suggestions: ['Check your card details', 'Try a different payment method'],
+      };
+
+      const result = await service.sendRegistrationErrorEmail(
+        'user@example.playaplan.app', 
+        errorDetails,
+        'user-123'
+      );
+
+      expect(result).toBeTruthy();
+      expect(mockEmailService.sendEmail).toHaveBeenCalledWith(
+        expect.objectContaining({
+          to: 'user@example.playaplan.app',
+          subject: expect.stringContaining('Registration'),
+          html: expect.stringContaining('PAYMENT_FAILED'),
+          text: expect.stringContaining('PAYMENT_FAILED'),
+          notificationType: NotificationType.REGISTRATION_ERROR,
+          userId: 'user-123',
         }),
       );
     });
@@ -157,11 +225,30 @@ describe('NotificationsService', () => {
 
       const result = await service.sendNotification(
         'user@example.playaplan.app',
-        NotificationType.WELCOME,
-        { name: 'Test User' },
+        NotificationType.EMAIL_VERIFICATION,
+        { verificationUrl: 'http://test.com/verify?token=123', userId: 'user-123' },
       );
 
       expect(result).toBeFalsy();
+    });
+
+    it('should send notification successfully', async () => {
+      mockEmailService.sendEmail.mockResolvedValueOnce(true);
+
+      const result = await service.sendNotification(
+        'user@example.playaplan.app',
+        NotificationType.EMAIL_VERIFICATION,
+        { verificationUrl: 'http://test.com/verify?token=123', userId: 'user-123' },
+      );
+
+      expect(result).toBeTruthy();
+      expect(mockEmailService.sendEmail).toHaveBeenCalledWith(
+        expect.objectContaining({
+          to: 'user@example.playaplan.app',
+          notificationType: NotificationType.EMAIL_VERIFICATION,
+          userId: 'user-123',
+        }),
+      );
     });
   });
 }); 

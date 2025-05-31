@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import { UserService } from './user.service';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { NotificationsService } from '../../notifications/services/notifications.service';
 import { CreateUserDto } from '../dto/create-user.dto';
 import { UserRole } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
@@ -70,6 +71,13 @@ describe('UserService', () => {
         {
           provide: PrismaService,
           useValue: prismaServiceMock,
+        },
+        {
+          provide: NotificationsService,
+          useValue: {
+            sendEmailChangeNotificationOld: jest.fn().mockResolvedValue(true),
+            sendEmailChangeNotificationNew: jest.fn().mockResolvedValue(true),
+          },
         },
       ],
     }).compile();

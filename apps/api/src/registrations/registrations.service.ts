@@ -1,11 +1,35 @@
-import { BadRequestException, Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException, ConflictException, Logger } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
+import { NotificationsService } from '../notifications/services/notifications.service';
 import { CreateRegistrationDto, AddJobToRegistrationDto, CreateCampRegistrationDto, UpdateRegistrationDto } from './dto';
 import { Registration, RegistrationStatus } from '@prisma/client';
 
+interface JobRegistrationWithJobs extends Registration {
+  jobs?: Array<{
+    job?: {
+      name?: string;
+      category?: {
+        name?: string;
+      };
+      shift?: {
+        name?: string;
+        startTime?: string;
+        endTime?: string;
+        dayOfWeek?: string;
+      };
+      location?: string;
+    };
+  }>;
+}
+
 @Injectable()
 export class RegistrationsService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(RegistrationsService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notificationsService: NotificationsService,
+  ) {}
 
   /**
    * Create a new registration for a user for a specific year
@@ -446,25 +470,186 @@ export class RegistrationsService {
    * @returns The created registrations and camping option registrations
    */
   async createCampRegistration(userId: string, createCampRegistrationDto: CreateCampRegistrationDto) {
-    // Check if user exists
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-    });
+    try {
+      // Check if user exists
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+      });
 
-    if (!user) {
-      throw new NotFoundException(`User with ID ${userId} not found`);
+      if (!user) {
+        throw new NotFoundException(`User with ID ${userId} not found`);
+      }
+
+      // Validate that terms have been accepted
+      if (!createCampRegistrationDto.acceptedTerms) {
+        throw new BadRequestException('Terms and conditions must be accepted');
+      }
+
+      // Get current year for job registration
+      const currentYear = new Date().getFullYear();
+
+      let jobRegistration = null;
+      const campingOptionRegistrations: Array<{
+        id: string;
+        userId: string;
+        campingOptionId: string;
+        createdAt: Date;
+        updatedAt: Date;
+        campingOption: {
+          id: string;
+          name: string;
+          description: string | null;
+          enabled: boolean;
+          workShiftsRequired: number;
+          participantDues: number;
+          staffDues: number;
+          maxSignups: number;
+          createdAt: Date;
+          updatedAt: Date;
+          fields: Array<{
+            id: string;
+            displayName: string;
+            description: string | null;
+            dataType: string;
+            required: boolean;
+            maxLength: number | null;
+            minValue: number | null;
+            maxValue: number | null;
+            createdAt: Date;
+            updatedAt: Date;
+            campingOptionId: string;
+          }>;
+        };
+      }> = [];
+
+      // Create job registration if jobs are provided
+      if (createCampRegistrationDto.jobs && createCampRegistrationDto.jobs.length > 0) {
+        // Check if user already has a registration for this year
+        const existingRegistration = await this.prisma.registration.findUnique({
+          where: {
+            userId_year: {
+              userId,
+              year: currentYear,
+            },
+          },
+        });
+
+        if (existingRegistration) {
+          throw new ConflictException(`User already has a registration for ${currentYear}`);
+        }
+
+        // Create the job registration
+        jobRegistration = await this.create({
+          userId,
+          year: currentYear,
+          jobIds: createCampRegistrationDto.jobs,
+        });
+      }
+
+      // Create camping option registrations
+      if (createCampRegistrationDto.campingOptions && createCampRegistrationDto.campingOptions.length > 0) {
+        for (const campingOptionId of createCampRegistrationDto.campingOptions) {
+          // Check if camping option exists
+          const campingOption = await this.prisma.campingOption.findUnique({
+            where: { id: campingOptionId },
+            include: { fields: true },
+          });
+
+          if (!campingOption) {
+            throw new NotFoundException(`Camping option with ID ${campingOptionId} not found`);
+          }
+
+          // Check if user already has this camping option registered
+          const existingCampingRegistration = await this.prisma.campingOptionRegistration.findFirst({
+            where: {
+              userId,
+              campingOptionId,
+            },
+          });
+
+          if (existingCampingRegistration) {
+            throw new ConflictException(`User already registered for camping option: ${campingOption.name}`);
+          }
+
+          // Create the camping option registration
+          const campingRegistration = await this.prisma.campingOptionRegistration.create({
+            data: {
+              userId,
+              campingOptionId,
+            },
+            include: {
+              campingOption: {
+                include: { fields: true },
+              },
+            },
+          });
+
+          // Create custom field values if provided
+          if (createCampRegistrationDto.customFields && campingOption.fields.length > 0) {
+            for (const field of campingOption.fields) {
+              const fieldValue = createCampRegistrationDto.customFields[field.id];
+              if (fieldValue !== undefined) {
+                await this.prisma.campingOptionFieldValue.create({
+                  data: {
+                    fieldId: field.id,
+                    registrationId: campingRegistration.id,
+                    value: String(fieldValue),
+                  },
+                });
+              }
+            }
+          }
+
+          campingOptionRegistrations.push(campingRegistration);
+        }
+      }
+
+      const result = {
+        jobRegistration,
+        campingOptionRegistrations,
+        message: 'Camp registration completed successfully',
+      };
+
+      // Send registration confirmation email (non-blocking)
+      this.sendRegistrationConfirmationEmail(user, jobRegistration, campingOptionRegistrations, currentYear)
+        .catch(error => {
+          this.logger.warn(`Failed to send registration confirmation email to ${user.email}: ${error.message}`);
+        });
+
+      return result;
+    } catch (error: unknown) {
+      const err = error as Error;
+      this.logger.error(`Registration creation failed for user ${userId}: ${err.message}`, err.stack);
+      
+      // Send registration error email (non-blocking)
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { email: true },
+      });
+      
+      if (user) {
+        this.sendRegistrationErrorEmail(user.email, err, userId)
+          .catch(emailError => {
+            this.logger.warn(`Failed to send registration error email to ${user.email}: ${emailError.message}`);
+          });
+      }
+      
+      // Re-throw the original error
+      throw error;
     }
+  }
 
-    // Validate that terms have been accepted
-    if (!createCampRegistrationDto.acceptedTerms) {
-      throw new BadRequestException('Terms and conditions must be accepted');
-    }
-
-    // Get current year for job registration
-    const currentYear = new Date().getFullYear();
-
-    let jobRegistration = null;
-    const campingOptionRegistrations: Array<{
+  /**
+   * Send registration confirmation email
+   * @param user - User object with email
+   * @param jobRegistration - Job registration details
+   * @param campingOptionRegistrations - Camping option registrations
+   * @param year - Registration year
+   */
+  private async sendRegistrationConfirmationEmail(
+    user: { email: string },
+    jobRegistration: Registration | null,
+    campingOptionRegistrations: Array<{
       id: string;
       userId: string;
       campingOptionId: string;
@@ -495,95 +680,118 @@ export class RegistrationsService {
           campingOptionId: string;
         }>;
       };
-    }> = [];
+    }>,
+    year: number
+  ): Promise<void> {
+    try {
+      // Calculate total cost from camping options
+      const totalCost = campingOptionRegistrations.reduce((total, reg) => {
+        return total + (reg.campingOption?.participantDues || 0);
+      }, 0);
 
-    // Create job registration if jobs are provided
-    if (createCampRegistrationDto.jobs && createCampRegistrationDto.jobs.length > 0) {
-      // Check if user already has a registration for this year
-      const existingRegistration = await this.prisma.registration.findUnique({
-        where: {
-          userId_year: {
-            userId,
-            year: currentYear,
+      // Format camping options
+      const campingOptions = campingOptionRegistrations.map(reg => ({
+        name: reg.campingOption?.name || 'Unknown',
+        description: reg.campingOption?.description || undefined,
+      }));
+
+      // Format jobs from job registration - safely handle potential undefined jobs
+      const jobs = jobRegistration && 'jobs' in jobRegistration && Array.isArray((jobRegistration as JobRegistrationWithJobs).jobs)
+        ? (jobRegistration as JobRegistrationWithJobs).jobs?.map((regJob) => ({
+          name: regJob.job?.name || 'Unknown Job',
+          category: regJob.job?.category?.name || 'Unknown Category',
+          shift: {
+            name: regJob.job?.shift?.name || 'Unknown Shift',
+            startTime: regJob.job?.shift?.startTime || '',
+            endTime: regJob.job?.shift?.endTime || '',
+            dayOfWeek: regJob.job?.shift?.dayOfWeek || '',
           },
-        },
-      });
+          location: regJob.job?.location || 'TBD',
+        })) || []
+        : [];
 
-      if (existingRegistration) {
-        throw new ConflictException(`User already has a registration for ${currentYear}`);
-      }
+      const registrationDetails = {
+        id: jobRegistration?.id || 'pending',
+        year,
+        status: jobRegistration?.status || 'PENDING',
+        campingOptions,
+        jobs,
+        totalCost: totalCost > 0 ? totalCost * 100 : undefined, // Convert to cents
+        currency: 'USD',
+      };
 
-      // Create the job registration
-      jobRegistration = await this.create({
-        userId,
-        year: currentYear,
-        jobIds: createCampRegistrationDto.jobs,
-      });
+      await this.notificationsService.sendRegistrationConfirmationEmail(
+        user.email,
+        registrationDetails,
+        jobRegistration?.userId || ''
+      );
+
+      this.logger.log(`Registration confirmation email sent to ${user.email}`);
+    } catch (error: unknown) {
+      const err = error as Error;
+      this.logger.error(`Error sending registration confirmation email: ${err.message}`, err.stack);
+      // Don't throw - email failures should not block registration
     }
+  }
 
-    // Create camping option registrations
-    if (createCampRegistrationDto.campingOptions && createCampRegistrationDto.campingOptions.length > 0) {
-      for (const campingOptionId of createCampRegistrationDto.campingOptions) {
-        // Check if camping option exists
-        const campingOption = await this.prisma.campingOption.findUnique({
-          where: { id: campingOptionId },
-          include: { fields: true },
-        });
+  /**
+   * Send registration error email
+   * @param email - User email
+   * @param error - The error that occurred
+   * @param userId - User ID for audit trail
+   */
+  private async sendRegistrationErrorEmail(email: string, error: Error, userId: string): Promise<void> {
+    try {
+      const errorDetails = {
+        error: error.constructor.name,
+        message: error.message,
+        suggestions: this.getRegistrationErrorSuggestions(error),
+      };
 
-        if (!campingOption) {
-          throw new NotFoundException(`Camping option with ID ${campingOptionId} not found`);
-        }
-
-        // Check if user already has this camping option registered
-        const existingCampingRegistration = await this.prisma.campingOptionRegistration.findFirst({
-          where: {
-            userId,
-            campingOptionId,
-          },
-        });
-
-        if (existingCampingRegistration) {
-          throw new ConflictException(`User already registered for camping option: ${campingOption.name}`);
-        }
-
-        // Create the camping option registration
-        const campingRegistration = await this.prisma.campingOptionRegistration.create({
-          data: {
-            userId,
-            campingOptionId,
-          },
-          include: {
-            campingOption: {
-              include: { fields: true },
-            },
-          },
-        });
-
-        // Create custom field values if provided
-        if (createCampRegistrationDto.customFields && campingOption.fields.length > 0) {
-          for (const field of campingOption.fields) {
-            const fieldValue = createCampRegistrationDto.customFields[field.id];
-            if (fieldValue !== undefined) {
-              await this.prisma.campingOptionFieldValue.create({
-                data: {
-                  fieldId: field.id,
-                  registrationId: campingRegistration.id,
-                  value: String(fieldValue),
-                },
-              });
-            }
-          }
-        }
-
-        campingOptionRegistrations.push(campingRegistration);
-      }
+      await this.notificationsService.sendRegistrationErrorEmail(email, errorDetails, userId);
+      this.logger.log(`Registration error email sent to ${email}`);
+    } catch (emailError: unknown) {
+      const err = emailError as Error;
+      this.logger.error(`Error sending registration error email: ${err.message}`, err.stack);
+      // Don't throw - email failures should not block error handling
     }
+  }
 
-    return {
-      jobRegistration,
-      campingOptionRegistrations,
-      message: 'Camp registration completed successfully',
-    };
+  /**
+   * Get helpful suggestions based on the type of error
+   * @param error - The error that occurred
+   * @returns Array of suggestion strings
+   */
+  private getRegistrationErrorSuggestions(error: Error): string[] {
+    if (error instanceof ConflictException) {
+      return [
+        'Check if you already have a registration for this year',
+        'Review your camping option selections for duplicates',
+        'Contact support if you believe this is an error',
+      ];
+    }
+    
+    if (error instanceof NotFoundException) {
+      return [
+        'Verify that all selected options are still available',
+        'Refresh the page and try again',
+        'Contact support if options should be available',
+      ];
+    }
+    
+    if (error instanceof BadRequestException) {
+      return [
+        'Ensure you have accepted the terms and conditions',
+        'Check that all required fields are filled out',
+        'Verify your selections are valid',
+      ];
+    }
+    
+    return [
+      'Try again in a few minutes',
+      'Clear your browser cache and reload the page',
+      'Contact support if the problem persists',
+    ];
   }
 
   /**

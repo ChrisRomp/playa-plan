@@ -17,6 +17,54 @@ const AdminConfigPage: React.FC = () => {
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [success, setSuccess] = useState<string | null>(null);
   
+  // Test email state
+  const [testEmailAddress, setTestEmailAddress] = useState('');
+  const [isTestEmailLoading, setIsTestEmailLoading] = useState(false);
+  const [testEmailError, setTestEmailError] = useState<string | null>(null);
+  const [testEmailSuccess, setTestEmailSuccess] = useState<string | null>(null);
+  const [testEmailAuditRecord, setTestEmailAuditRecord] = useState<{
+    id: string;
+    recipientEmail: string;
+    timestamp: string;
+    subject: string;
+  } | null>(null);
+  
+  // Test email monitoring state for 6.7.4.x features
+  const [testEmailHistory, setTestEmailHistory] = useState<Array<{
+    id: string;
+    recipientEmail: string;
+    subject: string;
+    status: string;
+    errorMessage?: string;
+    sentAt?: string;
+    createdAt: string;
+  }>>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  const [isTestingConnection, setIsTestingConnection] = useState(false);
+  const [connectionTestResult, setConnectionTestResult] = useState<{
+    success: boolean;
+    message: string;
+    details?: {
+      host: string;
+      port: number;
+      secure: boolean;
+      authenticated: boolean;
+      connectionTime?: number;
+    };
+    errorDetails?: {
+      code?: string;
+      errno?: number;
+      address?: string;
+      port?: number;
+      response?: string;
+    };
+  } | null>(null);
+  
+  // Collapsible section state
+  const [showTestEmailSection, setShowTestEmailSection] = useState(false);
+  const [showMonitoringSection, setShowMonitoringSection] = useState(false);
+  
   // Form state
   const [formData, setFormData] = useState({
     campName: '',
@@ -38,6 +86,7 @@ const AdminConfigPage: React.FC = () => {
     paypalClientId: '',
     paypalClientSecret: '',
     paypalMode: 'sandbox',
+    emailEnabled: false,
     smtpHost: '',
     smtpPort: 587,
     smtpUsername: '',
@@ -84,6 +133,7 @@ const AdminConfigPage: React.FC = () => {
             paypalClientId: response.data.paypalClientId || '',
             paypalClientSecret: '', // Always empty - excluded from API response for security
             paypalMode: response.data.paypalMode || 'sandbox',
+            emailEnabled: response.data.emailEnabled || false,
             smtpHost: response.data.smtpHost || '',
             smtpPort: response.data.smtpPort || 587,
             smtpUsername: response.data.smtpUsername || '',
@@ -153,8 +203,176 @@ const AdminConfigPage: React.FC = () => {
       errors.push('Sender Email must be a valid email address');
     }
     
+    // Email configuration validation when email is enabled
+    if (formData.emailEnabled) {
+      if (!formData.smtpHost || formData.smtpHost.trim() === '') {
+        errors.push('SMTP Host is required when email notifications are enabled');
+      }
+      
+      if (!formData.smtpPort || formData.smtpPort <= 0 || formData.smtpPort > 65535) {
+        errors.push('SMTP Port must be a valid port number (1-65535) when email notifications are enabled');
+      }
+      
+      if (!formData.senderEmail || formData.senderEmail.trim() === '') {
+        errors.push('Sender Email is required when email notifications are enabled');
+      }
+      
+      if (!formData.senderName || formData.senderName.trim() === '') {
+        errors.push('Sender Name is required when email notifications are enabled');
+      }
+    }
+    
     return errors;
   };
+  
+  // Handle audit record link click
+  const handleAuditRecordClick = (auditRecord: { id: string; recipientEmail: string; timestamp: string; subject: string }) => {
+    // For now, show an alert with audit record details
+    // In the future, this could navigate to a dedicated audit page
+    const details = [
+      `Audit Record ID: ${auditRecord.id}`,
+      `Recipient: ${auditRecord.recipientEmail}`,
+      `Subject: ${auditRecord.subject}`,
+      `Timestamp: ${auditRecord.timestamp ? new Date(auditRecord.timestamp).toLocaleString() : 'Not available'}`
+    ].join('\n');
+    
+    alert(`Email Audit Record Details:\n\n${details}`);
+  };
+  
+  // Clear test email state
+  const clearTestEmailState = () => {
+    setTestEmailError(null);
+    setTestEmailSuccess(null);
+    setTestEmailAuditRecord(null);
+  };
+  
+  // Simplified test email sending with default parameters
+  const handleSendTestEmail = async () => {
+    // Validate email addresses (support comma-separated)
+    const emails = testEmailAddress.split(',').map(e => e.trim()).filter(e => e.length > 0);
+    const invalidEmails = emails.filter(email => !isValidEmail(email));
+    
+    if (emails.length === 0) {
+      setTestEmailError('Please enter at least one email address');
+      return;
+    }
+    
+    if (invalidEmails.length > 0) {
+      setTestEmailError(`Invalid email address(es): ${invalidEmails.join(', ')}`);
+      return;
+    }
+    
+    setIsTestEmailLoading(true);
+    clearTestEmailState();
+    
+    try {
+      // Use default parameters for simplified testing
+      const response = await api.post('/notifications/email/test', {
+        email: testEmailAddress,
+        format: 'html',
+        includeSmtpDetails: true,
+      });
+      
+      if (response.data.success) {
+        const recipientCount = emails.length;
+        setTestEmailSuccess(
+          `Test email sent successfully to ${recipientCount} recipient${recipientCount > 1 ? 's' : ''}!`
+        );
+        setTestEmailAddress(''); // Clear the input on success
+        setTestEmailAuditRecord({
+          id: response.data.auditRecordId || '',
+          recipientEmail: emails.join(', '),
+          timestamp: response.data.timestamp || new Date().toISOString(),
+          subject: response.data.emailPreview?.subject || 'Test Email from PlayaPlan'
+        });
+      } else {
+        setTestEmailError(response.data.message || 'Failed to send test email');
+      }
+    } catch (err) {
+      console.error('Failed to send test email:', err);
+      
+      // Type the error properly
+      interface ApiError {
+        response?: {
+          data?: {
+            message?: string;
+          };
+        };
+      }
+      
+      const errorMessage = (err as ApiError)?.response?.data?.message || 'Failed to send test email. Please try again.';
+      setTestEmailError(errorMessage);
+    } finally {
+      setIsTestEmailLoading(false);
+    }
+  };
+  
+  // Load test email history
+  const loadTestEmailHistory = async () => {
+    setIsLoadingHistory(true);
+    setHistoryError(null);
+    
+    try {
+      const response = await api.get('/notifications/email/test/history?limit=10');
+      setTestEmailHistory(response.data.testEmails || []);
+    } catch (err) {
+      console.error('Failed to load test email history:', err);
+      
+      interface ApiError {
+        response?: {
+          data?: {
+            message?: string;
+          };
+        };
+      }
+      
+      const errorMessage = (err as ApiError)?.response?.data?.message || 'Failed to load test email history';
+      setHistoryError(errorMessage);
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  };
+  
+  // Test SMTP connection
+  const handleTestSmtpConnection = async () => {
+    setIsTestingConnection(true);
+    setConnectionTestResult(null);
+    
+    try {
+      const response = await api.post('/notifications/email/test-connection');
+      setConnectionTestResult(response.data);
+    } catch (err) {
+      console.error('Failed to test SMTP connection:', err);
+      
+      interface ApiError {
+        response?: {
+          data?: {
+            message?: string;
+          };
+        };
+      }
+      
+      const errorMessage = (err as ApiError)?.response?.data?.message || 'Failed to test SMTP connection';
+      setConnectionTestResult({
+        success: false,
+        message: errorMessage,
+      });
+    } finally {
+      setIsTestingConnection(false);
+    }
+  };
+  
+  // Clear connection test result
+  const clearConnectionTestResult = () => {
+    setConnectionTestResult(null);
+  };
+  
+  // Auto-load test email history when monitoring section is expanded
+  useEffect(() => {
+    if (showMonitoringSection && formData.emailEnabled && testEmailHistory.length === 0) {
+      loadTestEmailHistory();
+    }
+  }, [showMonitoringSection, formData.emailEnabled, testEmailHistory.length]);
   
   // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
@@ -195,6 +413,7 @@ const AdminConfigPage: React.FC = () => {
       paypalClientId: formData.paypalClientId,
       // Note: paypalClientSecret excluded - will be conditionally added below
       paypalMode: formData.paypalMode,
+      emailEnabled: formData.emailEnabled,
       smtpHost: formData.smtpHost,
       smtpPort: formData.smtpPort,
       smtpUsername: formData.smtpUsername,
@@ -677,122 +896,494 @@ const AdminConfigPage: React.FC = () => {
           <div className="mb-8">
             <h2 className="text-xl font-semibold mb-4 pb-2 border-b">Email Configuration</h2>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="mb-4">
-                <label htmlFor="smtpHost" className="block text-gray-700 font-medium mb-2">
-                  SMTP Host
-                </label>
-                <input
-                  type="text"
-                  id="smtpHost"
-                  name="smtpHost"
-                  value={formData.smtpHost}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              
-              <div className="mb-4">
-                <label htmlFor="smtpPort" className="block text-gray-700 font-medium mb-2">
-                  SMTP Port
-                </label>
-                <input
-                  type="number"
-                  id="smtpPort"
-                  name="smtpPort"
-                  value={formData.smtpPort}
-                  onChange={handleInputChange}
-                  min={1}
-                  max={65535}
-                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="mb-4">
-                <label htmlFor="smtpUsername" className="block text-gray-700 font-medium mb-2">
-                  SMTP Username
-                </label>
-                <input
-                  type="text"
-                  id="smtpUsername"
-                  name="smtpUsername"
-                  value={formData.smtpUsername}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              
-              <div className="mb-4">
-                <label htmlFor="smtpPassword" className="block text-gray-700 font-medium mb-2">
-                  SMTP Password
-                </label>
-                <input
-                  type="password"
-                  id="smtpPassword"
-                  name="smtpPassword"
-                  value={formData.smtpPassword}
-                  onChange={handleInputChange}
-                  placeholder={formData.smtpPassword === '' ? 'Leave blank to keep existing password' : ''}
-                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                <p className="text-sm text-gray-500 mt-1">
-                  Leave blank to keep the existing password. Only enter a new password if you want to change it.
-                </p>
-              </div>
-            </div>
-            
-            <div className="flex items-center mb-4">
+            <div className="flex items-center mb-6">
               <input
                 type="checkbox"
-                id="smtpUseSsl"
-                name="smtpUseSsl"
-                checked={formData.smtpUseSsl}
+                id="emailEnabled"
+                name="emailEnabled"
+                checked={formData.emailEnabled}
                 onChange={handleInputChange}
                 className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
               />
-              <label htmlFor="smtpUseSsl" className="ml-2 block text-gray-700">
-                Use SSL for SMTP
+              <label htmlFor="emailEnabled" className="ml-2 block text-gray-700 font-medium">
+                Enable Email Notifications
               </label>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="mb-4">
-                <label htmlFor="senderEmail" className="block text-gray-700 font-medium mb-2">
-                  Sender Email
-                </label>
-                <input
-                  type="email"
-                  id="senderEmail"
-                  name="senderEmail"
-                  value={formData.senderEmail}
-                  onChange={handleInputChange}
-                  className={`w-full px-3 py-2 border ${
-                    formData.senderEmail && !isValidEmail(formData.senderEmail)
-                      ? 'border-red-500'
-                      : 'border-gray-300'
-                  } rounded focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                />
-                {formData.senderEmail && !isValidEmail(formData.senderEmail) && (
-                  <p className="text-red-500 text-sm mt-1">Please enter a valid email address</p>
-                )}
+            <div className={`${!formData.emailEnabled ? 'opacity-50 pointer-events-none' : ''}`}>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="mb-4">
+                  <label htmlFor="smtpHost" className="block text-gray-700 font-medium mb-2">
+                    SMTP Host
+                  </label>
+                  <input
+                    type="text"
+                    id="smtpHost"
+                    name="smtpHost"
+                    value={formData.smtpHost}
+                    onChange={handleInputChange}
+                    disabled={!formData.emailEnabled}
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  />
+                </div>
+                
+                <div className="mb-4">
+                  <label htmlFor="smtpPort" className="block text-gray-700 font-medium mb-2">
+                    SMTP Port
+                  </label>
+                  <input
+                    type="number"
+                    id="smtpPort"
+                    name="smtpPort"
+                    value={formData.smtpPort}
+                    onChange={handleInputChange}
+                    min={1}
+                    max={65535}
+                    disabled={!formData.emailEnabled}
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  />
+                </div>
               </div>
               
-              <div className="mb-4">
-                <label htmlFor="senderName" className="block text-gray-700 font-medium mb-2">
-                  Sender Name
-                </label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="mb-4">
+                  <label htmlFor="smtpUsername" className="block text-gray-700 font-medium mb-2">
+                    SMTP Username
+                  </label>
+                  <input
+                    type="text"
+                    id="smtpUsername"
+                    name="smtpUsername"
+                    value={formData.smtpUsername}
+                    onChange={handleInputChange}
+                    disabled={!formData.emailEnabled}
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  />
+                </div>
+                
+                <div className="mb-4">
+                  <label htmlFor="smtpPassword" className="block text-gray-700 font-medium mb-2">
+                    SMTP Password
+                  </label>
+                  <input
+                    type="password"
+                    id="smtpPassword"
+                    name="smtpPassword"
+                    value={formData.smtpPassword}
+                    onChange={handleInputChange}
+                    disabled={!formData.emailEnabled}
+                    placeholder={formData.smtpPassword === '' ? 'Leave blank to keep existing password' : ''}
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  />
+                  <p className="text-sm text-gray-500 mt-1">
+                    Leave blank to keep the existing password. Only enter a new password if you want to change it.
+                  </p>
+                </div>
+              </div>
+              
+              <div className="flex items-center mb-4">
                 <input
-                  type="text"
-                  id="senderName"
-                  name="senderName"
-                  value={formData.senderName}
+                  type="checkbox"
+                  id="smtpUseSsl"
+                  name="smtpUseSsl"
+                  checked={formData.smtpUseSsl}
                   onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  disabled={!formData.emailEnabled}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded disabled:cursor-not-allowed"
                 />
+                <label htmlFor="smtpUseSsl" className="ml-2 block text-gray-700">
+                  Use SSL for SMTP
+                </label>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="mb-4">
+                  <label htmlFor="senderEmail" className="block text-gray-700 font-medium mb-2">
+                    Sender Email
+                  </label>
+                  <input
+                    type="email"
+                    id="senderEmail"
+                    name="senderEmail"
+                    value={formData.senderEmail}
+                    onChange={handleInputChange}
+                    disabled={!formData.emailEnabled}
+                    className={`w-full px-3 py-2 border ${
+                      formData.senderEmail && !isValidEmail(formData.senderEmail)
+                        ? 'border-red-500'
+                        : 'border-gray-300'
+                    } rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed`}
+                  />
+                  {formData.senderEmail && !isValidEmail(formData.senderEmail) && (
+                    <p className="text-red-500 text-sm mt-1">Please enter a valid email address</p>
+                  )}
+                </div>
+                
+                <div className="mb-4">
+                  <label htmlFor="senderName" className="block text-gray-700 font-medium mb-2">
+                    Sender Name
+                  </label>
+                  <input
+                    type="text"
+                    id="senderName"
+                    name="senderName"
+                    value={formData.senderName}
+                    onChange={handleInputChange}
+                    disabled={!formData.emailEnabled}
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  />
+                </div>
               </div>
             </div>
+          </div>
+          
+          <div className="mb-8">
+            <div className="flex items-center justify-between mb-4 pb-2 border-b">
+              <h2 className="text-xl font-semibold">Test Email Configuration</h2>
+              <button
+                type="button"
+                onClick={() => setShowTestEmailSection(!showTestEmailSection)}
+                className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors"
+              >
+                {showTestEmailSection ? 'Hide' : 'Show'} Test Email
+              </button>
+            </div>
+            
+            {!formData.emailEnabled && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+                <div className="flex">
+                  <div className="ml-3">
+                    <h3 className="text-sm font-medium text-yellow-800">
+                      Email Testing Disabled
+                    </h3>
+                    <p className="mt-1 text-sm text-yellow-700">
+                      Email notifications are currently disabled. Please enable email notifications above to test your configuration.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {showTestEmailSection && (
+              <div className={`${!formData.emailEnabled ? 'opacity-50 pointer-events-none' : ''}`}>
+                <p className="text-gray-600 mb-6">
+                  Test your SMTP configuration to ensure email delivery is working correctly. 
+                  Start by testing the connection, then send test emails to verify end-to-end functionality.
+                </p>
+                
+                {/* SMTP Connection Test */}
+                <div className="mb-8 bg-gray-50 border border-gray-200 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-lg font-medium">SMTP Connection Test</h3>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handleTestSmtpConnection}
+                        disabled={!formData.emailEnabled || isTestingConnection}
+                        className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
+                      >
+                        {isTestingConnection ? 'Testing...' : 'Test SMTP Connection'}
+                      </button>
+                      {connectionTestResult && (
+                        <button
+                          type="button"
+                          onClick={clearConnectionTestResult}
+                          className="px-3 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors"
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <p className="text-gray-600 mb-4">
+                    Test your SMTP connection without sending an email. This validates your server settings, authentication, and network connectivity.
+                  </p>
+                  
+                  {/* Connection Test Results */}
+                  {connectionTestResult && (
+                    <div className={`mt-4 rounded-lg p-4 ${
+                      connectionTestResult.success 
+                        ? 'bg-green-50 border border-green-200' 
+                        : 'bg-red-50 border border-red-200'
+                    }`}>
+                      <div className="flex">
+                        <div className="ml-3 w-full">
+                          <h4 className={`text-sm font-medium ${
+                            connectionTestResult.success ? 'text-green-800' : 'text-red-800'
+                          }`}>
+                            {connectionTestResult.success ? '✅ Connection Successful' : '❌ Connection Failed'}
+                          </h4>
+                          <p className={`mt-1 text-sm ${
+                            connectionTestResult.success ? 'text-green-700' : 'text-red-700'
+                          }`}>
+                            {connectionTestResult.message}
+                          </p>
+                          
+                          {connectionTestResult.details && (
+                            <div className="mt-3 text-xs font-mono bg-white border rounded p-2">
+                              <div className="grid grid-cols-2 gap-2">
+                                <div><strong>Host:</strong> {connectionTestResult.details.host}</div>
+                                <div><strong>Port:</strong> {connectionTestResult.details.port}</div>
+                                <div><strong>Secure:</strong> {connectionTestResult.details.secure ? 'Yes' : 'No'}</div>
+                                <div><strong>Authenticated:</strong> {connectionTestResult.details.authenticated ? 'Yes' : 'No'}</div>
+                                {connectionTestResult.details.connectionTime && (
+                                  <div><strong>Response Time:</strong> {connectionTestResult.details.connectionTime}ms</div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                          
+                          {connectionTestResult.errorDetails && (
+                            <div className="mt-3 text-xs font-mono bg-white border rounded p-2">
+                              <div><strong>Error Details:</strong></div>
+                              {connectionTestResult.errorDetails.code && <div>Code: {connectionTestResult.errorDetails.code}</div>}
+                              {connectionTestResult.errorDetails.response && <div>Response: {connectionTestResult.errorDetails.response}</div>}
+                              {connectionTestResult.errorDetails.address && <div>Address: {connectionTestResult.errorDetails.address}</div>}
+                              {connectionTestResult.errorDetails.port && <div>Port: {connectionTestResult.errorDetails.port}</div>}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                
+                {/* Send Test Email */}
+                <div className="mb-6">
+                  <h3 className="text-lg font-medium mb-3">Send Test Email</h3>
+                  <p className="text-gray-600 mb-4">
+                    Send a test email to verify end-to-end email delivery. 
+                    The test email will use default settings with HTML format and include SMTP configuration details.
+                  </p>
+                  
+                  {/* Email Address and Actions */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end mb-4">
+                    <div className="md:col-span-2">
+                      <label htmlFor="testEmailAddress" className="block text-gray-700 font-medium mb-2">
+                        Email Address(es)
+                      </label>
+                      <input
+                        type="text"
+                        id="testEmailAddress"
+                        value={testEmailAddress}
+                        onChange={(e) => setTestEmailAddress(e.target.value)}
+                        placeholder="email@example.com or email1@example.com, email2@example.com"
+                        disabled={!formData.emailEnabled || isTestEmailLoading}
+                        className={`w-full px-3 py-2 border ${
+                          testEmailAddress && testEmailAddress.split(',').some(email => !isValidEmail(email.trim()))
+                            ? 'border-red-500'
+                            : 'border-gray-300'
+                        } rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed`}
+                      />
+                      <p className="text-sm text-gray-500 mt-1">
+                        Separate multiple emails with commas
+                      </p>
+                    </div>
+                    
+                    <div>
+                      <button
+                        type="button"
+                        onClick={handleSendTestEmail}
+                        disabled={!formData.emailEnabled || isTestEmailLoading || !testEmailAddress}
+                        className="w-full px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
+                      >
+                        {isTestEmailLoading ? 'Sending...' : 'Send Test Email'}
+                      </button>
+                    </div>
+                  </div>
+                  
+                  {/* Error and Success Messages */}
+                  {testEmailError && (
+                    <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-4">
+                      <div className="flex">
+                        <div className="ml-3">
+                          <h3 className="text-sm font-medium text-red-800">
+                            Test Email Failed
+                          </h3>
+                          <p className="mt-1 text-sm text-red-700">
+                            {testEmailError}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {testEmailSuccess && (
+                    <div className="mt-4 bg-green-50 border border-green-200 rounded-lg p-4">
+                      <div className="flex">
+                        <div className="ml-3 w-full">
+                          <h3 className="text-sm font-medium text-green-800">
+                            Test Email Sent Successfully
+                          </h3>
+                          <p className="mt-1 text-sm text-green-700">
+                            {testEmailSuccess}
+                          </p>
+                          {testEmailAuditRecord && testEmailAuditRecord.id && (
+                            <div className="mt-2 pt-2 border-t border-green-200">
+                              <p className="text-xs text-green-600">
+                                Audit Record: 
+                                <button
+                                  type="button"
+                                  onClick={() => handleAuditRecordClick(testEmailAuditRecord)}
+                                  className="ml-1 text-blue-600 hover:text-blue-800 underline cursor-pointer"
+                                >
+                                  {testEmailAuditRecord.id}
+                                </button>
+                              </p>
+                              <p className="text-xs text-green-600 mt-1">
+                                Sent at: {new Date(testEmailAuditRecord.timestamp).toLocaleString()}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+          
+          <div className="mb-8">
+            <div className="flex items-center justify-between mb-4 pb-2 border-b">
+              <h2 className="text-xl font-semibold">Email Monitoring and Troubleshooting</h2>
+              <button
+                type="button"
+                onClick={() => setShowMonitoringSection(!showMonitoringSection)}
+                className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors"
+              >
+                {showMonitoringSection ? 'Hide' : 'Show'} Monitoring
+              </button>
+            </div>
+            
+            {!formData.emailEnabled && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+                <div className="flex">
+                  <div className="ml-3">
+                    <h3 className="text-sm font-medium text-yellow-800">
+                      Email Monitoring Disabled
+                    </h3>
+                    <p className="mt-1 text-sm text-yellow-700">
+                      Email notifications are currently disabled. Please enable email notifications above to access monitoring features.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {showMonitoringSection && (
+              <div className={`${!formData.emailEnabled ? 'opacity-50 pointer-events-none' : ''}`}>
+                {/* Test Email History */}
+                <div className="mb-6">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-lg font-medium">Recent Test Email History</h3>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={loadTestEmailHistory}
+                        disabled={isLoadingHistory}
+                        className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors disabled:bg-gray-300"
+                      >
+                        {isLoadingHistory ? 'Loading...' : 'Refresh'}
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <p className="text-gray-600 mb-4">
+                    View recent test email attempts to troubleshoot delivery issues and monitor email system health.
+                  </p>
+                  
+                  {/* History Display */}
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                    {isLoadingHistory && (
+                      <div className="flex justify-center py-4">
+                        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+                      </div>
+                    )}
+                    
+                    {historyError && (
+                      <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
+                        <p className="text-red-700 text-sm">
+                          <strong>Error loading history:</strong> {historyError}
+                        </p>
+                      </div>
+                    )}
+                    
+                    {!isLoadingHistory && !historyError && testEmailHistory.length === 0 && (
+                      <p className="text-gray-500 text-center py-4">
+                        No test emails found. Send a test email to see history here.
+                      </p>
+                    )}
+                    
+                    {!isLoadingHistory && !historyError && testEmailHistory.length > 0 && (
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-gray-200">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Recipient
+                              </th>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Subject
+                              </th>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Status
+                              </th>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Sent At
+                              </th>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Error
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-gray-200">
+                            {testEmailHistory.map((email) => (
+                              <tr key={email.id} className="hover:bg-gray-50">
+                                <td className="px-3 py-2 text-sm text-gray-900">
+                                  {email.recipientEmail}
+                                </td>
+                                <td className="px-3 py-2 text-sm text-gray-900">
+                                  {email.subject}
+                                </td>
+                                <td className="px-3 py-2 text-sm">
+                                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                    email.status === 'SENT' 
+                                      ? 'bg-green-100 text-green-800'
+                                      : email.status === 'FAILED'
+                                      ? 'bg-red-100 text-red-800' 
+                                      : 'bg-yellow-100 text-yellow-800'
+                                  }`}>
+                                    {email.status}
+                                  </span>
+                                </td>
+                                <td className="px-3 py-2 text-sm text-gray-500">
+                                  {email.sentAt 
+                                    ? new Date(email.sentAt).toLocaleString()
+                                    : new Date(email.createdAt).toLocaleString()
+                                  }
+                                </td>
+                                <td className="px-3 py-2 text-sm text-red-600">
+                                  {email.errorMessage && (
+                                    <span 
+                                      className="cursor-help" 
+                                      title={email.errorMessage}
+                                    >
+                                      ⚠️ Error
+                                    </span>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
           
           <div className="mb-8">
