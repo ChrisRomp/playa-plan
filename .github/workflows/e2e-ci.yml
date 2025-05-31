@@ -1,5 +1,9 @@
 name: E2E Tests
 
+permissions:
+  contents: read
+  actions: write
+
 on:
   push:
     branches: [ main ]
@@ -61,22 +65,30 @@ jobs:
         # Add test-specific environment variables
         echo "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/playaplan_test" >> .env
         echo "JWT_SECRET=test-secret-key-for-ci" >> .env
-        echo "NODE_ENV=test" >> .env
+        echo "NODE_ENV=development" >> .env
     
     - name: Setup database
       run: |
         cd apps/api
         npx --yes prisma migrate deploy
         npx --yes prisma db seed
+      env:
+        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/playaplan_test
     
     - name: Build applications
-      run: |
-        npm run build
+      run: npm run build
+      env:
+        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/playaplan_test
+        JWT_SECRET: test-secret-key-for-ci
+        NODE_ENV: development
     
     - name: Run Playwright tests
       run: npx --yes playwright test
       env:
         CI: true
+        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/playaplan_test
+        JWT_SECRET: test-secret-key-for-ci
+        NODE_ENV: development
     
     - name: Upload Playwright Report
       uses: actions/upload-artifact@v4
