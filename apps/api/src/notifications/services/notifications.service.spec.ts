@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { NotificationsService } from './notifications.service';
 import { EmailService } from './email.service';
+import { CoreConfigService } from '../../core-config/services/core-config.service';
 import { NotificationType } from '@prisma/client';
 
 describe('NotificationsService', () => {
@@ -10,6 +11,8 @@ describe('NotificationsService', () => {
   let emailService: EmailService;
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   let configService: ConfigService;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  let coreConfigService: CoreConfigService;
 
   const mockEmailService = {
     sendEmail: jest.fn(),
@@ -20,6 +23,12 @@ describe('NotificationsService', () => {
       if (key === 'app.baseUrl') return 'http://test.com';
       if (key === 'nodeEnv') return 'test';
       return defaultValue;
+    }),
+  };
+
+  const mockCoreConfigService = {
+    findCurrent: jest.fn().mockResolvedValue({
+      campName: 'Test Camp',
     }),
   };
 
@@ -37,12 +46,17 @@ describe('NotificationsService', () => {
           provide: ConfigService,
           useValue: mockConfigService,
         },
+        {
+          provide: CoreConfigService,
+          useValue: mockCoreConfigService,
+        },
       ],
     }).compile();
 
     service = module.get<NotificationsService>(NotificationsService);
     emailService = module.get<EmailService>(EmailService);
     configService = module.get<ConfigService>(ConfigService);
+    coreConfigService = module.get<CoreConfigService>(CoreConfigService);
   });
 
   it('should be defined', () => {

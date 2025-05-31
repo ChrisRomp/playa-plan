@@ -138,75 +138,54 @@ export class NotificationsController {
       // Get current email configuration
       const emailConfig = await this.coreConfigService.getEmailConfiguration();
       
+      // Get camp configuration for dynamic camp name
+      const campConfig = await this.coreConfigService.findCurrent(false);
+      const campName = campConfig?.campName || 'PlayaPlan';
+      
       // Check if email is enabled
       if (!emailConfig.emailEnabled) {
-        return {
-          success: false,
-          message: 'Email sending is currently disabled. Please enable email in the configuration first.',
-          timestamp: new Date().toISOString(),
-        };
+        throw new Error('Email notifications are currently disabled. Please enable email notifications first.');
       }
 
       // Check if SMTP is properly configured
-      if (!emailConfig.smtpHost || !emailConfig.smtpUsername || !emailConfig.smtpPassword || !emailConfig.senderEmail) {
-        return {
-          success: false,
-          message: 'SMTP configuration is incomplete. Please configure SMTP settings before sending test emails.',
-          timestamp: new Date().toISOString(),
-        };
+      if (!emailConfig.smtpHost || !emailConfig.senderEmail) {
+        throw new Error('SMTP configuration is incomplete. Please configure SMTP settings before sending test emails.');
       }
 
       const timestamp = new Date();
-      const adminUserName = `${req.user.firstName} ${req.user.lastName}`;
+      const user = req.user;
+      const recipients = testEmailDto.email.split(',').map(e => e.trim()).filter(e => e.length > 0);
 
-      // Prepare test email details
+      // Send test email using the service
       const testEmailDetails = {
         smtpHost: emailConfig.smtpHost,
         smtpPort: emailConfig.smtpPort || 587,
-        smtpSecure: emailConfig.smtpUseSsl,
+        smtpSecure: emailConfig.smtpUseSsl || false,
         senderEmail: emailConfig.senderEmail,
-        senderName: emailConfig.senderName || 'PlayaPlan',
-        adminUserName,
-        adminEmail: req.user.email,
+        senderName: emailConfig.senderName || campName,
+        adminUserName: `${user.firstName} ${user.lastName}`,
+        adminEmail: user.email,
         timestamp,
       };
 
-      // Send the test email
-      const result = await this.notificationsService.sendTestEmail(
+      const customContent = {
+        subject: testEmailDto.subject || `Test Email from ${campName}`,
+        message: testEmailDto.message,
+        format: testEmailDto.format,
+        includeSmtpDetails: testEmailDto.includeSmtpDetails,
+      };
+
+      const success = await this.notificationsService.sendTestEmail(
         testEmailDto.email,
         testEmailDetails,
-        req.user.id,
-        {
-          subject: testEmailDto.subject,
-          message: testEmailDto.message,
-          format: testEmailDto.format,
-          includeSmtpDetails: testEmailDto.includeSmtpDetails,
-        }
+        user.id,
+        customContent
       );
 
-      if (result) {
-        // Parse recipients to get all email addresses
-        const recipients = testEmailDto.email.split(',').map(e => e.trim()).filter(e => e.length > 0);
-        
-        // Get the latest audit record for this test email
-        const auditRecords = await this.prismaService.emailAudit.findMany({
-          where: {
-            recipientEmail: { in: recipients },
-            notificationType: NotificationType.EMAIL_TEST,
-            status: EmailAuditStatus.SENT,
-          },
-          orderBy: {
-            createdAt: 'desc',
-          },
-          take: 1,
-        });
-
-        const auditRecordId = auditRecords.length > 0 ? auditRecords[0].id : undefined;
-
+      if (success) {
         return {
           success: true,
-          message: `Test email sent successfully to ${recipients.length} recipient(s)!`,
-          auditRecordId,
+          message: `Test email sent successfully to ${recipients.length} recipient${recipients.length > 1 ? 's' : ''}!`,
           timestamp: timestamp.toISOString(),
           recipients,
           smtpConfiguration: {
@@ -214,10 +193,10 @@ export class NotificationsController {
             port: emailConfig.smtpPort || 587,
             secure: emailConfig.smtpUseSsl,
             senderEmail: emailConfig.senderEmail,
-            senderName: emailConfig.senderName || 'PlayaPlan',
+            senderName: emailConfig.senderName || campName,
           },
           emailPreview: {
-            subject: testEmailDto.subject || 'Test Email from PlayaPlan',
+            subject: testEmailDto.subject || `Test Email from ${campName}`,
             format: testEmailDto.format || 'html',
             includeSmtpDetails: testEmailDto.includeSmtpDetails !== false,
           },
@@ -235,10 +214,10 @@ export class NotificationsController {
             port: emailConfig.smtpPort || 587,
             secure: emailConfig.smtpUseSsl,
             senderEmail: emailConfig.senderEmail,
-            senderName: emailConfig.senderName || 'PlayaPlan',
+            senderName: emailConfig.senderName || campName,
           },
           emailPreview: {
-            subject: testEmailDto.subject || 'Test Email from PlayaPlan',
+            subject: testEmailDto.subject || `Test Email from ${campName}`,
             format: testEmailDto.format || 'html',
             includeSmtpDetails: testEmailDto.includeSmtpDetails !== false,
           },

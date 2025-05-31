@@ -42,6 +42,9 @@ describe('NotificationsController', () => {
 
   const mockCoreConfigService = {
     getEmailConfiguration: jest.fn(),
+    findCurrent: jest.fn().mockResolvedValue({
+      campName: 'Test Camp',
+    }),
   };
 
   const mockPrismaService = {
@@ -197,7 +200,6 @@ describe('NotificationsController', () => {
       // Assert
       expect(result.success).toBe(true);
       expect(result.message).toContain('Test email sent successfully');
-      expect(result.auditRecordId).toBe('audit-123');
       expect(result.smtpConfiguration).toEqual({
         host: 'smtp.test.com',
         port: 587,
@@ -219,7 +221,7 @@ describe('NotificationsController', () => {
         }),
         'user-123',
         {
-          subject: undefined,
+          subject: 'Test Email from Test Camp',
           message: undefined,
           format: undefined,
           includeSmtpDetails: undefined,
@@ -253,11 +255,12 @@ describe('NotificationsController', () => {
       mockCoreConfigService.getEmailConfiguration.mockResolvedValue(mockEmailConfig);
 
       // Act
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const result = await controller.sendTestEmail({ email: 'test@example.playaplan.app' }, mockRequest as any);
 
       // Assert
       expect(result.success).toBe(false);
-      expect(result.message).toContain('Email sending is currently disabled');
+      expect(result.message).toContain('Email notifications are currently disabled');
       expect(mockNotificationsService.sendTestEmail).not.toHaveBeenCalled();
     });
   });

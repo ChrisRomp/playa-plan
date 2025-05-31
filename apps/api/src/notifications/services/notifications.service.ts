@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EmailService, EmailOptions } from './email.service';
+import { CoreConfigService } from '../../core-config/services/core-config.service';
 import { NotificationType } from '@prisma/client';
 
 export interface NotificationTemplate {
@@ -16,6 +17,7 @@ export interface TemplateData {
   loginCode?: string;
   oldEmail?: string;
   newEmail?: string;
+  campName?: string;
   paymentDetails?: {
     id: string;
     amount: number;
@@ -90,10 +92,25 @@ export class NotificationsService {
   constructor(
     private readonly emailService: EmailService,
     private readonly configService: ConfigService,
+    private readonly coreConfigService: CoreConfigService,
   ) {
     this.baseUrl = this.configService.get<string>('app.baseUrl', 'http://localhost:3000');
     this.isDebugMode = this.configService.get<string>('nodeEnv') === 'development' || 
                         process.argv.includes('--debug');
+  }
+
+  /**
+   * Get the camp name from core configuration
+   * @returns Camp name or fallback to 'PlayaPlan'
+   */
+  private async getCampName(): Promise<string> {
+    try {
+      const config = await this.coreConfigService.findCurrent(false);
+      return config?.campName || 'PlayaPlan';
+    } catch (error) {
+      this.logger.warn('Failed to get camp name from configuration, using fallback');
+      return 'PlayaPlan';
+    }
   }
 
   /**
@@ -109,7 +126,11 @@ export class NotificationsService {
     data: TemplateData,
   ): Promise<boolean> {
     try {
-      const template = this.getNotificationTemplate(type, data);
+      // Get camp name from configuration and include it in template data
+      const campName = await this.getCampName();
+      const templateData = { ...data, campName };
+      
+      const template = this.getNotificationTemplate(type, templateData);
       
       const emailOptions: EmailOptions = {
         to,
@@ -375,42 +396,43 @@ export class NotificationsService {
   private getNotificationTemplate(type: NotificationType, data: TemplateData): NotificationTemplate {
     switch (type) {
       case NotificationType.PASSWORD_RESET:
-        return this.getPasswordResetTemplate(data.resetUrl || '');
+        return this.getPasswordResetTemplate(data.resetUrl || '', data.campName || '');
       case NotificationType.EMAIL_VERIFICATION:
-        return this.getEmailVerificationTemplate(data.verificationUrl || '');
+        return this.getEmailVerificationTemplate(data.verificationUrl || '', data.campName || '');
       case NotificationType.EMAIL_AUTHENTICATION:
-        return this.getLoginCodeTemplate(data.loginCode || '');
+        return this.getLoginCodeTemplate(data.loginCode || '', data.campName || '');
       case NotificationType.EMAIL_CHANGE:
         return this.getEmailChangeTemplate(
           data.oldEmail || '', 
           data.newEmail || '', 
-          Boolean(data.isToOldEmail)
+          Boolean(data.isToOldEmail),
+          data.campName || ''
         );
       case NotificationType.PAYMENT_CONFIRMATION:
         if (!data.paymentDetails) {
           throw new Error('Payment details are required for payment confirmation template');
         }
-        return this.getPaymentConfirmationTemplate(data.paymentDetails);
+        return this.getPaymentConfirmationTemplate(data.paymentDetails, data.campName || '');
       case NotificationType.REGISTRATION_CONFIRMATION:
         if (!data.registrationDetails) {
           throw new Error('Registration details are required for registration confirmation template');
         }
-        return this.getRegistrationConfirmationTemplate(data.registrationDetails);
+        return this.getRegistrationConfirmationTemplate(data.registrationDetails, data.campName || '');
       case NotificationType.REGISTRATION_ERROR:
         if (!data.errorDetails) {
           throw new Error('Error details are required for registration error template');
         }
-        return this.getRegistrationErrorTemplate(data.errorDetails);
+        return this.getRegistrationErrorTemplate(data.errorDetails, data.campName || '');
       case NotificationType.SHIFT_REMINDER:
         if (!data.shiftDetails) {
           throw new Error('Shift details are required for shift reminder template');
         }
-        return this.getShiftReminderTemplate(data.shiftDetails);
+        return this.getShiftReminderTemplate(data.shiftDetails, data.campName || '');
       case NotificationType.EMAIL_TEST:
         if (!data.testEmailDetails) {
           throw new Error('Test email details are required for test email template');
         }
-        return this.getTestEmailTemplate(data.testEmailDetails);
+        return this.getTestEmailTemplate(data.testEmailDetails, data.campName || '');
       default:
         throw new Error(`Unknown notification type: ${type}`);
     }
@@ -419,25 +441,25 @@ export class NotificationsService {
   /**
    * Get welcome email template
    */
-  private getWelcomeTemplate(name: string): NotificationTemplate {
-    const subject = 'Welcome to PlayaPlan!';
+  private getWelcomeTemplate(name: string, campName: string): NotificationTemplate {
+    const subject = `Welcome to ${campName}!`;
     const text = `
       Hi ${name},
       
-      Welcome to PlayaPlan! We're excited to have you on board.
+      Welcome to ${campName}! We're excited to have you on board.
       
       You can now sign in to your account and start exploring our services.
       
       Best regards,
-      The PlayaPlan Team
+      The ${campName} Team
     `;
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2>Welcome to PlayaPlan!</h2>
+        <h2>Welcome to ${campName}!</h2>
         <p>Hi ${name},</p>
-        <p>Welcome to PlayaPlan! We're excited to have you on board.</p>
+        <p>Welcome to ${campName}! We're excited to have you on board.</p>
         <p>You can now sign in to your account and start exploring our services.</p>
-        <p>Best regards,<br>The PlayaPlan Team</p>
+        <p>Best regards,<br>The ${campName} Team</p>
       </div>
     `;
     
@@ -447,8 +469,8 @@ export class NotificationsService {
   /**
    * Get password reset email template
    */
-  private getPasswordResetTemplate(resetUrl: string): NotificationTemplate {
-    const subject = 'Reset Your PlayaPlan Password';
+  private getPasswordResetTemplate(resetUrl: string, campName: string): NotificationTemplate {
+    const subject = `Reset Your ${campName} Password`;
     const text = `
       Hi there,
       
@@ -459,7 +481,7 @@ export class NotificationsService {
       This link will expire in 1 hour. If you didn't request this, please ignore this email.
       
       Best regards,
-      The PlayaPlan Team
+      The ${campName} Team
     `;
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -472,7 +494,7 @@ export class NotificationsService {
         <p>Or copy and paste this link into your browser:</p>
         <p>${resetUrl}</p>
         <p>This link will expire in 1 hour. If you didn't request this, please ignore this email.</p>
-        <p>Best regards,<br>The PlayaPlan Team</p>
+        <p>Best regards,<br>The ${campName} Team</p>
       </div>
     `;
     
@@ -482,8 +504,8 @@ export class NotificationsService {
   /**
    * Get email verification template
    */
-  private getEmailVerificationTemplate(verificationUrl: string): NotificationTemplate {
-    const subject = 'Verify Your PlayaPlan Email';
+  private getEmailVerificationTemplate(verificationUrl: string, campName: string): NotificationTemplate {
+    const subject = `Verify Your ${campName} Email`;
     const text = `
       Hi there,
       
@@ -494,7 +516,7 @@ export class NotificationsService {
       This link will expire in 24 hours.
       
       Best regards,
-      The PlayaPlan Team
+      The ${campName} Team
     `;
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -507,7 +529,7 @@ export class NotificationsService {
         <p>Or copy and paste this link into your browser:</p>
         <p>${verificationUrl}</p>
         <p>This link will expire in 24 hours.</p>
-        <p>Best regards,<br>The PlayaPlan Team</p>
+        <p>Best regards,<br>The ${campName} Team</p>
       </div>
     `;
     
@@ -517,29 +539,29 @@ export class NotificationsService {
   /**
    * Get login code email template
    */
-  private getLoginCodeTemplate(code: string): NotificationTemplate {
-    const subject = 'Your PlayaPlan Login Code';
+  private getLoginCodeTemplate(code: string, campName: string): NotificationTemplate {
+    const subject = `Your ${campName} Login Code`;
     const text = `
       Hello,
       
-      Your verification code to log in to PlayaPlan is: ${code}
+      Your verification code to log in to ${campName} is: ${code}
       
       This code will expire in 15 minutes. If you did not request this code, please ignore this email.
       
       Best regards,
-      The PlayaPlan Team
+      The ${campName} Team
     `;
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <h2>Your Login Verification Code</h2>
         <p>Hello,</p>
-        <p>Your verification code to log in to PlayaPlan is:</p>
+        <p>Your verification code to log in to ${campName} is:</p>
         <div style="background-color: #f5f5f5; padding: 15px; font-size: 24px; text-align: center; letter-spacing: 5px; font-weight: bold; margin: 20px 0;">
           ${code}
         </div>
         <p>This code will expire in 15 minutes.</p>
         <p>If you did not request this code, please ignore this email.</p>
-        <p>Best regards,<br>The PlayaPlan Team</p>
+        <p>Best regards,<br>The ${campName} Team</p>
       </div>
     `;
     return { subject, text, html };
@@ -548,7 +570,7 @@ export class NotificationsService {
   /**
    * Get payment confirmation template
    */
-  private getPaymentConfirmationTemplate(paymentDetails: { id: string; amount: number; currency: string; date: Date }): NotificationTemplate {
+  private getPaymentConfirmationTemplate(paymentDetails: { id: string; amount: number; currency: string; date: Date }, campName: string): NotificationTemplate {
     const { id, amount, currency, date } = paymentDetails;
     const formattedDate = new Date(date).toLocaleDateString();
     const formattedAmount = new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(amount / 100);
@@ -564,7 +586,7 @@ export class NotificationsService {
       Thank you for your payment!
       
       Best regards,
-      The PlayaPlan Team
+      The ${campName} Team
     `;
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -573,7 +595,7 @@ export class NotificationsService {
         <p>We've received your payment of ${formattedAmount} on ${formattedDate}.</p>
         <p><strong>Payment ID:</strong> ${id}</p>
         <p>Thank you for your payment!</p>
-        <p>Best regards,<br>The PlayaPlan Team</p>
+        <p>Best regards,<br>The ${campName} Team</p>
       </div>
     `;
     
@@ -583,7 +605,7 @@ export class NotificationsService {
   /**
    * Get email change template
    */
-  private getEmailChangeTemplate(oldEmail: string, newEmail: string, isToOldEmail: boolean): NotificationTemplate {
+  private getEmailChangeTemplate(oldEmail: string, newEmail: string, isToOldEmail: boolean, campName: string): NotificationTemplate {
     const subject = isToOldEmail ? 'Email Change Notification' : 'Email Change Confirmation';
     const text = `
       Hi there,
@@ -596,7 +618,7 @@ export class NotificationsService {
       If you did not request this change, please contact support immediately.
       
       Best regards,
-      The PlayaPlan Team
+      The ${campName} Team
     `;
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -606,7 +628,7 @@ export class NotificationsService {
         <p><strong>Old Email:</strong> ${oldEmail}</p>
         <p><strong>New Email:</strong> ${newEmail}</p>
         <p>If you did not request this change, please contact support immediately.</p>
-        <p>Best regards,<br>The PlayaPlan Team</p>
+        <p>Best regards,<br>The ${campName} Team</p>
       </div>
     `;
     
@@ -637,7 +659,7 @@ export class NotificationsService {
     }>;
     totalCost?: number;
     currency?: string;
-  }): NotificationTemplate {
+  }, campName: string): NotificationTemplate {
     const { id, year, status, campingOptions, jobs, totalCost, currency } = registrationDetails;
     const formattedDate = new Date(year, 0, 1).toLocaleDateString();
     const formattedAmount = totalCost ? new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(totalCost / 100) : 'N/A';
@@ -659,10 +681,10 @@ export class NotificationsService {
       Jobs:
       ${jobs ? jobs.map(job => `- ${job.name} (${job.category}, ${job.shift.name} - ${job.shift.endTime})`).join('\n') : 'N/A'}
       
-      Thank you for registering with PlayaPlan!
+      Thank you for registering with ${campName}!
       
       Best regards,
-      The PlayaPlan Team
+      The ${campName} Team
     `;
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -681,8 +703,8 @@ export class NotificationsService {
         <ul>
           ${jobs ? jobs.map(job => `<li>- ${job.name} (${job.category}, ${job.shift.name} - ${job.shift.endTime})</li>`).join('') : '<li>N/A</li>'}
         </ul>
-        <p>Thank you for registering with PlayaPlan!</p>
-        <p>Best regards,<br>The PlayaPlan Team</p>
+        <p>Thank you for registering with ${campName}!</p>
+        <p>Best regards,<br>The ${campName} Team</p>
       </div>
     `;
     
@@ -696,7 +718,7 @@ export class NotificationsService {
     error: string;
     message: string;
     suggestions?: string[];
-  }): NotificationTemplate {
+  }, campName: string): NotificationTemplate {
     const { error, message, suggestions } = errorDetails;
     
     const subject = 'Registration Error Notification';
@@ -714,7 +736,7 @@ export class NotificationsService {
       Please try again later or contact support for assistance.
       
       Best regards,
-      The PlayaPlan Team
+      The ${campName} Team
     `;
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -728,7 +750,7 @@ export class NotificationsService {
           ${suggestions ? suggestions.map(suggestion => `<li>- ${suggestion}</li>`).join('') : '<li>N/A</li>'}
         </ul>
         <p>Please try again later or contact support for assistance.</p>
-        <p>Best regards,<br>The PlayaPlan Team</p>
+        <p>Best regards,<br>The ${campName} Team</p>
       </div>
     `;
     
@@ -745,7 +767,7 @@ export class NotificationsService {
     startTime: string;
     endTime: string;
     location: string;
-  }): NotificationTemplate {
+  }, campName: string): NotificationTemplate {
     const { id, jobName, date, startTime, endTime, location } = shiftDetails;
     const formattedDate = new Date(date).toLocaleDateString();
     
@@ -764,7 +786,7 @@ export class NotificationsService {
       Please make sure to arrive on time.
       
       Best regards,
-      The PlayaPlan Team
+      The ${campName} Team
     `;
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -779,7 +801,7 @@ export class NotificationsService {
           <strong>Shift ID:</strong> ${id}
         </p>
         <p>Please make sure to arrive on time.</p>
-        <p>Best regards,<br>The PlayaPlan Team</p>
+        <p>Best regards,<br>The ${campName} Team</p>
       </div>
     `;
     
@@ -804,7 +826,7 @@ export class NotificationsService {
       format?: 'html' | 'text';
       includeSmtpDetails?: boolean;
     };
-  }): NotificationTemplate {
+  }, campName: string): NotificationTemplate {
     const { 
       smtpHost, 
       smtpPort, 
@@ -817,8 +839,8 @@ export class NotificationsService {
       customContent 
     } = testEmailDetails;
     
-    // Use custom subject if provided, otherwise use default
-    const subject = customContent?.subject || 'Test Email from PlayaPlan';
+    // Use custom subject if provided, otherwise use default with camp name
+    const subject = customContent?.subject || `Test Email from ${campName}`;
     
     // Use custom message if provided, otherwise use default
     const customMessage = customContent?.message || 'This is a test email to verify your SMTP configuration is working correctly.';
@@ -871,11 +893,11 @@ export class NotificationsService {
             <h3 style="margin-top: 0; color: #495057; font-size: 16px;">Test Details</h3>
             <p style="margin: 8px 0; font-size: 14px;"><strong>Sent by:</strong> ${adminUserName} (${adminEmail})</p>
             <p style="margin: 8px 0; font-size: 14px;"><strong>Timestamp:</strong> ${formattedTimestamp}</p>
-            <p style="margin: 8px 0; font-size: 14px;"><strong>Application:</strong> PlayaPlan Email System</p>
+            <p style="margin: 8px 0; font-size: 14px;"><strong>Application:</strong> ${campName} Email System</p>
           </div>
 
           <div style="margin-top: 32px; text-align: center; color: #6c757d; font-size: 12px;">
-            <p>This is an automated test email from PlayaPlan. If you received this unexpectedly, please contact your administrator.</p>
+            <p>This is an automated test email from ${campName}. If you received this unexpectedly, please contact your administrator.</p>
           </div>
         </div>
       `;
@@ -898,9 +920,9 @@ SMTP Configuration:
 Test Details:
 - Sent by: ${adminUserName} (${adminEmail})
 - Timestamp: ${formattedTimestamp}
-- Application: PlayaPlan Email System
+- Application: ${campName} Email System
 
-This is an automated test email from PlayaPlan. If you received this unexpectedly, please contact your administrator.
+This is an automated test email from ${campName}. If you received this unexpectedly, please contact your administrator.
       `.trim();
 
       return { subject, html, text };
@@ -926,9 +948,9 @@ ${smtpDetailsText}
 Test Details:
 - Sent by: ${adminUserName} (${adminEmail})
 - Timestamp: ${formattedTimestamp}
-- Application: PlayaPlan Email System
+- Application: ${campName} Email System
 
-This is an automated test email from PlayaPlan. If you received this unexpectedly, please contact your administrator.
+This is an automated test email from ${campName}. If you received this unexpectedly, please contact your administrator.
       `.trim();
 
       return { subject, html: text, text };
