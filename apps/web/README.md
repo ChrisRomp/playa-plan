@@ -34,4 +34,34 @@ To build the application for production:
 npm run build
 ```
 
-The built files will be in the `dist` directory. 
+The built files will be in the `dist` directory.
+
+# Web Application
+
+## Dynamic Document Metadata
+
+The application automatically updates the page title and meta description based on the camp configuration from the API.
+
+### Implementation
+
+- **Hook**: `useDocumentMetadata()` in `src/hooks/useDocumentMetadata.ts`
+- **Usage**: Called in the main `App.tsx` component
+- **Fallback**: Default title "PlayaPlan" and description if API fails
+
+### Features
+
+- **Dynamic Title**: Updates to `{campName} - Camp Registration`
+- **Sanitized Meta Description**: Strips HTML tags and limits to 160 characters for SEO
+- **Error Handling**: Gracefully handles API failures without breaking the app
+- **Performance**: Only runs once on app initialization
+
+### Example
+
+```typescript
+// When camp config has campName: "Burning Man 2024"
+document.title = "Burning Man 2024 - Camp Registration"
+
+// When camp config has campDescription with HTML
+// "<p>Amazing <strong>desert</strong> experience</p>"
+// Becomes: "Amazing desert experience"
+``` 
