@@ -641,13 +641,13 @@ export class RegistrationsService {
 
   /**
    * Send registration confirmation email
-   * @param user - User object with email
+   * @param user - User object with email and name fields
    * @param jobRegistration - Job registration details
    * @param campingOptionRegistrations - Camping option registrations
    * @param year - Registration year
    */
   private async sendRegistrationConfirmationEmail(
-    user: { email: string },
+    user: { email: string; firstName?: string; lastName?: string; playaName?: string | null },
     jobRegistration: Registration | null,
     campingOptionRegistrations: Array<{
       id: string;
@@ -720,10 +720,15 @@ export class RegistrationsService {
         currency: 'USD',
       };
 
+      // Build user name for email personalization
+      const userName = user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : undefined;
+
       await this.notificationsService.sendRegistrationConfirmationEmail(
         user.email,
         registrationDetails,
-        jobRegistration?.userId || ''
+        jobRegistration?.userId || '',
+        userName,
+        user.playaName || undefined
       );
 
       this.logger.log(`Registration confirmation email sent to ${user.email}`);

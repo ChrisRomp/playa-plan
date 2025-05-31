@@ -653,7 +653,7 @@ export class NotificationsService {
   private getFriendlyRegistrationStatus(status: string): string {
     switch (status.toUpperCase()) {
       case 'PENDING':
-        return 'Pending Review';
+        return 'Pending';
       case 'CONFIRMED':
         return 'Confirmed';
       case 'WAITLISTED':

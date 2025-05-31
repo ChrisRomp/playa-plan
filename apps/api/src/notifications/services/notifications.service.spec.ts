@@ -172,6 +172,71 @@ describe('NotificationsService', () => {
       const result = await service.sendRegistrationConfirmationEmail(
         'user@example.playaplan.app', 
         registrationDetails,
+        'user-123',
+        'John Doe',
+        'BurnerName'
+      );
+
+      expect(result).toBeTruthy();
+      expect(mockEmailService.sendEmail).toHaveBeenCalledWith(
+        expect.objectContaining({
+          to: 'user@example.playaplan.app',
+          subject: expect.stringContaining('Registration'),
+          html: expect.not.stringContaining('registration-123'),
+          text: expect.not.stringContaining('registration-123'),
+          notificationType: NotificationType.REGISTRATION_CONFIRMATION,
+          userId: 'user-123',
+        }),
+      );
+    });
+
+    it('should send registration confirmation email with userName fallback when no playaName', async () => {
+      mockEmailService.sendEmail.mockResolvedValueOnce(true);
+
+      const registrationDetails = {
+        id: 'registration-456',
+        year: 2024,
+        status: 'PENDING',
+        jobs: [],
+        totalCost: 200,
+        currency: 'USD',
+      };
+
+      const result = await service.sendRegistrationConfirmationEmail(
+        'user@example.playaplan.app', 
+        registrationDetails,
+        'user-123',
+        'Jane Smith'
+      );
+
+      expect(result).toBeTruthy();
+      expect(mockEmailService.sendEmail).toHaveBeenCalledWith(
+        expect.objectContaining({
+          to: 'user@example.playaplan.app',
+          subject: expect.stringContaining('Registration'),
+          html: expect.stringContaining('Hi Jane Smith,'),
+          text: expect.stringContaining('Hi Jane Smith,'),
+          notificationType: NotificationType.REGISTRATION_CONFIRMATION,
+          userId: 'user-123',
+        }),
+      );
+    });
+
+    it('should send registration confirmation email with generic greeting when no names provided', async () => {
+      mockEmailService.sendEmail.mockResolvedValueOnce(true);
+
+      const registrationDetails = {
+        id: 'registration-789',
+        year: 2024,
+        status: 'PENDING',
+        jobs: [],
+        totalCost: 200,
+        currency: 'USD',
+      };
+
+      const result = await service.sendRegistrationConfirmationEmail(
+        'user@example.playaplan.app', 
+        registrationDetails,
         'user-123'
       );
 
@@ -180,8 +245,8 @@ describe('NotificationsService', () => {
         expect.objectContaining({
           to: 'user@example.playaplan.app',
           subject: expect.stringContaining('Registration'),
-          html: expect.stringContaining('registration-123'),
-          text: expect.stringContaining('registration-123'),
+          html: expect.stringContaining('Hi there,'),
+          text: expect.stringContaining('Hi there,'),
           notificationType: NotificationType.REGISTRATION_CONFIRMATION,
           userId: 'user-123',
         }),
