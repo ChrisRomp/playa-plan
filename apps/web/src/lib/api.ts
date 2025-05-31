@@ -168,8 +168,14 @@ api.interceptors.response.use(
   async error => {
     const originalRequest = error.config;
     
+    // Skip token refresh for login-related endpoints where 401 is expected
+    const isLoginEndpoint = originalRequest.url?.includes('/auth/login-with-code') || 
+                           originalRequest.url?.includes('/auth/request-login-code') ||
+                           originalRequest.url?.includes('/auth/register');
+    
     // If error response is 401 and we haven't already tried to refresh
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    // and this is not a login endpoint
+    if (error.response?.status === 401 && !originalRequest._retry && !isLoginEndpoint) {
       if (isRefreshing) {
         // If we're already refreshing, add this request to the queue
         return new Promise((resolve, reject) => {

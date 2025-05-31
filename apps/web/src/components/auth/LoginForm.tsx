@@ -42,8 +42,6 @@ const LoginForm: React.FC = () => {
   useEffect(() => {
     if (authError) {
       setError(authError);
-      // Reset loading state when there's an error from auth context
-      setLocalLoading(false);
     } else {
       // Clear local error when auth context error is cleared
       setError('');
