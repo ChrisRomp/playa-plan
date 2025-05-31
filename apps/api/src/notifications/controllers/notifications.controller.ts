@@ -9,7 +9,7 @@ import { SendEmailDto, SendEmailToMultipleRecipientsDto, SendTestEmailDto } from
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
-import { UserRole, NotificationType, EmailAuditStatus } from '@prisma/client';
+import { UserRole, NotificationType } from '@prisma/client';
 
 /**
  * Type definition for authenticated request
