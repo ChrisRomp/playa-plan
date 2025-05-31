@@ -107,7 +107,7 @@ export class NotificationsService {
     try {
       const config = await this.coreConfigService.findCurrent(false);
       return config?.campName || 'PlayaPlan';
-    } catch (error) {
+    } catch {
       this.logger.warn('Failed to get camp name from configuration, using fallback');
       return 'PlayaPlan';
     }

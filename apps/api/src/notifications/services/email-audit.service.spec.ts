@@ -6,7 +6,6 @@ import { EmailAuditStatus, NotificationType } from '@prisma/client';
 
 describe('EmailAuditService', () => {
   let service: EmailAuditService;
-  let mockPrismaService: jest.Mocked<PrismaService>;
 
   const mockEmailAuditCreate = jest.fn();
   const mockEmailAuditFindMany = jest.fn();
@@ -30,7 +29,6 @@ describe('EmailAuditService', () => {
     }).compile();
 
     service = module.get<EmailAuditService>(EmailAuditService);
-    mockPrismaService = module.get(PrismaService);
 
     // Spy on logger to avoid actual logging during tests
     jest.spyOn(Logger.prototype, 'debug').mockImplementation();

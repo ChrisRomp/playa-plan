@@ -5,26 +5,11 @@ import { EmailService } from '../services/email.service';
 import { EmailAuditService } from '../services/email-audit.service';
 import { CoreConfigService } from '../../core-config/services/core-config.service';
 import { PrismaService } from '../../common/prisma/prisma.service';
-import { SendEmailDto, SendEmailToMultipleRecipientsDto, SendTestEmailDto } from '../dto/send-email.dto';
+import { SendEmailDto, SendEmailToMultipleRecipientsDto } from '../dto/send-email.dto';
 import { NotificationType, UserRole, EmailAuditStatus } from '@prisma/client';
-
-interface MockAuthRequest {
-  user: {
-    id: string;
-    email: string;
-    firstName: string;
-    lastName: string;
-    role: UserRole;
-  };
-}
 
 describe('NotificationsController', () => {
   let controller: NotificationsController;
-  let notificationsService: NotificationsService;
-  let emailService: EmailService;
-  let emailAuditService: EmailAuditService;
-  let coreConfigService: CoreConfigService;
-  let prismaService: PrismaService;
 
   const mockNotificationsService = {
     sendEmailVerificationEmail: jest.fn(),
@@ -84,11 +69,6 @@ describe('NotificationsController', () => {
     }).compile();
 
     controller = module.get<NotificationsController>(NotificationsController);
-    notificationsService = module.get<NotificationsService>(NotificationsService);
-    emailService = module.get<EmailService>(EmailService);
-    emailAuditService = module.get<EmailAuditService>(EmailAuditService);
-    coreConfigService = module.get<CoreConfigService>(CoreConfigService);
-    prismaService = module.get<PrismaService>(PrismaService);
   });
 
   it('should be defined', () => {

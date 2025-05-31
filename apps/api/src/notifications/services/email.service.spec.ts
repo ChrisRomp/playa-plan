@@ -21,6 +21,16 @@ interface EmailConfiguration {
   senderName: string | null;
 }
 
+interface MockError extends Error {
+  code?: string;
+  errno?: number;
+  address?: string;
+  port?: number;
+  hostname?: string;
+  responseCode?: number;
+  response?: string;
+}
+
 describe('EmailService', () => {
   let service: EmailService;
   let mockCoreConfigService: jest.Mocked<CoreConfigService>;
@@ -48,7 +58,7 @@ describe('EmailService', () => {
     } as any;
 
     // Mock nodemailer.createTransport
-    const createTransportSpy = jest.spyOn(nodemailer, 'createTransport')
+    jest.spyOn(nodemailer, 'createTransport')
       .mockReturnValue(mockTransporter);
 
     // Mock services
@@ -65,8 +75,7 @@ describe('EmailService', () => {
     } as any;
 
     mockConfigService = {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      get: jest.fn((key: string, defaultValue?: any) => {
+      get: jest.fn((key: string, defaultValue?: unknown) => {
         // Default to 'test' mode unless overridden in specific tests
         if (key === 'NODE_ENV') return 'test';
         return defaultValue;
@@ -439,8 +448,7 @@ describe('EmailService', () => {
         subject: 'Test',
         html: '<p>Test</p>',
         // Missing notificationType - TypeScript should catch this
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } as any;
+      } as EmailOptions;
 
       // Act
       const result = await service.sendEmail(incompleteOptions);
@@ -683,11 +691,11 @@ describe('EmailService', () => {
 
       mockCoreConfigService.getEmailConfiguration.mockResolvedValue(mockConfig);
 
-      const mockError = new Error('Connection refused');
-      (mockError as any).code = 'ECONNREFUSED';
-      (mockError as any).errno = -111;
-      (mockError as any).address = '192.168.1.1';
-      (mockError as any).port = 587;
+      const mockError: MockError = new Error('Connection refused');
+      mockError.code = 'ECONNREFUSED';
+      mockError.errno = -111;
+      mockError.address = '192.168.1.1';
+      mockError.port = 587;
 
       const mockVerify = jest.fn().mockRejectedValue(mockError);
       const mockTransporter = { 
@@ -725,9 +733,9 @@ describe('EmailService', () => {
 
       mockCoreConfigService.getEmailConfiguration.mockResolvedValue(mockConfig);
 
-      const mockError = new Error('Host not found');
-      (mockError as any).code = 'ENOTFOUND';
-      (mockError as any).hostname = 'invalid.smtp.com';
+      const mockError: MockError = new Error('Host not found');
+      mockError.code = 'ENOTFOUND';
+      mockError.hostname = 'invalid.smtp.com';
 
       const mockVerify = jest.fn().mockRejectedValue(mockError);
       const mockTransporter = { 
@@ -760,8 +768,8 @@ describe('EmailService', () => {
 
       mockCoreConfigService.getEmailConfiguration.mockResolvedValue(mockConfig);
 
-      const mockError = new Error('Connection timed out');
-      (mockError as any).code = 'ETIMEDOUT';
+      const mockError: MockError = new Error('Connection timed out');
+      mockError.code = 'ETIMEDOUT';
 
       const mockVerify = jest.fn().mockRejectedValue(mockError);
       const mockTransporter = { 
@@ -794,8 +802,8 @@ describe('EmailService', () => {
 
       mockCoreConfigService.getEmailConfiguration.mockResolvedValue(mockConfig);
 
-      const mockError = new Error('Authentication failed');
-      (mockError as any).code = 'EAUTH';
+      const mockError: MockError = new Error('Authentication failed');
+      mockError.code = 'EAUTH';
 
       const mockVerify = jest.fn().mockRejectedValue(mockError);
       const mockTransporter = { 
@@ -828,8 +836,8 @@ describe('EmailService', () => {
 
       mockCoreConfigService.getEmailConfiguration.mockResolvedValue(mockConfig);
 
-      const mockError = new Error('535 Authentication failed');
-      (mockError as any).responseCode = 535;
+      const mockError: MockError = new Error('535 Authentication failed');
+      mockError.responseCode = 535;
 
       const mockVerify = jest.fn().mockRejectedValue(mockError);
       const mockTransporter = { 
@@ -861,8 +869,8 @@ describe('EmailService', () => {
 
       mockCoreConfigService.getEmailConfiguration.mockResolvedValue(mockConfig);
 
-      const mockError = new Error('SMTP error');
-      (mockError as any).response = '550 Mailbox unavailable';
+      const mockError: MockError = new Error('SMTP error');
+      mockError.response = '550 Mailbox unavailable';
 
       const mockVerify = jest.fn().mockRejectedValue(mockError);
       const mockTransporter = { 
@@ -895,8 +903,8 @@ describe('EmailService', () => {
 
       mockCoreConfigService.getEmailConfiguration.mockResolvedValue(mockConfig);
 
-      const mockError = new Error('Unknown error');
-      (mockError as any).code = 'EUNKNOWN';
+      const mockError: MockError = new Error('Unknown error');
+      mockError.code = 'EUNKNOWN';
 
       const mockVerify = jest.fn().mockRejectedValue(mockError);
       const mockTransporter = { 

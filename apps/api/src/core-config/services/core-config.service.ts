@@ -125,7 +125,7 @@ export class CoreConfigService {
       });
       
       return result.map(config => this.mapToEntity(config));
-    } catch (error: unknown) {
+    } catch {
       return [];
     }
   }
@@ -342,7 +342,7 @@ export class CoreConfigService {
         senderEmail: config.senderEmail,
         senderName: config.senderName,
       };
-    } catch (error: unknown) {
+    } catch {
       this.logger.warn('Failed to retrieve email configuration, returning disabled state');
       
       // Return safe defaults if configuration retrieval fails

@@ -4,6 +4,24 @@ import { NotificationsService } from '../notifications/services/notifications.se
 import { CreateRegistrationDto, AddJobToRegistrationDto, CreateCampRegistrationDto, UpdateRegistrationDto } from './dto';
 import { Registration, RegistrationStatus } from '@prisma/client';
 
+interface JobRegistrationWithJobs extends Registration {
+  jobs?: Array<{
+    job?: {
+      name?: string;
+      category?: {
+        name?: string;
+      };
+      shift?: {
+        name?: string;
+        startTime?: string;
+        endTime?: string;
+        dayOfWeek?: string;
+      };
+      location?: string;
+    };
+  }>;
+}
+
 @Injectable()
 export class RegistrationsService {
   private readonly logger = new Logger(RegistrationsService.name);
@@ -678,9 +696,8 @@ export class RegistrationsService {
       }));
 
       // Format jobs from job registration - safely handle potential undefined jobs
-      const jobs = jobRegistration && 'jobs' in jobRegistration && Array.isArray((jobRegistration as any).jobs)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        ? (jobRegistration as any).jobs.map((regJob: any) => ({
+      const jobs = jobRegistration && 'jobs' in jobRegistration && Array.isArray((jobRegistration as JobRegistrationWithJobs).jobs)
+        ? (jobRegistration as JobRegistrationWithJobs).jobs?.map((regJob) => ({
           name: regJob.job?.name || 'Unknown Job',
           category: regJob.job?.category?.name || 'Unknown Category',
           shift: {
@@ -690,7 +707,7 @@ export class RegistrationsService {
             dayOfWeek: regJob.job?.shift?.dayOfWeek || '',
           },
           location: regJob.job?.location || 'TBD',
-        }))
+        })) || []
         : [];
 
       const registrationDetails = {
