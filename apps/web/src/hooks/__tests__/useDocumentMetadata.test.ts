@@ -69,6 +69,52 @@ describe('useDocumentMetadata', () => {
     expect(metaTag.content).toBe('This is a test description with HTML tags');
   });
 
+  it('should safely handle potentially malicious HTML including script tags', async () => {
+    const mockConfig = {
+      campName: 'Security Test Camp',
+      campDescription: '<script>alert("xss")</script><p>Safe content</p><img src="x" onerror="alert(1)">'
+    };
+
+    mockApiGet.mockResolvedValueOnce({
+      data: mockConfig
+    });
+
+    renderHook(() => useDocumentMetadata());
+
+    // Wait for async operation
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    const metaTag = document.querySelector('meta[name="description"]') as HTMLMetaElement;
+    expect(metaTag).toBeTruthy();
+    // Should only contain the safe text content, no script or dangerous attributes
+    expect(metaTag.content).toBe('Safe content');
+    // Ensure no script elements were created in the DOM
+    expect(document.querySelectorAll('script')).toHaveLength(0);
+  });
+
+  it('should handle malformed HTML safely', async () => {
+    const mockConfig = {
+      campName: 'Malformed HTML Camp',
+      campDescription: '<div>Some text<script>alert("bad")</script></div><p>Good content</p>'
+    };
+
+    mockApiGet.mockResolvedValueOnce({
+      data: mockConfig
+    });
+
+    renderHook(() => useDocumentMetadata());
+
+    // Wait for async operation
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    const metaTag = document.querySelector('meta[name="description"]') as HTMLMetaElement;
+    expect(metaTag).toBeTruthy();
+    // DOMParser extracts text content but prevents script execution
+    expect(metaTag.content).toBe('Some textalert("bad")Good content');
+    // Most importantly, ensure no script elements were actually executed
+    expect(document.querySelectorAll('script')).toHaveLength(0);
+  });
+
   it('should handle API errors gracefully', async () => {
     mockApiGet.mockRejectedValueOnce(new Error('API Error'));
 
@@ -84,7 +130,7 @@ describe('useDocumentMetadata', () => {
   });
 
   it('should truncate long descriptions to 160 characters', async () => {
-    const longDescription = 'A'.repeat(200);
+    const longDescription = `<p>${'A'.repeat(200)}</p>`;
     const mockConfig = {
       campName: 'Test Camp',
       campDescription: longDescription

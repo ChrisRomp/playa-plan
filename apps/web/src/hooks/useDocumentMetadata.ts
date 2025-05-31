@@ -2,6 +2,25 @@ import { useEffect } from 'react';
 import { api } from '../lib/api';
 
 /**
+ * Safely removes HTML tags and extracts plain text using DOMParser
+ * This prevents HTML injection vulnerabilities that regex-based approaches can miss
+ */
+const sanitizeHtmlToText = (html: string): string => {
+  try {
+    // Use browser's DOMParser to safely parse HTML
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+    
+    // Extract only the text content, which strips all HTML safely
+    return doc.body.textContent || doc.body.innerText || '';
+  } catch (error) {
+    // Fallback: if DOMParser fails, return empty string for safety
+    console.warn('Failed to sanitize HTML content:', error);
+    return '';
+  }
+};
+
+/**
  * Custom hook to dynamically update document metadata based on camp configuration
  * Updates the page title to include the camp name and sets a meta description
  */
@@ -20,9 +39,8 @@ export const useDocumentMetadata = () => {
         }
         
         if (config?.campDescription) {
-          // Strip HTML tags and limit to 160 characters for SEO
-          const cleanDescription = config.campDescription
-            .replace(/<[^>]*>/g, '') // Remove HTML tags
+          // Safely strip HTML tags and limit to 160 characters for SEO
+          const cleanDescription = sanitizeHtmlToText(config.campDescription)
             .trim()
             .substring(0, 160);
           
