@@ -381,7 +381,9 @@ export class NotificationsService {
       } catch (error) {
         successful = false;
         // Log the error but continue with other recipients
-        console.error(`Failed to send test email to ${recipient}:`, error);
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const sanitizedRecipient = recipient.replace(/[%\r\n]/g, '');
+        console.error(`Failed to send test email to ${sanitizedRecipient}: ${errorMessage}`);
       }
     }
 
