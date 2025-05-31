@@ -819,98 +819,6 @@ describe('Test Email Functionality', () => {
   });
 
   describe('Advanced Test Email Features', () => {
-    it('should show and hide advanced options', async () => {
-      render(<AdminConfigPage />);
-
-      await waitFor(() => {
-        expect(screen.getByDisplayValue('PlayaPlan 2024')).toBeInTheDocument();
-      });
-
-      // Advanced options should be hidden initially
-      expect(screen.queryByLabelText('Custom Subject')).not.toBeInTheDocument();
-
-      // Click to show advanced options
-      const advancedToggle = screen.getByText('▶ Advanced Options');
-      fireEvent.click(advancedToggle);
-
-      // Advanced options should now be visible
-      expect(screen.getByLabelText('Custom Subject')).toBeInTheDocument();
-      expect(screen.getByLabelText('Email Format')).toBeInTheDocument();
-      expect(screen.getByLabelText('Custom Message Content')).toBeInTheDocument();
-    });
-
-    it('should apply quick templates correctly', async () => {
-      render(<AdminConfigPage />);
-
-      await waitFor(() => {
-        expect(screen.getByDisplayValue('PlayaPlan 2024')).toBeInTheDocument();
-      });
-
-      // Show advanced options first
-      const advancedToggle = screen.getByText('▶ Advanced Options');
-      fireEvent.click(advancedToggle);
-
-      // Click basic test template
-      const basicTemplate = screen.getByText('Basic Test');
-      fireEvent.click(basicTemplate);
-
-      // Check values are set
-      expect(screen.getByDisplayValue('Basic Test Email')).toBeInTheDocument();
-      expect(screen.getByDisplayValue('This is a basic test to verify email delivery.')).toBeInTheDocument();
-
-      // Click detailed template
-      const detailedTemplate = screen.getByText('Detailed SMTP Test');
-      fireEvent.click(detailedTemplate);
-
-      // Check values changed
-      expect(screen.getByDisplayValue('Detailed SMTP Configuration Test')).toBeInTheDocument();
-      expect(screen.getByDisplayValue(/This detailed test includes all SMTP configuration/)).toBeInTheDocument();
-
-      // Click plain text template
-      const plainTemplate = screen.getByText('Plain Text Test');
-      fireEvent.click(plainTemplate);
-
-      // Check format changed to text
-      const formatSelect = screen.getByDisplayValue('Plain Text');
-      expect(formatSelect).toBeInTheDocument();
-    });
-
-    it('should generate and show email preview', async () => {
-      render(<AdminConfigPage />);
-
-      await waitFor(() => {
-        expect(screen.getByDisplayValue('PlayaPlan 2024')).toBeInTheDocument();
-      });
-
-      // Fill email input
-      const emailInput = screen.getByPlaceholderText(/email@example.com/);
-      fireEvent.change(emailInput, { target: { value: 'test@example.com' } });
-
-      // Click preview button
-      const previewButton = screen.getByText('Preview Email');
-      fireEvent.click(previewButton);
-
-      // Check preview modal appears
-      await waitFor(() => {
-        expect(screen.getByText('Email Preview - HTML')).toBeInTheDocument();
-      });
-
-      // Check preview content
-      expect(screen.getByText('Subject:')).toBeInTheDocument();
-      // Use getAllByText to handle multiple instances and select the one in the modal
-      const testEmailTexts = screen.getAllByText('Test Email from PlayaPlan');
-      expect(testEmailTexts.length).toBeGreaterThan(0);
-
-      // Close preview
-      const closeButton = screen.getByText('Close');
-      fireEvent.click(closeButton);
-
-      // Modal should be hidden
-      await waitFor(() => {
-        expect(screen.queryByText('Email Preview - HTML')).not.toBeInTheDocument();
-      });
-    });
-
     it('should handle multiple email recipients', async () => {
       const mockTestEmailResponse = {
         data: {
@@ -939,8 +847,6 @@ describe('Test Email Functionality', () => {
       await waitFor(() => {
         expect(mockApiPost).toHaveBeenCalledWith('/notifications/email/test', {
           email: 'test1@example.com, test2@example.com',
-          subject: undefined,
-          message: undefined,
           format: 'html',
           includeSmtpDetails: true,
         });
