@@ -41,19 +41,19 @@ if [ "$USE_DOCKER" = "true" ]; then
     
     # Start services
     print_status "Starting services with Docker Compose..."
-    docker-compose -f docker-compose.e2e.yml up -d --build
+    docker compose -f docker-compose.e2e.yml up -d --build
     
     # Wait for services
     print_status "Waiting for services to be ready..."
-    timeout 120 bash -c 'until docker-compose -f docker-compose.e2e.yml ps --services --filter health=healthy | wc -l | grep -q "3"; do
+    timeout 120 bash -c 'until [ $(docker compose -f docker-compose.e2e.yml ps --services --filter health=healthy | wc -l) -eq 3 ]; do
         echo "Waiting for services..."
         sleep 2
     done'
     
     # Setup database
     print_status "Setting up database..."
-    docker-compose -f docker-compose.e2e.yml exec api npx prisma migrate deploy
-    docker-compose -f docker-compose.e2e.yml exec api npx prisma db seed
+    docker compose -f docker-compose.e2e.yml exec api npx prisma migrate deploy
+    docker compose -f docker-compose.e2e.yml exec api npx prisma db seed
     
     # Run tests
     print_status "Running Playwright tests..."
@@ -61,7 +61,7 @@ if [ "$USE_DOCKER" = "true" ]; then
     
     # Cleanup
     print_status "Cleaning up..."
-    docker-compose -f docker-compose.e2e.yml down -v
+    docker compose -f docker-compose.e2e.yml down -v
     
 else
     print_status "Using manual service startup for e2e testing"
