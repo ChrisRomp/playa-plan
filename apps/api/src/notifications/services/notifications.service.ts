@@ -350,9 +350,10 @@ export class NotificationsService {
     // Parse multiple email addresses if comma-separated
     const recipients = email.split(',').map(e => e.trim()).filter(e => e.length > 0);
     
-    // Validate all email addresses
+    // Validate all email addresses using a safer regex pattern
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
     for (const recipient of recipients) {
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient)) {
+      if (!emailRegex.test(recipient)) {
         throw new Error(`Invalid email address: ${recipient}`);
       }
     }
