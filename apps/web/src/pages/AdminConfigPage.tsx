@@ -30,7 +30,6 @@ const AdminConfigPage: React.FC = () => {
   } | null>(null);
   
   // Test email monitoring state for 6.7.4.x features
-  const [showTestEmailHistory, setShowTestEmailHistory] = useState(false);
   const [testEmailHistory, setTestEmailHistory] = useState<Array<{
     id: string;
     recipientEmail: string;
@@ -368,13 +367,12 @@ const AdminConfigPage: React.FC = () => {
     setConnectionTestResult(null);
   };
   
-  // Toggle test email history visibility
-  const toggleTestEmailHistory = () => {
-    if (!showTestEmailHistory && testEmailHistory.length === 0) {
+  // Auto-load test email history when monitoring section is expanded
+  useEffect(() => {
+    if (showMonitoringSection && formData.emailEnabled && testEmailHistory.length === 0) {
       loadTestEmailHistory();
     }
-    setShowTestEmailHistory(!showTestEmailHistory);
-  };
+  }, [showMonitoringSection, formData.emailEnabled, testEmailHistory.length]);
   
   // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
@@ -1283,22 +1281,12 @@ const AdminConfigPage: React.FC = () => {
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
-                        onClick={toggleTestEmailHistory}
-                        disabled={!formData.emailEnabled}
-                        className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
+                        onClick={loadTestEmailHistory}
+                        disabled={isLoadingHistory}
+                        className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors disabled:bg-gray-300"
                       >
-                        {showTestEmailHistory ? 'Hide History' : 'Show History'}
+                        {isLoadingHistory ? 'Loading...' : 'Refresh'}
                       </button>
-                      {showTestEmailHistory && (
-                        <button
-                          type="button"
-                          onClick={loadTestEmailHistory}
-                          disabled={isLoadingHistory}
-                          className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors disabled:bg-gray-300"
-                        >
-                          {isLoadingHistory ? 'Loading...' : 'Refresh'}
-                        </button>
-                      )}
                     </div>
                   </div>
                   
@@ -1307,94 +1295,92 @@ const AdminConfigPage: React.FC = () => {
                   </p>
                   
                   {/* History Display */}
-                  {showTestEmailHistory && (
-                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                      {isLoadingHistory && (
-                        <div className="flex justify-center py-4">
-                          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
-                        </div>
-                      )}
-                      
-                      {historyError && (
-                        <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
-                          <p className="text-red-700 text-sm">
-                            <strong>Error loading history:</strong> {historyError}
-                          </p>
-                        </div>
-                      )}
-                      
-                      {!isLoadingHistory && !historyError && testEmailHistory.length === 0 && (
-                        <p className="text-gray-500 text-center py-4">
-                          No test emails found. Send a test email to see history here.
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                    {isLoadingHistory && (
+                      <div className="flex justify-center py-4">
+                        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+                      </div>
+                    )}
+                    
+                    {historyError && (
+                      <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
+                        <p className="text-red-700 text-sm">
+                          <strong>Error loading history:</strong> {historyError}
                         </p>
-                      )}
-                      
-                      {!isLoadingHistory && !historyError && testEmailHistory.length > 0 && (
-                        <div className="overflow-x-auto">
-                          <table className="min-w-full divide-y divide-gray-200">
-                            <thead className="bg-gray-50">
-                              <tr>
-                                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                  Recipient
-                                </th>
-                                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                  Subject
-                                </th>
-                                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                  Status
-                                </th>
-                                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                  Sent At
-                                </th>
-                                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                  Error
-                                </th>
-                              </tr>
-                            </thead>
-                            <tbody className="bg-white divide-y divide-gray-200">
-                              {testEmailHistory.map((email) => (
-                                <tr key={email.id} className="hover:bg-gray-50">
-                                  <td className="px-3 py-2 text-sm text-gray-900">
-                                    {email.recipientEmail}
-                                  </td>
-                                  <td className="px-3 py-2 text-sm text-gray-900">
-                                    {email.subject}
-                                  </td>
-                                  <td className="px-3 py-2 text-sm">
-                                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                                      email.status === 'SENT' 
-                                        ? 'bg-green-100 text-green-800'
-                                        : email.status === 'FAILED'
-                                        ? 'bg-red-100 text-red-800' 
-                                        : 'bg-yellow-100 text-yellow-800'
-                                    }`}>
-                                      {email.status}
+                      </div>
+                    )}
+                    
+                    {!isLoadingHistory && !historyError && testEmailHistory.length === 0 && (
+                      <p className="text-gray-500 text-center py-4">
+                        No test emails found. Send a test email to see history here.
+                      </p>
+                    )}
+                    
+                    {!isLoadingHistory && !historyError && testEmailHistory.length > 0 && (
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-gray-200">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Recipient
+                              </th>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Subject
+                              </th>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Status
+                              </th>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Sent At
+                              </th>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Error
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-gray-200">
+                            {testEmailHistory.map((email) => (
+                              <tr key={email.id} className="hover:bg-gray-50">
+                                <td className="px-3 py-2 text-sm text-gray-900">
+                                  {email.recipientEmail}
+                                </td>
+                                <td className="px-3 py-2 text-sm text-gray-900">
+                                  {email.subject}
+                                </td>
+                                <td className="px-3 py-2 text-sm">
+                                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                    email.status === 'SENT' 
+                                      ? 'bg-green-100 text-green-800'
+                                      : email.status === 'FAILED'
+                                      ? 'bg-red-100 text-red-800' 
+                                      : 'bg-yellow-100 text-yellow-800'
+                                  }`}>
+                                    {email.status}
+                                  </span>
+                                </td>
+                                <td className="px-3 py-2 text-sm text-gray-500">
+                                  {email.sentAt 
+                                    ? new Date(email.sentAt).toLocaleString()
+                                    : new Date(email.createdAt).toLocaleString()
+                                  }
+                                </td>
+                                <td className="px-3 py-2 text-sm text-red-600">
+                                  {email.errorMessage && (
+                                    <span 
+                                      className="cursor-help" 
+                                      title={email.errorMessage}
+                                    >
+                                      ⚠️ Error
                                     </span>
-                                  </td>
-                                  <td className="px-3 py-2 text-sm text-gray-500">
-                                    {email.sentAt 
-                                      ? new Date(email.sentAt).toLocaleString()
-                                      : new Date(email.createdAt).toLocaleString()
-                                    }
-                                  </td>
-                                  <td className="px-3 py-2 text-sm text-red-600">
-                                    {email.errorMessage && (
-                                      <span 
-                                        className="cursor-help" 
-                                        title={email.errorMessage}
-                                      >
-                                        ⚠️ Error
-                                      </span>
-                                    )}
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      )}
-                    </div>
-                  )}
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             )}
