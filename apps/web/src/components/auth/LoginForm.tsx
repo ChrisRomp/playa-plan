@@ -17,7 +17,7 @@ const LoginForm: React.FC = () => {
   const [localLoading, setLocalLoading] = useState(false);
   
   // Get authentication context values
-  const { requestVerificationCode, verifyCode, error: authError } = useAuth();
+  const { requestVerificationCode, verifyCode, error: authError, isAuthenticated } = useAuth();
   const [error, setError] = useState('');
   
   // Initialize email from localStorage if available (for page refreshes)
@@ -40,17 +40,22 @@ const LoginForm: React.FC = () => {
 
   // Update local error state when auth context error changes
   useEffect(() => {
-    console.log('useEffect authError changed:', authError);
     if (authError) {
       setError(authError);
       // Reset loading state when there's an error from auth context
-      console.log('useEffect: Setting localLoading to false due to authError');
       setLocalLoading(false);
     } else {
       // Clear local error when auth context error is cleared
       setError('');
     }
   }, [authError]);
+
+  // Reset loading state when authentication succeeds
+  useEffect(() => {
+    if (isAuthenticated) {
+      setLocalLoading(false);
+    }
+  }, [isAuthenticated]);
 
   // Note: Redirect logic is now handled by the parent LoginPage component
   // We no longer need to handle redirects here as LoginPage uses React Router's useNavigate
@@ -101,6 +106,8 @@ const LoginForm: React.FC = () => {
    */
   const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Clear any existing errors first
     setError('');
     
     if (!verificationCode) {
@@ -108,18 +115,20 @@ const LoginForm: React.FC = () => {
       return;
     }
     
-    console.log('handleVerify: Setting localLoading to true');
+    // Prevent multiple simultaneous verification attempts
+    if (localLoading) {
+      return;
+    }
+    
     // Set local loading state
     setLocalLoading(true);
     
     try {
-      console.log('handleVerify: Calling verifyCode');
       // Call the API to verify the code
       await verifyCode(email, verificationCode);
-      console.log('handleVerify: verifyCode succeeded');
-      // Successful verification will trigger a redirect via the isAuthenticated useEffect
+      // Success: the useEffect watching isAuthenticated will handle the redirect
+      // and reset the loading state
     } catch (err) {
-      console.log('handleVerify: verifyCode failed, setting error and resetting loading');
       // If there's an error, display it to the user
       if (err instanceof Error) {
         setError(err.message);
@@ -128,11 +137,7 @@ const LoginForm: React.FC = () => {
       }
       console.error('Verification failed:', err);
       
-      // Explicitly reset loading state on error
-      setLocalLoading(false);
-    } finally {
-      console.log('handleVerify: Finally block - setting localLoading to false');
-      // Always reset loading state regardless of success or failure
+      // Critical: Always reset loading state on any error so user can retry
       setLocalLoading(false);
     }
   };
