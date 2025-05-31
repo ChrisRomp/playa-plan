@@ -76,25 +76,11 @@ jobs:
       env:
         DATABASE_URL: postgresql://postgres:postgres@localhost:5432/playaplan_test
     
-    - name: Build applications
-      run: |
-        echo "Building applications..."
-        npm run build:api
-        npm run build:web
-        echo "Build completed. Checking API build output:"
-        ls -la apps/api/dist/ || echo "No API dist directory found"
-      env:
-        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/playaplan_test
-        JWT_SECRET: test-secret-key-for-ci
-        NODE_ENV: development
-    
     - name: Start API server in background
       run: |
         cd apps/api
-        echo "Starting API server..."
-        echo "Contents of dist directory:"
-        ls -la dist/ || echo "No dist directory found"
-        nohup npm run start > api.log 2>&1 &
+        echo "Starting API server in development mode..."
+        nohup npm run dev > api.log 2>&1 &
         echo $! > api.pid
         echo "API server started with PID $(cat api.pid)"
       env:
