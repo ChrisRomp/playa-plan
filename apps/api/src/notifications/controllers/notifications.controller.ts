@@ -57,7 +57,7 @@ export class NotificationsController {
       subject: sendEmailDto.subject,
       html: sendEmailDto.html,
       text: sendEmailDto.text,
-      notificationType: NotificationType.EMAIL_VERIFICATION,
+      notificationType: sendEmailDto.notificationType || NotificationType.EMAIL_VERIFICATION,
       attachments: sendEmailDto.attachments?.map(att => ({
         filename: att.filename,
         content: att.content,
@@ -89,7 +89,7 @@ export class NotificationsController {
       subject: dto.subject,
       html: dto.html,
       text: dto.text,
-      notificationType: NotificationType.EMAIL_VERIFICATION,
+      notificationType: dto.notificationType || NotificationType.EMAIL_VERIFICATION,
       attachments: dto.attachments?.map(att => ({
         filename: att.filename,
         content: att.content,

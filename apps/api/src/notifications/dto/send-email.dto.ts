@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEmail, IsNotEmpty, IsOptional, IsString, ArrayMinSize, ValidateNested, IsArray, IsIn, IsBoolean } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsOptional, IsString, ArrayMinSize, ValidateNested, IsArray, IsIn, IsBoolean, IsEnum } from 'class-validator';
 import { Type } from 'class-transformer';
+import { NotificationType } from '@prisma/client';
 
 export class AttachmentDto {
   @ApiProperty({ description: 'Filename of the attachment' })
@@ -39,6 +40,15 @@ export class SendEmailDto {
   @IsOptional()
   text?: string;
 
+  @ApiPropertyOptional({ 
+    description: 'Type of notification for audit purposes',
+    enum: NotificationType,
+    example: NotificationType.EMAIL_VERIFICATION
+  })
+  @IsOptional()
+  @IsEnum(NotificationType)
+  notificationType?: NotificationType;
+
   @ApiPropertyOptional({ description: 'Email attachments' })
   @IsOptional()
   @IsArray()
@@ -68,6 +78,15 @@ export class SendEmailToMultipleRecipientsDto {
   @IsString()
   @IsOptional()
   text?: string;
+
+  @ApiPropertyOptional({ 
+    description: 'Type of notification for audit purposes',
+    enum: NotificationType,
+    example: NotificationType.EMAIL_VERIFICATION
+  })
+  @IsOptional()
+  @IsEnum(NotificationType)
+  notificationType?: NotificationType;
 
   @ApiPropertyOptional({ description: 'Email attachments' })
   @IsOptional()
