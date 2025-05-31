@@ -5,24 +5,25 @@ permissions:
   actions: write
 
 on:
-  push:
-    branches: [ main ]
-    paths:
-      - 'tests/**'
-      - 'apps/web/**'
-      - 'apps/api/**'
-      - 'playwright.config.ts'
-      - 'package.json'
-      - 'package-lock.json'
-  pull_request:
-    branches: [ main ]
-    paths:
-      - 'tests/**'
-      - 'apps/web/**'
-      - 'apps/api/**'
-      - 'playwright.config.ts'
-      - 'package.json'
-      - 'package-lock.json'
+  workflow_dispatch:
+  # push:
+  #   branches: [ main ]
+  #   paths:
+  #     - 'tests/**'
+  #     - 'apps/web/**'
+  #     - 'apps/api/**'
+  #     - 'playwright.config.ts'
+  #     - 'package.json'
+  #     - 'package-lock.json'
+  # pull_request:
+  #   branches: [ main ]
+  #   paths:
+  #     - 'tests/**'
+  #     - 'apps/web/**'
+  #     - 'apps/api/**'
+  #     - 'playwright.config.ts'
+  #     - 'package.json'
+  #     - 'package-lock.json'
 
 jobs:
   e2e-tests:
