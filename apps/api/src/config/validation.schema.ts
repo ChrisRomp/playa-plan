@@ -34,7 +34,7 @@ const validationSchema = Joi.object({
   CORS_METHODS: Joi.string(),
   CORS_ALLOWED_HEADERS: Joi.string(),
   CORS_EXPOSED_HEADERS: Joi.string(),
-  CORS_CREDENTIALS: Joi.boolean().default(false),
+  CORS_CREDENTIALS: Joi.boolean().default(true),
   CORS_MAX_AGE: Joi.number(),
   
   // JWT configuration
