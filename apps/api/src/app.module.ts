@@ -1,4 +1,4 @@
-import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
+import { Module, NestModule, MiddlewareConsumer, Controller, Get } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { PrismaModule } from './common/prisma/prisma.module';
 import { UsersModule } from './users/users.module';
@@ -14,8 +14,18 @@ import { APP_FILTER } from '@nestjs/core';
 import { GlobalExceptionFilter } from './common/filters/http-exception.filter';
 import { ThrottlingModule } from './common/throttling/throttling.module';
 import { SecurityHeadersMiddleware } from './common/middleware/security-headers.middleware';
+import { Public } from './auth/decorators/public.decorator';
 import configuration from './config/configuration';
 import validationSchema from './config/validation.schema';
+
+@Controller()
+class AppController {
+  @Get('health')
+  @Public()
+  health() {
+    return { status: 'ok', timestamp: new Date().toISOString() };
+  }
+}
 
 /**
  * Root module of the PlayaPlan API application
@@ -54,6 +64,7 @@ import validationSchema from './config/validation.schema';
     CoreConfigModule,
     // Other feature modules will be added here as they are implemented
   ],
+  controllers: [AppController],
   providers: [
     // Global exception filter
     {

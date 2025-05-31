@@ -77,11 +77,44 @@ jobs:
         DATABASE_URL: postgresql://postgres:postgres@localhost:5432/playaplan_test
     
     - name: Build applications
-      run: npm run build
+      run: |
+        echo "Building applications..."
+        npm run build:api
+        npm run build:web
+        echo "Build completed. Checking API build output:"
+        ls -la apps/api/dist/ || echo "No API dist directory found"
       env:
         DATABASE_URL: postgresql://postgres:postgres@localhost:5432/playaplan_test
         JWT_SECRET: test-secret-key-for-ci
         NODE_ENV: development
+    
+    - name: Start API server in background
+      run: |
+        cd apps/api
+        echo "Starting API server..."
+        echo "Contents of dist directory:"
+        ls -la dist/ || echo "No dist directory found"
+        nohup npm run start > api.log 2>&1 &
+        echo $! > api.pid
+        echo "API server started with PID $(cat api.pid)"
+      env:
+        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/playaplan_test
+        JWT_SECRET: test-secret-key-for-ci
+        NODE_ENV: development
+        PORT: 3000
+    
+    - name: Wait for API server to be ready
+      run: |
+        echo "Waiting for API server to start..."
+        timeout 60 bash -c 'until curl -f http://localhost:3000/health 2>/dev/null; do 
+          echo "API not ready yet, waiting..."
+          if [ -f apps/api/api.log ]; then
+            echo "Last 10 lines of API log:"
+            tail -10 apps/api/api.log
+          fi
+          sleep 2
+        done'
+        echo "API server is ready!"
     
     - name: Run Playwright tests
       run: npx --yes playwright test
@@ -105,4 +138,23 @@ jobs:
       with:
         name: test-results
         path: test-results/
-        retention-days: 10 
+        retention-days: 10
+    
+    - name: Show API logs on failure
+      if: failure()
+      run: |
+        echo "API server logs:"
+        if [ -f apps/api/api.log ]; then
+          cat apps/api/api.log
+        else
+          echo "No API log file found"
+        fi
+    
+    - name: Cleanup API server
+      if: always()
+      run: |
+        if [ -f apps/api/api.pid ]; then
+          echo "Stopping API server with PID $(cat apps/api/api.pid)"
+          kill $(cat apps/api/api.pid) || echo "API server already stopped"
+          rm apps/api/api.pid
+        fi 
