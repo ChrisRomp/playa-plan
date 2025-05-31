@@ -12,6 +12,7 @@ export interface NotificationTemplate {
 
 export interface TemplateData {
   name?: string;
+  playaName?: string;
   resetUrl?: string;
   verificationUrl?: string;
   loginCode?: string;
@@ -263,6 +264,8 @@ export class NotificationsService {
    * @param email User email address
    * @param registrationDetails Registration details including camping options, jobs, and payment
    * @param userId User ID for audit trail
+   * @param userName User's full name (first + last)
+   * @param playaName User's playa name (if any)
    * @returns Promise resolving to true if email was sent successfully
    */
   async sendRegistrationConfirmationEmail(
@@ -289,11 +292,15 @@ export class NotificationsService {
       totalCost?: number;
       currency?: string;
     },
-    userId: string
+    userId: string,
+    userName?: string,
+    playaName?: string
   ): Promise<boolean> {
     return this.sendNotification(email, NotificationType.REGISTRATION_CONFIRMATION, { 
       registrationDetails, 
-      userId 
+      userId,
+      name: userName,
+      playaName
     });
   }
 
@@ -420,7 +427,7 @@ export class NotificationsService {
         if (!data.registrationDetails) {
           throw new Error('Registration details are required for registration confirmation template');
         }
-        return this.getRegistrationConfirmationTemplate(data.registrationDetails, data.campName || '');
+        return this.getRegistrationConfirmationTemplate(data.registrationDetails, data.campName || '', data);
       case NotificationType.REGISTRATION_ERROR:
         if (!data.errorDetails) {
           throw new Error('Error details are required for registration error template');
@@ -639,6 +646,66 @@ export class NotificationsService {
   }
 
   /**
+   * Convert registration status enum to user-friendly text
+   * @param status Raw status value
+   * @returns User-friendly status text
+   */
+  private getFriendlyRegistrationStatus(status: string): string {
+    switch (status.toUpperCase()) {
+      case 'PENDING':
+        return 'Pending';
+      case 'CONFIRMED':
+        return 'Confirmed';
+      case 'WAITLISTED':
+        return 'Waitlisted';
+      case 'CANCELLED':
+        return 'Cancelled';
+      case 'REJECTED':
+        return 'Rejected';
+      default:
+        return status;
+    }
+  }
+
+  /**
+   * Get appropriate greeting based on available name information
+   * @param userName Full name (first + last)
+   * @param playaName Playa name
+   * @returns Appropriate greeting
+   */
+  private getGreeting(userName?: string, playaName?: string): string {
+    if (playaName && playaName.trim()) {
+      return `Hi ${playaName.trim()},`;
+    }
+    if (userName && userName.trim()) {
+      return `Hi ${userName.trim()},`;
+    }
+    return 'Hi there,';
+  }
+
+  /**
+   * Get registration status message based on status
+   * @param status Registration status
+   * @returns Appropriate status message
+   */
+  private getRegistrationStatusMessage(status: string): string {
+    switch (status.toUpperCase()) {
+      case 'PENDING':
+        return 'Your registration has been received and is pending review or payment.';
+      case 'CONFIRMED':
+        return 'Your registration has been confirmed.';
+      case 'WAITLISTED':
+        return 'Your registration has been received and you have been placed on the waitlist.';
+      case 'CANCELLED':
+        return 'Your registration has been cancelled.';
+      case 'REJECTED':
+        return 'Your registration has been reviewed and unfortunately was not approved.';
+      default:
+        return 'Your registration has been received.';
+    }
+  }
+
+  /**
    * Get registration confirmation template
    */
   private getRegistrationConfirmationTemplate(registrationDetails: {
@@ -662,26 +729,29 @@ export class NotificationsService {
     }>;
     totalCost?: number;
     currency?: string;
-  }, campName: string): NotificationTemplate {
-    const { id, year, status, campingOptions, jobs, totalCost, currency } = registrationDetails;
-    const formattedDate = new Date(year, 0, 1).toLocaleDateString();
+  }, campName: string, data?: TemplateData): NotificationTemplate {
+    const { status, campingOptions, jobs, totalCost, currency } = registrationDetails;
+    const formattedDate = new Date().toLocaleDateString();
     const formattedAmount = totalCost ? new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(totalCost / 100) : 'N/A';
+    
+    const greeting = this.getGreeting(data?.name, data?.playaName);
+    const friendlyStatus = this.getFriendlyRegistrationStatus(status);
+    const statusMessage = this.getRegistrationStatusMessage(status);
     
     const subject = 'Registration Confirmation';
     const text = `
-      Hi there,
+      ${greeting}
       
-      Your registration has been confirmed.
+      ${statusMessage}
       
-      Registration ID: ${id}
-      Status: ${status}
+      Status: ${friendlyStatus}
       Date: ${formattedDate}
-      Total Cost: ${formattedAmount}
+      Total Dues: ${formattedAmount}
       
-      Camping Options:
-      ${campingOptions ? campingOptions.map(option => `- ${option.name} (${option.description})`).join('\n') : 'N/A'}
+      Selected Options:
+      ${campingOptions ? campingOptions.map(option => `- ${option.name}${option.description ? ` (${option.description})` : ''}`).join('\n') : 'N/A'}
       
-      Jobs:
+      Work Shift(s):
       ${jobs ? jobs.map(job => `- ${job.name} (${job.category}, ${job.shift.name} - ${job.shift.endTime})`).join('\n') : 'N/A'}
       
       Thank you for registering with ${campName}!
@@ -692,19 +762,18 @@ export class NotificationsService {
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <h2>${subject}</h2>
-        <p>Hi there,</p>
-        <p>Your registration has been confirmed.</p>
-        <p><strong>Registration ID:</strong> ${id}</p>
-        <p><strong>Status:</strong> ${status}</p>
+        <p>${greeting}</p>
+        <p>${statusMessage}</p>
+        <p><strong>Status:</strong> ${friendlyStatus}</p>
         <p><strong>Date:</strong> ${formattedDate}</p>
-        <p><strong>Total Cost:</strong> ${formattedAmount}</p>
-        <p><strong>Camping Options:</strong></p>
+        <p><strong>Total Dues:</strong> ${formattedAmount}</p>
+        <p><strong>Selected Options:</strong></p>
         <ul>
-          ${campingOptions ? campingOptions.map(option => `<li>- ${option.name} (${option.description})</li>`).join('') : '<li>N/A</li>'}
+          ${campingOptions ? campingOptions.map(option => `<li>${option.name}${option.description ? ` (${option.description})` : ''}</li>`).join('') : '<li>N/A</li>'}
         </ul>
-        <p><strong>Jobs:</strong></p>
+        <p><strong>Work Shift(s):</strong></p>
         <ul>
-          ${jobs ? jobs.map(job => `<li>- ${job.name} (${job.category}, ${job.shift.name} - ${job.shift.endTime})</li>`).join('') : '<li>N/A</li>'}
+          ${jobs ? jobs.map(job => `<li>${job.name} (${job.category}, ${job.shift.name} - ${job.shift.endTime})</li>`).join('') : '<li>N/A</li>'}
         </ul>
         <p>Thank you for registering with ${campName}!</p>
         <p>Best regards,<br>The ${campName} Team</p>
