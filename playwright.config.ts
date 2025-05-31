@@ -1,5 +1,8 @@
 import { defineConfig, devices } from '@playwright/test';
 
+/**
+ * @see https://playwright.dev/docs/test-configuration
+ */
 export default defineConfig({
   testDir: './tests',
   /* Run tests in files in parallel */
@@ -72,10 +75,12 @@ export default defineConfig({
   ],
 
   /* Run your local dev server before starting the tests */
-  webServer: {
-    command: process.env.CI ? 'npm run dev:web' : 'npm run dev',
+  // In CI, we manage services manually for better control
+  // Locally, we can use webServer for convenience
+  webServer: process.env.CI ? undefined : {
+    command: 'npm run dev',
     url: 'http://localhost:5173',
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: true,
     timeout: 120 * 1000, // 2 minutes to start
     stdout: 'ignore',
     stderr: 'pipe',

@@ -53,6 +53,9 @@ turbo/
 # E2E testing artifacts
 playwright-report/
 test-results/
+*.pid
+web.log
+api.log
 
 # Optional: lockfile per workspace if using npm workspaces
 apps/*/package-lock.json
