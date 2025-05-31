@@ -170,10 +170,10 @@ export class UserController {
       throw new NotFoundException('User not found');
     }
     
-    // Staff can only update participants, not other staff or admins
+    // Staff can only update participants or their own account, not other staff or admins
     if (req.user && req.user.role === UserRole.STAFF) {
-      if (userExists.role !== UserRole.PARTICIPANT) {
-        throw new ForbiddenException('Staff can only update participant accounts');
+      if (userExists.role !== UserRole.PARTICIPANT && req.user.id !== id) {
+        throw new ForbiddenException('Staff cannot update other staff or admin accounts');
       }
     }
 

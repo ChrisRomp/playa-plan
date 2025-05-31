@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotFoundException, ForbiddenException } from '@nestjs/common';
+import { NotFoundException, ForbiddenException, Request } from '@nestjs/common';
 import { UserController } from './user.controller';
 import { UserService } from '../services/user.service';
 import { UserRole } from '@prisma/client';
@@ -7,9 +7,20 @@ import { CreateUserDto } from '../dto/create-user.dto';
 import { UpdateUserDto } from '../dto/update-user.dto';
 import { User } from '../entities/user.entity';
 
+/**
+ * Type definition for authenticated request in tests
+ */
+interface AuthRequest extends Request {
+  user: {
+    id: string;
+    email: string;
+    role: UserRole;
+  };
+}
+
 // Mock the Request object
-const mockRequest = () => {
-  const req: any = {};
+const mockRequest = (): AuthRequest => {
+  const req = {} as AuthRequest;
   req.user = {
     id: 'test-uuid',
     email: 'test@example.playaplan.app',
@@ -18,8 +29,8 @@ const mockRequest = () => {
   return req;
 };
 
-const mockAdminRequest = () => {
-  const req: any = {};
+const mockAdminRequest = (): AuthRequest => {
+  const req = {} as AuthRequest;
   req.user = {
     id: 'admin-uuid',
     email: 'admin@example.playaplan.app',
@@ -28,9 +39,29 @@ const mockAdminRequest = () => {
   return req;
 };
 
+const mockStaffRequest = (): AuthRequest => {
+  const req = {} as AuthRequest;
+  req.user = {
+    id: 'staff-uuid',
+    email: 'staff@example.playaplan.app',
+    role: UserRole.STAFF
+  };
+  return req;
+};
+
+// Common test data
+const updateDataFirstName: UpdateUserDto = { firstName: 'Updated' };
+
 describe('UserController', () => {
   let controller: UserController;
-  let userServiceMock: any;
+  let userServiceMock: {
+    findAll: jest.Mock;
+    findById: jest.Mock;
+    findByEmail: jest.Mock;
+    create: jest.Mock;
+    update: jest.Mock;
+    delete: jest.Mock;
+  };
 
   const mockUser = {
     id: 'test-uuid',
@@ -53,6 +84,13 @@ describe('UserController', () => {
     ...mockUser,
     id: 'admin-uuid',
     role: UserRole.ADMIN,
+  };
+
+  const mockStaffUser = {
+    ...mockUser,
+    id: 'staff-uuid',
+    email: 'staff@example.playaplan.app',
+    role: UserRole.STAFF,
   };
 
   beforeEach(async () => {
@@ -93,7 +131,7 @@ describe('UserController', () => {
       const result = await controller.findAll(mockAdminRequest());
 
       // Assert
-      expect(result).toEqual(expectedUsers.map(user => expect.any(User)));
+      expect(result).toEqual(expectedUsers.map(() => expect.any(User)));
       expect(userServiceMock.findAll).toHaveBeenCalledTimes(1);
     });
   });
@@ -225,13 +263,74 @@ describe('UserController', () => {
 
     it('should pass through NotFoundException from service', async () => {
       // Arrange
-      const updateData: UpdateUserDto = { firstName: 'Updated' };
+      const updateData = updateDataFirstName;
       // Set findById to return null so the controller will throw NotFoundException
       userServiceMock.findById.mockResolvedValue(null);
 
       // Act & Assert
       await expect(controller.update('non-existent-id', updateData, mockAdminRequest()))
         .rejects.toThrow(NotFoundException);
+    });
+
+    it('should allow staff to update their own profile', async () => {
+      // Arrange - staff user updating their own profile
+      const updateData = updateDataFirstName;
+      const updatedStaffUser = { ...mockStaffUser, ...updateData };
+      
+      userServiceMock.findById.mockResolvedValue(mockStaffUser);
+      userServiceMock.update.mockResolvedValue(updatedStaffUser);
+
+      // Act
+      const result = await controller.update('staff-uuid', updateData, mockStaffRequest());
+
+      // Assert
+      expect(result).toEqual(expect.any(User));
+      expect(userServiceMock.update).toHaveBeenCalledWith('staff-uuid', updateData);
+    });
+
+    it('should forbid staff from updating other staff accounts', async () => {
+      // Arrange - staff user trying to update another staff user
+      const updateData = updateDataFirstName;
+      const otherStaffUser = { 
+        ...mockStaffUser, 
+        id: 'other-staff-uuid',
+        email: 'other-staff@example.playaplan.app'
+      };
+      
+      userServiceMock.findById.mockResolvedValue(otherStaffUser);
+
+      // Act & Assert
+      await expect(controller.update('other-staff-uuid', updateData, mockStaffRequest()))
+        .rejects.toThrow(ForbiddenException);
+      expect(userServiceMock.update).not.toHaveBeenCalled();
+    });
+
+    it('should forbid staff from updating admin accounts', async () => {
+      // Arrange - staff user trying to update admin user
+      const updateData = updateDataFirstName;
+      
+      userServiceMock.findById.mockResolvedValue(mockAdminUser);
+
+      // Act & Assert
+      await expect(controller.update('admin-uuid', updateData, mockStaffRequest()))
+        .rejects.toThrow(ForbiddenException);
+      expect(userServiceMock.update).not.toHaveBeenCalled();
+    });
+
+    it('should allow staff to update participant accounts', async () => {
+      // Arrange - staff user updating participant
+      const updateData = updateDataFirstName;
+      const updatedUser = { ...mockUser, ...updateData };
+      
+      userServiceMock.findById.mockResolvedValue(mockUser);
+      userServiceMock.update.mockResolvedValue(updatedUser);
+
+      // Act
+      const result = await controller.update('test-uuid', updateData, mockStaffRequest());
+
+      // Assert
+      expect(result).toEqual(expect.any(User));
+      expect(userServiceMock.update).toHaveBeenCalledWith('test-uuid', updateData);
     });
   });
 
