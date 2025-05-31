@@ -28,6 +28,16 @@ const mockAdminRequest = () => {
   return req;
 };
 
+const mockStaffRequest = () => {
+  const req: any = {};
+  req.user = {
+    id: 'staff-uuid',
+    email: 'staff@example.playaplan.app',
+    role: UserRole.STAFF
+  };
+  return req;
+};
+
 describe('UserController', () => {
   let controller: UserController;
   let userServiceMock: any;
@@ -53,6 +63,13 @@ describe('UserController', () => {
     ...mockUser,
     id: 'admin-uuid',
     role: UserRole.ADMIN,
+  };
+
+  const mockStaffUser = {
+    ...mockUser,
+    id: 'staff-uuid',
+    email: 'staff@example.playaplan.app',
+    role: UserRole.STAFF,
   };
 
   beforeEach(async () => {
@@ -232,6 +249,67 @@ describe('UserController', () => {
       // Act & Assert
       await expect(controller.update('non-existent-id', updateData, mockAdminRequest()))
         .rejects.toThrow(NotFoundException);
+    });
+
+    it('should allow staff to update their own profile', async () => {
+      // Arrange - staff user updating their own profile
+      const updateData: UpdateUserDto = { firstName: 'Updated' };
+      const updatedStaffUser = { ...mockStaffUser, ...updateData };
+      
+      userServiceMock.findById.mockResolvedValue(mockStaffUser);
+      userServiceMock.update.mockResolvedValue(updatedStaffUser);
+
+      // Act
+      const result = await controller.update('staff-uuid', updateData, mockStaffRequest());
+
+      // Assert
+      expect(result).toEqual(expect.any(User));
+      expect(userServiceMock.update).toHaveBeenCalledWith('staff-uuid', updateData);
+    });
+
+    it('should forbid staff from updating other staff accounts', async () => {
+      // Arrange - staff user trying to update another staff user
+      const updateData: UpdateUserDto = { firstName: 'Updated' };
+      const otherStaffUser = { 
+        ...mockStaffUser, 
+        id: 'other-staff-uuid',
+        email: 'other-staff@example.playaplan.app'
+      };
+      
+      userServiceMock.findById.mockResolvedValue(otherStaffUser);
+
+      // Act & Assert
+      await expect(controller.update('other-staff-uuid', updateData, mockStaffRequest()))
+        .rejects.toThrow(ForbiddenException);
+      expect(userServiceMock.update).not.toHaveBeenCalled();
+    });
+
+    it('should forbid staff from updating admin accounts', async () => {
+      // Arrange - staff user trying to update admin user
+      const updateData: UpdateUserDto = { firstName: 'Updated' };
+      
+      userServiceMock.findById.mockResolvedValue(mockAdminUser);
+
+      // Act & Assert
+      await expect(controller.update('admin-uuid', updateData, mockStaffRequest()))
+        .rejects.toThrow(ForbiddenException);
+      expect(userServiceMock.update).not.toHaveBeenCalled();
+    });
+
+    it('should allow staff to update participant accounts', async () => {
+      // Arrange - staff user updating participant
+      const updateData: UpdateUserDto = { firstName: 'Updated' };
+      const updatedUser = { ...mockUser, ...updateData };
+      
+      userServiceMock.findById.mockResolvedValue(mockUser);
+      userServiceMock.update.mockResolvedValue(updatedUser);
+
+      // Act
+      const result = await controller.update('test-uuid', updateData, mockStaffRequest());
+
+      // Assert
+      expect(result).toEqual(expect.any(User));
+      expect(userServiceMock.update).toHaveBeenCalledWith('test-uuid', updateData);
     });
   });
 
