@@ -1,0 +1,185 @@
+name: E2E Tests
+
+permissions:
+  contents: read
+  actions: write
+
+on:
+  workflow_dispatch:
+  # push:
+  #   branches: [ main ]
+  #   paths:
+  #     - 'tests/**'
+  #     - 'apps/web/**'
+  #     - 'apps/api/**'
+  #     - 'playwright.config.ts'
+  #     - 'package.json'
+  #     - 'package-lock.json'
+  # pull_request:
+  #   branches: [ main ]
+  #   paths:
+  #     - 'tests/**'
+  #     - 'apps/web/**'
+  #     - 'apps/api/**'
+  #     - 'playwright.config.ts'
+  #     - 'package.json'
+  #     - 'package-lock.json'
+
+jobs:
+  e2e-tests:
+    name: End-to-End Tests
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+          POSTGRES_DB: playaplan_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Use Node.js 22.x
+      uses: actions/setup-node@v3
+      with:
+        node-version: 22.x
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Install Playwright Browsers
+      run: npx --yes playwright install --with-deps
+    
+    - name: Setup test environment
+      run: |
+        cp .env.sample .env
+        # Add test-specific environment variables
+        echo "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/playaplan_test" >> .env
+        echo "JWT_SECRET=test-secret-key-for-ci" >> .env
+        echo "NODE_ENV=development" >> .env
+    
+    - name: Setup database
+      run: |
+        cd apps/api
+        npx --yes prisma generate
+        npx --yes prisma migrate deploy
+        npx --yes prisma db seed
+      env:
+        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/playaplan_test
+    
+    - name: Start API server in background
+      run: |
+        cd apps/api
+        echo "Starting API server in development mode..."
+        nohup npm run dev > api.log 2>&1 &
+        echo $! > api.pid
+        echo "API server started with PID $(cat api.pid)"
+      env:
+        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/playaplan_test
+        JWT_SECRET: test-secret-key-for-ci
+        NODE_ENV: development
+        PORT: 3000
+    
+    - name: Wait for API server to be ready
+      run: |
+        echo "Waiting for API server to start..."
+        timeout 60 bash -c 'until curl -f http://localhost:3000/health 2>/dev/null; do 
+          echo "API not ready yet, waiting..."
+          if [ -f apps/api/api.log ]; then
+            echo "Last 10 lines of API log:"
+            tail -10 apps/api/api.log
+          fi
+          sleep 2
+        done'
+        echo "API server is ready!"
+    
+    - name: Start Web server in background
+      run: |
+        cd apps/web
+        echo "Starting Web server..."
+        nohup npm run dev > web.log 2>&1 &
+        echo $! > web.pid
+        echo "Web server started with PID $(cat web.pid)"
+      env:
+        VITE_API_URL: http://localhost:3000
+        NODE_ENV: development
+        PORT: 5173
+    
+    - name: Wait for Web server to be ready
+      run: |
+        echo "Waiting for Web server to start..."
+        timeout 60 bash -c 'until curl -f http://localhost:5173 2>/dev/null; do 
+          echo "Web server not ready yet, waiting..."
+          if [ -f apps/web/web.log ]; then
+            echo "Last 10 lines of Web log:"
+            tail -10 apps/web/web.log
+          fi
+          sleep 2
+        done'
+        echo "Web server is ready!"
+    
+    - name: Run Playwright tests
+      run: npx --yes playwright test
+      env:
+        CI: true
+        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/playaplan_test
+        JWT_SECRET: test-secret-key-for-ci
+        NODE_ENV: development
+    
+    - name: Upload Playwright Report
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: playwright-report
+        path: playwright-report/
+        retention-days: 10
+    
+    - name: Upload Test Results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: test-results
+        path: test-results/
+        retention-days: 10
+    
+    - name: Show server logs on failure
+      if: failure()
+      run: |
+        echo "=== API server logs ==="
+        if [ -f apps/api/api.log ]; then
+          cat apps/api/api.log
+        else
+          echo "No API log file found"
+        fi
+        echo ""
+        echo "=== Web server logs ==="
+        if [ -f apps/web/web.log ]; then
+          cat apps/web/web.log
+        else
+          echo "No Web log file found"
+        fi
+    
+    - name: Cleanup servers
+      if: always()
+      run: |
+        echo "Stopping servers..."
+        if [ -f apps/api/api.pid ]; then
+          echo "Stopping API server with PID $(cat apps/api/api.pid)"
+          kill $(cat apps/api/api.pid) || echo "API server already stopped"
+          rm apps/api/api.pid
+        fi
+        if [ -f apps/web/web.pid ]; then
+          echo "Stopping Web server with PID $(cat apps/web/web.pid)"
+          kill $(cat apps/web/web.pid) || echo "Web server already stopped"
+          rm apps/web/web.pid
+        fi 

@@ -17,7 +17,7 @@ const LoginForm: React.FC = () => {
   const [localLoading, setLocalLoading] = useState(false);
   
   // Get authentication context values
-  const { requestVerificationCode, verifyCode, error: authError } = useAuth();
+  const { requestVerificationCode, verifyCode, error: authError, isAuthenticated } = useAuth();
   const [error, setError] = useState('');
   
   // Initialize email from localStorage if available (for page refreshes)
@@ -42,10 +42,18 @@ const LoginForm: React.FC = () => {
   useEffect(() => {
     if (authError) {
       setError(authError);
-      // Reset loading state when there's an error from auth context
-      setLocalLoading(false);
+    } else {
+      // Clear local error when auth context error is cleared
+      setError('');
     }
   }, [authError]);
+
+  // Reset loading state when authentication succeeds
+  useEffect(() => {
+    if (isAuthenticated) {
+      setLocalLoading(false);
+    }
+  }, [isAuthenticated]);
 
   // Note: Redirect logic is now handled by the parent LoginPage component
   // We no longer need to handle redirects here as LoginPage uses React Router's useNavigate
@@ -96,10 +104,17 @@ const LoginForm: React.FC = () => {
    */
   const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Clear any existing errors first
     setError('');
     
     if (!verificationCode) {
       setError('Verification code is required');
+      return;
+    }
+    
+    // Prevent multiple simultaneous verification attempts
+    if (localLoading) {
       return;
     }
     
@@ -109,7 +124,8 @@ const LoginForm: React.FC = () => {
     try {
       // Call the API to verify the code
       await verifyCode(email, verificationCode);
-      // Successful verification will trigger a redirect via the isAuthenticated useEffect
+      // Success: the useEffect watching isAuthenticated will handle the redirect
+      // and reset the loading state
     } catch (err) {
       // If there's an error, display it to the user
       if (err instanceof Error) {
@@ -118,8 +134,8 @@ const LoginForm: React.FC = () => {
         setError('Verification failed. Please check your code and try again.');
       }
       console.error('Verification failed:', err);
-    } finally {
-      // Always reset loading state regardless of success or failure
+      
+      // Critical: Always reset loading state on any error so user can retry
       setLocalLoading(false);
     }
   };
