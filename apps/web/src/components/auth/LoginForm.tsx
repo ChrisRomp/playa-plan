@@ -40,10 +40,15 @@ const LoginForm: React.FC = () => {
 
   // Update local error state when auth context error changes
   useEffect(() => {
+    console.log('useEffect authError changed:', authError);
     if (authError) {
       setError(authError);
       // Reset loading state when there's an error from auth context
+      console.log('useEffect: Setting localLoading to false due to authError');
       setLocalLoading(false);
+    } else {
+      // Clear local error when auth context error is cleared
+      setError('');
     }
   }, [authError]);
 
@@ -103,14 +108,18 @@ const LoginForm: React.FC = () => {
       return;
     }
     
+    console.log('handleVerify: Setting localLoading to true');
     // Set local loading state
     setLocalLoading(true);
     
     try {
+      console.log('handleVerify: Calling verifyCode');
       // Call the API to verify the code
       await verifyCode(email, verificationCode);
+      console.log('handleVerify: verifyCode succeeded');
       // Successful verification will trigger a redirect via the isAuthenticated useEffect
     } catch (err) {
+      console.log('handleVerify: verifyCode failed, setting error and resetting loading');
       // If there's an error, display it to the user
       if (err instanceof Error) {
         setError(err.message);
@@ -118,7 +127,11 @@ const LoginForm: React.FC = () => {
         setError('Verification failed. Please check your code and try again.');
       }
       console.error('Verification failed:', err);
+      
+      // Explicitly reset loading state on error
+      setLocalLoading(false);
     } finally {
+      console.log('handleVerify: Finally block - setting localLoading to false');
       // Always reset loading state regardless of success or failure
       setLocalLoading(false);
     }
