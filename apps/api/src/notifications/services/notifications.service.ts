@@ -668,6 +668,45 @@ export class NotificationsService {
   }
 
   /**
+   * Convert DayOfWeek enum to user-friendly text
+   * @param day Raw day enum value
+   * @returns User-friendly day text
+   */
+  private getFriendlyDayName(day: string): string {
+    if (!day) return '';
+    
+    const dayMap: Record<string, string> = {
+      // Standard days
+      MONDAY: 'Monday',
+      TUESDAY: 'Tuesday',
+      WEDNESDAY: 'Wednesday',
+      THURSDAY: 'Thursday',
+      FRIDAY: 'Friday',
+      SATURDAY: 'Saturday',
+      SUNDAY: 'Sunday',
+      // Special event days
+      PRE_OPENING: 'Pre-Opening',
+      OPENING_SUNDAY: 'Opening Sunday',
+      CLOSING_SUNDAY: 'Closing Sunday',
+      POST_EVENT: 'Post-Event',
+      // Handle lowercase versions too
+      monday: 'Monday',
+      tuesday: 'Tuesday',
+      wednesday: 'Wednesday',
+      thursday: 'Thursday',
+      friday: 'Friday',
+      saturday: 'Saturday',
+      sunday: 'Sunday',
+      pre_opening: 'Pre-Opening',
+      opening_sunday: 'Opening Sunday',
+      closing_sunday: 'Closing Sunday',
+      post_event: 'Post-Event'
+    };
+    
+    return dayMap[day] || day; // Return mapped value or original if not found
+  }
+
+  /**
    * Get appropriate greeting based on available name information
    * @param userName Full name (first + last)
    * @param playaName Playa name
@@ -752,7 +791,7 @@ export class NotificationsService {
       ${campingOptions ? campingOptions.map(option => `- ${option.name}${option.description ? ` (${option.description})` : ''}`).join('\n') : 'N/A'}
       
       Work Shift(s):
-      ${jobs ? jobs.map(job => `- ${job.name} (${job.category}, ${job.shift.name} - ${job.shift.endTime})`).join('\n') : 'N/A'}
+      ${jobs ? jobs.map(job => `- ${job.category}: ${this.getFriendlyDayName(job.shift.dayOfWeek)} ${job.shift.startTime}-${job.shift.endTime}`).join('\n') : 'N/A'}
       
       Thank you for registering with ${campName}!
       
@@ -773,7 +812,7 @@ export class NotificationsService {
         </ul>
         <p><strong>Work Shift(s):</strong></p>
         <ul>
-          ${jobs ? jobs.map(job => `<li>${job.name} (${job.category}, ${job.shift.name} - ${job.shift.endTime})</li>`).join('') : '<li>N/A</li>'}
+          ${jobs ? jobs.map(job => `<li>${job.category}: ${this.getFriendlyDayName(job.shift.dayOfWeek)} ${job.shift.startTime}-${job.shift.endTime}</li>`).join('') : '<li>N/A</li>'}
         </ul>
         <p>Thank you for registering with ${campName}!</p>
         <p>Best regards,<br>The ${campName} Team</p>
