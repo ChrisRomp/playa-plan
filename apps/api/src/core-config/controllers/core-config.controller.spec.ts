@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { CoreConfigController } from './core-config.controller';
 import { CoreConfigService } from '../services/core-config.service';
+import { EmailService } from '../../notifications/services/email.service';
 import { CreateCoreConfigDto, UpdateCoreConfigDto, CoreConfigResponseDto } from '../dto';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { CoreConfig } from '../entities/core-config.entity';
@@ -8,6 +9,7 @@ import { CoreConfig } from '../entities/core-config.entity';
 describe('CoreConfigController', () => {
   let controller: CoreConfigController;
   let service: CoreConfigService;
+  let emailService: EmailService;
 
   const mockCoreConfig: Partial<CoreConfig> = {
     id: 'test-id',
@@ -83,6 +85,10 @@ describe('CoreConfigController', () => {
     adminTest: jest.fn().mockReturnValue('Core Config module is working!'),
   };
 
+  const mockEmailService = {
+    refreshConfiguration: jest.fn().mockResolvedValue(undefined),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [CoreConfigController],
@@ -91,11 +97,16 @@ describe('CoreConfigController', () => {
           provide: CoreConfigService,
           useValue: mockCoreConfigService,
         },
+        {
+          provide: EmailService,
+          useValue: mockEmailService,
+        },
       ],
     }).compile();
 
     controller = module.get<CoreConfigController>(CoreConfigController);
     service = module.get<CoreConfigService>(CoreConfigService);
+    emailService = module.get<EmailService>(EmailService);
   });
 
   afterEach(() => {
@@ -174,6 +185,31 @@ describe('CoreConfigController', () => {
       expect(result.campName).toEqual(mockUpdateConfigDto.campName);
     });
 
+    it('should refresh email configuration when email settings are updated', async () => {
+      const emailUpdateDto = {
+        ...mockUpdateConfigDto,
+        emailEnabled: true,
+        senderEmail: 'new@example.com',
+      };
+      
+      await controller.update('test-id', emailUpdateDto);
+      
+      expect(service.update).toHaveBeenCalledWith('test-id', emailUpdateDto);
+      expect(emailService.refreshConfiguration).toHaveBeenCalled();
+    });
+
+    it('should not refresh email configuration when non-email settings are updated', async () => {
+      const nonEmailUpdateDto = {
+        campName: 'New Camp Name',
+        campDescription: 'New description',
+      };
+      
+      await controller.update('test-id', nonEmailUpdateDto);
+      
+      expect(service.update).toHaveBeenCalledWith('test-id', nonEmailUpdateDto);
+      expect(emailService.refreshConfiguration).not.toHaveBeenCalled();
+    });
+
     it('should throw NotFoundException if config not found', async () => {
       mockCoreConfigService.update.mockRejectedValueOnce(new NotFoundException('Config not found'));
       
@@ -197,6 +233,33 @@ describe('CoreConfigController', () => {
       expect(result.campName).toEqual(mockUpdateConfigDto.campName);
     });
 
+    it('should refresh email configuration when email settings are updated', async () => {
+      const emailUpdateDto = {
+        ...mockUpdateConfigDto,
+        smtpHost: 'smtp.newhost.com',
+        senderName: 'New Sender',
+      };
+      
+      await controller.updateCurrent(emailUpdateDto);
+      
+      expect(service.findCurrent).toHaveBeenCalledWith(false);
+      expect(service.update).toHaveBeenCalledWith(mockCoreConfig.id, emailUpdateDto);
+      expect(emailService.refreshConfiguration).toHaveBeenCalled();
+    });
+
+    it('should not refresh email configuration when non-email settings are updated', async () => {
+      const nonEmailUpdateDto = {
+        campName: 'New Camp Name',
+        registrationYear: 2025,
+      };
+      
+      await controller.updateCurrent(nonEmailUpdateDto);
+      
+      expect(service.findCurrent).toHaveBeenCalledWith(false);
+      expect(service.update).toHaveBeenCalledWith(mockCoreConfig.id, nonEmailUpdateDto);
+      expect(emailService.refreshConfiguration).not.toHaveBeenCalled();
+    });
+
     it('should create a new configuration if none exists', async () => {
       // Mock the findCurrent to throw NotFoundException
       mockCoreConfigService.findCurrent.mockRejectedValueOnce(new NotFoundException('Config not found'));
@@ -206,6 +269,23 @@ describe('CoreConfigController', () => {
       expect(service.findCurrent).toHaveBeenCalledWith(false);
       expect(service.create).toHaveBeenCalled();
       expect(result).toBeInstanceOf(CoreConfigResponseDto);
+    });
+
+    it('should refresh email configuration when creating new config with email settings', async () => {
+      // Mock the findCurrent to throw NotFoundException
+      mockCoreConfigService.findCurrent.mockRejectedValueOnce(new NotFoundException('Config not found'));
+      
+      const emailCreateDto = {
+        ...mockUpdateConfigDto,
+        emailEnabled: true,
+        smtpPassword: 'newpassword',
+      };
+      
+      await controller.updateCurrent(emailCreateDto);
+      
+      expect(service.findCurrent).toHaveBeenCalledWith(false);
+      expect(service.create).toHaveBeenCalled();
+      expect(emailService.refreshConfiguration).toHaveBeenCalled();
     });
 
     it('should throw BadRequestException if campName is missing when creating', async () => {

@@ -262,6 +262,25 @@ export class EmailService implements OnModuleInit {
         : 'noreply@example.com';
       const emailFrom = from || defaultFrom;
       
+      // Enhanced debug mode: Show all email parameters that will be sent
+      if (isDebugMode) {
+        console.log('\n====== DEBUG: EMAIL PARAMETERS ======');
+        console.log(`From: ${emailFrom}`);
+        console.log(`To: ${Array.isArray(to) ? to.join(', ') : to}`);
+        if (ccEmails && ccEmails.length > 0) console.log(`CC: ${ccEmails.join(', ')}`);
+        if (bccEmails && bccEmails.length > 0) console.log(`BCC: ${bccEmails.join(', ')}`);
+        console.log(`Subject: ${subject}`);
+        console.log(`Reply-To: ${replyTo || emailFrom}`);
+        console.log('\n--- SMTP Configuration ---');
+        console.log(`Host: ${config.smtpHost}`);
+        console.log(`Port: ${config.smtpPort}`);
+        console.log(`Username: ${config.smtpUsername}`);
+        console.log(`Secure: ${config.smtpUseSsl}`);
+        console.log(`Sender Email Config: ${config.senderEmail}`);
+        console.log(`Sender Name Config: ${config.senderName}`);
+        console.log('=============================================\n');
+      }
+      
       // Attempt to send via SMTP
       const emailSent = await this.sendViaSmtp({
         to,
@@ -334,7 +353,18 @@ export class EmailService implements OnModuleInit {
       return true;
     } catch (error: unknown) {
       const err = error as Error;
-      this.logger.error(`SMTP email error: ${err.message}`, err.stack);
+      
+      // Enhanced error logging with mail options
+      this.logger.error(`SMTP email error: ${err.message}`);
+      this.logger.error(`Failed mail options:`, {
+        from: mailOptions.from,
+        to: mailOptions.to,
+        cc: mailOptions.cc,
+        bcc: mailOptions.bcc,
+        subject: mailOptions.subject,
+        replyTo: mailOptions.replyTo,
+      });
+      
       return false;
     }
   }

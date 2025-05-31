@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { NotificationsService } from './services/notifications.service';
 import { EmailService } from './services/email.service';
@@ -11,7 +11,7 @@ import { CoreConfigModule } from '../core-config/core-config.module';
  * including email sending and notifications management
  */
 @Module({
-  imports: [ConfigModule, CoreConfigModule],
+  imports: [ConfigModule, forwardRef(() => CoreConfigModule)],
   controllers: [NotificationsController],
   providers: [NotificationsService, EmailService, EmailAuditService],
   exports: [NotificationsService, EmailService, EmailAuditService],
