@@ -70,6 +70,7 @@ jobs:
     - name: Setup database
       run: |
         cd apps/api
+        npx --yes prisma generate
         npx --yes prisma migrate deploy
         npx --yes prisma db seed
       env:
