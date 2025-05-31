@@ -1,93 +1,106 @@
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderHook } from '@testing-library/react';
-import { describe, it, expect, beforeEach, vi, type Mock } from 'vitest';
 import { useDocumentMetadata } from '../useDocumentMetadata';
 
-// Mock fetch
-const mockFetch = vi.fn() as Mock;
-global.fetch = mockFetch;
+// Mock the API client
+vi.mock('../../lib/api', () => ({
+  api: {
+    get: vi.fn(),
+  },
+}));
+
+// Import the mocked API after the mock is defined
+import { api } from '../../lib/api';
+const mockApiGet = api.get as ReturnType<typeof vi.fn>;
 
 describe('useDocumentMetadata', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
-    // Reset document title and meta description
-    document.title = 'PlayaPlan';
-    const metaDesc = document.querySelector('meta[name="description"]');
-    if (metaDesc) {
-      metaDesc.setAttribute('content', 'Camp registration and management platform');
+    // Reset DOM state
+    document.title = 'Test';
+    const metaTag = document.querySelector('meta[name="description"]');
+    if (metaTag) {
+      metaTag.remove();
     }
+    
+    // Reset API mock
+    mockApiGet.mockClear();
   });
 
-  it('should update document title when camp configuration is available', async () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('should update document title with camp name', async () => {
     const mockConfig = {
-      campName: 'Burning Man 2024',
-      campDescription: 'The ultimate desert experience with art, music, and community.',
+      campName: 'Black Rock City Camp',
+      campDescription: 'A test camp description'
     };
 
-    mockFetch.mockResolvedValueOnce({
-      json: () => Promise.resolve(mockConfig),
-    } as Response);
+    mockApiGet.mockResolvedValueOnce({
+      data: mockConfig
+    });
 
     renderHook(() => useDocumentMetadata());
 
-    // Wait for the async operation to complete
+    // Wait for async operation
     await new Promise(resolve => setTimeout(resolve, 0));
 
-    expect(document.title).toBe('Burning Man 2024 - Camp Registration');
+    expect(mockApiGet).toHaveBeenCalledWith('/public/config');
+    expect(document.title).toBe('Black Rock City Camp - Camp Registration');
   });
 
-  it('should update meta description and strip HTML tags', async () => {
+  it('should update meta description with sanitized camp description', async () => {
     const mockConfig = {
       campName: 'Test Camp',
-      campDescription: '<p>This is a <strong>test description</strong> with HTML tags.</p>',
+      campDescription: '<p>This is a <strong>test</strong> description with HTML tags</p>'
     };
 
-    mockFetch.mockResolvedValueOnce({
-      json: () => Promise.resolve(mockConfig),
-    } as Response);
+    mockApiGet.mockResolvedValueOnce({
+      data: mockConfig
+    });
 
     renderHook(() => useDocumentMetadata());
 
-    // Wait for the async operation to complete
+    // Wait for async operation
     await new Promise(resolve => setTimeout(resolve, 0));
 
-    const metaDesc = document.querySelector('meta[name="description"]') as HTMLMetaElement;
-    expect(metaDesc?.content).toBe('This is a test description with HTML tags.');
+    const metaTag = document.querySelector('meta[name="description"]') as HTMLMetaElement;
+    expect(metaTag).toBeTruthy();
+    expect(metaTag.content).toBe('This is a test description with HTML tags');
   });
 
   it('should handle API errors gracefully', async () => {
-    mockFetch.mockRejectedValueOnce(new Error('API Error'));
+    mockApiGet.mockRejectedValueOnce(new Error('API Error'));
 
     const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
     renderHook(() => useDocumentMetadata());
 
-    // Wait for the async operation to complete
+    // Wait for async operation
     await new Promise(resolve => setTimeout(resolve, 0));
 
     expect(consoleSpy).toHaveBeenCalledWith('Failed to update document metadata:', expect.any(Error));
-    expect(document.title).toBe('PlayaPlan'); // Should remain unchanged
-
-    consoleSpy.mockRestore();
+    expect(document.title).toBe('Test'); // Should remain unchanged
   });
 
   it('should truncate long descriptions to 160 characters', async () => {
     const longDescription = 'A'.repeat(200);
     const mockConfig = {
       campName: 'Test Camp',
-      campDescription: longDescription,
+      campDescription: longDescription
     };
 
-    mockFetch.mockResolvedValueOnce({
-      json: () => Promise.resolve(mockConfig),
-    } as Response);
+    mockApiGet.mockResolvedValueOnce({
+      data: mockConfig
+    });
 
     renderHook(() => useDocumentMetadata());
 
-    // Wait for the async operation to complete
+    // Wait for async operation
     await new Promise(resolve => setTimeout(resolve, 0));
 
-    const metaDesc = document.querySelector('meta[name="description"]') as HTMLMetaElement;
-    expect(metaDesc?.content).toBe('A'.repeat(157) + '...');
-    expect(metaDesc?.content.length).toBe(160);
+    const metaTag = document.querySelector('meta[name="description"]') as HTMLMetaElement;
+    expect(metaTag.content.length).toBe(160);
+    expect(metaTag.content).toBe('A'.repeat(160));
   });
 }); 

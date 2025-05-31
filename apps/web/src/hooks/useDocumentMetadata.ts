@@ -1,44 +1,45 @@
 import { useEffect } from 'react';
+import { api } from '../lib/api';
 
 /**
- * Hook to dynamically update document title and meta description
- * based on camp configuration from the API
+ * Custom hook to dynamically update document metadata based on camp configuration
+ * Updates the page title to include the camp name and sets a meta description
  */
-export function useDocumentMetadata() {
+export const useDocumentMetadata = () => {
   useEffect(() => {
-    async function updateMetadata() {
+    const updateMetadata = async () => {
       try {
-        // Fetch current camp configuration
-        const response = await fetch('/api/core-config/current');
-        const config = await response.json();
+        // Fetch the current camp configuration using the API client
+        // This will use the full backend URL since we removed the proxy
+        const response = await api.get('/public/config');
+        const config = response.data;
         
-        // Update document title
         if (config?.campName) {
+          // Update document title
           document.title = `${config.campName} - Camp Registration`;
         }
         
-        // Update meta description
         if (config?.campDescription) {
-          // Strip HTML tags from description
-          const text = config.campDescription.replace(/<[^>]*>/g, '');
-          // Limit to 160 characters for SEO best practices
-          const description = text.length > 160 ? text.substring(0, 157) + '...' : text;
+          // Strip HTML tags and limit to 160 characters for SEO
+          const cleanDescription = config.campDescription
+            .replace(/<[^>]*>/g, '') // Remove HTML tags
+            .trim()
+            .substring(0, 160);
           
-          // Find or create meta description tag
-          let metaDesc = document.querySelector('meta[name="description"]') as HTMLMetaElement;
-          if (!metaDesc) {
-            metaDesc = document.createElement('meta');
-            metaDesc.setAttribute('name', 'description');
-            document.head.appendChild(metaDesc);
+          // Update or create meta description
+          let metaDescription = document.querySelector('meta[name="description"]');
+          if (!metaDescription) {
+            metaDescription = document.createElement('meta');
+            metaDescription.setAttribute('name', 'description');
+            document.head.appendChild(metaDescription);
           }
-          metaDesc.setAttribute('content', description);
+          metaDescription.setAttribute('content', cleanDescription);
         }
       } catch (error) {
-        // Silently fail - page still works with default title
         console.warn('Failed to update document metadata:', error);
       }
-    }
-    
+    };
+
     updateMetadata();
-  }, []);
-} 
+  }, []); // Empty dependency array means this runs once on mount
+}; 
