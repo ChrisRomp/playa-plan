@@ -73,7 +73,13 @@ const TestComponent = () => {
       </button>
       <button 
         data-testid="verify-code-btn" 
-        onClick={() => verifyCode('test@example.playaplan.app', '123456')}
+        onClick={async () => {
+          try {
+            await verifyCode('test@example.playaplan.app', '123456');
+          } catch {
+            // Error is handled by the context, just catch it here to prevent unhandled promise rejection
+          }
+        }}
       >
         Verify Code
       </button>
@@ -371,6 +377,44 @@ describe('AuthContext', () => {
       
       // Verify verifyCode was called
       expect(auth.verifyCode).toHaveBeenCalledWith('test@example.playaplan.app', '123456');
+    });
+
+    it('should set error state and reset loading on verification failure', async () => {
+      // Mock verifyCode to fail with 401 Unauthorized (incorrect code)
+      (authApi.verifyCode as Mock).mockRejectedValue(
+        new Error('Invalid or expired verification code')
+      );
+      
+      // Render with act
+      await act(async () => {
+        render(
+          <AuthProvider>
+            <TestComponent />
+          </AuthProvider>
+        );
+      });
+      
+      // Wait for initial render
+      await waitFor(() => {
+        expect(screen.getByTestId('loading').textContent).toBe('false');
+      });
+      
+      // Click the button to verify code (with wrong code)
+      await act(async () => {
+        screen.getByTestId('verify-code-btn').click();
+      });
+      
+      // Check error state is set
+      await waitFor(() => {
+        expect(screen.getByTestId('error').textContent).toContain('Invalid or expired verification code');
+      });
+      
+      // Most importantly: check loading state is reset to false
+      expect(screen.getByTestId('loading').textContent).toBe('false');
+      
+      // Check authentication state remains false
+      expect(screen.getByTestId('authenticated').textContent).toBe('false');
+      expect(screen.getByTestId('user').textContent).toBe('no user');
     });
   });
 });

@@ -155,6 +155,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setError(errorMessage);
       console.error('Verification failed:', err);
       
+      // Clear authentication state on verification failure
+      setIsAuthenticated(false);
+      setUser(null);
+      
       // Rethrow the error so it can be caught by the component
       throw err;
     } finally {
