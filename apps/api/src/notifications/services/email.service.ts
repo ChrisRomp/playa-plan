@@ -371,9 +371,10 @@ export class EmailService implements OnModuleInit {
 
   /**
    * Test SMTP connection without sending an email
+   * @param configOverride Optional configuration to use instead of database config
    * @returns Promise with connection test result
    */
-  async testSmtpConnection(): Promise<{
+  async testSmtpConnection(configOverride?: Partial<EmailConfiguration>): Promise<{
     success: boolean;
     message: string;
     errorDetails?: {
@@ -385,8 +386,9 @@ export class EmailService implements OnModuleInit {
     };
   }> {
     try {
-      // Get current configuration
-      const config = await this.getEmailConfig();
+      // Get current configuration or use override
+      const dbConfig = await this.getEmailConfig();
+      const config = configOverride ? { ...dbConfig, ...configOverride } : dbConfig;
       
       if (!config.emailEnabled) {
         return {
