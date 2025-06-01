@@ -981,7 +981,7 @@ export class NotificationsService {
           <table style="width: 100%; font-family: monospace; font-size: 14px;">
             <tr><td style="padding: 4px 8px; font-weight: bold;">Host:</td><td style="padding: 4px 8px;">${smtpHost}</td></tr>
             <tr><td style="padding: 4px 8px; font-weight: bold;">Port:</td><td style="padding: 4px 8px;">${smtpPort}</td></tr>
-            <tr><td style="padding: 4px 8px; font-weight: bold;">Secure:</td><td style="padding: 4px 8px;">${smtpSecure ? 'Yes (SSL/TLS)' : 'No'}</td></tr>
+            <tr><td style="padding: 4px 8px; font-weight: bold;">SSL:</td><td style="padding: 4px 8px;">${smtpSecure ? 'Yes' : 'No'}</td></tr>
             <tr><td style="padding: 4px 8px; font-weight: bold;">Sender:</td><td style="padding: 4px 8px;">${senderName} &lt;${senderEmail}&gt;</td></tr>
           </table>
         </div>` : '';
@@ -1024,7 +1024,7 @@ ${includeSmtpDetails ? `
 SMTP Configuration:
 - Host: ${smtpHost}
 - Port: ${smtpPort}
-- Secure: ${smtpSecure ? 'Yes (SSL/TLS)' : 'No'}
+- SSL: ${smtpSecure ? 'Yes' : 'No'}
 - Sender: ${senderName} <${senderEmail}>
 ` : ''}
 
@@ -1044,7 +1044,7 @@ This is an automated test email from ${campName}. If you received this unexpecte
 SMTP Configuration:
 - Host: ${smtpHost}
 - Port: ${smtpPort}
-- Secure: ${smtpSecure ? 'Yes (SSL/TLS)' : 'No'}
+- SSL: ${smtpSecure ? 'Yes' : 'No'}
 - Sender: ${senderName} <${senderEmail}>
 ` : '';
 
