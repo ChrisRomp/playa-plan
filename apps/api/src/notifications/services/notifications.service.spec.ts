@@ -228,13 +228,15 @@ describe('NotificationsService', () => {
           // Verify the simplified format shows only the name without description
           html: expect.stringContaining('<li>Skydiving</li>'),
           text: expect.stringContaining('- Skydiving'),
-          // Verify it does NOT contain the old format with description in parentheses
-          html: expect.not.stringContaining('(Skydiving camp option)'),
-          text: expect.not.stringContaining('(Skydiving camp option)'),
           notificationType: NotificationType.REGISTRATION_CONFIRMATION,
           userId: 'user-123',
         }),
       );
+
+      // Verify it does NOT contain the old format with description in parentheses
+      const callArgs = mockEmailService.sendEmail.mock.calls[0][0];
+      expect(callArgs.html).not.toContain('(Skydiving camp option)');
+      expect(callArgs.text).not.toContain('(Skydiving camp option)');
     });
 
     it('should send registration confirmation email with userName fallback when no playaName', async () => {
