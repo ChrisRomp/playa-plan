@@ -370,10 +370,58 @@ export class EmailService implements OnModuleInit {
   }
 
   /**
+   * Merges database configuration with form override, treating empty strings as not provided
+   * @param dbConfig Database configuration
+   * @param override Form configuration that may contain empty strings
+   * @returns Merged configuration with fallback to database values for empty strings
+   */
+  private mergeEmailConfiguration(dbConfig: EmailConfiguration, override: Partial<EmailConfiguration>): EmailConfiguration {
+    const result = { ...dbConfig };
+    
+    // For each override property, only use it if it's not null, undefined, or empty string
+    Object.keys(override).forEach(key => {
+      const typedKey = key as keyof EmailConfiguration;
+      const value = override[typedKey];
+      if (value !== null && value !== undefined && value !== '') {
+        // Type-safe assignment based on the property key
+        switch (typedKey) {
+          case 'emailEnabled':
+            result.emailEnabled = value as boolean;
+            break;
+          case 'smtpHost':
+            result.smtpHost = value as string;
+            break;
+          case 'smtpPort':
+            result.smtpPort = value as number;
+            break;
+          case 'smtpUsername':
+            result.smtpUsername = value as string;
+            break;
+          case 'smtpPassword':
+            result.smtpPassword = value as string;
+            break;
+          case 'smtpUseSsl':
+            result.smtpUseSsl = value as boolean;
+            break;
+          case 'senderEmail':
+            result.senderEmail = value as string;
+            break;
+          case 'senderName':
+            result.senderName = value as string;
+            break;
+        }
+      }
+    });
+    
+    return result;
+  }
+
+  /**
    * Test SMTP connection without sending an email
+   * @param configOverride Optional configuration to use instead of database config
    * @returns Promise with connection test result
    */
-  async testSmtpConnection(): Promise<{
+  async testSmtpConnection(configOverride?: Partial<EmailConfiguration>): Promise<{
     success: boolean;
     message: string;
     errorDetails?: {
@@ -385,8 +433,9 @@ export class EmailService implements OnModuleInit {
     };
   }> {
     try {
-      // Get current configuration
-      const config = await this.getEmailConfig();
+      // Get current configuration or use override
+      const dbConfig = await this.getEmailConfig();
+      const config = configOverride ? this.mergeEmailConfiguration(dbConfig, configOverride) : dbConfig;
       
       if (!config.emailEnabled) {
         return {

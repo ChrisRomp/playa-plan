@@ -339,7 +339,19 @@ const AdminConfigPage: React.FC = () => {
     setConnectionTestResult(null);
     
     try {
-      const response = await api.post('/notifications/email/test-connection');
+      // Send current form values for testing
+      const testConfig = {
+        emailEnabled: formData.emailEnabled,
+        smtpHost: formData.smtpHost,
+        smtpPort: formData.smtpPort,
+        smtpUsername: formData.smtpUsername,
+        smtpPassword: formData.smtpPassword,
+        smtpUseSsl: formData.smtpUseSsl,
+        senderEmail: formData.senderEmail,
+        senderName: formData.senderName,
+      };
+      
+      const response = await api.post('/notifications/email/test-connection', testConfig);
       setConnectionTestResult(response.data);
     } catch (err) {
       console.error('Failed to test SMTP connection:', err);
