@@ -400,13 +400,27 @@ export class RegistrationsService {
     // Check if registration exists
     const existingRegistration = await this.prisma.registration.findUnique({
       where: { id },
+      include: {
+        user: true,
+        jobs: {
+          include: {
+            job: {
+              include: {
+                category: true,
+                shift: true,
+              },
+            },
+          },
+        },
+        payments: true,
+      },
     });
 
     if (!existingRegistration) {
       throw new NotFoundException(`Registration with ID ${id} not found`);
     }
 
-    return this.prisma.registration.update({
+    const updatedRegistration = await this.prisma.registration.update({
       where: { id },
       data: updateRegistrationDto,
       include: {
@@ -424,6 +438,16 @@ export class RegistrationsService {
         payments: true,
       },
     });
+
+    // Send confirmation email if status changed to CONFIRMED
+    if (existingRegistration.status !== 'CONFIRMED' && updatedRegistration.status === 'CONFIRMED') {
+      this.sendRegistrationConfirmationEmailForUpdatedStatus(updatedRegistration)
+        .catch(error => {
+          this.logger.warn(`Failed to send registration confirmation email for updated status: ${error.message}`);
+        });
+    }
+
+    return updatedRegistration;
   }
 
   /**
@@ -610,11 +634,8 @@ export class RegistrationsService {
         message: 'Camp registration completed successfully',
       };
 
-      // Send registration confirmation email (non-blocking)
-      this.sendRegistrationConfirmationEmail(user, jobRegistration, campingOptionRegistrations, currentYear)
-        .catch(error => {
-          this.logger.warn(`Failed to send registration confirmation email to ${user.email}: ${error.message}`);
-        });
+      // Note: Registration confirmation email will be sent after payment completion
+      // This prevents race condition where email shows "pending" status before payment is processed
 
       return result;
     } catch (error: unknown) {
@@ -736,6 +757,55 @@ export class RegistrationsService {
       const err = error as Error;
       this.logger.error(`Error sending registration confirmation email: ${err.message}`, err.stack);
       // Don't throw - email failures should not block registration
+    }
+  }
+
+  /**
+   * Send registration confirmation email for manually updated status
+   * @param registration - Updated registration with user data
+   */
+  private async sendRegistrationConfirmationEmailForUpdatedStatus(
+    registration: Registration & {
+      user: { email: string; firstName?: string; lastName?: string; playaName?: string | null };
+      jobs?: Array<{
+        job?: {
+          name?: string;
+          category?: { name?: string };
+          shift?: {
+            name?: string;
+            startTime?: string;
+            endTime?: string;
+            dayOfWeek?: string;
+          };
+          location?: string;
+        };
+      }>;
+    }
+  ): Promise<void> {
+    try {
+      // Get camping option registrations for this user
+      const campingOptionRegistrations = await this.prisma.campingOptionRegistration.findMany({
+        where: { userId: registration.userId },
+        include: {
+          campingOption: {
+            include: { fields: true },
+          },
+        },
+      });
+
+      // Use the existing helper method to send the email
+      await this.sendRegistrationConfirmationEmail(
+        registration.user,
+        registration as JobRegistrationWithJobs,
+        campingOptionRegistrations,
+        registration.year
+      );
+
+      this.logger.log(`Registration confirmation email sent for updated status to ${registration.user.email}`);
+    } catch (error: unknown) {
+      const err = error as Error;
+      this.logger.error(`Error sending registration confirmation email for updated status: ${err.message}`, err.stack);
+      // Don't throw - email failures should not block registration updates
     }
   }
 

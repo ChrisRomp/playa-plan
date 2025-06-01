@@ -3,6 +3,7 @@ import { PaymentsService } from './payments.service';
 import { StripeService } from './stripe.service';
 import { PaypalService } from './paypal.service';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { NotificationsService } from '../../notifications/services/notifications.service';
 import { PaymentProvider, PaymentStatus } from '@prisma/client';
 import { NotFoundException, BadRequestException } from '@nestjs/common';
 
@@ -76,6 +77,10 @@ const mockPaypalService = {
   createRefund: jest.fn(),
 };
 
+const mockNotificationsService = {
+  sendNotification: jest.fn().mockResolvedValue(undefined),
+};
+
 describe('PaymentsService', () => {
   let service: PaymentsService;
 
@@ -86,6 +91,7 @@ describe('PaymentsService', () => {
         { provide: PrismaService, useValue: mockPrismaService },
         { provide: StripeService, useValue: mockStripeService },
         { provide: PaypalService, useValue: mockPaypalService },
+        { provide: NotificationsService, useValue: mockNotificationsService },
       ],
     }).compile();
 

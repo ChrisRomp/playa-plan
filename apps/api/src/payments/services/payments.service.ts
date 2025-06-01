@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { NotificationsService } from '../../notifications/services/notifications.service';
 import { CreatePaymentDto, UpdatePaymentDto, CreateRefundDto, RecordManualPaymentDto, CreateStripePaymentDto, CreatePaypalPaymentDto } from '../dto';
 import { Payment, PaymentProvider, PaymentStatus, Registration, UserRole } from '@prisma/client';
 import { StripeService } from './stripe.service';
@@ -46,6 +47,7 @@ export class PaymentsService {
     private readonly prisma: PrismaService,
     private readonly stripeService: StripeService,
     private readonly paypalService: PaypalService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   /**
@@ -553,6 +555,12 @@ export class PaymentsService {
                   payment: transactionResults[0].id,
                   registration: transactionResults[1].id
                 })}`);
+
+                // Send registration confirmation email with the updated status
+                this.sendRegistrationConfirmationEmailAfterPayment(payment.registration.id)
+                  .catch(emailError => {
+                    this.logger.warn(`Failed to send registration confirmation email: ${emailError instanceof Error ? emailError.message : 'Unknown error'}`);
+                  });
               } catch (transactionError) {
                 // If the transaction fails, at least try to update the payment status
                 // This ensures we record the successful Stripe payment even if registration update fails
@@ -615,6 +623,101 @@ export class PaymentsService {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(`Failed to verify Stripe session: ${errorMessage}`, error instanceof Error ? error.stack : undefined);
       throw new BadRequestException('Failed to verify Stripe session');
+    }
+  }
+
+  /**
+   * Send registration confirmation email after payment completion
+   * @param registrationId - The registration ID
+   */
+  private async sendRegistrationConfirmationEmailAfterPayment(registrationId: string): Promise<void> {
+    try {
+      // Get the updated registration with all necessary data
+      const registration = await this.prisma.registration.findUnique({
+        where: { id: registrationId },
+        include: {
+          user: true,
+          jobs: {
+            include: {
+              job: {
+                include: {
+                  category: true,
+                  shift: true,
+                },
+              },
+            },
+          },
+          payments: true,
+        },
+      });
+
+      if (!registration) {
+        this.logger.warn(`Registration ${registrationId} not found for confirmation email`);
+        return;
+      }
+
+      // Get camping option registrations for this user
+      const campingOptionRegistrations = await this.prisma.campingOptionRegistration.findMany({
+        where: { userId: registration.userId },
+        include: {
+          campingOption: {
+            include: { fields: true },
+          },
+        },
+      });
+
+      // Calculate total cost from camping options
+      const totalCost = campingOptionRegistrations.reduce((total, reg) => {
+        return total + (reg.campingOption?.participantDues || 0);
+      }, 0);
+
+      // Format camping options
+      const campingOptions = campingOptionRegistrations.map(reg => ({
+        name: reg.campingOption?.name || 'Unknown',
+        description: reg.campingOption?.description || undefined,
+      }));
+
+      // Format jobs from registration
+      const jobs = registration.jobs?.map((regJob) => ({
+        name: regJob.job?.name || 'Unknown Job',
+        category: regJob.job?.category?.name || 'Unknown Category',
+        shift: {
+          name: regJob.job?.shift?.name || 'Unknown Shift',
+          startTime: regJob.job?.shift?.startTime || '',
+          endTime: regJob.job?.shift?.endTime || '',
+          dayOfWeek: regJob.job?.shift?.dayOfWeek || '',
+        },
+        location: regJob.job?.location || 'TBD',
+      })) || [];
+
+      const registrationDetails = {
+        id: registration.id,
+        year: registration.year,
+        status: registration.status, // This should now be 'CONFIRMED'
+        campingOptions,
+        jobs,
+        totalCost: totalCost > 0 ? totalCost * 100 : undefined, // Convert to cents
+        currency: 'USD',
+      };
+
+      // Build user name for email personalization
+      const userName = registration.user.firstName && registration.user.lastName 
+        ? `${registration.user.firstName} ${registration.user.lastName}` 
+        : undefined;
+
+      await this.notificationsService.sendRegistrationConfirmationEmail(
+        registration.user.email,
+        registrationDetails,
+        registration.userId,
+        userName,
+        registration.user.playaName || undefined
+      );
+
+      this.logger.log(`Registration confirmation email sent to ${registration.user.email} with status ${registration.status}`);
+    } catch (error: unknown) {
+      const err = error as Error;
+      this.logger.error(`Error sending registration confirmation email after payment: ${err.message}`, err.stack);
+      // Don't throw - email failures should not block payment processing
     }
   }
 }
