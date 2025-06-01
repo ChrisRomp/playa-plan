@@ -936,8 +936,17 @@ describe('Test Email Functionality', () => {
         expect(screen.getByText(/✅ Connection Successful/)).toBeInTheDocument();
       });
 
-      // Check that API was called correctly
-      expect(mockApiPost).toHaveBeenCalledWith('/notifications/email/test-connection');
+      // Check that API was called correctly with form data
+      expect(mockApiPost).toHaveBeenCalledWith('/notifications/email/test-connection', {
+        emailEnabled: true,
+        smtpHost: 'smtp.test.com',
+        smtpPort: 587,
+        smtpUsername: 'test@example.com',
+        smtpPassword: '',
+        smtpUseSsl: false,
+        senderEmail: 'sender@example.com',
+        senderName: 'Test Sender',
+      });
 
       // Check connection details are displayed
       expect(screen.getByText('smtp.test.com')).toBeInTheDocument();
@@ -985,8 +994,17 @@ describe('Test Email Functionality', () => {
         expect(screen.getByText(/❌ Connection Failed/)).toBeInTheDocument();
       });
 
-      // Check that API was called correctly
-      expect(mockApiPost).toHaveBeenCalledWith('/notifications/email/test-connection');
+      // Check that API was called correctly with form data
+      expect(mockApiPost).toHaveBeenCalledWith('/notifications/email/test-connection', {
+        emailEnabled: true,
+        smtpHost: 'smtp.test.com',
+        smtpPort: 587,
+        smtpUsername: 'test@example.com',
+        smtpPassword: '',
+        smtpUseSsl: false,
+        senderEmail: 'sender@example.com',
+        senderName: 'Test Sender',
+      });
 
       // Check error details are displayed
       const etimedoutElements = screen.getAllByText((content, element) => {
