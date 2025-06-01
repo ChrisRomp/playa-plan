@@ -78,6 +78,19 @@ describe('SelfOrAdminGuard', () => {
     expect(() => guard.canActivate(mockContext)).toThrow('You can only access your own profile');
   });
 
+  it('should deny access when participant tries to access another participant\'s profile', () => {
+    // Setup context with participant accessing another participant's profile
+    const request = {
+      user: { id: 'participant-one', role: UserRole.PARTICIPANT },
+      params: { id: 'participant-two' }
+    };
+    
+    jest.spyOn(mockContext.switchToHttp(), 'getRequest').mockReturnValue(request);
+    
+    // Call the guard - should throw ForbiddenException
+    expect(() => guard.canActivate(mockContext)).toThrow('You can only access your own profile');
+  });
+
   it('should deny access when no user is present', () => {
     // Setup context with no authenticated user
     const request = {

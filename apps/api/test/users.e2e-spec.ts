@@ -76,6 +76,15 @@ describe('UsersController (e2e)', () => {
     role: UserRole.STAFF,
   };
 
+  const mockParticipantTwo: UserType = {
+    ...mockUser,
+    id: 'participant-two-uuid-e2e',
+    email: 'participant-two-e2e@example.playaplan.app',
+    firstName: 'Second',
+    lastName: 'Participant',
+    role: UserRole.PARTICIPANT,
+  };
+
   // Helper to create authentication tokens for testing
   const getAuthToken = (user: UserType) => {
     return jwtService.sign({ sub: user.id, email: user.email, role: user.role });
@@ -202,6 +211,19 @@ describe('UsersController (e2e)', () => {
         return request(app.getHttpServer())
           .get(`/users/${mockAdmin.id}`)
           .set('Authorization', `Bearer ${userToken}`)
+          .expect((res: request.Response) => {
+            expect(res.status).toBe(403); // Forbidden
+          });
+      });
+
+      it('should deny participant from viewing another participant\'s profile', () => {
+        // Arrange
+        const participantOneToken = getAuthToken(mockUser);
+
+        // Act & Assert
+        return request(app.getHttpServer())
+          .get(`/users/${mockParticipantTwo.id}`)
+          .set('Authorization', `Bearer ${participantOneToken}`)
           .expect((res: request.Response) => {
             expect(res.status).toBe(403); // Forbidden
           });
@@ -502,6 +524,21 @@ describe('UsersController (e2e)', () => {
         });
     });
 
+    it('should deny participant from editing another participant\'s profile', () => {
+      // Arrange
+      const participantOneToken = getAuthToken(mockUser);
+      const updateData = { firstName: 'Hacked', lastName: 'Name' };
+
+      // Act & Assert
+      return request(app.getHttpServer())
+        .put(`/users/${mockParticipantTwo.id}`)
+        .set('Authorization', `Bearer ${participantOneToken}`)
+        .send(updateData)
+        .expect((res: request.Response) => {
+          expect(res.status).toBe(403); // Forbidden
+        });
+    });
+
     it('should return 404 if user not found', () => {
       // Arrange
       const adminToken = getAuthToken(mockAdmin);
@@ -531,6 +568,19 @@ describe('UsersController (e2e)', () => {
         .set('Authorization', `Bearer ${adminToken}`)
         .expect((res: request.Response) => {
           expect(res.status).toBe(204);
+        });
+    });
+
+    it('should deny participant from deleting another participant\'s profile', () => {
+      // Arrange
+      const participantOneToken = getAuthToken(mockUser);
+
+      // Act & Assert
+      return request(app.getHttpServer())
+        .delete(`/users/${mockParticipantTwo.id}`)
+        .set('Authorization', `Bearer ${participantOneToken}`)
+        .expect((res: request.Response) => {
+          expect(res.status).toBe(403); // Forbidden
         });
     });
 
