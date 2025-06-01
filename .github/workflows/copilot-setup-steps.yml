@@ -20,7 +20,7 @@ jobs:
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: playa_plan_test
+          POSTGRES_DB: playaplan_test
         ports:
           - 5432:5432
         options: >-
@@ -42,7 +42,16 @@ jobs:
       - name: Set up environment
         run: |
           cp .env.sample .env
-          sed -i 's|DATABASE_URL="[^"]*"|DATABASE_URL="postgresql://postgres:postgres@localhost:5432/playa_plan_test?schema=public"|' .env
+          sed -i 's|DATABASE_URL="[^"]*"|DATABASE_URL="postgresql://postgres:postgres@localhost:5432/playaplan_test?schema=public"|' .env
 
       - name: Install dependencies for all workspaces
         run: npm install
+
+      - name: Setup database
+        run: |
+          cd apps/api
+          npx --yes prisma generate
+          npx --yes prisma migrate deploy
+          npx --yes prisma db seed
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/playaplan_test?schema=public
