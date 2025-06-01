@@ -1009,5 +1009,60 @@ describe('EmailService', () => {
 
       createTransportSpy.mockRestore();
     });
+
+    it('should merge partial configuration override with database configuration', async () => {
+      const mockDbConfig = {
+        emailEnabled: false,
+        smtpHost: 'old-smtp.test.com',
+        smtpPort: 25,
+        smtpUsername: 'old@example.com',
+        smtpPassword: 'oldpassword',
+        smtpUseSsl: true,
+        senderEmail: 'old-sender@example.com',
+        senderName: 'Old Sender',
+      };
+
+      const mockConfigOverride = {
+        emailEnabled: true,
+        smtpHost: 'form-smtp.test.com',
+        smtpPort: 587,
+        smtpUsername: 'form@example.com',
+        smtpUseSsl: false,
+        senderEmail: 'form-sender@example.com',
+        senderName: 'Form Sender',
+        // Note: smtpPassword is not provided, should fallback to database value
+      };
+
+      mockCoreConfigService.getEmailConfiguration.mockResolvedValue(mockDbConfig);
+
+      const mockVerify = jest.fn().mockResolvedValue(true);
+      const mockTransporter = { 
+        verify: mockVerify,
+      } as unknown as nodemailer.Transporter;
+      
+      const createTransportSpy = jest.spyOn(nodemailer, 'createTransport')
+        .mockReturnValue(mockTransporter);
+
+      const result = await service.testSmtpConnection(mockConfigOverride);
+
+      expect(result.success).toBe(true);
+      expect(result.message).toBe('SMTP connection verified successfully');
+      
+      // Verify that createTransport was called with merged config including database password
+      expect(createTransportSpy).toHaveBeenCalledWith({
+        host: 'form-smtp.test.com',
+        port: 587,
+        secure: false,
+        auth: {
+          user: 'form@example.com',
+          pass: 'oldpassword', // This should come from database
+        },
+        connectionTimeout: 10000,
+        greetingTimeout: 5000,
+        socketTimeout: 10000,
+      });
+
+      createTransportSpy.mockRestore();
+    });
   });
 }); 

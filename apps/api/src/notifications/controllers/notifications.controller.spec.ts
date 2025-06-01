@@ -590,5 +590,50 @@ describe('NotificationsController', () => {
       // Verify that EmailService was called with the form config
       expect(mockEmailService.testSmtpConnection).toHaveBeenCalledWith(mockFormConfig);
     });
+
+    it('should merge partial form configuration with database configuration', async () => {
+      const mockDbConfig = {
+        emailEnabled: false,
+        smtpHost: 'old-smtp.test.com',
+        smtpPort: 25,
+        smtpUsername: 'old@example.com',
+        smtpPassword: 'oldpassword',
+        smtpUseSsl: true,
+        senderEmail: 'old-sender@example.com',
+        senderName: 'Old Sender',
+      };
+
+      const mockFormConfig = {
+        emailEnabled: true,
+        smtpHost: 'form-smtp.test.com',
+        smtpPort: 587,
+        smtpUsername: 'form@example.com',
+        smtpUseSsl: false,
+        senderEmail: 'form-sender@example.com',
+        senderName: 'Form Sender',
+        // Note: smtpPassword is not provided, should fallback to database value
+      };
+
+      const mockConnectionResult = {
+        success: true,
+        message: 'SMTP connection verified successfully',
+      };
+
+      mockCoreConfigService.getEmailConfiguration.mockResolvedValue(mockDbConfig);
+      mockEmailService.testSmtpConnection.mockResolvedValue(mockConnectionResult);
+
+      const result = await controller.testSmtpConnection(mockFormConfig);
+
+      expect(result.success).toBe(true);
+      expect(result.details?.host).toBe('form-smtp.test.com');
+      expect(result.details?.port).toBe(587);
+      expect(result.details?.secure).toBe(false);
+      
+      // Verify that EmailService was called with merged config including database password
+      expect(mockEmailService.testSmtpConnection).toHaveBeenCalledWith({
+        ...mockFormConfig,
+        smtpPassword: 'oldpassword', // This should come from database
+      });
+    });
   });
 }); 

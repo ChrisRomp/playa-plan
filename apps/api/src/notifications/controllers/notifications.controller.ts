@@ -395,7 +395,7 @@ export class NotificationsController {
 
       // Test the SMTP connection
       const startTime = Date.now();
-      const result = await this.emailService.testSmtpConnection(testSmtpDto || undefined);
+      const result = await this.emailService.testSmtpConnection(testSmtpDto ? configToTest : undefined);
       const connectionTime = Date.now() - startTime;
 
       if (result.success) {
