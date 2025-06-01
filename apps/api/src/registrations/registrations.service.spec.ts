@@ -34,6 +34,9 @@ describe('RegistrationsService', () => {
     payment: {
       findUnique: jest.fn(),
     },
+    campingOptionRegistration: {
+      findMany: jest.fn(),
+    },
   };
 
   beforeEach(async () => {
@@ -311,6 +314,14 @@ describe('RegistrationsService', () => {
         id: registrationId,
         userId: 'user-id',
         year: 2024,
+        status: RegistrationStatus.PENDING,
+        user: {
+          email: 'test@example.com',
+          firstName: 'Test',
+          lastName: 'User',
+        },
+        jobs: [],
+        payments: [],
       };
       const updatedRegistration = {
         ...existingRegistration,
@@ -319,11 +330,26 @@ describe('RegistrationsService', () => {
       
       mockPrismaService.registration.findUnique.mockResolvedValue(existingRegistration);
       mockPrismaService.registration.update.mockResolvedValue(updatedRegistration);
+      mockPrismaService.campingOptionRegistration.findMany.mockResolvedValue([]);
 
       const result = await service.update(registrationId, updateDto);
       
       expect(mockPrismaService.registration.findUnique).toHaveBeenCalledWith({
         where: { id: registrationId },
+        include: {
+          user: true,
+          jobs: {
+            include: {
+              job: {
+                include: {
+                  category: true,
+                  shift: true,
+                },
+              },
+            },
+          },
+          payments: true,
+        },
       });
       expect(mockPrismaService.registration.update).toHaveBeenCalledWith({
         where: { id: registrationId },
