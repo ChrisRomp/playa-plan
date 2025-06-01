@@ -370,10 +370,6 @@ export class NotificationsController {
       // Get current email configuration to check if testing is possible
       const emailConfig = await this.coreConfigService.getEmailConfiguration();
       
-      // If form data is provided, let the service handle the merging to avoid empty string issues
-      // Otherwise, use database config for validation
-      const configToValidate = testSmtpDto ? emailConfig : emailConfig;
-      
       // Check if email is enabled (use form value if provided, otherwise database)
       const emailEnabled = testSmtpDto?.emailEnabled !== undefined ? testSmtpDto.emailEnabled : emailConfig.emailEnabled;
       if (!emailEnabled) {

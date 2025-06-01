@@ -380,9 +380,36 @@ export class EmailService implements OnModuleInit {
     
     // For each override property, only use it if it's not null, undefined, or empty string
     Object.keys(override).forEach(key => {
-      const value = override[key as keyof EmailConfiguration];
+      const typedKey = key as keyof EmailConfiguration;
+      const value = override[typedKey];
       if (value !== null && value !== undefined && value !== '') {
-        (result as any)[key] = value;
+        // Type-safe assignment based on the property key
+        switch (typedKey) {
+          case 'emailEnabled':
+            result.emailEnabled = value as boolean;
+            break;
+          case 'smtpHost':
+            result.smtpHost = value as string;
+            break;
+          case 'smtpPort':
+            result.smtpPort = value as number;
+            break;
+          case 'smtpUsername':
+            result.smtpUsername = value as string;
+            break;
+          case 'smtpPassword':
+            result.smtpPassword = value as string;
+            break;
+          case 'smtpUseSsl':
+            result.smtpUseSsl = value as boolean;
+            break;
+          case 'senderEmail':
+            result.senderEmail = value as string;
+            break;
+          case 'senderName':
+            result.senderName = value as string;
+            break;
+        }
       }
     });
     
