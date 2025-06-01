@@ -367,35 +367,75 @@ export class NotificationsController {
     };
   }> {
     try {
-      // Get current email configuration and merge with DTO if provided
+      // Get current email configuration to check if testing is possible
       const emailConfig = await this.coreConfigService.getEmailConfiguration();
-      const configToTest = testSmtpDto ? { ...emailConfig, ...testSmtpDto } : emailConfig;
       
-      // Check if email is enabled
-      if (!configToTest.emailEnabled) {
+      // If form data is provided, let the service handle the merging to avoid empty string issues
+      // Otherwise, use database config for validation
+      const configToValidate = testSmtpDto ? emailConfig : emailConfig;
+      
+      // Check if email is enabled (use form value if provided, otherwise database)
+      const emailEnabled = testSmtpDto?.emailEnabled !== undefined ? testSmtpDto.emailEnabled : emailConfig.emailEnabled;
+      if (!emailEnabled) {
         return {
           success: false,
           message: 'Email notifications are currently disabled. Please enable email notifications first.',
         };
       }
 
-      // Check if SMTP is properly configured
-      if (!configToTest.smtpHost || !configToTest.smtpUsername || !configToTest.smtpPassword || !configToTest.senderEmail) {
+      // For completeness validation, we need to check if we have the minimum required config
+      // If form data is provided, we'll let the service handle the proper merging
+      if (testSmtpDto) {
+        // Form data provided - let service handle validation with proper merging
+        const startTime = Date.now();
+        const result = await this.emailService.testSmtpConnection(testSmtpDto);
+        const connectionTime = Date.now() - startTime;
+
+        if (result.success) {
+          return {
+            success: true,
+            message: 'SMTP connection successful! Your email configuration is working correctly.',
+            details: {
+              host: testSmtpDto.smtpHost || emailConfig.smtpHost || '',
+              port: testSmtpDto.smtpPort || emailConfig.smtpPort || 587,
+              secure: testSmtpDto.smtpUseSsl !== undefined ? testSmtpDto.smtpUseSsl : emailConfig.smtpUseSsl,
+              authenticated: true,
+              connectionTime,
+            },
+          };
+        } else {
+          return {
+            success: false,
+            message: result.message || 'SMTP connection failed. Please check your configuration.',
+            details: {
+              host: testSmtpDto.smtpHost || emailConfig.smtpHost || '',
+              port: testSmtpDto.smtpPort || emailConfig.smtpPort || 587,
+              secure: testSmtpDto.smtpUseSsl !== undefined ? testSmtpDto.smtpUseSsl : emailConfig.smtpUseSsl,
+              authenticated: false,
+              connectionTime,
+            },
+            errorDetails: result.errorDetails,
+          };
+        }
+      }
+
+      // No form data provided - validate database config and test
+      if (!emailConfig.smtpHost || !emailConfig.smtpUsername || !emailConfig.smtpPassword || !emailConfig.senderEmail) {
         return {
           success: false,
           message: 'SMTP configuration is incomplete. Please ensure all SMTP settings are configured.',
           details: {
-            host: configToTest.smtpHost || '',
-            port: configToTest.smtpPort || 587,
-            secure: configToTest.smtpUseSsl,
+            host: emailConfig.smtpHost || '',
+            port: emailConfig.smtpPort || 587,
+            secure: emailConfig.smtpUseSsl,
             authenticated: false,
           },
         };
       }
 
-      // Test the SMTP connection
+      // Test the SMTP connection using database config only
       const startTime = Date.now();
-      const result = await this.emailService.testSmtpConnection(testSmtpDto ? configToTest : undefined);
+      const result = await this.emailService.testSmtpConnection();
       const connectionTime = Date.now() - startTime;
 
       if (result.success) {
@@ -403,9 +443,9 @@ export class NotificationsController {
           success: true,
           message: 'SMTP connection successful! Your email configuration is working correctly.',
           details: {
-            host: configToTest.smtpHost,
-            port: configToTest.smtpPort || 587,
-            secure: configToTest.smtpUseSsl,
+            host: emailConfig.smtpHost || '',
+            port: emailConfig.smtpPort || 587,
+            secure: emailConfig.smtpUseSsl,
             authenticated: true,
             connectionTime,
           },
@@ -415,9 +455,9 @@ export class NotificationsController {
           success: false,
           message: result.message || 'SMTP connection failed. Please check your configuration.',
           details: {
-            host: configToTest.smtpHost,
-            port: configToTest.smtpPort || 587,
-            secure: configToTest.smtpUseSsl,
+            host: emailConfig.smtpHost || '',
+            port: emailConfig.smtpPort || 587,
+            secure: emailConfig.smtpUseSsl,
             authenticated: false,
             connectionTime,
           },

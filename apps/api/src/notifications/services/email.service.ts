@@ -370,6 +370,26 @@ export class EmailService implements OnModuleInit {
   }
 
   /**
+   * Merges database configuration with form override, treating empty strings as not provided
+   * @param dbConfig Database configuration
+   * @param override Form configuration that may contain empty strings
+   * @returns Merged configuration with fallback to database values for empty strings
+   */
+  private mergeEmailConfiguration(dbConfig: EmailConfiguration, override: Partial<EmailConfiguration>): EmailConfiguration {
+    const result = { ...dbConfig };
+    
+    // For each override property, only use it if it's not null, undefined, or empty string
+    Object.keys(override).forEach(key => {
+      const value = override[key as keyof EmailConfiguration];
+      if (value !== null && value !== undefined && value !== '') {
+        (result as any)[key] = value;
+      }
+    });
+    
+    return result;
+  }
+
+  /**
    * Test SMTP connection without sending an email
    * @param configOverride Optional configuration to use instead of database config
    * @returns Promise with connection test result
@@ -388,7 +408,7 @@ export class EmailService implements OnModuleInit {
     try {
       // Get current configuration or use override
       const dbConfig = await this.getEmailConfig();
-      const config = configOverride ? { ...dbConfig, ...configOverride } : dbConfig;
+      const config = configOverride ? this.mergeEmailConfiguration(dbConfig, configOverride) : dbConfig;
       
       if (!config.emailEnabled) {
         return {

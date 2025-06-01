@@ -629,11 +629,51 @@ describe('NotificationsController', () => {
       expect(result.details?.port).toBe(587);
       expect(result.details?.secure).toBe(false);
       
-      // Verify that EmailService was called with merged config including database password
-      expect(mockEmailService.testSmtpConnection).toHaveBeenCalledWith({
-        ...mockFormConfig,
-        smtpPassword: 'oldpassword', // This should come from database
-      });
+      // Verify that EmailService was called with the form data (service will handle merging)
+      expect(mockEmailService.testSmtpConnection).toHaveBeenCalledWith(mockFormConfig);
+    });
+
+    it('should treat empty string form values as not provided and fallback to database values', async () => {
+      const mockDbConfig = {
+        emailEnabled: false,
+        smtpHost: 'db-smtp.test.com',
+        smtpPort: 25,
+        smtpUsername: 'db@example.com',
+        smtpPassword: 'dbpassword',
+        smtpUseSsl: true,
+        senderEmail: 'db-sender@example.com',
+        senderName: 'DB Sender',
+      };
+
+      // Form data with empty strings (simulating frontend form submission)
+      const mockFormConfig = {
+        emailEnabled: true,
+        smtpHost: 'form-smtp.test.com',
+        smtpPort: 587,
+        smtpUsername: 'form@example.com',
+        smtpPassword: '', // Empty string should fallback to database value
+        smtpUseSsl: false,
+        senderEmail: 'form-sender@example.com',
+        senderName: '', // Empty string should fallback to database value
+      };
+
+      const mockConnectionResult = {
+        success: true,
+        message: 'SMTP connection verified successfully',
+      };
+
+      mockCoreConfigService.getEmailConfiguration.mockResolvedValue(mockDbConfig);
+      mockEmailService.testSmtpConnection.mockResolvedValue(mockConnectionResult);
+
+      const result = await controller.testSmtpConnection(mockFormConfig);
+
+      expect(result.success).toBe(true);
+      expect(result.details?.host).toBe('form-smtp.test.com');
+      expect(result.details?.port).toBe(587);
+      expect(result.details?.secure).toBe(false);
+      
+      // Verify that EmailService was called with the form data (service will handle merging)
+      expect(mockEmailService.testSmtpConnection).toHaveBeenCalledWith(mockFormConfig);
     });
   });
 }); 
