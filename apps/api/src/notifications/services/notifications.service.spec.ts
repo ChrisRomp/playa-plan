@@ -190,6 +190,53 @@ describe('NotificationsService', () => {
       );
     });
 
+    it('should send registration confirmation email with camping options showing simplified format', async () => {
+      mockEmailService.sendEmail.mockResolvedValueOnce(true);
+
+      const registrationDetails = {
+        id: 'registration-123',
+        year: 2024,
+        status: 'CONFIRMED',
+        campingOptions: [
+          {
+            name: 'Skydiving',
+            description: 'Skydiving camp option'
+          },
+          {
+            name: 'Photography',
+            description: 'Photography camp option'
+          }
+        ],
+        jobs: [],
+        totalCost: 450,
+        currency: 'USD',
+      };
+
+      const result = await service.sendRegistrationConfirmationEmail(
+        'user@example.playaplan.app', 
+        registrationDetails,
+        'user-123',
+        'John Doe',
+        'BurnerName'
+      );
+
+      expect(result).toBeTruthy();
+      expect(mockEmailService.sendEmail).toHaveBeenCalledWith(
+        expect.objectContaining({
+          to: 'user@example.playaplan.app',
+          subject: expect.stringContaining('Registration'),
+          // Verify the simplified format shows only the name without description
+          html: expect.stringContaining('<li>Skydiving</li>'),
+          text: expect.stringContaining('- Skydiving'),
+          // Verify it does NOT contain the old format with description in parentheses
+          html: expect.not.stringContaining('(Skydiving camp option)'),
+          text: expect.not.stringContaining('(Skydiving camp option)'),
+          notificationType: NotificationType.REGISTRATION_CONFIRMATION,
+          userId: 'user-123',
+        }),
+      );
+    });
+
     it('should send registration confirmation email with userName fallback when no playaName', async () => {
       mockEmailService.sendEmail.mockResolvedValueOnce(true);
 

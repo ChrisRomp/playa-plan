@@ -788,7 +788,7 @@ export class NotificationsService {
       Total Dues: ${formattedAmount}
       
       Selected Options:
-      ${campingOptions ? campingOptions.map(option => `- ${option.name}${option.description ? ` (${option.description})` : ''}`).join('\n') : 'N/A'}
+      ${campingOptions ? campingOptions.map(option => `- ${option.name}`).join('\n') : 'N/A'}
       
       Work Shift(s):
       ${jobs ? jobs.map(job => `- ${job.category}: ${this.getFriendlyDayName(job.shift.dayOfWeek)} ${job.shift.startTime}-${job.shift.endTime}`).join('\n') : 'N/A'}
@@ -808,7 +808,7 @@ export class NotificationsService {
         <p><strong>Total Dues:</strong> ${formattedAmount}</p>
         <p><strong>Selected Options:</strong></p>
         <ul>
-          ${campingOptions ? campingOptions.map(option => `<li>${option.name}${option.description ? ` (${option.description})` : ''}</li>`).join('') : '<li>N/A</li>'}
+          ${campingOptions ? campingOptions.map(option => `<li>${option.name}</li>`).join('') : '<li>N/A</li>'}
         </ul>
         <p><strong>Work Shift(s):</strong></p>
         <ul>
