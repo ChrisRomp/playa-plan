@@ -16,10 +16,10 @@ Based on `prd-admin-registration-management.md`
 - `apps/api/src/registrations/services/registration-admin.service.ts` - Service for admin registration operations (edit, cancel) (COMPLETED)
 - `apps/api/src/registrations/dto/admin-registration.dto.ts` - DTOs for admin registration operations (COMPLETED)
 - `apps/api/src/registrations/services/registration-cleanup.service.ts` - Service for cleaning up related records on cancellation (COMPLETED)
+- `apps/web/src/pages/ManageRegistrationsPage.tsx` - Main admin registration management interface (COMPLETED)
 - `apps/api/src/notifications/services/admin-notifications.service.ts` - Service for admin-triggered user notifications
 - `apps/api/src/notifications/templates/registration-modification.template.ts` - Email template for registration modifications
 - `apps/api/src/notifications/templates/registration-cancellation.template.ts` - Email template for registration cancellations
-- `apps/web/src/pages/admin/ManageRegistrationsPage.tsx` - Main admin registration management interface
 - `apps/web/src/components/admin/registrations/RegistrationEditForm.tsx` - Form component for editing registrations
 - `apps/web/src/components/admin/registrations/RegistrationCancelForm.tsx` - Form component for cancelling registrations
 - `apps/web/src/components/admin/registrations/RegistrationSearchTable.tsx` - Table component for finding and listing registrations
@@ -35,6 +35,18 @@ Based on `prd-admin-registration-management.md`
 - `apps/web/src/components/admin/registrations/RegistrationCancelForm.test.tsx` - Unit tests for RegistrationCancelForm
 - `apps/web/src/hooks/useRegistrationManagement.test.ts` - Unit tests for useRegistrationManagement hook
 - `apps/api/test/admin-registrations.e2e-spec.ts` - End-to-end tests for admin registration management
+- `apps/api/src/registrations/services/registration-cleanup.service.ts` - Service for cleaning up registration data (COMPLETED)
+- `apps/api/src/registrations/services/registration-admin.service.ts` - Service for admin registration operations (COMPLETED)
+- `apps/api/src/registrations/controllers/admin-registrations.controller.ts` - Controller for admin registration endpoints (COMPLETED)
+- `apps/web/src/pages/ManageRegistrationsPage.tsx` - Main admin registration management page (COMPLETED)
+- `apps/web/src/components/admin/registrations/RegistrationSearchTable.tsx` - Reusable table component for registration display (COMPLETED)
+- `apps/web/src/components/admin/registrations/RegistrationEditForm.tsx` - Form for editing registrations (COMPLETED)
+- `apps/web/src/components/admin/registrations/RegistrationCancelForm.tsx` - Form for cancelling registrations (COMPLETED)
+- `apps/web/src/components/admin/registrations/AuditTrailView.tsx` - Component for viewing audit history (COMPLETED)
+- `apps/web/src/hooks/useRegistrationManagement.ts` - Custom hook for registration management state (COMPLETED)
+- `apps/web/src/lib/api/admin-registrations.ts` - API client for admin registration operations (COMPLETED)
+- `apps/web/src/routes/index.ts` - Route configuration for admin registration management (COMPLETED)
+- `apps/web/src/pages/AdminPage.tsx` - Updated admin panel with registration management link (COMPLETED)
 
 ### Notes
 
@@ -75,20 +87,19 @@ Based on `prd-admin-registration-management.md`
   - [x] 2.10 Implement refund prompting logic for cancellations with payments
   - [x] 2.11 Ensure all operations prevent editing of already cancelled registrations
 
-- [ ] 3.0 Create Admin Registration Management Interface
-  - [ ] 3.1 Create ManageRegistrationsPage.tsx as new admin section (separate from reports)
-  - [ ] 3.2 Create RegistrationSearchTable component reusing DataTable patterns from RegistrationReportsPage
-  - [ ] 3.3 Add Edit and Cancel action columns to the registration table
-  - [ ] 3.4 Implement search and filter functionality for finding specific registrations
-  - [ ] 3.5 Create RegistrationEditForm component with camping options and work shifts editing
-  - [ ] 3.6 Create RegistrationCancelForm component with refund prompting and notification toggle
-  - [ ] 3.7 Implement confirmation dialogs for destructive actions (cancellation)
-  - [ ] 3.8 Create AuditTrailView component to display modification history
-  - [ ] 3.9 Add success/error messaging for all administrative actions
-  - [ ] 3.10 Implement useRegistrationManagement custom hook for state management
-  - [ ] 3.11 Create API client functions in admin-registrations.ts for backend communication
-  - [ ] 3.12 Add new "Manage Registrations" navigation item to admin panel
-  - [ ] 3.13 Ensure mobile-responsive design following existing admin interface patterns
+- [x] 3.0 Admin Registration Management Interface
+  - [x] **3.1** Create ManageRegistrationsPage.tsx as new admin section (COMPLETED)
+  - [x] **3.2** Create RegistrationSearchTable component reusing DataTable patterns from RegistrationReportsPage (COMPLETED)
+  - [x] **3.3** Add Edit and Cancel action columns to registration table (COMPLETED)
+  - [x] **3.4** Implement search and filter functionality for finding specific registrations (COMPLETED)
+  - [x] **3.5** Create RegistrationEditForm component for editing registrations with camping options and work shifts (COMPLETED)
+  - [x] **3.6** Create RegistrationCancelForm component for cancelling registrations with refund prompting and notification toggle (COMPLETED)
+  - [x] **3.7** Implement confirmation dialogs for destructive actions (COMPLETED)
+  - [x] **3.8** Create AuditTrailView component to display modification history (COMPLETED)
+  - [x] **3.9** Add success/error messaging for all operations (COMPLETED)
+  - [x] **3.10** Implement useRegistrationManagement custom hook for state management (COMPLETED)
+  - [x] **3.11** Create API client functions for all admin registration operations (COMPLETED)
+  - [x] **3.12** Add new "Manage Registrations" navigation item to admin panel (COMPLETED)
 
 - [ ] 4.0 Implement User Notification System
   - [ ] 4.1 Create AdminNotificationsService for admin-triggered user notifications
