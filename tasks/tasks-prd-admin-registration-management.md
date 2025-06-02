@@ -12,10 +12,10 @@ Based on `prd-admin-registration-management.md`
 - `apps/api/src/admin-audit/services/admin-audit.service.ts` - Service for creating and retrieving audit records (COMPLETED)
 - `apps/api/src/admin-audit/dto/admin-audit.dto.ts` - DTOs for audit trail data transfer (COMPLETED)
 - `apps/api/src/admin-audit/entities/admin-audit.entity.ts` - Audit trail entity definitions (COMPLETED)
-- `apps/api/src/registrations/controllers/admin-registrations.controller.ts` - Admin-specific registration management endpoints
-- `apps/api/src/registrations/services/registration-admin.service.ts` - Service for admin registration operations (edit, cancel)
-- `apps/api/src/registrations/dto/admin-registration.dto.ts` - DTOs for admin registration operations
-- `apps/api/src/registrations/services/registration-cleanup.service.ts` - Service for cleaning up related records on cancellation
+- `apps/api/src/registrations/controllers/admin-registrations.controller.ts` - Admin-specific registration management endpoints (COMPLETED)
+- `apps/api/src/registrations/services/registration-admin.service.ts` - Service for admin registration operations (edit, cancel) (COMPLETED)
+- `apps/api/src/registrations/dto/admin-registration.dto.ts` - DTOs for admin registration operations (COMPLETED)
+- `apps/api/src/registrations/services/registration-cleanup.service.ts` - Service for cleaning up related records on cancellation (COMPLETED)
 - `apps/api/src/notifications/services/admin-notifications.service.ts` - Service for admin-triggered user notifications
 - `apps/api/src/notifications/templates/registration-modification.template.ts` - Email template for registration modifications
 - `apps/api/src/notifications/templates/registration-cancellation.template.ts` - Email template for registration cancellations
@@ -46,8 +46,9 @@ Based on `prd-admin-registration-management.md`
 - All admin operations must be properly authorized using existing auth guards
 - Audit trail should use IDs for target records to avoid storing PII, but can include admin user information via joins from users table
 - Registration modifications should use Prisma transactions to ensure atomicity
-- Avoid use of `any` types especially outside of tests
-- Remove any unused variables
+- Lint new/modified files with configuration `eslint.config.cjs`; common linting errors:
+    - Avoid use of `any` types especially outside of tests
+    - Remove any unused variables
 
 ## Tasks
 
@@ -61,18 +62,18 @@ Based on `prd-admin-registration-management.md`
   - [x] 1.7 Create enum files in `apps/api/src/common/enums/` for action types and target types
   - [x] 1.8 Create AdminAudit module, service, DTOs, and entity files
 
-- [ ] 2.0 Develop Backend Registration Management Services
-  - [ ] 2.1 Create RegistrationAdminService with methods for editing and cancelling registrations
-  - [ ] 2.2 Implement editRegistration() method with Prisma transactions for atomic updates
-  - [ ] 2.3 Implement cancelRegistration() method with cleanup of related records
-  - [ ] 2.4 Create RegistrationCleanupService to handle work shift deletion and camping option release
-  - [ ] 2.5 Integrate AdminAuditService into all admin operations for audit trail logging
-  - [ ] 2.6 Create AdminRegistrationsController with endpoints: GET /admin/registrations, PUT /admin/registrations/:id, DELETE /admin/registrations/:id
-  - [ ] 2.7 Implement proper authorization using existing auth guards (admin role required)
-  - [ ] 2.8 Create DTOs for admin registration operations with proper validation
-  - [ ] 2.9 Add audit trail viewing endpoint: GET /admin/registrations/:id/audit-trail
-  - [ ] 2.10 Implement refund prompting logic for cancellations with payments
-  - [ ] 2.11 Ensure all operations prevent editing of already cancelled registrations
+- [x] 2.0 Develop Backend Registration Management Services
+  - [x] 2.1 Create RegistrationAdminService with methods for editing and cancelling registrations
+  - [x] 2.2 Implement editRegistration() method with Prisma transactions for atomic updates
+  - [x] 2.3 Implement cancelRegistration() method with cleanup of related records
+  - [x] 2.4 Create RegistrationCleanupService to handle work shift deletion and camping option release
+  - [x] 2.5 Integrate AdminAuditService into all admin operations for audit trail logging
+  - [x] 2.6 Create AdminRegistrationsController with endpoints: GET /admin/registrations, PUT /admin/registrations/:id, DELETE /admin/registrations/:id
+  - [x] 2.7 Implement proper authorization using existing auth guards (admin role required)
+  - [x] 2.8 Create DTOs for admin registration operations with proper validation
+  - [x] 2.9 Add audit trail viewing endpoint: GET /admin/registrations/:id/audit-trail
+  - [x] 2.10 Implement refund prompting logic for cancellations with payments
+  - [x] 2.11 Ensure all operations prevent editing of already cancelled registrations
 
 - [ ] 3.0 Create Admin Registration Management Interface
   - [ ] 3.1 Create ManageRegistrationsPage.tsx as new admin section (separate from reports)
