@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEmail, IsNotEmpty, IsOptional, IsString, ArrayMinSize, ValidateNested, IsArray, IsIn, IsBoolean, IsEnum } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsOptional, IsString, ArrayMinSize, ValidateNested, IsArray, IsIn, IsBoolean, IsEnum, IsNumber, Min, Max } from 'class-validator';
 import { Type } from 'class-transformer';
 import { NotificationType } from '@prisma/client';
 
@@ -136,4 +136,74 @@ export class SendTestEmailDto {
   @IsOptional()
   @IsBoolean()
   includeSmtpDetails?: boolean;
-} 
+}
+
+export class TestSmtpConnectionDto {
+  @ApiPropertyOptional({ 
+    description: 'Whether email notifications are enabled',
+    example: true 
+  })
+  @IsOptional()
+  @IsBoolean()
+  emailEnabled?: boolean;
+
+  @ApiPropertyOptional({ 
+    description: 'SMTP server hostname',
+    example: 'smtp.gmail.com' 
+  })
+  @IsOptional()
+  @IsString()
+  smtpHost?: string;
+
+  @ApiPropertyOptional({ 
+    description: 'SMTP server port',
+    example: 587,
+    minimum: 1,
+    maximum: 65535
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  @Max(65535)
+  smtpPort?: number;
+
+  @ApiPropertyOptional({ 
+    description: 'SMTP username',
+    example: 'user@example.com' 
+  })
+  @IsOptional()
+  @IsString()
+  smtpUsername?: string;
+
+  @ApiPropertyOptional({ 
+    description: 'SMTP password',
+    example: 'password123' 
+  })
+  @IsOptional()
+  @IsString()
+  smtpPassword?: string;
+
+  @ApiPropertyOptional({ 
+    description: 'Whether to use SSL for SMTP connection',
+    example: false 
+  })
+  @IsOptional()
+  @IsBoolean()
+  smtpUseSsl?: boolean;
+
+  @ApiPropertyOptional({ 
+    description: 'Sender email address',
+    example: 'noreply@example.com' 
+  })
+  @IsOptional()
+  @IsEmail()
+  senderEmail?: string;
+
+  @ApiPropertyOptional({ 
+    description: 'Sender name',
+    example: 'Camp Organization' 
+  })
+  @IsOptional()
+  @IsString()
+  senderName?: string;
+}

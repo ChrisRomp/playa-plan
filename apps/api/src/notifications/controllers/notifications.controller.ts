@@ -5,7 +5,7 @@ import { EmailService } from '../services/email.service';
 import { EmailAuditService } from '../services/email-audit.service';
 import { CoreConfigService } from '../../core-config/services/core-config.service';
 import { PrismaService } from '../../common/prisma/prisma.service';
-import { SendEmailDto, SendEmailToMultipleRecipientsDto, SendTestEmailDto } from '../dto/send-email.dto';
+import { SendEmailDto, SendEmailToMultipleRecipientsDto, SendTestEmailDto, TestSmtpConnectionDto } from '../dto/send-email.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
@@ -348,7 +348,7 @@ export class NotificationsController {
   @ApiResponse({ status: HttpStatus.OK, description: 'SMTP connection test completed' })
   @ApiResponse({ status: HttpStatus.UNAUTHORIZED, description: 'Unauthorized' })
   @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Forbidden - requires admin role' })
-  async testSmtpConnection(): Promise<{
+  async testSmtpConnection(@Body() testSmtpDto?: TestSmtpConnectionDto): Promise<{
     success: boolean;
     message: string;
     details?: {
@@ -367,18 +367,55 @@ export class NotificationsController {
     };
   }> {
     try {
-      // Get current email configuration
+      // Get current email configuration to check if testing is possible
       const emailConfig = await this.coreConfigService.getEmailConfiguration();
       
-      // Check if email is enabled
-      if (!emailConfig.emailEnabled) {
+      // Check if email is enabled (use form value if provided, otherwise database)
+      const emailEnabled = testSmtpDto?.emailEnabled !== undefined ? testSmtpDto.emailEnabled : emailConfig.emailEnabled;
+      if (!emailEnabled) {
         return {
           success: false,
           message: 'Email notifications are currently disabled. Please enable email notifications first.',
         };
       }
 
-      // Check if SMTP is properly configured
+      // For completeness validation, we need to check if we have the minimum required config
+      // If form data is provided, we'll let the service handle the proper merging
+      if (testSmtpDto) {
+        // Form data provided - let service handle validation with proper merging
+        const startTime = Date.now();
+        const result = await this.emailService.testSmtpConnection(testSmtpDto);
+        const connectionTime = Date.now() - startTime;
+
+        if (result.success) {
+          return {
+            success: true,
+            message: 'SMTP connection successful! Your email configuration is working correctly.',
+            details: {
+              host: testSmtpDto.smtpHost || emailConfig.smtpHost || '',
+              port: testSmtpDto.smtpPort || emailConfig.smtpPort || 587,
+              secure: testSmtpDto.smtpUseSsl !== undefined ? testSmtpDto.smtpUseSsl : emailConfig.smtpUseSsl,
+              authenticated: true,
+              connectionTime,
+            },
+          };
+        } else {
+          return {
+            success: false,
+            message: result.message || 'SMTP connection failed. Please check your configuration.',
+            details: {
+              host: testSmtpDto.smtpHost || emailConfig.smtpHost || '',
+              port: testSmtpDto.smtpPort || emailConfig.smtpPort || 587,
+              secure: testSmtpDto.smtpUseSsl !== undefined ? testSmtpDto.smtpUseSsl : emailConfig.smtpUseSsl,
+              authenticated: false,
+              connectionTime,
+            },
+            errorDetails: result.errorDetails,
+          };
+        }
+      }
+
+      // No form data provided - validate database config and test
       if (!emailConfig.smtpHost || !emailConfig.smtpUsername || !emailConfig.smtpPassword || !emailConfig.senderEmail) {
         return {
           success: false,
@@ -392,7 +429,7 @@ export class NotificationsController {
         };
       }
 
-      // Test the SMTP connection
+      // Test the SMTP connection using database config only
       const startTime = Date.now();
       const result = await this.emailService.testSmtpConnection();
       const connectionTime = Date.now() - startTime;
@@ -402,7 +439,7 @@ export class NotificationsController {
           success: true,
           message: 'SMTP connection successful! Your email configuration is working correctly.',
           details: {
-            host: emailConfig.smtpHost,
+            host: emailConfig.smtpHost || '',
             port: emailConfig.smtpPort || 587,
             secure: emailConfig.smtpUseSsl,
             authenticated: true,
@@ -414,7 +451,7 @@ export class NotificationsController {
           success: false,
           message: result.message || 'SMTP connection failed. Please check your configuration.',
           details: {
-            host: emailConfig.smtpHost,
+            host: emailConfig.smtpHost || '',
             port: emailConfig.smtpPort || 587,
             secure: emailConfig.smtpUseSsl,
             authenticated: false,

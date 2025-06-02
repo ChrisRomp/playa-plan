@@ -3,6 +3,7 @@ import { PrismaService } from '../common/prisma/prisma.service';
 import { NotificationsService } from '../notifications/services/notifications.service';
 import { CreateRegistrationDto, AddJobToRegistrationDto, CreateCampRegistrationDto, UpdateRegistrationDto } from './dto';
 import { Registration, RegistrationStatus } from '@prisma/client';
+import { DayOfWeek } from '../common/enums/day-of-week.enum';
 
 interface JobRegistrationWithJobs extends Registration {
   jobs?: Array<{
@@ -717,6 +718,19 @@ export class RegistrationsService {
       }));
 
       // Format jobs from job registration - safely handle potential undefined jobs
+      const dayOfWeekOrder = {
+        [DayOfWeek.PRE_OPENING]: 0,
+        [DayOfWeek.OPENING_SUNDAY]: 1,
+        [DayOfWeek.MONDAY]: 2,
+        [DayOfWeek.TUESDAY]: 3,
+        [DayOfWeek.WEDNESDAY]: 4,
+        [DayOfWeek.THURSDAY]: 5,
+        [DayOfWeek.FRIDAY]: 6,
+        [DayOfWeek.SATURDAY]: 7,
+        [DayOfWeek.CLOSING_SUNDAY]: 8,
+        [DayOfWeek.POST_EVENT]: 9
+      };
+
       const jobs = jobRegistration && 'jobs' in jobRegistration && Array.isArray((jobRegistration as JobRegistrationWithJobs).jobs)
         ? (jobRegistration as JobRegistrationWithJobs).jobs?.map((regJob) => ({
           name: regJob.job?.name || 'Unknown Job',
@@ -728,7 +742,11 @@ export class RegistrationsService {
             dayOfWeek: regJob.job?.shift?.dayOfWeek || '',
           },
           location: regJob.job?.location || 'TBD',
-        })) || []
+        })).sort((a, b) => {
+          const orderA = dayOfWeekOrder[a.shift.dayOfWeek as DayOfWeek] ?? 999;
+          const orderB = dayOfWeekOrder[b.shift.dayOfWeek as DayOfWeek] ?? 999;
+          return orderA - orderB;
+        }) || []
         : [];
 
       const registrationDetails = {
