@@ -1,0 +1,169 @@
+# Task List: Admin Registration Management
+
+Based on `prd-admin-registration-management.md`
+
+## Relevant Files
+
+- `apps/api/prisma/schema.prisma` - Add AdminAudit model and related enums for audit trail functionality
+- `apps/api/prisma/migrations/` - Database migration for AdminAudit table and related schema changes
+- `apps/api/src/common/enums/admin-audit.enum.ts` - Enums for audit action types and target record types
+- `apps/api/src/admin-audit/admin-audit.module.ts` - NestJS module for audit trail functionality
+- `apps/api/src/admin-audit/services/admin-audit.service.ts` - Service for creating and retrieving audit records
+- `apps/api/src/admin-audit/dto/admin-audit.dto.ts` - DTOs for audit trail data transfer
+- `apps/api/src/admin-audit/entities/admin-audit.entity.ts` - Audit trail entity definitions
+- `apps/api/src/registrations/controllers/admin-registrations.controller.ts` - Admin-specific registration management endpoints
+- `apps/api/src/registrations/services/registration-admin.service.ts` - Service for admin registration operations (edit, cancel)
+- `apps/api/src/registrations/dto/admin-registration.dto.ts` - DTOs for admin registration operations
+- `apps/api/src/registrations/services/registration-cleanup.service.ts` - Service for cleaning up related records on cancellation
+- `apps/api/src/notifications/services/admin-notifications.service.ts` - Service for admin-triggered user notifications
+- `apps/api/src/notifications/templates/registration-modification.template.ts` - Email template for registration modifications
+- `apps/api/src/notifications/templates/registration-cancellation.template.ts` - Email template for registration cancellations
+- `apps/web/src/pages/admin/ManageRegistrationsPage.tsx` - Main admin registration management interface
+- `apps/web/src/components/admin/registrations/RegistrationEditForm.tsx` - Form component for editing registrations
+- `apps/web/src/components/admin/registrations/RegistrationCancelForm.tsx` - Form component for cancelling registrations
+- `apps/web/src/components/admin/registrations/RegistrationSearchTable.tsx` - Table component for finding and listing registrations
+- `apps/web/src/components/admin/registrations/AuditTrailView.tsx` - Component for displaying audit trail history
+- `apps/web/src/hooks/useRegistrationManagement.ts` - Custom hook for registration management operations
+- `apps/web/src/lib/api/admin-registrations.ts` - API client functions for admin registration operations
+- `apps/api/src/admin-audit/services/admin-audit.service.spec.ts` - Unit tests for AdminAuditService
+- `apps/api/src/registrations/services/registration-admin.service.spec.ts` - Unit tests for RegistrationAdminService
+- `apps/api/src/registrations/services/registration-cleanup.service.spec.ts` - Unit tests for RegistrationCleanupService
+- `apps/api/src/registrations/controllers/admin-registrations.controller.spec.ts` - Unit tests for AdminRegistrationsController
+- `apps/api/src/notifications/services/admin-notifications.service.spec.ts` - Unit tests for AdminNotificationsService
+- `apps/web/src/components/admin/registrations/RegistrationEditForm.test.tsx` - Unit tests for RegistrationEditForm
+- `apps/web/src/components/admin/registrations/RegistrationCancelForm.test.tsx` - Unit tests for RegistrationCancelForm
+- `apps/web/src/hooks/useRegistrationManagement.test.ts` - Unit tests for useRegistrationManagement hook
+- `apps/api/test/admin-registrations.e2e-spec.ts` - End-to-end tests for admin registration management
+
+### Notes
+
+- Database migration should be created using Prisma CLI: `npx prisma migrate dev --name add-admin-audit-system`
+- Run tests using workspace scripts: `npm run test:api` for API tests, `npm run test:web` for web tests, or `npm run test` for all tests
+- Use `npm run test:watch` for watch mode during development
+- Use `npm run test:coverage` to generate test coverage reports
+- All admin operations must be properly authorized using existing auth guards
+- Audit trail should use IDs for target records to avoid storing PII, but can include admin user information via joins from users table
+- Registration modifications should use Prisma transactions to ensure atomicity
+- Avoid use of `any` types especially outside of tests
+- Remove any unused variables
+
+## Tasks
+
+- [ ] 1.0 Implement Database Schema and Audit System
+  - [ ] 1.1 Create AdminAudit model in `schema.prisma` with fields: id (UUID), adminUserId, actionType, targetRecordType, targetRecordId, oldValues (JSON), newValues (JSON), reason, transactionId (UUID, optional), createdAt (UTC)
+  - [ ] 1.2 Create AdminAuditActionType enum with values: REGISTRATION_EDIT, REGISTRATION_CANCEL, PAYMENT_REFUND, WORK_SHIFT_ADD, WORK_SHIFT_REMOVE, WORK_SHIFT_MODIFY, CAMPING_OPTION_ADD, CAMPING_OPTION_REMOVE, CAMPING_OPTION_MODIFY
+  - [ ] 1.3 Create AdminAuditTargetType enum with values: REGISTRATION, USER, PAYMENT, WORK_SHIFT, CAMPING_OPTION
+  - [ ] 1.4 Create and run database migration: `npx prisma migrate dev --name add-admin-audit-system`
+  - [ ] 1.5 Generate updated Prisma client: `npx prisma generate`
+  - [ ] 1.6 Create AdminAuditService to handle audit record creation and retrieval using Prisma (include methods to join admin user information like email, and support for grouping related audit records by transactionId)
+  - [ ] 1.7 Create enum files in `apps/api/src/common/enums/` for action types and target types
+  - [ ] 1.8 Create AdminAudit module, service, DTOs, and entity files
+
+- [ ] 2.0 Develop Backend Registration Management Services
+  - [ ] 2.1 Create RegistrationAdminService with methods for editing and cancelling registrations
+  - [ ] 2.2 Implement editRegistration() method with Prisma transactions for atomic updates
+  - [ ] 2.3 Implement cancelRegistration() method with cleanup of related records
+  - [ ] 2.4 Create RegistrationCleanupService to handle work shift deletion and camping option release
+  - [ ] 2.5 Integrate AdminAuditService into all admin operations for audit trail logging
+  - [ ] 2.6 Create AdminRegistrationsController with endpoints: GET /admin/registrations, PUT /admin/registrations/:id, DELETE /admin/registrations/:id
+  - [ ] 2.7 Implement proper authorization using existing auth guards (admin role required)
+  - [ ] 2.8 Create DTOs for admin registration operations with proper validation
+  - [ ] 2.9 Add audit trail viewing endpoint: GET /admin/registrations/:id/audit-trail
+  - [ ] 2.10 Implement refund prompting logic for cancellations with payments
+  - [ ] 2.11 Ensure all operations prevent editing of already cancelled registrations
+
+- [ ] 3.0 Create Admin Registration Management Interface
+  - [ ] 3.1 Create ManageRegistrationsPage.tsx as new admin section (separate from reports)
+  - [ ] 3.2 Create RegistrationSearchTable component reusing DataTable patterns from RegistrationReportsPage
+  - [ ] 3.3 Add Edit and Cancel action columns to the registration table
+  - [ ] 3.4 Implement search and filter functionality for finding specific registrations
+  - [ ] 3.5 Create RegistrationEditForm component with camping options and work shifts editing
+  - [ ] 3.6 Create RegistrationCancelForm component with refund prompting and notification toggle
+  - [ ] 3.7 Implement confirmation dialogs for destructive actions (cancellation)
+  - [ ] 3.8 Create AuditTrailView component to display modification history
+  - [ ] 3.9 Add success/error messaging for all administrative actions
+  - [ ] 3.10 Implement useRegistrationManagement custom hook for state management
+  - [ ] 3.11 Create API client functions in admin-registrations.ts for backend communication
+  - [ ] 3.12 Add new "Manage Registrations" navigation item to admin panel
+  - [ ] 3.13 Ensure mobile-responsive design following existing admin interface patterns
+
+- [ ] 4.0 Implement User Notification System
+  - [ ] 4.1 Create AdminNotificationsService for admin-triggered user notifications
+  - [ ] 4.2 Create registration modification email template showing current registration status
+  - [ ] 4.3 Create registration cancellation email template with simple cancellation notice
+  - [ ] 4.4 Integrate notification toggle in RegistrationEditForm (unchecked by default)
+  - [ ] 4.5 Integrate notification toggle in RegistrationCancelForm (unchecked by default)
+  - [ ] 4.6 Implement notification sending in registration edit/cancel operations
+  - [ ] 4.7 Ensure notifications use same format as registration confirmation for modifications
+  - [ ] 4.8 Add error handling for notification failures without blocking main operations
+  - [ ] 4.9 Log notification attempts in existing email audit system
+  - [ ] 4.10 Ensure notifications include admin contact information for questions
+
+- [ ] 5.0 Implement Comprehensive Testing Suite
+  - [ ] 5.1 AdminAuditService Unit Tests
+    - [ ] 5.1.1 Test createAuditRecord() with all required fields and proper data types
+    - [ ] 5.1.2 Test getAuditTrail() returns audit records for specific registration
+    - [ ] 5.1.3 Test audit logging handles JSON serialization of old/new values
+    - [ ] 5.1.4 Test audit record creation with different action types and target types
+    - [ ] 5.1.5 Test error handling for database failures during audit logging
+    - [ ] 5.1.6 Test audit records use IDs for target records to avoid PII, but include admin user information via joins
+  - [ ] 5.2 RegistrationAdminService Unit Tests
+    - [ ] 5.2.1 Test editRegistration() successfully updates registration and creates audit record
+    - [ ] 5.2.2 Test editRegistration() prevents modification of cancelled registrations
+    - [ ] 5.2.3 Test editRegistration() handles camping option modifications with availability checks
+    - [ ] 5.2.4 Test editRegistration() handles work shift modifications with availability checks
+    - [ ] 5.2.5 Test editRegistration() uses Prisma transactions for atomicity
+    - [ ] 5.2.6 Test cancelRegistration() updates status and triggers cleanup services
+    - [ ] 5.2.7 Test cancelRegistration() handles refund prompting for paid registrations
+    - [ ] 5.2.8 Test error handling for invalid registration IDs and unauthorized access
+  - [ ] 5.3 RegistrationCleanupService Unit Tests
+    - [ ] 5.3.1 Test cleanupRegistration() deletes associated work shifts
+    - [ ] 5.3.2 Test cleanupRegistration() releases camping option allocations
+    - [ ] 5.3.3 Test cleanup operations handle missing related records gracefully
+    - [ ] 5.3.4 Test cleanup creates appropriate audit records for each operation
+    - [ ] 5.3.5 Test cleanup operations are atomic and roll back on failures
+  - [ ] 5.4 AdminRegistrationsController Unit Tests
+    - [ ] 5.4.1 Test GET /admin/registrations endpoint with proper authorization
+    - [ ] 5.4.2 Test PUT /admin/registrations/:id endpoint with validation and audit logging
+    - [ ] 5.4.3 Test DELETE /admin/registrations/:id endpoint with confirmation and cleanup
+    - [ ] 5.4.4 Test GET /admin/registrations/:id/audit-trail endpoint returns audit history
+    - [ ] 5.4.5 Test unauthorized access returns proper HTTP status codes
+    - [ ] 5.4.6 Test validation errors return appropriate error messages
+    - [ ] 5.4.7 Test participant users receive 403 Forbidden for all admin registration endpoints
+    - [ ] 5.4.8 Test staff users receive 403 Forbidden for all admin registration endpoints
+    - [ ] 5.4.9 Test unauthenticated requests receive 401 Unauthorized for all endpoints
+  - [ ] 5.5 AdminNotificationsService Unit Tests
+    - [ ] 5.5.1 Test sendRegistrationModificationNotification() uses correct template and format
+    - [ ] 5.5.2 Test sendRegistrationCancellationNotification() sends simple cancellation notice
+    - [ ] 5.5.3 Test notification toggle respects user preferences (default disabled)
+    - [ ] 5.5.4 Test notification failures don't block main registration operations
+    - [ ] 5.5.5 Test notifications include current registration status and admin contact info
+  - [ ] 5.6 Frontend Component Unit Tests
+    - [ ] 5.6.1 Test RegistrationEditForm renders correctly with current registration data
+    - [ ] 5.6.2 Test RegistrationEditForm handles camping option changes with validation
+    - [ ] 5.6.3 Test RegistrationEditForm handles work shift modifications correctly
+    - [ ] 5.6.4 Test RegistrationCancelForm displays refund prompting for paid registrations
+    - [ ] 5.6.5 Test RegistrationCancelForm notification toggle defaults to unchecked
+    - [ ] 5.6.6 Test RegistrationSearchTable displays action buttons and handles clicks
+    - [ ] 5.6.7 Test AuditTrailView displays audit history in readable format
+    - [ ] 5.6.8 Test useRegistrationManagement hook handles API calls and state management
+  - [ ] 5.7 Integration Tests
+    - [ ] 5.7.1 Test complete registration edit workflow from API to database
+    - [ ] 5.7.2 Test complete registration cancellation workflow with cleanup
+    - [ ] 5.7.3 Test audit trail creation and retrieval across all admin operations
+    - [ ] 5.7.4 Test notification integration with admin operations
+    - [ ] 5.7.5 Test authorization and role-based access control for all endpoints
+    - [ ] 5.7.6 Test frontend-backend integration for all admin registration operations
+    - [ ] 5.7.7 Test participant users cannot access admin registration management endpoints (401/403 responses)
+    - [ ] 5.7.8 Test staff users cannot access admin registration management endpoints (401/403 responses)
+    - [ ] 5.7.9 Test JWT token validation and expiration handling for admin endpoints
+  - [ ] 5.8 End-to-End Tests
+    - [ ] 5.8.1 Test admin can find, edit, and save registration changes successfully
+    - [ ] 5.8.2 Test admin can cancel registration with optional refund and notification
+    - [ ] 5.8.3 Test audit trail is visible and accurate after admin operations
+    - [ ] 5.8.4 Test unauthorized users cannot access admin registration management
+    - [ ] 5.8.5 Test error handling and user feedback for all admin operations
+    - [ ] 5.8.6 Test mobile responsiveness of admin registration management interface
+    - [ ] 5.8.7 Test participant users are redirected or shown access denied when attempting to access admin registration management
+    - [ ] 5.8.8 Test staff users are redirected or shown access denied when attempting to access admin registration management
+    - [ ] 5.8.9 Test admin navigation menu only shows "Manage Registrations" for admin role users 
