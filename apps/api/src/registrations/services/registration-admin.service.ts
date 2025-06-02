@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { AdminAuditService, CreateAuditRecordDto } from '../../admin-audit/services/admin-audit.service';
+import { AdminNotificationsService, AdminNotificationData } from '../../notifications/services/admin-notifications.service';
 import { RegistrationCleanupService } from './registration-cleanup.service';
 import { 
   Registration, 
@@ -41,6 +42,7 @@ export class RegistrationAdminService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly adminAuditService: AdminAuditService,
+    private readonly adminNotificationsService: AdminNotificationsService,
     private readonly cleanupService: RegistrationCleanupService,
   ) {}
 
@@ -148,7 +150,7 @@ export class RegistrationAdminService {
     this.logger.log(`Admin ${adminUserId} editing registration ${registrationId}`);
 
     try {
-      return await this.prisma.$transaction(async (prisma) => {
+      const result = await this.prisma.$transaction(async (prisma) => {
         // Get current registration with all related data
         const currentRegistration = await prisma.registration.findUnique({
           where: { id: registrationId },
@@ -364,15 +366,78 @@ export class RegistrationAdminService {
           },
         });
 
-        return {
-          registration: finalRegistration!,
-          transactionId,
-          message: 'Registration successfully updated',
-          notificationStatus: editData.sendNotification 
-            ? 'Notification will be sent to user' 
-            : 'No notification sent',
-        };
+        return finalRegistration!;
       });
+
+      // Send notification after successful transaction if requested
+      let notificationStatus = 'No notification sent';
+      if (editData.sendNotification) {
+        try {
+          // Get admin user info
+          const adminUser = await this.prisma.user.findUnique({
+            where: { id: adminUserId },
+            select: { id: true, firstName: true, lastName: true, email: true },
+          });
+
+          if (adminUser) {
+            // Get camping options for the user
+            const campingOptions = await this.prisma.campingOptionRegistration.findMany({
+              where: { userId: result.user.id },
+              include: { campingOption: true },
+            });
+
+            const notificationData: AdminNotificationData = {
+              adminUser,
+              targetUser: {
+                id: result.user.id,
+                firstName: result.user.firstName,
+                lastName: result.user.lastName,
+                email: result.user.email,
+                playaName: result.user.playaName || undefined,
+              },
+              registration: {
+                id: result.id,
+                year: result.year,
+                status: result.status,
+                campingOptions: campingOptions.map((cor: { campingOption: { name: string; description?: string | null } }) => ({
+                  name: cor.campingOption.name,
+                  description: cor.campingOption.description || undefined,
+                })),
+                jobs: result.jobs?.map((rj: { job: { name: string; category?: { name: string } | null; shift?: { name: string; startTime: string; endTime: string; dayOfWeek: string } | null } }) => ({
+                  name: rj.job.name,
+                  category: rj.job.category?.name || 'Uncategorized',
+                  shift: {
+                    name: rj.job.shift?.name || 'No shift',
+                    startTime: rj.job.shift?.startTime || '',
+                    endTime: rj.job.shift?.endTime || '',
+                    dayOfWeek: rj.job.shift?.dayOfWeek || '',
+                  },
+                  location: 'TBD', // TODO: Add location field to job schema
+                })) || [],
+              },
+              reason: editData.reason,
+            };
+
+            const success = await this.adminNotificationsService.sendRegistrationModificationNotification(notificationData);
+            notificationStatus = success 
+              ? 'Notification sent successfully to user'
+              : 'Failed to send notification to user';
+          } else {
+            notificationStatus = 'Failed to send notification: Admin user not found';
+          }
+        } catch (error: unknown) {
+          const err = error as Error;
+          this.logger.warn(`Failed to send modification notification for registration ${registrationId}: ${err.message}`);
+          notificationStatus = 'Failed to send notification to user';
+        }
+      }
+
+      return {
+        registration: result,
+        transactionId,
+        message: 'Registration successfully updated',
+        notificationStatus,
+      };
     } catch (error: unknown) {
       const err = error as Error;
       this.logger.error(`Failed to edit registration ${registrationId}: ${err.message}`, err.stack);
@@ -396,7 +461,7 @@ export class RegistrationAdminService {
     this.logger.log(`Admin ${adminUserId} cancelling registration ${registrationId}`);
 
     try {
-      return await this.prisma.$transaction(async (prisma) => {
+      const result = await this.prisma.$transaction(async (prisma) => {
         // Get current registration
         const registration = await prisma.registration.findUnique({
           where: { id: registrationId },
@@ -474,16 +539,64 @@ export class RegistrationAdminService {
 
         return {
           registration: cancelledRegistration,
-          transactionId,
-          message: 'Registration successfully cancelled',
-          notificationStatus: cancelData.sendNotification 
-            ? 'Cancellation notification will be sent to user' 
-            : 'No notification sent',
-          refundInfo: cancelData.processRefund && refundInfo.hasPayments 
-            ? refundInfo.message 
-            : undefined,
+          refundInfo: cancelData.processRefund && refundInfo.hasPayments ? refundInfo.message : undefined,
         };
       });
+
+      // Send notification after successful transaction if requested
+      let notificationStatus = 'No notification sent';
+      if (cancelData.sendNotification) {
+        try {
+          // Get admin user info
+          const adminUser = await this.prisma.user.findUnique({
+            where: { id: adminUserId },
+            select: { id: true, firstName: true, lastName: true, email: true },
+          });
+
+          if (adminUser) {
+            const notificationData: AdminNotificationData = {
+              adminUser,
+              targetUser: {
+                id: result.registration.user.id,
+                firstName: result.registration.user.firstName,
+                lastName: result.registration.user.lastName,
+                email: result.registration.user.email,
+                playaName: result.registration.user.playaName || undefined,
+              },
+              registration: {
+                id: result.registration.id,
+                year: result.registration.year,
+                status: 'CANCELLED',
+              },
+              reason: cancelData.reason,
+              refundInfo: cancelData.processRefund && result.refundInfo ? {
+                amount: 0, // TODO: Calculate actual refund amount
+                currency: 'USD',
+                processed: false,
+              } : undefined,
+            };
+
+            const success = await this.adminNotificationsService.sendRegistrationCancellationNotification(notificationData);
+            notificationStatus = success 
+              ? 'Cancellation notification sent successfully to user'
+              : 'Failed to send cancellation notification to user';
+          } else {
+            notificationStatus = 'Failed to send notification: Admin user not found';
+          }
+        } catch (error: unknown) {
+          const err = error as Error;
+          this.logger.warn(`Failed to send cancellation notification for registration ${registrationId}: ${err.message}`);
+          notificationStatus = 'Failed to send notification to user';
+        }
+      }
+
+      return {
+        registration: result.registration,
+        transactionId,
+        message: 'Registration successfully cancelled',
+        notificationStatus,
+        refundInfo: result.refundInfo,
+      };
     } catch (error: unknown) {
       const err = error as Error;
       this.logger.error(`Failed to cancel registration ${registrationId}: ${err.message}`, err.stack);

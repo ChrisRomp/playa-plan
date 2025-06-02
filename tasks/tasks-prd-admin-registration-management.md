@@ -17,7 +17,7 @@ Based on `prd-admin-registration-management.md`
 - `apps/api/src/registrations/dto/admin-registration.dto.ts` - DTOs for admin registration operations (COMPLETED)
 - `apps/api/src/registrations/services/registration-cleanup.service.ts` - Service for cleaning up related records on cancellation (COMPLETED)
 - `apps/web/src/pages/ManageRegistrationsPage.tsx` - Main admin registration management interface (COMPLETED)
-- `apps/api/src/notifications/services/admin-notifications.service.ts` - Service for admin-triggered user notifications
+- `apps/api/src/notifications/services/admin-notifications.service.ts` - Service for admin-triggered user notifications (COMPLETED)
 - `apps/api/src/notifications/templates/registration-modification.template.ts` - Email template for registration modifications
 - `apps/api/src/notifications/templates/registration-cancellation.template.ts` - Email template for registration cancellations
 - `apps/web/src/components/admin/registrations/RegistrationEditForm.tsx` - Form component for editing registrations
@@ -88,30 +88,30 @@ Based on `prd-admin-registration-management.md`
   - [x] 2.11 Ensure all operations prevent editing of already cancelled registrations
 
 - [x] 3.0 Admin Registration Management Interface
-  - [x] **3.1** Create ManageRegistrationsPage.tsx as new admin section (COMPLETED)
-  - [x] **3.2** Create RegistrationSearchTable component reusing DataTable patterns from RegistrationReportsPage (COMPLETED)
-  - [x] **3.3** Add Edit and Cancel action columns to registration table (COMPLETED)
-  - [x] **3.4** Implement search and filter functionality for finding specific registrations (COMPLETED)
-  - [x] **3.5** Create RegistrationEditForm component for editing registrations with camping options and work shifts (COMPLETED)
-  - [x] **3.6** Create RegistrationCancelForm component for cancelling registrations with refund prompting and notification toggle (COMPLETED)
-  - [x] **3.7** Implement confirmation dialogs for destructive actions (COMPLETED)
-  - [x] **3.8** Create AuditTrailView component to display modification history (COMPLETED)
-  - [x] **3.9** Add success/error messaging for all operations (COMPLETED)
-  - [x] **3.10** Implement useRegistrationManagement custom hook for state management (COMPLETED)
-  - [x] **3.11** Create API client functions for all admin registration operations (COMPLETED)
-  - [x] **3.12** Add new "Manage Registrations" navigation item to admin panel (COMPLETED)
+  - [x] 3.1 Create ManageRegistrationsPage.tsx as new admin section
+  - [x] 3.2 Create RegistrationSearchTable component reusing DataTable patterns from RegistrationReportsPage
+  - [x] 3.3 Add Edit and Cancel action columns to registration table
+  - [x] 3.4 Implement search and filter functionality for finding specific registrations
+  - [x] 3.5 Create RegistrationEditForm component for editing registrations with camping options and work shifts
+  - [x] 3.6 Create RegistrationCancelForm component for cancelling registrations with refund prompting and notification toggle
+  - [x] 3.7 Implement confirmation dialogs for destructive actions
+  - [x] 3.8 Create AuditTrailView component to display modification history
+  - [x] 3.9 Add success/error messaging for all operations
+  - [x] 3.10 Implement useRegistrationManagement custom hook for state management
+  - [x] 3.11 Create API client functions for all admin registration operations
+  - [x] 3.12 Add new "Manage Registrations" navigation item to admin panel
 
-- [ ] 4.0 Implement User Notification System
-  - [ ] 4.1 Create AdminNotificationsService for admin-triggered user notifications
-  - [ ] 4.2 Create registration modification email template showing current registration status
-  - [ ] 4.3 Create registration cancellation email template with simple cancellation notice
-  - [ ] 4.4 Integrate notification toggle in RegistrationEditForm (unchecked by default)
-  - [ ] 4.5 Integrate notification toggle in RegistrationCancelForm (unchecked by default)
-  - [ ] 4.6 Implement notification sending in registration edit/cancel operations
-  - [ ] 4.7 Ensure notifications use same format as registration confirmation for modifications
-  - [ ] 4.8 Add error handling for notification failures without blocking main operations
-  - [ ] 4.9 Log notification attempts in existing email audit system
-  - [ ] 4.10 Ensure notifications include admin contact information for questions
+- [x] 4.0 Implement User Notification System
+  - [x] 4.1 Create AdminNotificationsService for admin-triggered user notifications
+  - [x] 4.2 Create registration modification email template showing current registration status
+  - [x] 4.3 Create registration cancellation email template with simple cancellation notice
+  - [x] 4.4 Integrate notification toggle in RegistrationEditForm (unchecked by default)
+  - [x] 4.5 Integrate notification toggle in RegistrationCancelForm (unchecked by default)
+  - [x] 4.6 Implement notification sending in registration edit/cancel operations
+  - [x] 4.7 Ensure notifications use same format as registration confirmation for modifications
+  - [x] 4.8 Add error handling for notification failures without blocking main operations
+  - [x] 4.9 Log notification attempts in existing email audit system
+  - [x] 4.10 Ensure notifications include admin contact information for questions
 
 - [ ] 5.0 Implement Comprehensive Testing Suite
   - [ ] 5.1 AdminAuditService Unit Tests
