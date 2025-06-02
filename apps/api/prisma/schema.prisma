@@ -38,6 +38,7 @@ model User {
   payments                   Payment[]
   registrations              Registration[]
   emailAudit                 EmailAudit[]
+  adminAuditRecords          AdminAudit[]                @relation("AdminAuditRecords")
 
   @@map("users")
 }
@@ -239,6 +240,22 @@ model EmailAudit {
   @@map("email_audit")
 }
 
+model AdminAudit {
+  id               String                  @id @default(uuid())
+  adminUserId      String
+  actionType       AdminAuditActionType
+  targetRecordType AdminAuditTargetType
+  targetRecordId   String
+  oldValues        Json?
+  newValues        Json?
+  reason           String?
+  transactionId    String?
+  createdAt        DateTime                @default(now())
+  adminUser        User                    @relation("AdminAuditRecords", fields: [adminUserId], references: [id])
+
+  @@map("admin_audit")
+}
+
 model CoreConfig {
   id                       String     @id @default(uuid())
   campName                 String
@@ -349,4 +366,24 @@ enum EmailAuditStatus {
 enum PaypalMode {
   SANDBOX
   LIVE
+}
+
+enum AdminAuditActionType {
+  REGISTRATION_EDIT
+  REGISTRATION_CANCEL
+  PAYMENT_REFUND
+  WORK_SHIFT_ADD
+  WORK_SHIFT_REMOVE
+  WORK_SHIFT_MODIFY
+  CAMPING_OPTION_ADD
+  CAMPING_OPTION_REMOVE
+  CAMPING_OPTION_MODIFY
+}
+
+enum AdminAuditTargetType {
+  REGISTRATION
+  USER
+  PAYMENT
+  WORK_SHIFT
+  CAMPING_OPTION
 }
