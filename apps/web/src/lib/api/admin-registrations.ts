@@ -118,7 +118,7 @@ interface BackendRegistrationEditData {
   status: 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'WAITLISTED';
   jobIds: string[];
   campingOptionIds: string[];
-  reason: string;
+  notes: string;
   sendNotification: boolean;
 }
 
@@ -184,12 +184,12 @@ export const adminRegistrationsApi = {
    * Edit a registration
    */
   editRegistration: async (registrationId: string, data: RegistrationEditData): Promise<void> => {
-    // Transform frontend 'notes' to backend 'reason' field
+    // Transform frontend data to backend format (no transformation needed now)
     const backendData: BackendRegistrationEditData = {
       status: data.status,
       jobIds: data.jobIds,
       campingOptionIds: data.campingOptionIds,
-      reason: data.notes || '', // Backend expects 'reason' field
+      notes: data.notes || '', // Backend now expects 'notes' field
       sendNotification: data.sendNotification,
     };
     
