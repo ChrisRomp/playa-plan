@@ -151,15 +151,15 @@ Based on `prd-admin-registration-management.md`
     - [x] 5.4.7 Test participant users receive 403 Forbidden for all admin registration endpoints
     - [x] 5.4.8 Test staff users receive 403 Forbidden for all admin registration endpoints
     - [x] 5.4.9 Test unauthenticated requests receive 401 Unauthorized for all endpoints
-  - [ ] 5.5 AdminNotificationsService Unit Tests
-    - [ ] 5.5.1 Test sendRegistrationModificationNotification() uses correct template and format
-    - [ ] 5.5.2 Test sendRegistrationCancellationNotification() sends simple cancellation notice
-    - [ ] 5.5.3 Test notification toggle respects user preferences (default disabled)
-    - [ ] 5.5.4 Test notification failures don't block main registration operations
-    - [ ] 5.5.5 Test notifications include current registration status and admin contact info
-    - [ ] 5.5.6 Test modification notifications exclude dues information for admin changes
-    - [ ] 5.5.7 Test cancellation notifications use generic "contact us" instead of admin email
-    - [ ] 5.5.8 Test cancellation notifications include refund amount when processed automatically
+  - [x] 5.5 AdminNotificationsService Unit Tests
+    - [x] 5.5.1 Test sendRegistrationModificationNotification() uses correct template and format
+    - [x] 5.5.2 Test sendRegistrationCancellationNotification() sends simple cancellation notice
+    - [x] 5.5.3 Test notification toggle respects user preferences (default disabled)
+    - [x] 5.5.4 Test notification failures don't block main registration operations
+    - [x] 5.5.5 Test notifications include current registration status and admin contact info
+    - [x] 5.5.6 Test modification notifications exclude dues information for admin changes
+    - [x] 5.5.7 Test cancellation notifications use generic "contact us" instead of admin email
+    - [x] 5.5.8 Test cancellation notifications include refund amount when processed automatically
   - [ ] 5.6 PaymentsService Unit Tests
     - [ ] 5.6.1 Test processRefund() successfully processes Stripe refunds with payment intent IDs
     - [ ] 5.6.2 Test processRefund() converts checkout session IDs to payment intent IDs for Stripe
