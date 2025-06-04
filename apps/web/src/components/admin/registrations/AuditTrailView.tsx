@@ -1,28 +1,10 @@
 import { useState, useEffect } from 'react';
 import { X, Clock, User, Eye, AlertTriangle } from 'lucide-react';
 import { LoadingSpinner } from '../../common/LoadingSpinner';
+import { adminRegistrationsApi } from '../../../lib/api/admin-registrations';
 
-// TODO: Replace with actual API types when implemented
-interface AuditRecord {
-  id: string;
-  adminUserId: string;
-  actionType: 'REGISTRATION_EDIT' | 'REGISTRATION_CANCEL' | 'PAYMENT_REFUND' | 
-              'WORK_SHIFT_ADD' | 'WORK_SHIFT_REMOVE' | 'WORK_SHIFT_MODIFY' |
-              'CAMPING_OPTION_ADD' | 'CAMPING_OPTION_REMOVE' | 'CAMPING_OPTION_MODIFY';
-  targetRecordType: 'REGISTRATION' | 'USER' | 'PAYMENT' | 'WORK_SHIFT' | 'CAMPING_OPTION';
-  targetRecordId: string;
-  oldValues?: Record<string, unknown>;
-  newValues?: Record<string, unknown>;
-  reason: string;
-  transactionId?: string;
-  createdAt: string;
-  adminUser: {
-    id: string;
-    email: string;
-    firstName: string;
-    lastName: string;
-  };
-}
+// Use the AuditRecord type from the API client instead of defining locally
+type AuditRecord = Awaited<ReturnType<typeof adminRegistrationsApi.getAuditTrail>>[0];
 
 interface AuditTrailViewProps {
   /** ID of the registration to view audit trail for */
@@ -43,56 +25,14 @@ export function AuditTrailView({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Mock data for development - replace with actual API call
+  // Fetch audit trail from API
   useEffect(() => {
     const fetchAuditTrail = async () => {
       setLoading(true);
       setError(null);
       try {
-        // TODO: Replace with actual API call to /admin/registrations/:id/audit-trail
-        // const data = await adminRegistrationsApi.getAuditTrail(registrationId);
-        
-        // Mock data for development
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        const mockData: AuditRecord[] = [
-          {
-            id: '1',
-            adminUserId: 'admin1',
-            actionType: 'REGISTRATION_EDIT',
-            targetRecordType: 'REGISTRATION',
-            targetRecordId: registrationId,
-            oldValues: { status: 'PENDING' },
-            newValues: { status: 'CONFIRMED' },
-            reason: 'Approved after payment verification',
-            createdAt: '2024-01-20T10:30:00Z',
-            adminUser: {
-              id: 'admin1',
-              email: 'admin@camp.org',
-              firstName: 'Admin',
-              lastName: 'User',
-            },
-          },
-          {
-            id: '2',
-            adminUserId: 'admin1',
-            actionType: 'WORK_SHIFT_ADD',
-            targetRecordType: 'WORK_SHIFT',
-            targetRecordId: 'job1',
-            oldValues: undefined,
-            newValues: { jobName: 'Kitchen Helper', registrationId },
-            reason: 'Added kitchen shift per user request',
-            transactionId: 'tx-123',
-            createdAt: '2024-01-22T14:15:00Z',
-            adminUser: {
-              id: 'admin1',
-              email: 'admin@camp.org',
-              firstName: 'Admin',
-              lastName: 'User',
-            },
-          },
-        ];
-        
-        setAuditRecords(mockData);
+        const data = await adminRegistrationsApi.getAuditTrail(registrationId);
+        setAuditRecords(data);
       } catch (err) {
         setError('Failed to load audit trail');
         console.error('Error fetching audit trail:', err);
