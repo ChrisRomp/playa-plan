@@ -230,11 +230,11 @@ export function RegistrationEditForm({
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] mx-4 overflow-hidden">
-        <form onSubmit={handleSubmit} className="flex flex-col h-full">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+        <form onSubmit={handleSubmit} className="flex flex-col h-full max-h-[90vh]">
           {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b">
+          <div className="flex items-center justify-between p-6 border-b flex-shrink-0">
             <div>
               <h2 className="text-lg font-semibold text-gray-900">Edit Registration</h2>
               <p className="text-sm text-gray-600">
@@ -250,8 +250,8 @@ export function RegistrationEditForm({
             </button>
           </div>
 
-          {/* Content */}
-          <div className="flex-1 overflow-y-auto p-6 space-y-6">
+          {/* Content - Scrollable Area */}
+          <div className="flex-1 overflow-y-auto p-6 space-y-6 min-h-0">
             {/* General Errors */}
             {errors.general && (
               <div className="bg-red-50 border border-red-200 rounded-md p-4">
@@ -436,8 +436,8 @@ export function RegistrationEditForm({
             </div>
           </div>
 
-          {/* Footer */}
-          <div className="flex items-center justify-between p-6 border-t bg-gray-50">
+          {/* Footer - Fixed at bottom */}
+          <div className="flex items-center justify-between p-6 border-t bg-gray-50 flex-shrink-0">
             <div className="text-sm text-gray-600">
               {hasChanges ? 'Changes detected' : 'No changes made'}
             </div>
