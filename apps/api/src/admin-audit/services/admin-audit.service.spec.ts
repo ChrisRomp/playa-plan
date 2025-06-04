@@ -303,7 +303,7 @@ describe('AdminAuditService', () => {
         (prismaService.adminAudit.create as jest.Mock).mockResolvedValue(mockAdminAudit);
 
         // Act
-        const result = await service.createAuditRecord(createData);
+        await service.createAuditRecord(createData);
 
         // Assert
         expect(prismaService.adminAudit.create).toHaveBeenCalledWith({
