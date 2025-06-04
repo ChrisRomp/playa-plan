@@ -438,7 +438,7 @@ export class PaymentsService {
           throw new BadRequestException('Payment has no provider reference ID');
         }
         
-        // For Stripe, amount needs to be in cents
+        // Convert from dollars (database) to cents (Stripe expects cents)
         const refundAmountCents = Math.round(refundAmount * 100);
         
         providerRefund = await this.stripeService.createRefund(
@@ -451,8 +451,7 @@ export class PaymentsService {
           throw new BadRequestException('Payment has no provider reference ID');
         }
         
-        // For PayPal, we need to use the capture ID which might be different from order ID
-        // Usually we'd store the capture ID in providerRefId after payment completion
+        // Use dollar amount as-is since PayPal expects dollar amounts and database stores in dollars
         providerRefund = await this.paypalService.createRefund(
           payment.providerRefId,
           refundAmount,
