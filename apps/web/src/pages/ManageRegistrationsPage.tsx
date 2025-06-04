@@ -4,6 +4,10 @@ import { Link } from 'react-router-dom';
 import { ROUTES } from '../routes';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import RegistrationSearchTable from '../components/admin/registrations/RegistrationSearchTable';
+import RegistrationEditForm from '../components/admin/registrations/RegistrationEditForm';
+import RegistrationCancelForm from '../components/admin/registrations/RegistrationCancelForm';
+import AuditTrailView from '../components/admin/registrations/AuditTrailView';
+import { useRegistrationManagement } from '../hooks/useRegistrationManagement';
 import { adminRegistrationsApi, PaginatedRegistrationsResponse } from '../lib/api/admin-registrations';
 
 // TODO: Replace with actual API types when implemented
@@ -61,6 +65,18 @@ export function ManageRegistrationsPage() {
   const [localFilters, setLocalFilters] = useState<RegistrationFilters>({});
   const [showFilters, setShowFilters] = useState(false);
   const debounceTimerRef = useRef<NodeJS.Timeout>();
+
+  // Registration management state and actions
+  const {
+    state: managementState,
+    openEditModal,
+    openCancelModal,
+    openAuditTrailModal,
+    closeAllModals,
+    editRegistration,
+    cancelRegistration,
+    clearMessages,
+  } = useRegistrationManagement();
 
   // Fetch registrations from API
   const fetchRegistrations = useCallback(async () => {
@@ -133,20 +149,52 @@ export function ManageRegistrationsPage() {
     setFilters({});
   };
 
+  // Convert API registration format to component format
+  const convertRegistrationForComponent = (registration: Registration) => {
+    return {
+      ...registration,
+      jobs: registration.jobs.map((rj, index) => ({
+        id: `registration-job-${index}`, // Generate ID since it's not in the API response
+        job: rj.job
+      })),
+      campingOptions: [] // TODO: Fetch actual camping options for this registration
+    };
+  };
+
   const handleViewAuditTrail = (registrationId: string) => {
-    // TODO: Implement audit trail modal or navigation
-    console.log('View audit trail for registration:', registrationId);
+    const registration = registrations.find(r => r.id === registrationId);
+    if (registration) {
+      openAuditTrailModal(convertRegistrationForComponent(registration));
+    }
   };
 
   const handleEditRegistration = (registrationId: string) => {
-    // TODO: Implement edit registration modal or navigation
-    console.log('Edit registration:', registrationId);
+    const registration = registrations.find(r => r.id === registrationId);
+    if (registration) {
+      openEditModal(convertRegistrationForComponent(registration));
+    }
   };
 
   const handleCancelRegistration = (registrationId: string) => {
-    // TODO: Implement cancel registration modal with confirmation
-    console.log('Cancel registration:', registrationId);
+    const registration = registrations.find(r => r.id === registrationId);
+    if (registration) {
+      openCancelModal(convertRegistrationForComponent(registration));
+    }
   };
+
+  // Handle successful operations by refreshing data
+  useEffect(() => {
+    if (managementState.lastSuccessMessage) {
+      fetchRegistrations(); // Refresh the list after successful operations
+      
+      // Clear success message after 5 seconds
+      const timer = setTimeout(() => {
+        clearMessages();
+      }, 5000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [managementState.lastSuccessMessage, fetchRegistrations, clearMessages]);
 
   if (loading) {
     return (
@@ -322,6 +370,59 @@ export function ManageRegistrationsPage() {
           onViewAuditTrail={handleViewAuditTrail}
           emptyMessage="No registrations found"
         />
+
+        {/* Success/Error Messages */}
+        {managementState.lastSuccessMessage && (
+          <div className="fixed top-4 right-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded shadow-lg z-50">
+            <div className="flex">
+              <CheckCircle className="h-5 w-5 text-green-400 mr-2 flex-shrink-0" />
+              <span>{managementState.lastSuccessMessage}</span>
+            </div>
+          </div>
+        )}
+
+        {managementState.lastErrorMessage && (
+          <div className="fixed top-4 right-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded shadow-lg z-50">
+            <div className="flex">
+              <AlertTriangle className="h-5 w-5 text-red-400 mr-2 flex-shrink-0" />
+              <span>{managementState.lastErrorMessage}</span>
+              <button
+                onClick={clearMessages}
+                className="ml-4 text-red-700 hover:text-red-900"
+              >
+                <X size={16} />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Modals */}
+        {managementState.editModalOpen && managementState.selectedRegistration && (
+          <RegistrationEditForm
+            registration={managementState.selectedRegistration as unknown as Parameters<typeof RegistrationEditForm>[0]['registration']}
+            availableJobs={[]} // TODO: Pass actual available jobs
+            availableCampingOptions={[]} // TODO: Pass actual available camping options
+            loading={managementState.editLoading}
+            onSubmit={editRegistration}
+            onClose={closeAllModals}
+          />
+        )}
+
+        {managementState.cancelModalOpen && managementState.selectedRegistration && (
+          <RegistrationCancelForm
+            registration={managementState.selectedRegistration as unknown as Parameters<typeof RegistrationCancelForm>[0]['registration']}
+            loading={managementState.cancelLoading}
+            onSubmit={cancelRegistration}
+            onClose={closeAllModals}
+          />
+        )}
+
+        {managementState.auditTrailModalOpen && managementState.selectedRegistration && (
+          <AuditTrailView
+            registrationId={managementState.selectedRegistration.id}
+            onClose={closeAllModals}
+          />
+        )}
       </div>
     </div>
   );
