@@ -7,9 +7,10 @@ import { AdminRegistrationsController } from './controllers/admin-registrations.
 import { PrismaModule } from '../common/prisma/prisma.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { AdminAuditModule } from '../admin-audit/admin-audit.module';
+import { PaymentsModule } from '../payments/payments.module';
 
 @Module({
-  imports: [PrismaModule, NotificationsModule, AdminAuditModule],
+  imports: [PrismaModule, NotificationsModule, AdminAuditModule, PaymentsModule],
   controllers: [RegistrationsController, AdminRegistrationsController],
   providers: [RegistrationsService, RegistrationAdminService, RegistrationCleanupService],
   exports: [RegistrationsService, RegistrationAdminService, RegistrationCleanupService],

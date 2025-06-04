@@ -255,8 +255,6 @@ ${refundMessage}
 
 If you have any questions about this cancellation, please contact us.
 
-Thank you for your understanding.
-
 Best regards,
 ${templateData.campName} Team`;
 
@@ -290,8 +288,6 @@ ${templateData.campName} Team`;
         ` : ''}
         
         <p>If you have any questions about this cancellation, please contact us.</p>
-        
-        <p>Thank you for your understanding.</p>
         
         <p>Best regards,<br>
         <strong>${templateData.campName} Team</strong></p>
