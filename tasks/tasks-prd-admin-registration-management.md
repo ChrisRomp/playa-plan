@@ -135,12 +135,12 @@ Based on `prd-admin-registration-management.md`
     - [x] 5.2.11 Test processAutoRefunds() handles partial refund failures gracefully
     - [x] 5.2.12 Test processAutoRefunds() formats refund amounts correctly (no division by 100)
     - [x] 5.2.13 Test cancelRegistration() continues even when automatic refunds fail
-  - [ ] 5.3 RegistrationCleanupService Unit Tests
-    - [ ] 5.3.1 Test cleanupRegistration() deletes associated work shifts
-    - [ ] 5.3.2 Test cleanupRegistration() releases camping option allocations
-    - [ ] 5.3.3 Test cleanup operations handle missing related records gracefully
-    - [ ] 5.3.4 Test cleanup creates appropriate audit records for each operation
-    - [ ] 5.3.5 Test cleanup operations are atomic and roll back on failures
+  - [x] 5.3 RegistrationCleanupService Unit Tests
+    - [x] 5.3.1 Test cleanupRegistration() deletes associated work shifts
+    - [x] 5.3.2 Test cleanupRegistration() releases camping option allocations
+    - [x] 5.3.3 Test cleanup operations handle missing related records gracefully
+    - [x] 5.3.4 Test cleanup creates appropriate audit records for each operation
+    - [x] 5.3.5 Test cleanup operations are atomic and roll back on failures
   - [ ] 5.4 AdminRegistrationsController Unit Tests
     - [ ] 5.4.1 Test GET /admin/registrations endpoint with proper authorization
     - [ ] 5.4.2 Test PUT /admin/registrations/:id endpoint with validation and audit logging
