@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { ArrowLeft, Filter, X, Users, CheckCircle, AlertTriangle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { ROUTES } from '../routes';
@@ -58,7 +58,9 @@ export function ManageRegistrationsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filters, setFilters] = useState<RegistrationFilters>({});
+  const [localFilters, setLocalFilters] = useState<RegistrationFilters>({});
   const [showFilters, setShowFilters] = useState(false);
+  const debounceTimerRef = useRef<NodeJS.Timeout>();
 
   // Fetch registrations from API
   const fetchRegistrations = useCallback(async () => {
@@ -78,6 +80,23 @@ export function ManageRegistrationsPage() {
       setLoading(false);
     }
   }, [filters]);
+
+  // Debounced effect to update filters
+  useEffect(() => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    debounceTimerRef.current = setTimeout(() => {
+      setFilters(localFilters);
+    }, 500); // 500ms debounce
+
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, [localFilters]);
 
   useEffect(() => {
     fetchRegistrations();
@@ -103,13 +122,14 @@ export function ManageRegistrationsPage() {
   }, [registrations]);
 
   const handleFilterChange = (key: keyof RegistrationFilters, value: string) => {
-    setFilters(prev => ({
+    setLocalFilters(prev => ({
       ...prev,
       [key]: value === '' ? undefined : key === 'year' ? parseInt(value) : value
     }));
   };
 
   const clearFilters = () => {
+    setLocalFilters({});
     setFilters({});
   };
 
@@ -227,7 +247,7 @@ export function ManageRegistrationsPage() {
                   Year
                 </label>
                 <select
-                  value={filters.year || ''}
+                  value={localFilters.year || ''}
                   onChange={(e) => handleFilterChange('year', e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500"
                 >
@@ -242,7 +262,7 @@ export function ManageRegistrationsPage() {
                   Status
                 </label>
                 <select
-                  value={filters.status || ''}
+                  value={localFilters.status || ''}
                   onChange={(e) => handleFilterChange('status', e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500"
                 >
@@ -259,7 +279,7 @@ export function ManageRegistrationsPage() {
                 </label>
                 <input
                   type="text"
-                  value={filters.email || ''}
+                  value={localFilters.email || ''}
                   onChange={(e) => handleFilterChange('email', e.target.value)}
                   placeholder="Search by email..."
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500"
@@ -271,7 +291,7 @@ export function ManageRegistrationsPage() {
                 </label>
                 <input
                   type="text"
-                  value={filters.name || ''}
+                  value={localFilters.name || ''}
                   onChange={(e) => handleFilterChange('name', e.target.value)}
                   placeholder="Search by name..."
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500"
