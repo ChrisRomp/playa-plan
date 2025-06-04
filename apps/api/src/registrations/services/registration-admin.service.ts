@@ -681,13 +681,13 @@ export class RegistrationAdminService {
     // Build result message
     let message = '';
     if (refundedCount > 0) {
-      message += `Automatically refunded ${refundedCount} payment(s) totaling $${(totalRefunded / 100).toFixed(2)}.`;
+      message += `Automatically refunded ${refundedCount} payment(s) totaling $${totalRefunded.toFixed(2)}.`;
     }
     if (failedRefunds.length > 0) {
       message += ` ${failedRefunds.length} automatic refund(s) failed and require manual processing.`;
     }
     if (manualPayments.length > 0) {
-      message += ` ${manualPayments.length} manual payment(s) totaling $${(totalManual / 100).toFixed(2)} require manual refund processing.`;
+      message += ` ${manualPayments.length} manual payment(s) totaling $${totalManual.toFixed(2)} require manual refund processing.`;
     }
     if (message === '') {
       message = 'No payments required refunding.';
