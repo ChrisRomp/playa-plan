@@ -54,6 +54,14 @@ interface RegistrationFilters {
   limit?: number;
 }
 
+export interface PaginatedRegistrationsResponse {
+  registrations: Registration[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
 interface AuditRecord {
   id: string;
   adminUserId: string;
@@ -80,7 +88,7 @@ export const adminRegistrationsApi = {
   /**
    * Get paginated list of registrations with optional filters
    */
-  getRegistrations: async (filters: RegistrationFilters = {}): Promise<Registration[]> => {
+  getRegistrations: async (filters: RegistrationFilters = {}): Promise<PaginatedRegistrationsResponse> => {
     const params = new URLSearchParams();
     
     if (filters.year) params.append('year', filters.year.toString());

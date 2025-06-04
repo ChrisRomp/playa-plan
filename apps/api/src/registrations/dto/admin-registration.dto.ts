@@ -5,8 +5,12 @@ import {
   IsUUID, 
   IsArray, 
   IsNotEmpty,
-  IsBoolean
+  IsBoolean,
+  IsNumber,
+  IsInt,
+  Min
 } from 'class-validator';
+import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { RegistrationStatus, Registration } from '@prisma/client';
 
@@ -107,6 +111,9 @@ export class AdminRegistrationQueryDto {
     example: 2024,
   })
   @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: 'Year must be an integer' })
+  @Min(2020, { message: 'Year must be 2020 or later' })
   year?: number;
 
   @ApiPropertyOptional({
@@ -140,6 +147,9 @@ export class AdminRegistrationQueryDto {
     default: 1,
   })
   @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: 'Page must be an integer' })
+  @Min(1, { message: 'Page must be 1 or greater' })
   page?: number;
 
   @ApiPropertyOptional({
@@ -148,6 +158,9 @@ export class AdminRegistrationQueryDto {
     default: 50,
   })
   @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: 'Limit must be an integer' })
+  @Min(1, { message: 'Limit must be 1 or greater' })
   limit?: number;
 }
 

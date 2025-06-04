@@ -69,7 +69,8 @@ export class RegistrationAdminService {
     }
 
     if (query.year) {
-      where.year = query.year;
+      // Convert year to number if it's a string
+      where.year = typeof query.year === 'string' ? parseInt(query.year, 10) : query.year;
     }
 
     if (query.status) {

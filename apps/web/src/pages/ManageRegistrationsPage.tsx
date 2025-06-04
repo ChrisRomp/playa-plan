@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { ROUTES } from '../routes';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import RegistrationSearchTable from '../components/admin/registrations/RegistrationSearchTable';
+import { adminRegistrationsApi, PaginatedRegistrationsResponse } from '../lib/api/admin-registrations';
 
 // TODO: Replace with actual API types when implemented
 interface Registration {
@@ -59,64 +60,24 @@ export function ManageRegistrationsPage() {
   const [filters, setFilters] = useState<RegistrationFilters>({});
   const [showFilters, setShowFilters] = useState(false);
 
-  // Mock data for development - replace with actual API call
+  // Fetch registrations from API
   const fetchRegistrations = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      // TODO: Replace with actual API call to /admin/registrations
-      // const data = await adminRegistrationsApi.getRegistrations(filters);
-      
-      // Mock data for development
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      const mockData: Registration[] = [
-        {
-          id: '1',
-          year: 2024,
-          status: 'CONFIRMED',
-          createdAt: '2024-01-15T10:00:00Z',
-          user: {
-            id: 'user1',
-            email: 'john.doe@example.com',
-            firstName: 'John',
-            lastName: 'Doe',
-            playaName: 'Sparkles',
-            role: 'PARTICIPANT',
-          },
-          jobs: [
-            {
-              job: {
-                id: 'job1',
-                name: 'Kitchen Helper',
-                category: { name: 'Kitchen' },
-                shift: {
-                  name: 'Morning Shift',
-                  startTime: '08:00',
-                  endTime: '12:00',
-                  dayOfWeek: 'MONDAY',
-                },
-              },
-            },
-          ],
-          payments: [
-            {
-              id: 'payment1',
-              amount: 150.00,
-              status: 'COMPLETED',
-            },
-          ],
-        },
-        // Add more mock data as needed
-      ];
-      
-      setRegistrations(mockData);
+      const data: PaginatedRegistrationsResponse = await adminRegistrationsApi.getRegistrations(filters);
+      console.log('API response:', data); // Debug log
+      // Extract registrations array from the response object
+      const registrationsArray = data?.registrations || [];
+      setRegistrations(Array.isArray(registrationsArray) ? registrationsArray : []);
     } catch (err) {
-      setError('Failed to fetch registrations data');
       console.error('Error fetching registrations:', err);
+      setError('Failed to fetch registrations data');
+      setRegistrations([]); // Set empty array on error
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [filters]);
 
   useEffect(() => {
     fetchRegistrations();
@@ -124,17 +85,20 @@ export function ManageRegistrationsPage() {
 
   // Get summary statistics
   const stats = useMemo(() => {
-    const total = registrations.length;
-    const confirmed = registrations.filter(r => r.status === 'CONFIRMED').length;
-    const pending = registrations.filter(r => r.status === 'PENDING').length;
-    const cancelled = registrations.filter(r => r.status === 'CANCELLED').length;
+    // Ensure registrations is an array before filtering
+    const regArray = Array.isArray(registrations) ? registrations : [];
+    const total = regArray.length;
+    const confirmed = regArray.filter(r => r.status === 'CONFIRMED').length;
+    const pending = regArray.filter(r => r.status === 'PENDING').length;
+    const cancelled = regArray.filter(r => r.status === 'CANCELLED').length;
     
     return { total, confirmed, pending, cancelled };
   }, [registrations]);
 
   // Get unique years for filter dropdown
   const availableYears = useMemo(() => {
-    const years = [...new Set(registrations.map(reg => reg.year))].sort((a, b) => b - a);
+    const regArray = Array.isArray(registrations) ? registrations : [];
+    const years = [...new Set(regArray.map(reg => reg.year))].sort((a, b) => b - a);
     return years;
   }, [registrations]);
 
