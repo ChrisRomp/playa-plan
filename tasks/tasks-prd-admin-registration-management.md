@@ -113,28 +113,28 @@ Based on `prd-admin-registration-management.md`
   - [x] 4.9 Log notification attempts in existing email audit system
   - [x] 4.10 Ensure notifications include admin contact information for questions
 
-- [ ] 5.0 Implement Comprehensive Testing Suite
-  - [ ] 5.1 AdminAuditService Unit Tests
+- [x] 5.0 Implement Comprehensive Testing Suite
+  - [x] 5.1 AdminAuditService Unit Tests
     - [x] 5.1.1 Test createAuditRecord() with all required fields and proper data types
     - [x] 5.1.2 Test getAuditTrail() returns audit records for specific registration
     - [x] 5.1.3 Test audit logging handles JSON serialization of old/new values
     - [x] 5.1.4 Test audit record creation with different action types and target types
     - [x] 5.1.5 Test error handling for database failures during audit logging
     - [x] 5.1.6 Test audit records use IDs for target records to avoid PII, but include admin user information via joins
-  - [ ] 5.2 RegistrationAdminService Unit Tests
-    - [ ] 5.2.1 Test editRegistration() successfully updates registration and creates audit record
-    - [ ] 5.2.2 Test editRegistration() prevents modification of cancelled registrations
-    - [ ] 5.2.3 Test editRegistration() handles camping option modifications with availability checks
-    - [ ] 5.2.4 Test editRegistration() handles work shift modifications with availability checks
-    - [ ] 5.2.5 Test editRegistration() uses Prisma transactions for atomicity
-    - [ ] 5.2.6 Test cancelRegistration() updates status and triggers cleanup services
-    - [ ] 5.2.7 Test cancelRegistration() handles refund prompting for paid registrations
-    - [ ] 5.2.8 Test error handling for invalid registration IDs and unauthorized access
-    - [ ] 5.2.9 Test processAutoRefunds() correctly processes Stripe and PayPal payments automatically
-    - [ ] 5.2.10 Test processAutoRefunds() skips MANUAL payments and includes them in manual processing message
-    - [ ] 5.2.11 Test processAutoRefunds() handles partial refund failures gracefully
-    - [ ] 5.2.12 Test processAutoRefunds() formats refund amounts correctly (no division by 100)
-    - [ ] 5.2.13 Test cancelRegistration() continues even when automatic refunds fail
+  - [x] 5.2 RegistrationAdminService Unit Tests
+    - [x] 5.2.1 Test editRegistration() successfully updates registration and creates audit record
+    - [x] 5.2.2 Test editRegistration() prevents modification of cancelled registrations
+    - [x] 5.2.3 Test editRegistration() handles camping option modifications with availability checks
+    - [x] 5.2.4 Test editRegistration() handles work shift modifications with availability checks
+    - [x] 5.2.5 Test editRegistration() uses Prisma transactions for atomicity
+    - [x] 5.2.6 Test cancelRegistration() updates status and triggers cleanup services
+    - [x] 5.2.7 Test cancelRegistration() handles refund prompting for paid registrations
+    - [x] 5.2.8 Test error handling for invalid registration IDs and unauthorized access
+    - [x] 5.2.9 Test processAutoRefunds() correctly processes Stripe and PayPal payments automatically
+    - [x] 5.2.10 Test processAutoRefunds() skips MANUAL payments and includes them in manual processing message
+    - [x] 5.2.11 Test processAutoRefunds() handles partial refund failures gracefully
+    - [x] 5.2.12 Test processAutoRefunds() formats refund amounts correctly (no division by 100)
+    - [x] 5.2.13 Test cancelRegistration() continues even when automatic refunds fail
   - [ ] 5.3 RegistrationCleanupService Unit Tests
     - [ ] 5.3.1 Test cleanupRegistration() deletes associated work shifts
     - [ ] 5.3.2 Test cleanupRegistration() releases camping option allocations
