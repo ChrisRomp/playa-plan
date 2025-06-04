@@ -234,7 +234,7 @@ export class AdminNotificationsService {
     const refundInfo = templateData.refundInfo as RefundInfo | undefined;
     
     const refundMessage = refundInfo?.processed 
-      ? `A refund of ${refundInfo.amount} ${refundInfo.currency} has been processed and will appear on your payment method within 5-10 business days.`
+      ? `A refund of $${(refundInfo.amount / 100).toFixed(2)} has been processed. If paid by credit card, your refund will appear on your payment method within 5-10 business days.`
       : '';
 
     const subject = `Registration Cancelled - ${templateData.campName} ${templateData.registrationDetails?.year}`;
@@ -253,7 +253,7 @@ ${adminInfo?.reason}
 
 ${refundMessage}
 
-If you have any questions about this cancellation, please contact us at ${adminInfo?.email}.
+If you have any questions about this cancellation, please contact us.
 
 Thank you for your understanding.
 
@@ -289,7 +289,7 @@ ${templateData.campName} Team`;
         </div>
         ` : ''}
         
-        <p>If you have any questions about this cancellation, please contact us at <a href="mailto:${adminInfo?.email}">${adminInfo?.email}</a>.</p>
+        <p>If you have any questions about this cancellation, please contact us.</p>
         
         <p>Thank you for your understanding.</p>
         
