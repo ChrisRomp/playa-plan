@@ -141,16 +141,16 @@ Based on `prd-admin-registration-management.md`
     - [x] 5.3.3 Test cleanup operations handle missing related records gracefully
     - [x] 5.3.4 Test cleanup creates appropriate audit records for each operation
     - [x] 5.3.5 Test cleanup operations are atomic and roll back on failures
-  - [ ] 5.4 AdminRegistrationsController Unit Tests
-    - [ ] 5.4.1 Test GET /admin/registrations endpoint with proper authorization
-    - [ ] 5.4.2 Test PUT /admin/registrations/:id endpoint with validation and audit logging
-    - [ ] 5.4.3 Test DELETE /admin/registrations/:id endpoint with confirmation and cleanup
-    - [ ] 5.4.4 Test GET /admin/registrations/:id/audit-trail endpoint returns audit history
-    - [ ] 5.4.5 Test unauthorized access returns proper HTTP status codes
-    - [ ] 5.4.6 Test validation errors return appropriate error messages
-    - [ ] 5.4.7 Test participant users receive 403 Forbidden for all admin registration endpoints
-    - [ ] 5.4.8 Test staff users receive 403 Forbidden for all admin registration endpoints
-    - [ ] 5.4.9 Test unauthenticated requests receive 401 Unauthorized for all endpoints
+  - [x] 5.4 AdminRegistrationsController Unit Tests
+    - [x] 5.4.1 Test GET /admin/registrations endpoint with proper authorization
+    - [x] 5.4.2 Test PUT /admin/registrations/:id endpoint with validation and audit logging
+    - [x] 5.4.3 Test DELETE /admin/registrations/:id endpoint with confirmation and cleanup
+    - [x] 5.4.4 Test GET /admin/registrations/:id/audit-trail endpoint returns audit history
+    - [x] 5.4.5 Test unauthorized access returns proper HTTP status codes
+    - [x] 5.4.6 Test validation errors return appropriate error messages
+    - [x] 5.4.7 Test participant users receive 403 Forbidden for all admin registration endpoints
+    - [x] 5.4.8 Test staff users receive 403 Forbidden for all admin registration endpoints
+    - [x] 5.4.9 Test unauthenticated requests receive 401 Unauthorized for all endpoints
   - [ ] 5.5 AdminNotificationsService Unit Tests
     - [ ] 5.5.1 Test sendRegistrationModificationNotification() uses correct template and format
     - [ ] 5.5.2 Test sendRegistrationCancellationNotification() sends simple cancellation notice
