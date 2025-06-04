@@ -791,7 +791,6 @@ export class NotificationsService {
     
     // Check if this is an admin modification
     const isAdminModification = Boolean(data?.adminInfo);
-    const adminInfo = data?.adminInfo;
     
     const subject = isAdminModification 
       ? `Registration Modified - ${campName} ${registrationDetails.year}`
@@ -801,45 +800,27 @@ export class NotificationsService {
       ? `Your registration for ${campName} ${registrationDetails.year} has been modified by our administrative team.`
       : this.getRegistrationStatusMessage(status);
     
-    const adminSection = isAdminModification && adminInfo ? `
-
-Administrative Changes:
-- Modified by: ${adminInfo.name}
-- Reason: ${adminInfo.reason}
-- Contact: ${adminInfo.email}
-
-Your current registration details are shown below.` : '';
-
-    const adminHtmlSection = isAdminModification && adminInfo ? `
-      <div style="background-color: #fef3c7; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #f59e0b;">
-        <h3 style="margin-top: 0; color: #92400e;">Administrative Changes</h3>
-        <ul style="margin: 5px 0; padding-left: 20px;">
-          <li><strong>Modified by:</strong> ${adminInfo.name}</li>
-          <li><strong>Reason:</strong> ${adminInfo.reason}</li>
-          <li><strong>Contact:</strong> <a href="mailto:${adminInfo.email}">${adminInfo.email}</a></li>
-        </ul>
-        <p style="margin: 10px 0 0 0; font-style: italic;">Your current registration details are shown below.</p>
-      </div>
-    ` : '';
+    const duesLine = isAdminModification ? '' : `Total Dues: ${formattedAmount}\n`;
     
     const text = `${greeting}
       
-${statusMessage}${adminSection}
+${statusMessage}
       
 Status: ${friendlyStatus}
 Date: ${formattedDate}
-Total Dues: ${formattedAmount}
-      
+${duesLine}      
 Selected Options:
 ${campingOptions ? campingOptions.map(option => `- ${option.name}`).join('\n') : 'N/A'}
       
 Work Shift(s):
 ${jobs ? jobs.map(job => `- ${job.category}: ${this.getFriendlyDayName(job.shift.dayOfWeek)} ${job.shift.startTime}-${job.shift.endTime}`).join('\n') : 'N/A'}
       
-${isAdminModification ? `If you have any questions about these changes, please contact ${adminInfo?.email}.` : 'Thank you for registering with ' + campName + '!'}
+${isAdminModification ? `If you have any questions about these changes, please contact us.` : 'Thank you for registering with ' + campName + '!'}
       
 Best regards,
 The ${campName} Team`;
+
+    const duesHtml = isAdminModification ? '' : `<p><strong>Total Dues:</strong> ${formattedAmount}</p>`;
 
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
@@ -847,13 +828,11 @@ The ${campName} Team`;
         <p>${greeting}</p>
         <p>${statusMessage}</p>
         
-        ${adminHtmlSection}
-        
         <div style="background-color: #f9fafb; padding: 15px; border-radius: 5px; margin: 20px 0;">
           <h3 style="margin-top: 0; color: #374151;">Registration Details</h3>
           <p><strong>Status:</strong> ${friendlyStatus}</p>
           <p><strong>Date:</strong> ${formattedDate}</p>
-          <p><strong>Total Dues:</strong> ${formattedAmount}</p>
+          ${duesHtml}
         </div>
         
         <div style="background-color: #f0f9ff; padding: 15px; border-radius: 5px; margin: 20px 0;">
@@ -870,7 +849,7 @@ The ${campName} Team`;
           </ul>
         </div>
         
-        <p>${isAdminModification ? `If you have any questions about these changes, please contact <a href="mailto:${adminInfo?.email}">${adminInfo?.email}</a>.` : `Thank you for registering with ${campName}!`}</p>
+        <p>${isAdminModification ? `If you have any questions about these changes, please contact us.` : `Thank you for registering with ${campName}!`}</p>
         
         <p>Best regards,<br>
         <strong>The ${campName} Team</strong></p>
