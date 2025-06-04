@@ -51,12 +51,16 @@ interface Job {
 interface CampingOption {
   id: string;
   name: string;
-  description?: string;
-  pricePerPerson: number;
-  maxOccupancy?: number;
+  description?: string | null;
+  enabled: boolean;
+  workShiftsRequired: number;
+  participantDues: number;
+  staffDues: number;
+  maxSignups: number;
   currentRegistrations?: number;
   availabilityStatus?: boolean;
-  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 interface RegistrationEditData {
@@ -109,6 +113,15 @@ interface AuditRecord {
   };
 }
 
+// Backend interface for API compatibility
+interface BackendRegistrationEditData {
+  status: 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'WAITLISTED';
+  jobIds: string[];
+  campingOptionIds: string[];
+  reason: string;
+  sendNotification: boolean;
+}
+
 /**
  * API client for admin registration management operations
  */
@@ -150,7 +163,16 @@ export const adminRegistrationsApi = {
    * Edit a registration
    */
   editRegistration: async (registrationId: string, data: RegistrationEditData): Promise<void> => {
-    await api.put(`/admin/registrations/${registrationId}`, data);
+    // Transform frontend 'notes' to backend 'reason' field
+    const backendData: BackendRegistrationEditData = {
+      status: data.status,
+      jobIds: data.jobIds,
+      campingOptionIds: data.campingOptionIds,
+      reason: data.notes || '', // Backend expects 'reason' field
+      sendNotification: data.sendNotification,
+    };
+    
+    await api.put(`/admin/registrations/${registrationId}`, backendData);
   },
 
   /**

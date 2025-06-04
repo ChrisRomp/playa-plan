@@ -46,12 +46,12 @@ export class AdminEditRegistrationDto {
   campingOptionIds?: string[];
 
   @ApiProperty({
-    description: 'Reason for the administrative action',
+    description: 'Notes or reason for the administrative action',
     example: 'User requested change due to vehicle breakdown',
   })
-  @IsString({ message: 'Reason must be a string' })
-  @IsNotEmpty({ message: 'Reason is required for admin actions' })
-  reason!: string;
+  @IsString({ message: 'Notes must be a string' })
+  @IsOptional()
+  notes?: string;
 
   @ApiPropertyOptional({
     description: 'Whether to send notification to user about the changes',

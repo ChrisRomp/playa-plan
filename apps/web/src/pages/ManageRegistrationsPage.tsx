@@ -179,7 +179,9 @@ export function ManageRegistrationsPage() {
         id: `registration-job-${index}`, // Generate ID since it's not in the API response
         job: rj.job
       })),
-      campingOptions: [] // TODO: Fetch actual camping options for this registration
+      // Note: Camping options are stored separately in CampingOptionRegistration table
+      // This would require a separate API call to fetch user's camping options
+      campingOptions: [] 
     };
   };
 

@@ -195,7 +195,7 @@ export class RegistrationAdminService {
             targetRecordId: registrationId,
             oldValues: { status: currentRegistration.status },
             newValues: { status: editData.status },
-            reason: editData.reason,
+            reason: editData.notes || 'No notes provided',
             transactionId,
           });
         }
@@ -211,7 +211,7 @@ export class RegistrationAdminService {
             await this.cleanupService.cleanupWorkShifts(
               registrationId,
               adminUserId,
-              `Work shifts modified: ${editData.reason}`,
+              `Work shifts modified: ${editData.notes || 'No notes provided'}`,
               transactionId,
             );
           }
@@ -240,7 +240,7 @@ export class RegistrationAdminService {
               targetRecordId: jobId,
               oldValues: undefined,
               newValues: { registrationId, jobId, jobName: job.name },
-              reason: `Work shift added: ${editData.reason}`,
+              reason: `Work shift added: ${editData.notes || 'No notes provided'}`,
               transactionId,
             });
           }
@@ -253,7 +253,7 @@ export class RegistrationAdminService {
               targetRecordId: registrationId,
               oldValues: { jobIds: currentJobIds },
               newValues: { jobIds: newJobIds },
-              reason: editData.reason,
+              reason: editData.notes || 'No notes provided',
               transactionId,
             });
           }
@@ -279,7 +279,7 @@ export class RegistrationAdminService {
               currentRegistration.userId,
               campingOptionsToRemove,
               adminUserId,
-              `Camping options modified: ${editData.reason}`,
+              `Camping options modified: ${editData.notes || 'No notes provided'}`,
               transactionId,
             );
           }
@@ -324,7 +324,7 @@ export class RegistrationAdminService {
                 campingOptionId, 
                 campingOptionName: campingOption.name 
               },
-              reason: `Camping option added: ${editData.reason}`,
+              reason: `Camping option added: ${editData.notes || 'No notes provided'}`,
               transactionId,
             });
           }
@@ -337,7 +337,7 @@ export class RegistrationAdminService {
               targetRecordId: registrationId,
               oldValues: { campingOptionIds: currentCampingOptionIds },
               newValues: { campingOptionIds: newCampingOptionIds },
-              reason: editData.reason,
+              reason: editData.notes || 'No notes provided',
               transactionId,
             });
           }
@@ -416,7 +416,7 @@ export class RegistrationAdminService {
                   location: 'TBD', // TODO: Add location field to job schema
                 })) || [],
               },
-              reason: editData.reason,
+              reason: editData.notes || 'No notes provided',
             };
 
             const success = await this.adminNotificationsService.sendRegistrationModificationNotification(notificationData);

@@ -61,10 +61,16 @@ interface Job {
 interface CampingOption {
   id: string;
   name: string;
-  description?: string;
-  pricePerPerson: number;
-  maxOccupancy?: number;
-  currentOccupancy?: number;
+  description?: string | null;
+  enabled: boolean;
+  workShiftsRequired: number;
+  participantDues: number;
+  staffDues: number;
+  maxSignups: number;
+  currentRegistrations?: number;
+  availabilityStatus?: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 interface RegistrationEditFormProps {
@@ -359,13 +365,13 @@ export function RegistrationEditForm({
                         />
                         <div className="ml-3 flex-1">
                           <div className="text-sm font-medium text-gray-900">{option.name}</div>
-                          <div className="text-xs text-gray-500">${option.pricePerPerson}/person</div>
+                          <div className="text-xs text-gray-500">${option.participantDues} participant dues</div>
                           {option.description && (
                             <div className="text-xs text-gray-500">{option.description}</div>
                           )}
-                          {option.maxOccupancy && option.currentOccupancy !== undefined && (
+                          {option.maxSignups > 0 && option.currentRegistrations !== undefined && (
                             <div className="text-xs text-gray-500">
-                              {option.currentOccupancy}/{option.maxOccupancy} occupied
+                              {option.currentRegistrations}/{option.maxSignups} registered
                             </div>
                           )}
                         </div>
