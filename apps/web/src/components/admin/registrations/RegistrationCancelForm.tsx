@@ -136,10 +136,10 @@ export function RegistrationCancelForm({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 max-h-[90vh] overflow-hidden">
-        <form onSubmit={handleSubmit} className="flex flex-col h-full">
+      <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 max-h-[90vh] flex flex-col">
+        <form onSubmit={handleSubmit} className="flex flex-col h-full min-h-0">
           {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b">
+          <div className="flex items-center justify-between p-6 border-b flex-shrink-0">
             <div className="flex items-center space-x-3">
               <div className="flex-shrink-0 w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
                 <Trash2 size={16} className="text-red-600" />
@@ -161,7 +161,7 @@ export function RegistrationCancelForm({
           </div>
 
           {/* Content */}
-          <div className="flex-1 overflow-y-auto p-6 space-y-6">
+          <div className="flex-1 overflow-y-auto p-6 space-y-6 min-h-0">
             {/* Warning */}
             <div className="bg-red-50 border border-red-200 rounded-md p-4">
               <div className="flex">
@@ -263,7 +263,7 @@ export function RegistrationCancelForm({
           </div>
 
           {/* Footer */}
-          <div className="flex items-center justify-between p-6 border-t bg-gray-50">
+          <div className="flex items-center justify-between p-6 border-t bg-gray-50 flex-shrink-0">
             <div className="text-sm text-gray-600">
               {hasPayments && formData.processRefund 
                 ? `Refund of $${totalPaid.toFixed(2)} will be processed`
