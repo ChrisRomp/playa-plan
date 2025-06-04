@@ -130,6 +130,11 @@ Based on `prd-admin-registration-management.md`
     - [ ] 5.2.6 Test cancelRegistration() updates status and triggers cleanup services
     - [ ] 5.2.7 Test cancelRegistration() handles refund prompting for paid registrations
     - [ ] 5.2.8 Test error handling for invalid registration IDs and unauthorized access
+    - [ ] 5.2.9 Test processAutoRefunds() correctly processes Stripe and PayPal payments automatically
+    - [ ] 5.2.10 Test processAutoRefunds() skips MANUAL payments and includes them in manual processing message
+    - [ ] 5.2.11 Test processAutoRefunds() handles partial refund failures gracefully
+    - [ ] 5.2.12 Test processAutoRefunds() formats refund amounts correctly (no division by 100)
+    - [ ] 5.2.13 Test cancelRegistration() continues even when automatic refunds fail
   - [ ] 5.3 RegistrationCleanupService Unit Tests
     - [ ] 5.3.1 Test cleanupRegistration() deletes associated work shifts
     - [ ] 5.3.2 Test cleanupRegistration() releases camping option allocations
@@ -152,32 +157,58 @@ Based on `prd-admin-registration-management.md`
     - [ ] 5.5.3 Test notification toggle respects user preferences (default disabled)
     - [ ] 5.5.4 Test notification failures don't block main registration operations
     - [ ] 5.5.5 Test notifications include current registration status and admin contact info
-  - [ ] 5.6 Frontend Component Unit Tests
-    - [ ] 5.6.1 Test RegistrationEditForm renders correctly with current registration data
-    - [ ] 5.6.2 Test RegistrationEditForm handles camping option changes with validation
-    - [ ] 5.6.3 Test RegistrationEditForm handles work shift modifications correctly
-    - [ ] 5.6.4 Test RegistrationCancelForm displays refund prompting for paid registrations
-    - [ ] 5.6.5 Test RegistrationCancelForm notification toggle defaults to unchecked
-    - [ ] 5.6.6 Test RegistrationSearchTable displays action buttons and handles clicks
-    - [ ] 5.6.7 Test AuditTrailView displays audit history in readable format
-    - [ ] 5.6.8 Test useRegistrationManagement hook handles API calls and state management
-  - [ ] 5.7 Integration Tests
-    - [ ] 5.7.1 Test complete registration edit workflow from API to database
-    - [ ] 5.7.2 Test complete registration cancellation workflow with cleanup
-    - [ ] 5.7.3 Test audit trail creation and retrieval across all admin operations
-    - [ ] 5.7.4 Test notification integration with admin operations
-    - [ ] 5.7.5 Test authorization and role-based access control for all endpoints
-    - [ ] 5.7.6 Test frontend-backend integration for all admin registration operations
-    - [ ] 5.7.7 Test participant users cannot access admin registration management endpoints (401/403 responses)
-    - [ ] 5.7.8 Test staff users cannot access admin registration management endpoints (401/403 responses)
-    - [ ] 5.7.9 Test JWT token validation and expiration handling for admin endpoints
-  - [ ] 5.8 End-to-End Tests
-    - [ ] 5.8.1 Test admin can find, edit, and save registration changes successfully
-    - [ ] 5.8.2 Test admin can cancel registration with optional refund and notification
-    - [ ] 5.8.3 Test audit trail is visible and accurate after admin operations
-    - [ ] 5.8.4 Test unauthorized users cannot access admin registration management
-    - [ ] 5.8.5 Test error handling and user feedback for all admin operations
-    - [ ] 5.8.6 Test mobile responsiveness of admin registration management interface
-    - [ ] 5.8.7 Test participant users are redirected or shown access denied when attempting to access admin registration management
-    - [ ] 5.8.8 Test staff users are redirected or shown access denied when attempting to access admin registration management
-    - [ ] 5.8.9 Test admin navigation menu only shows "Manage Registrations" for admin role users 
+    - [ ] 5.5.6 Test modification notifications exclude dues information for admin changes
+    - [ ] 5.5.7 Test cancellation notifications use generic "contact us" instead of admin email
+    - [ ] 5.5.8 Test cancellation notifications include refund amount when processed automatically
+  - [ ] 5.6 PaymentsService Unit Tests
+    - [ ] 5.6.1 Test processRefund() successfully processes Stripe refunds with payment intent IDs
+    - [ ] 5.6.2 Test processRefund() converts checkout session IDs to payment intent IDs for Stripe
+    - [ ] 5.6.3 Test processRefund() maps custom refund reasons to valid Stripe reasons
+    - [ ] 5.6.4 Test processRefund() handles PayPal refunds with dollar amounts
+    - [ ] 5.6.5 Test processRefund() handles MANUAL payment refunds (database-only updates)
+    - [ ] 5.6.6 Test processRefund() correctly formats refund amounts for different providers
+    - [ ] 5.6.7 Test processRefund() fails gracefully when Stripe session has no payment intent
+    - [ ] 5.6.8 Test processRefund() handles Stripe API errors appropriately
+  - [ ] 5.7 StripeService Unit Tests  
+    - [ ] 5.7.1 Test createRefund() accepts payment intent IDs directly
+    - [ ] 5.7.2 Test createRefund() converts checkout session IDs to payment intent IDs
+    - [ ] 5.7.3 Test createRefund() maps custom reasons to valid Stripe refund reasons
+    - [ ] 5.7.4 Test createRefund() handles expanded payment intent objects in session response
+    - [ ] 5.7.5 Test createRefund() fails appropriately when session has no payment intent
+    - [ ] 5.7.6 Test getCheckoutSession() expands payment intent data correctly
+  - [ ] 5.8 Frontend Component Unit Tests
+    - [ ] 5.8.1 Test RegistrationEditForm renders correctly with current registration data
+    - [ ] 5.8.2 Test RegistrationEditForm handles camping option changes with validation
+    - [ ] 5.8.3 Test RegistrationEditForm handles work shift modifications correctly
+    - [ ] 5.8.4 Test RegistrationCancelForm displays refund prompting for paid registrations
+    - [ ] 5.8.5 Test RegistrationCancelForm notification toggle defaults to unchecked
+    - [ ] 5.8.6 Test RegistrationCancelForm modal scrolls properly with long content
+    - [ ] 5.8.7 Test RegistrationSearchTable displays action buttons and handles clicks
+    - [ ] 5.8.8 Test AuditTrailView displays audit history in readable format
+    - [ ] 5.8.9 Test useRegistrationManagement hook handles API calls and state management
+  - [ ] 5.9 Integration Tests
+    - [ ] 5.9.1 Test complete registration edit workflow from API to database
+    - [ ] 5.9.2 Test complete registration cancellation workflow with cleanup
+    - [ ] 5.9.3 Test audit trail creation and retrieval across all admin operations
+    - [ ] 5.9.4 Test notification integration with admin operations
+    - [ ] 5.9.5 Test authorization and role-based access control for all endpoints
+    - [ ] 5.9.6 Test frontend-backend integration for all admin registration operations
+    - [ ] 5.9.7 Test participant users cannot access admin registration management endpoints (401/403 responses)
+    - [ ] 5.9.8 Test staff users cannot access admin registration management endpoints (401/403 responses)
+    - [ ] 5.9.9 Test JWT token validation and expiration handling for admin endpoints
+    - [ ] 5.9.10 Test automatic refund processing integration with Stripe and PayPal
+    - [ ] 5.9.11 Test MANUAL payment provider handling in refund workflows
+    - [ ] 5.9.12 Test email notification templates with conditional content based on admin modifications
+  - [ ] 5.10 End-to-End Tests
+    - [ ] 5.10.1 Test admin can find, edit, and save registration changes successfully
+    - [ ] 5.10.2 Test admin can cancel registration with optional refund and notification
+    - [ ] 5.10.3 Test audit trail is visible and accurate after admin operations
+    - [ ] 5.10.4 Test unauthorized users cannot access admin registration management
+    - [ ] 5.10.5 Test error handling and user feedback for all admin operations
+    - [ ] 5.10.6 Test mobile responsiveness of admin registration management interface
+    - [ ] 5.10.7 Test participant users are redirected or shown access denied when attempting to access admin registration management
+    - [ ] 5.10.8 Test staff users are redirected or shown access denied when attempting to access admin registration management
+    - [ ] 5.10.9 Test admin navigation menu only shows "Manage Registrations" for admin role users
+    - [ ] 5.10.10 Test automatic Stripe refund processing for registration cancellations
+    - [ ] 5.10.11 Test manual refund messaging for MANUAL payments and failed automatic refunds
+    - [ ] 5.10.12 Test notification emails contain correct content based on modification type 
