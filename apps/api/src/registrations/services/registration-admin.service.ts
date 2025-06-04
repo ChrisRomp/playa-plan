@@ -9,12 +9,14 @@ import { PrismaService } from '../../common/prisma/prisma.service';
 import { AdminAuditService, CreateAuditRecordDto } from '../../admin-audit/services/admin-audit.service';
 import { AdminNotificationsService, AdminNotificationData } from '../../notifications/services/admin-notifications.service';
 import { RegistrationCleanupService } from './registration-cleanup.service';
+import { PaymentsService } from '../../payments/services/payments.service';
 import { 
   Registration, 
   RegistrationStatus, 
   AdminAuditActionType, 
   AdminAuditTargetType, 
   PaymentStatus,
+  PaymentProvider,
   Prisma 
 } from '@prisma/client';
 import { 
@@ -30,6 +32,8 @@ export interface RefundInfo {
   totalAmount: number;
   paymentIds: string[];
   message: string;
+  processed?: boolean;
+  refundAmount?: number;
 }
 
 /**
@@ -44,6 +48,7 @@ export class RegistrationAdminService {
     private readonly adminAuditService: AdminAuditService,
     private readonly adminNotificationsService: AdminNotificationsService,
     private readonly cleanupService: RegistrationCleanupService,
+    private readonly paymentsService: PaymentsService,
   ) {}
 
   /**
@@ -540,9 +545,25 @@ export class RegistrationAdminService {
 
         return {
           registration: cancelledRegistration,
-          refundInfo: cancelData.processRefund && refundInfo.hasPayments ? refundInfo.message : undefined,
+          refundInfo: cancelData.processRefund && refundInfo.hasPayments ? refundInfo : undefined,
         };
       });
+
+      // Process automatic refunds for payment processor payments if requested
+      let actualRefundInfo = result.refundInfo;
+      if (cancelData.processRefund && result.refundInfo?.hasPayments) {
+        try {
+          actualRefundInfo = await this.processAutoRefunds(result.registration.payments, cancelData.reason);
+          this.logger.log(`Processed automatic refunds for registration ${registrationId}: ${actualRefundInfo.message}`);
+        } catch (refundError) {
+          const errorMessage = refundError instanceof Error ? refundError.message : 'Unknown refund error';
+          this.logger.warn(`Failed to process automatic refunds for registration ${registrationId}: ${errorMessage}`);
+          // Continue with cancellation even if refunds fail
+          if (actualRefundInfo) {
+            actualRefundInfo.message = `Registration cancelled but refund processing failed: ${errorMessage}`;
+          }
+        }
+      }
 
       // Send notification after successful transaction if requested
       let notificationStatus = 'No notification sent';
@@ -570,10 +591,10 @@ export class RegistrationAdminService {
                 status: 'CANCELLED',
               },
               reason: cancelData.reason,
-              refundInfo: cancelData.processRefund && result.refundInfo ? {
-                amount: 0, // TODO: Calculate actual refund amount
+              refundInfo: actualRefundInfo?.processed ? {
+                amount: actualRefundInfo.refundAmount || 0,
                 currency: 'USD',
-                processed: false,
+                processed: true,
               } : undefined,
             };
 
@@ -596,13 +617,90 @@ export class RegistrationAdminService {
         transactionId,
         message: 'Registration successfully cancelled',
         notificationStatus,
-        refundInfo: result.refundInfo,
+        refundInfo: actualRefundInfo?.message,
       };
     } catch (error: unknown) {
       const err = error as Error;
       this.logger.error(`Failed to cancel registration ${registrationId}: ${err.message}`, err.stack);
       throw error;
     }
+  }
+
+  /**
+   * Process automatic refunds for payment processor payments
+   * @param payments - Array of payments to potentially refund
+   * @param reason - Reason for the refund
+   * @returns Updated refund information
+   */
+  private async processAutoRefunds(
+    payments: Array<{ id: string; amount: number; status: PaymentStatus; provider: PaymentProvider; providerRefId: string | null }>,
+    reason: string
+  ): Promise<RefundInfo> {
+    const eligiblePayments = payments.filter(
+      p => p.status === PaymentStatus.COMPLETED && 
+          (p.provider === PaymentProvider.STRIPE || p.provider === PaymentProvider.PAYPAL) &&
+          p.providerRefId
+    );
+
+    const manualPayments = payments.filter(
+      p => p.status === PaymentStatus.COMPLETED && 
+          (p.provider === PaymentProvider.MANUAL || !p.providerRefId)
+    );
+
+    let totalRefunded = 0;
+    let refundedCount = 0;
+    let failedRefunds: string[] = [];
+
+    // Process automatic refunds for payment processor payments
+    for (const payment of eligiblePayments) {
+      try {
+        const refundResult = await this.paymentsService.processRefund({
+          paymentId: payment.id,
+          reason: `Registration cancellation: ${reason}`,
+        });
+
+        if (refundResult.success) {
+          totalRefunded += refundResult.refundAmount;
+          refundedCount++;
+          this.logger.log(`Successfully refunded payment ${payment.id}: $${refundResult.refundAmount}`);
+        } else {
+          failedRefunds.push(payment.id);
+        }
+      } catch (refundError) {
+        const errorMessage = refundError instanceof Error ? refundError.message : 'Unknown error';
+        this.logger.error(`Failed to refund payment ${payment.id}: ${errorMessage}`);
+        failedRefunds.push(payment.id);
+      }
+    }
+
+    // Calculate total amounts
+    const totalEligible = eligiblePayments.reduce((sum, p) => sum + p.amount, 0);
+    const totalManual = manualPayments.reduce((sum, p) => sum + p.amount, 0);
+    const allPayments = [...eligiblePayments, ...manualPayments];
+
+    // Build result message
+    let message = '';
+    if (refundedCount > 0) {
+      message += `Automatically refunded ${refundedCount} payment(s) totaling $${(totalRefunded / 100).toFixed(2)}.`;
+    }
+    if (failedRefunds.length > 0) {
+      message += ` ${failedRefunds.length} automatic refund(s) failed and require manual processing.`;
+    }
+    if (manualPayments.length > 0) {
+      message += ` ${manualPayments.length} manual payment(s) totaling $${(totalManual / 100).toFixed(2)} require manual refund processing.`;
+    }
+    if (message === '') {
+      message = 'No payments required refunding.';
+    }
+
+    return {
+      hasPayments: allPayments.length > 0,
+      totalAmount: totalEligible + totalManual,
+      paymentIds: allPayments.map(p => p.id),
+      message: message.trim(),
+      processed: refundedCount > 0,
+      refundAmount: totalRefunded,
+    };
   }
 
   /**

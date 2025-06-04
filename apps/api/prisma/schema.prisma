@@ -337,6 +337,7 @@ enum PaymentStatus {
 enum PaymentProvider {
   STRIPE
   PAYPAL
+  MANUAL
 }
 
 enum NotificationType {
