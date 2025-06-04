@@ -8,7 +8,7 @@ import RegistrationEditForm from '../components/admin/registrations/Registration
 import RegistrationCancelForm from '../components/admin/registrations/RegistrationCancelForm';
 import AuditTrailView from '../components/admin/registrations/AuditTrailView';
 import { useRegistrationManagement } from '../hooks/useRegistrationManagement';
-import { adminRegistrationsApi, PaginatedRegistrationsResponse, Job, CampingOption } from '../lib/api/admin-registrations';
+import { adminRegistrationsApi, PaginatedRegistrationsResponse, Job, CampingOption, UserCampingOptionRegistration } from '../lib/api/admin-registrations';
 
 // TODO: Replace with actual API types when implemented
 interface Registration {
@@ -171,17 +171,19 @@ export function ManageRegistrationsPage() {
     setFilters({});
   };
 
-  // Convert API registration format to component format
-  const convertRegistrationForComponent = (registration: Registration) => {
+  // Convert API registration format to component format with camping options
+  const convertRegistrationForComponent = (registration: Registration, userCampingOptions: UserCampingOptionRegistration[] = []) => {
     return {
       ...registration,
       jobs: registration.jobs.map((rj, index) => ({
         id: `registration-job-${index}`, // Generate ID since it's not in the API response
         job: rj.job
       })),
-      // Note: Camping options are stored separately in CampingOptionRegistration table
-      // This would require a separate API call to fetch user's camping options
-      campingOptions: [] 
+      // Convert user camping options to the format expected by the component
+      campingOptions: userCampingOptions.map((ucor) => ({
+        id: ucor.id,
+        campingOption: ucor.campingOption
+      }))
     };
   };
 
@@ -192,10 +194,18 @@ export function ManageRegistrationsPage() {
     }
   };
 
-  const handleEditRegistration = (registrationId: string) => {
+  const handleEditRegistration = async (registrationId: string) => {
     const registration = registrations.find(r => r.id === registrationId);
     if (registration) {
-      openEditModal(convertRegistrationForComponent(registration));
+      try {
+        // Fetch user's camping options for this registration
+        const userCampingOptions = await adminRegistrationsApi.getUserCampingOptions(registrationId);
+        openEditModal(convertRegistrationForComponent(registration, userCampingOptions));
+      } catch (error) {
+        console.error('Error fetching user camping options:', error);
+        // Fallback to opening without camping options
+        openEditModal(convertRegistrationForComponent(registration));
+      }
     }
   };
 

@@ -606,6 +606,42 @@ export class RegistrationAdminService {
   }
 
   /**
+   * Get camping options for a registration user
+   * @param registrationId - ID of the registration
+   * @returns User's camping option registrations
+   */
+  async getUserCampingOptions(registrationId: string) {
+    // First get the registration to find the user
+    const registration = await this.prisma.registration.findUnique({
+      where: { id: registrationId },
+      select: { userId: true },
+    });
+
+    if (!registration) {
+      throw new NotFoundException(`Registration ${registrationId} not found`);
+    }
+
+    // Get user's camping option registrations
+    const campingOptionRegistrations = await this.prisma.campingOptionRegistration.findMany({
+      where: { userId: registration.userId },
+      include: {
+        campingOption: {
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            participantDues: true,
+            staffDues: true,
+            enabled: true,
+          },
+        },
+      },
+    });
+
+    return campingOptionRegistrations;
+  }
+
+  /**
    * Get audit trail for a specific registration
    * @param registrationId - ID of the registration
    * @returns Audit trail records

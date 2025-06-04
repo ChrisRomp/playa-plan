@@ -122,6 +122,19 @@ interface BackendRegistrationEditData {
   sendNotification: boolean;
 }
 
+interface UserCampingOptionRegistration {
+  id: string;
+  campingOptionId: string;
+  campingOption: {
+    id: string;
+    name: string;
+    description?: string | null;
+    participantDues: number;
+    staffDues: number;
+    enabled: boolean;
+  };
+}
+
 /**
  * API client for admin registration management operations
  */
@@ -160,6 +173,14 @@ export const adminRegistrationsApi = {
   },
 
   /**
+   * Get user's camping options for a registration
+   */
+  getUserCampingOptions: async (registrationId: string): Promise<UserCampingOptionRegistration[]> => {
+    const response = await api.get(`/admin/registrations/${registrationId}/camping-options`);
+    return response.data;
+  },
+
+  /**
    * Edit a registration
    */
   editRegistration: async (registrationId: string, data: RegistrationEditData): Promise<void> => {
@@ -192,6 +213,6 @@ export const adminRegistrationsApi = {
 };
 
 // Export types for use in components
-export type { Job, CampingOption, RegistrationEditData };
+export type { Job, CampingOption, RegistrationEditData, UserCampingOptionRegistration };
 
 export default adminRegistrationsApi; 

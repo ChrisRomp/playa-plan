@@ -222,4 +222,45 @@ export class AdminRegistrationsController {
   async getRegistrationAuditTrail(@Param('id') registrationId: string) {
     return this.adminService.getRegistrationAuditTrail(registrationId);
   }
+
+  @Get(':id/camping-options')
+  @ApiOperation({
+    summary: 'Get camping options for a registration user',
+    description: 'Retrieve all camping options registered by the user of this registration',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'Registration ID',
+    type: String,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Camping options successfully retrieved',
+    schema: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          id: { type: 'string' },
+          campingOptionId: { type: 'string' },
+          campingOption: {
+            type: 'object',
+            properties: {
+              id: { type: 'string' },
+              name: { type: 'string' },
+              description: { type: 'string' },
+              participantDues: { type: 'number' },
+              staffDues: { type: 'number' },
+            },
+          },
+        },
+      },
+    },
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized - Invalid or missing JWT token' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Admin role required' })
+  @ApiResponse({ status: 404, description: 'Not Found - Registration not found' })
+  async getUserCampingOptions(@Param('id') registrationId: string) {
+    return this.adminService.getUserCampingOptions(registrationId);
+  }
 } 
