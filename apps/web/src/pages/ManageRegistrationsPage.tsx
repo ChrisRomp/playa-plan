@@ -8,7 +8,7 @@ import RegistrationEditForm from '../components/admin/registrations/Registration
 import RegistrationCancelForm from '../components/admin/registrations/RegistrationCancelForm';
 import AuditTrailView from '../components/admin/registrations/AuditTrailView';
 import { useRegistrationManagement } from '../hooks/useRegistrationManagement';
-import { adminRegistrationsApi, PaginatedRegistrationsResponse } from '../lib/api/admin-registrations';
+import { adminRegistrationsApi, PaginatedRegistrationsResponse, Job, CampingOption } from '../lib/api/admin-registrations';
 
 // TODO: Replace with actual API types when implemented
 interface Registration {
@@ -59,6 +59,8 @@ interface RegistrationFilters {
  */
 export function ManageRegistrationsPage() {
   const [registrations, setRegistrations] = useState<Registration[]>([]);
+  const [availableJobs, setAvailableJobs] = useState<Job[]>([]);
+  const [availableCampingOptions, setAvailableCampingOptions] = useState<CampingOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filters, setFilters] = useState<RegistrationFilters>({});
@@ -77,6 +79,21 @@ export function ManageRegistrationsPage() {
     cancelRegistration,
     clearMessages,
   } = useRegistrationManagement();
+
+  // Fetch available options for edit form
+  const fetchAvailableOptions = useCallback(async () => {
+    try {
+      const [jobs, campingOptions] = await Promise.all([
+        adminRegistrationsApi.getAvailableJobs(),
+        adminRegistrationsApi.getAvailableCampingOptions(),
+      ]);
+      setAvailableJobs(jobs);
+      setAvailableCampingOptions(campingOptions);
+    } catch (err) {
+      console.error('Error fetching available options:', err);
+      // Continue with empty arrays if fetch fails
+    }
+  }, []);
 
   // Fetch registrations from API
   const fetchRegistrations = useCallback(async () => {
@@ -117,6 +134,11 @@ export function ManageRegistrationsPage() {
   useEffect(() => {
     fetchRegistrations();
   }, [fetchRegistrations]);
+
+  // Fetch available options on component mount
+  useEffect(() => {
+    fetchAvailableOptions();
+  }, [fetchAvailableOptions]);
 
   // Get summary statistics
   const stats = useMemo(() => {
@@ -400,8 +422,8 @@ export function ManageRegistrationsPage() {
         {managementState.editModalOpen && managementState.selectedRegistration && (
           <RegistrationEditForm
             registration={managementState.selectedRegistration as unknown as Parameters<typeof RegistrationEditForm>[0]['registration']}
-            availableJobs={[]} // TODO: Pass actual available jobs
-            availableCampingOptions={[]} // TODO: Pass actual available camping options
+            availableJobs={availableJobs}
+            availableCampingOptions={availableCampingOptions}
             loading={managementState.editLoading}
             onSubmit={editRegistration}
             onClose={closeAllModals}

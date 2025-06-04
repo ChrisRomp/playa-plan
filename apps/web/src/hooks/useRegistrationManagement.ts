@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { adminRegistrationsApi } from '../lib/api/admin-registrations';
 
 // TODO: Replace with actual API types when implemented
 interface Registration {
@@ -35,7 +36,7 @@ interface RegistrationEditData {
   status: 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'WAITLISTED';
   jobIds: string[];
   campingOptionIds: string[];
-  reason: string;
+  notes: string;
   sendNotification: boolean;
 }
 
@@ -147,12 +148,7 @@ export function useRegistrationManagement(): UseRegistrationManagementReturn {
     setState(prev => ({ ...prev, editLoading: true, lastErrorMessage: null }));
 
     try {
-      // TODO: Replace with actual API call
-      // await adminRegistrationsApi.editRegistration(state.selectedRegistration.id, data);
-      
-      // Mock API delay
-      console.log('Editing registration with data:', data);
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      await adminRegistrationsApi.editRegistration(state.selectedRegistration.id, data);
       
       setState(prev => ({
         ...prev,
@@ -162,8 +158,6 @@ export function useRegistrationManagement(): UseRegistrationManagementReturn {
         selectedRegistration: null,
       }));
 
-      // Trigger a refresh of the registration list in the parent component
-      // This would typically be done via a callback prop or context
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to update registration';
       setState(prev => ({
@@ -180,11 +174,7 @@ export function useRegistrationManagement(): UseRegistrationManagementReturn {
     setState(prev => ({ ...prev, cancelLoading: true, lastErrorMessage: null }));
 
     try {
-      // TODO: Replace with actual API call
-      // await adminRegistrationsApi.cancelRegistration(state.selectedRegistration.id, data);
-      
-      // Mock API delay
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      await adminRegistrationsApi.cancelRegistration(state.selectedRegistration.id, data);
       
       const refundMessage = data.processRefund 
         ? ' A refund has been processed.' 
@@ -201,8 +191,6 @@ export function useRegistrationManagement(): UseRegistrationManagementReturn {
         selectedRegistration: null,
       }));
 
-      // Trigger a refresh of the registration list in the parent component
-      // This would typically be done via a callback prop or context
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to cancel registration';
       setState(prev => ({

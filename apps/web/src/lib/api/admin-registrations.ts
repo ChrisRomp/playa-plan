@@ -31,11 +31,39 @@ interface Registration {
   }>;
 }
 
+interface Job {
+  id: string;
+  name: string;
+  description?: string;
+  category?: {
+    id: string;
+    name: string;
+  };
+  shift?: {
+    id: string;
+    name: string;
+    startTime: string;
+    endTime: string;
+    dayOfWeek: string;
+  };
+}
+
+interface CampingOption {
+  id: string;
+  name: string;
+  description?: string;
+  pricePerPerson: number;
+  maxOccupancy?: number;
+  currentRegistrations?: number;
+  availabilityStatus?: boolean;
+  enabled: boolean;
+}
+
 interface RegistrationEditData {
   status: 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'WAITLISTED';
   jobIds: string[];
   campingOptionIds: string[];
-  reason: string;
+  notes: string;
   sendNotification: boolean;
 }
 
@@ -103,6 +131,22 @@ export const adminRegistrationsApi = {
   },
 
   /**
+   * Get all available jobs for registration editing
+   */
+  getAvailableJobs: async (): Promise<Job[]> => {
+    const response = await api.get('/jobs');
+    return response.data;
+  },
+
+  /**
+   * Get all available camping options for registration editing
+   */
+  getAvailableCampingOptions: async (): Promise<CampingOption[]> => {
+    const response = await api.get('/camping-options');
+    return response.data;
+  },
+
+  /**
    * Edit a registration
    */
   editRegistration: async (registrationId: string, data: RegistrationEditData): Promise<void> => {
@@ -124,5 +168,8 @@ export const adminRegistrationsApi = {
     return response.data;
   },
 };
+
+// Export types for use in components
+export type { Job, CampingOption, RegistrationEditData };
 
 export default adminRegistrationsApi; 

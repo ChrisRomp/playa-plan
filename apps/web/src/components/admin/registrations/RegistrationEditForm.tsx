@@ -86,7 +86,7 @@ interface RegistrationEditData {
   status: 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'WAITLISTED';
   jobIds: string[];
   campingOptionIds: string[];
-  reason: string;
+  notes: string;
   sendNotification: boolean;
 }
 
@@ -106,7 +106,7 @@ export function RegistrationEditForm({
     status: registration.status,
     jobIds: registration.jobs.map(j => j.job.id),
     campingOptionIds: registration.campingOptions?.map(co => co.campingOption.id) || [],
-    reason: '',
+    notes: '',
     sendNotification: false,
   });
 
@@ -158,9 +158,9 @@ export function RegistrationEditForm({
     }));
   };
 
-  const handleReasonChange = (reason: string) => {
-    setFormData(prev => ({ ...prev, reason }));
-    setErrors(prev => ({ ...prev, reason: '' }));
+  const handleNotesChange = (notes: string) => {
+    setFormData(prev => ({ ...prev, notes }));
+    setErrors(prev => ({ ...prev, notes: '' }));
   };
 
   const handleNotificationToggle = (sendNotification: boolean) => {
@@ -172,10 +172,6 @@ export function RegistrationEditForm({
 
     if (!hasChanges) {
       newErrors.general = 'No changes have been made to the registration.';
-    }
-
-    if (hasChanges && !formData.reason.trim()) {
-      newErrors.reason = 'Please provide a reason for the changes.';
     }
 
     if (formData.status === 'CANCELLED') {
@@ -402,20 +398,20 @@ export function RegistrationEditForm({
               )}
             </div>
 
-            {/* Reason for Changes */}
+            {/* Notes */}
             <div>
-              <label htmlFor="reason" className="block text-sm font-medium text-gray-700 mb-2">
-                Reason for Changes *
+              <label htmlFor="notes" className="block text-sm font-medium text-gray-700 mb-2">
+                Notes
               </label>
               <textarea
-                id="reason"
-                value={formData.reason}
-                onChange={(e) => handleReasonChange(e.target.value)}
-                placeholder="Explain why these changes are being made..."
+                id="notes"
+                value={formData.notes}
+                onChange={(e) => handleNotesChange(e.target.value)}
+                placeholder="Add any notes about these changes (optional)..."
                 rows={3}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500"
               />
-              {errors.reason && <p className="mt-1 text-sm text-red-600">{errors.reason}</p>}
+              {errors.notes && <p className="mt-1 text-sm text-red-600">{errors.notes}</p>}
             </div>
 
             {/* Notification Toggle */}
