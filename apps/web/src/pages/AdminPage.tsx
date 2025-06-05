@@ -66,6 +66,14 @@ const AdminPage: React.FC = () => {
         </div>
         
         <div className="bg-white p-6 rounded-lg shadow-md">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Manage Registrations</h2>
+          <p className="text-gray-600 mb-4">View, edit, and manage user registrations.</p>
+          <Link to={ROUTES.ADMIN_MANAGE_REGISTRATIONS.path} className="text-blue-600 hover:text-blue-800 font-medium">
+            Manage Registrations &rarr;
+          </Link>
+        </div>
+        
+        <div className="bg-white p-6 rounded-lg shadow-md">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Payments</h2>
           <p className="text-gray-600 mb-4">Review payment status and manage transactions.</p>
           <button className="text-blue-600 hover:text-blue-800 font-medium">

@@ -1,0 +1,218 @@
+# Task List: Admin Registration Management
+
+Based on `prd-admin-registration-management.md`
+
+## Relevant Files
+
+- `apps/api/prisma/schema.prisma` - Add AdminAudit model and related enums for audit trail functionality (COMPLETED)
+- `apps/api/prisma/migrations/20250602034403_add_admin_audit_system/` - Database migration for AdminAudit table and related schema changes (COMPLETED)
+- `apps/api/src/common/enums/admin-audit-action-type.enum.ts` - Enum for audit action types (COMPLETED)
+- `apps/api/src/common/enums/admin-audit-target-type.enum.ts` - Enum for audit target record types (COMPLETED)
+- `apps/api/src/admin-audit/admin-audit.module.ts` - NestJS module for audit trail functionality (COMPLETED)
+- `apps/api/src/admin-audit/services/admin-audit.service.ts` - Service for creating and retrieving audit records (COMPLETED)
+- `apps/api/src/admin-audit/dto/admin-audit.dto.ts` - DTOs for audit trail data transfer (COMPLETED)
+- `apps/api/src/admin-audit/entities/admin-audit.entity.ts` - Audit trail entity definitions (COMPLETED)
+- `apps/api/src/registrations/controllers/admin-registrations.controller.ts` - Admin-specific registration management endpoints (COMPLETED)
+- `apps/api/src/registrations/services/registration-admin.service.ts` - Service for admin registration operations (edit, cancel) (COMPLETED)
+- `apps/api/src/registrations/dto/admin-registration.dto.ts` - DTOs for admin registration operations (COMPLETED)
+- `apps/api/src/registrations/services/registration-cleanup.service.ts` - Service for cleaning up related records on cancellation (COMPLETED)
+- `apps/web/src/pages/ManageRegistrationsPage.tsx` - Main admin registration management interface (COMPLETED)
+- `apps/api/src/notifications/services/admin-notifications.service.ts` - Service for admin-triggered user notifications (COMPLETED)
+- `apps/api/src/notifications/templates/registration-modification.template.ts` - Email template for registration modifications
+- `apps/api/src/notifications/templates/registration-cancellation.template.ts` - Email template for registration cancellations
+- `apps/web/src/components/admin/registrations/RegistrationEditForm.tsx` - Form component for editing registrations
+- `apps/web/src/components/admin/registrations/RegistrationCancelForm.tsx` - Form component for cancelling registrations
+- `apps/web/src/components/admin/registrations/RegistrationSearchTable.tsx` - Table component for finding and listing registrations
+- `apps/web/src/components/admin/registrations/AuditTrailView.tsx` - Component for displaying audit trail history
+- `apps/web/src/hooks/useRegistrationManagement.ts` - Custom hook for registration management operations
+- `apps/web/src/lib/api/admin-registrations.ts` - API client functions for admin registration operations
+- `apps/api/src/admin-audit/services/admin-audit.service.spec.ts` - Unit tests for AdminAuditService (COMPLETED)
+- `apps/api/src/registrations/services/registration-admin.service.spec.ts` - Unit tests for RegistrationAdminService
+- `apps/api/src/registrations/services/registration-cleanup.service.spec.ts` - Unit tests for RegistrationCleanupService
+- `apps/api/src/registrations/controllers/admin-registrations.controller.spec.ts` - Unit tests for AdminRegistrationsController
+- `apps/api/src/notifications/services/admin-notifications.service.spec.ts` - Unit tests for AdminNotificationsService
+- `apps/web/src/components/admin/registrations/RegistrationEditForm.test.tsx` - Unit tests for RegistrationEditForm (COMPLETED)
+- `apps/web/src/components/admin/registrations/RegistrationCancelForm.test.tsx` - Unit tests for RegistrationCancelForm (COMPLETED)
+- `apps/web/src/components/admin/registrations/RegistrationSearchTable.test.tsx` - Unit tests for RegistrationSearchTable (COMPLETED)
+- `apps/web/src/components/admin/registrations/AuditTrailView.test.tsx` - Unit tests for AuditTrailView (COMPLETED)
+- `apps/web/src/hooks/useRegistrationManagement.test.ts` - Unit tests for useRegistrationManagement hook (COMPLETED)
+- `apps/api/test/admin-registrations.e2e-spec.ts` - End-to-end tests for admin registration management
+- `apps/api/src/registrations/services/registration-cleanup.service.ts` - Service for cleaning up registration data (COMPLETED)
+- `apps/api/src/registrations/services/registration-admin.service.ts` - Service for admin registration operations (COMPLETED)
+- `apps/api/src/registrations/controllers/admin-registrations.controller.ts` - Controller for admin registration endpoints (COMPLETED)
+- `apps/web/src/pages/ManageRegistrationsPage.tsx` - Main admin registration management page (COMPLETED)
+- `apps/web/src/components/admin/registrations/RegistrationSearchTable.tsx` - Reusable table component for registration display (COMPLETED)
+- `apps/web/src/components/admin/registrations/RegistrationEditForm.tsx` - Form for editing registrations (COMPLETED)
+- `apps/web/src/components/admin/registrations/RegistrationCancelForm.tsx` - Form for cancelling registrations (COMPLETED)
+- `apps/web/src/components/admin/registrations/AuditTrailView.tsx` - Component for viewing audit history (COMPLETED)
+- `apps/web/src/hooks/useRegistrationManagement.ts` - Custom hook for registration management state (COMPLETED)
+- `apps/web/src/lib/api/admin-registrations.ts` - API client for admin registration operations (COMPLETED)
+- `apps/web/src/routes/index.ts` - Route configuration for admin registration management (COMPLETED)
+- `apps/web/src/pages/AdminPage.tsx` - Updated admin panel with registration management link (COMPLETED)
+- `apps/api/src/payments/services/payments.service.spec.ts` - Unit tests for PaymentsService (COMPLETED: processRefund tests)
+- `apps/api/src/payments/services/stripe.service.spec.ts` - Unit tests for StripeService (COMPLETED)
+
+### Notes
+
+- There is a .env file in the workspace root with database connection information
+- Database migration should be created using Prisma CLI: `npx prisma migrate dev --name add-admin-audit-system`
+- Run tests using workspace scripts: `npm run test:api` for API tests, `npm run test:web` for web tests, or `npm run test` for all tests
+- Use `npm run test:watch` for watch mode during development
+- Use `npm run test:coverage` to generate test coverage reports
+- All admin operations must be properly authorized using existing auth guards
+- Audit trail should use IDs for target records to avoid storing PII, but can include admin user information via joins from users table
+- Registration modifications should use Prisma transactions to ensure atomicity
+- Lint new/modified files with configuration `eslint.config.cjs`; common linting errors:
+    - Avoid use of `any` types especially outside of tests
+    - Remove any unused variables
+
+## Tasks
+
+- [x] 1.0 Implement Database Schema and Audit System
+  - [x] 1.1 Create AdminAudit model in `schema.prisma` with fields: id (UUID), adminUserId, actionType, targetRecordType, targetRecordId, oldValues (JSON), newValues (JSON), reason, transactionId (UUID, optional), createdAt (UTC)
+  - [x] 1.2 Create AdminAuditActionType enum with values: REGISTRATION_EDIT, REGISTRATION_CANCEL, PAYMENT_REFUND, WORK_SHIFT_ADD, WORK_SHIFT_REMOVE, WORK_SHIFT_MODIFY, CAMPING_OPTION_ADD, CAMPING_OPTION_REMOVE, CAMPING_OPTION_MODIFY
+  - [x] 1.3 Create AdminAuditTargetType enum with values: REGISTRATION, USER, PAYMENT, WORK_SHIFT, CAMPING_OPTION
+  - [x] 1.4 Create and run database migration: `npx prisma migrate dev --name add-admin-audit-system`
+  - [x] 1.5 Generate updated Prisma client: `npx prisma generate`
+  - [x] 1.6 Create AdminAuditService to handle audit record creation and retrieval using Prisma (include methods to join admin user information like email, and support for grouping related audit records by transactionId)
+  - [x] 1.7 Create enum files in `apps/api/src/common/enums/` for action types and target types
+  - [x] 1.8 Create AdminAudit module, service, DTOs, and entity files
+
+- [x] 2.0 Develop Backend Registration Management Services
+  - [x] 2.1 Create RegistrationAdminService with methods for editing and cancelling registrations
+  - [x] 2.2 Implement editRegistration() method with Prisma transactions for atomic updates
+  - [x] 2.3 Implement cancelRegistration() method with cleanup of related records
+  - [x] 2.4 Create RegistrationCleanupService to handle work shift deletion and camping option release
+  - [x] 2.5 Integrate AdminAuditService into all admin operations for audit trail logging
+  - [x] 2.6 Create AdminRegistrationsController with endpoints: GET /admin/registrations, PUT /admin/registrations/:id, DELETE /admin/registrations/:id
+  - [x] 2.7 Implement proper authorization using existing auth guards (admin role required)
+  - [x] 2.8 Create DTOs for admin registration operations with proper validation
+  - [x] 2.9 Add audit trail viewing endpoint: GET /admin/registrations/:id/audit-trail
+  - [x] 2.10 Implement refund prompting logic for cancellations with payments
+  - [x] 2.11 Ensure all operations prevent editing of already cancelled registrations
+
+- [x] 3.0 Admin Registration Management Interface
+  - [x] 3.1 Create ManageRegistrationsPage.tsx as new admin section
+  - [x] 3.2 Create RegistrationSearchTable component reusing DataTable patterns from RegistrationReportsPage
+  - [x] 3.3 Add Edit and Cancel action columns to registration table
+  - [x] 3.4 Implement search and filter functionality for finding specific registrations
+  - [x] 3.5 Create RegistrationEditForm component for editing registrations with camping options and work shifts
+  - [x] 3.6 Create RegistrationCancelForm component for cancelling registrations with refund prompting and notification toggle
+  - [x] 3.7 Implement confirmation dialogs for destructive actions
+  - [x] 3.8 Create AuditTrailView component to display modification history
+  - [x] 3.9 Add success/error messaging for all operations
+  - [x] 3.10 Implement useRegistrationManagement custom hook for state management
+  - [x] 3.11 Create API client functions for all admin registration operations
+  - [x] 3.12 Add new "Manage Registrations" navigation item to admin panel
+
+- [x] 4.0 Implement User Notification System
+  - [x] 4.1 Create AdminNotificationsService for admin-triggered user notifications
+  - [x] 4.2 Create registration modification email template showing current registration status
+  - [x] 4.3 Create registration cancellation email template with simple cancellation notice
+  - [x] 4.4 Integrate notification toggle in RegistrationEditForm (unchecked by default)
+  - [x] 4.5 Integrate notification toggle in RegistrationCancelForm (unchecked by default)
+  - [x] 4.6 Implement notification sending in registration edit/cancel operations
+  - [x] 4.7 Ensure notifications use same format as registration confirmation for modifications
+  - [x] 4.8 Add error handling for notification failures without blocking main operations
+  - [x] 4.9 Log notification attempts in existing email audit system
+  - [x] 4.10 Ensure notifications include admin contact information for questions
+
+- [x] 5.0 Implement Comprehensive Testing Suite
+  - [x] 5.1 AdminAuditService Unit Tests
+    - [x] 5.1.1 Test createAuditRecord() with all required fields and proper data types
+    - [x] 5.1.2 Test getAuditTrail() returns audit records for specific registration
+    - [x] 5.1.3 Test audit logging handles JSON serialization of old/new values
+    - [x] 5.1.4 Test audit record creation with different action types and target types
+    - [x] 5.1.5 Test error handling for database failures during audit logging
+    - [x] 5.1.6 Test audit records use IDs for target records to avoid PII, but include admin user information via joins
+  - [x] 5.2 RegistrationAdminService Unit Tests
+    - [x] 5.2.1 Test editRegistration() successfully updates registration and creates audit record
+    - [x] 5.2.2 Test editRegistration() prevents modification of cancelled registrations
+    - [x] 5.2.3 Test editRegistration() handles camping option modifications with availability checks
+    - [x] 5.2.4 Test editRegistration() handles work shift modifications with availability checks
+    - [x] 5.2.5 Test editRegistration() uses Prisma transactions for atomicity
+    - [x] 5.2.6 Test cancelRegistration() updates status and triggers cleanup services
+    - [x] 5.2.7 Test cancelRegistration() handles refund prompting for paid registrations
+    - [x] 5.2.8 Test error handling for invalid registration IDs and unauthorized access
+    - [x] 5.2.9 Test processAutoRefunds() correctly processes Stripe and PayPal payments automatically
+    - [x] 5.2.10 Test processAutoRefunds() skips MANUAL payments and includes them in manual processing message
+    - [x] 5.2.11 Test processAutoRefunds() handles partial refund failures gracefully
+    - [x] 5.2.12 Test processAutoRefunds() formats refund amounts correctly (no division by 100)
+    - [x] 5.2.13 Test cancelRegistration() continues even when automatic refunds fail
+  - [x] 5.3 RegistrationCleanupService Unit Tests
+    - [x] 5.3.1 Test cleanupRegistration() deletes associated work shifts
+    - [x] 5.3.2 Test cleanupRegistration() releases camping option allocations
+    - [x] 5.3.3 Test cleanup operations handle missing related records gracefully
+    - [x] 5.3.4 Test cleanup creates appropriate audit records for each operation
+    - [x] 5.3.5 Test cleanup operations are atomic and roll back on failures
+  - [x] 5.4 AdminRegistrationsController Unit Tests
+    - [x] 5.4.1 Test GET /admin/registrations endpoint with proper authorization
+    - [x] 5.4.2 Test PUT /admin/registrations/:id endpoint with validation and audit logging
+    - [x] 5.4.3 Test DELETE /admin/registrations/:id endpoint with confirmation and cleanup
+    - [x] 5.4.4 Test GET /admin/registrations/:id/audit-trail endpoint returns audit history
+    - [x] 5.4.5 Test unauthorized access returns proper HTTP status codes
+    - [x] 5.4.6 Test validation errors return appropriate error messages
+    - [x] 5.4.7 Test participant users receive 403 Forbidden for all admin registration endpoints
+    - [x] 5.4.8 Test staff users receive 403 Forbidden for all admin registration endpoints
+    - [x] 5.4.9 Test unauthenticated requests receive 401 Unauthorized for all endpoints
+  - [x] 5.5 AdminNotificationsService Unit Tests
+    - [x] 5.5.1 Test sendRegistrationModificationNotification() uses correct template and format
+    - [x] 5.5.2 Test sendRegistrationCancellationNotification() sends simple cancellation notice
+    - [x] 5.5.3 Test notification toggle respects user preferences (default disabled)
+    - [x] 5.5.4 Test notification failures don't block main registration operations
+    - [x] 5.5.5 Test notifications include current registration status and admin contact info
+    - [x] 5.5.6 Test modification notifications exclude dues information for admin changes
+    - [x] 5.5.7 Test cancellation notifications use generic "contact us" instead of admin email
+    - [x] 5.5.8 Test cancellation notifications include refund amount when processed automatically
+  - [x] 5.6 PaymentsService Unit Tests
+    - [x] 5.6.1 Test processRefund() successfully processes Stripe refunds with payment intent IDs
+    - [x] 5.6.2 Test processRefund() converts checkout session IDs to payment intent IDs for Stripe
+    - [x] 5.6.3 Test processRefund() maps custom refund reasons to valid Stripe reasons
+    - [x] 5.6.4 Test processRefund() handles PayPal refunds with dollar amounts
+    - [x] 5.6.5 Test processRefund() handles MANUAL payment refunds (database-only updates)
+    - [x] 5.6.6 Test processRefund() correctly formats refund amounts for different providers
+    - [x] 5.6.7 Test processRefund() fails gracefully when Stripe session has no payment intent
+    - [x] 5.6.8 Test processRefund() handles Stripe API errors appropriately
+  - [x] 5.7 StripeService Unit Tests  
+    - [x] 5.7.1 Test createRefund() accepts payment intent IDs directly
+    - [x] 5.7.2 Test createRefund() converts checkout session IDs to payment intent IDs
+    - [x] 5.7.3 Test createRefund() maps custom reasons to valid Stripe refund reasons
+    - [x] 5.7.4 Test createRefund() handles expanded payment intent objects in session response
+    - [x] 5.7.5 Test createRefund() fails appropriately when session has no payment intent
+    - [x] 5.7.6 Test getCheckoutSession() expands payment intent data correctly
+  - [x] 5.8 Frontend Component Unit Tests
+    - [x] 5.8.1 Test RegistrationEditForm renders correctly with current registration data
+    - [x] 5.8.2 Test RegistrationEditForm handles camping option changes with validation
+    - [x] 5.8.3 Test RegistrationEditForm handles work shift modifications correctly
+    - [x] 5.8.4 Test RegistrationCancelForm displays refund prompting for paid registrations
+    - [x] 5.8.5 Test RegistrationCancelForm notification toggle defaults to unchecked
+    - [x] 5.8.6 Test RegistrationCancelForm modal scrolls properly with long content
+    - [x] 5.8.7 Test RegistrationSearchTable displays action buttons and handles clicks
+    - [x] 5.8.8 Test AuditTrailView displays audit history in readable format
+    - [x] 5.8.9 Test useRegistrationManagement hook handles API calls and state management
+  - [x] 5.9 Integration Tests
+    - [x] 5.9.1 Test complete registration edit workflow from API to database
+    - [x] 5.9.2 Test complete registration cancellation workflow with cleanup
+    - [x] 5.9.3 Test audit trail creation and retrieval across all admin operations
+    - [x] 5.9.4 Test notification integration with admin operations
+    - [x] 5.9.5 Test authorization and role-based access control for all endpoints
+    - [x] 5.9.6 Test frontend-backend integration for all admin registration operations
+    - [x] 5.9.7 Test participant users cannot access admin registration management endpoints (401/403 responses)
+    - [x] 5.9.8 Test staff users cannot access admin registration management endpoints (401/403 responses)
+    - [x] 5.9.9 Test JWT token validation and expiration handling for admin endpoints
+    - [x] 5.9.10 Test automatic refund processing integration with Stripe and PayPal
+    - [x] 5.9.11 Test MANUAL payment provider handling in refund workflows
+    - [x] 5.9.12 Test email notification templates with conditional content based on admin modifications
+  - [x] 5.10 End-to-End Tests
+    - [x] 5.10.1 Test admin can find, edit, and save registration changes successfully
+    - [x] 5.10.2 Test admin can cancel registration with optional refund and notification
+    - [x] 5.10.3 Test audit trail is visible and accurate after admin operations
+    - [x] 5.10.4 Test unauthorized users cannot access admin registration management
+    - [x] 5.10.5 Test error handling and user feedback for all admin operations
+    - [x] 5.10.6 Test mobile responsiveness of admin registration management interface
+    - [x] 5.10.7 Test participant users are redirected or shown access denied when attempting to access admin registration management
+    - [x] 5.10.8 Test staff users are redirected or shown access denied when attempting to access admin registration management
+    - [x] 5.10.9 Test admin navigation menu only shows "Manage Registrations" for admin role users
+    - [x] 5.10.10 Test automatic Stripe refund processing for registration cancellations
+    - [x] 5.10.11 Test manual refund messaging for MANUAL payments and failed automatic refunds
+    - [x] 5.10.12 Test notification emails contain correct content based on modification type 

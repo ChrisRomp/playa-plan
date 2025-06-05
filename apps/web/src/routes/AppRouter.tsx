@@ -15,6 +15,7 @@ import AdminCampingOptionFieldsPage from '../pages/AdminCampingOptionFieldsPage.
 import AdminJobCategoriesPage from '../pages/AdminJobCategoriesPage.tsx';
 import AdminJobsPage from '../pages/AdminJobsPage.tsx';
 import AdminShiftsPage from '../pages/AdminShiftsPage.tsx';
+import ManageRegistrationsPage from '../pages/ManageRegistrationsPage.tsx';
 import ShiftsPage from '../pages/ShiftsPage.tsx';
 import RegistrationPage from '../pages/registration/RegistrationPage.tsx';
 import RegistrationProtectedRoute from './RegistrationProtectedRoute.tsx';
@@ -78,6 +79,7 @@ const AppRouter: React.FC = () => {
         <Route path={ROUTES.ADMIN_JOB_CATEGORIES.path} element={<AdminJobCategoriesPage />} />
         <Route path={ROUTES.ADMIN_JOBS.path} element={<AdminJobsPage />} />
         <Route path={ROUTES.ADMIN_SHIFTS.path} element={<AdminShiftsPage />} />
+        <Route path={ROUTES.ADMIN_MANAGE_REGISTRATIONS.path} element={<ManageRegistrationsPage />} />
       </Route>
       
       {/* 404 route */}

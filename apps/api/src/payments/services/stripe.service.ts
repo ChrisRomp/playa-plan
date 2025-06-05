@@ -148,33 +148,63 @@ export class StripeService {
 
   /**
    * Process a refund for a payment
-   * @param paymentIntentId - The payment intent ID to refund
+   * @param providerRefId - The payment intent ID or checkout session ID to refund
    * @param amount - Optional amount to refund (in cents)
    * @param reason - Optional reason for the refund
    * @returns The created refund
    */
   async createRefund(
-    paymentIntentId: string,
+    providerRefId: string,
     amount?: number,
     reason?: string,
   ): Promise<Stripe.Refund> {
     try {
-      this.logger.log(`Creating refund for payment ${paymentIntentId}`);
+      this.logger.log(`Creating refund for payment ${providerRefId}`);
       
       const stripe = await this.getStripe();
       
+      // If the ID starts with 'cs_', it's a checkout session ID, we need to get the payment intent
+      let paymentIntentId = providerRefId;
+      if (providerRefId.startsWith('cs_')) {
+        this.logger.log(`Converting checkout session ${providerRefId} to payment intent ID`);
+        const session = await this.getCheckoutSession(providerRefId);
+        
+        if (!session.payment_intent) {
+          throw new Error(`Checkout session ${providerRefId} has no associated payment intent`);
+        }
+        
+        // payment_intent can be either a string ID or an expanded PaymentIntent object
+        paymentIntentId = typeof session.payment_intent === 'string' 
+          ? session.payment_intent 
+          : session.payment_intent.id;
+        
+        this.logger.log(`Found payment intent ${paymentIntentId} for session ${providerRefId}`);
+      }
+      
       const refundParams: Stripe.RefundCreateParams = {
         payment_intent: paymentIntentId,
-        reason: reason as 'duplicate' | 'fraudulent' | 'requested_by_customer' | undefined,
       };
       
       if (amount) {
         refundParams.amount = amount;
       }
       
+      // Map custom reasons to valid Stripe reasons or omit if not applicable
+      if (reason) {
+        const lowerReason = reason.toLowerCase();
+        if (lowerReason.includes('duplicate')) {
+          refundParams.reason = 'duplicate';
+        } else if (lowerReason.includes('fraud')) {
+          refundParams.reason = 'fraudulent';
+        } else {
+          // For registration cancellations and other customer requests, use requested_by_customer
+          refundParams.reason = 'requested_by_customer';
+        }
+      }
+      
       const refund = await stripe.refunds.create(refundParams);
       
-      this.logger.log(`Created refund ${refund.id} for payment ${paymentIntentId}`);
+      this.logger.log(`Created refund ${refund.id} for payment intent ${paymentIntentId}`);
       return refund;
     } catch (error: unknown) {
       const sanitizedMessage = this.sanitizeErrorMessage(error);

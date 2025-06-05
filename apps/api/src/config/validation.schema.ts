@@ -44,13 +44,6 @@ const validationSchema = Joi.object({
   EMAIL_PROVIDER: Joi.string().valid('sendgrid', 'smtp').default('sendgrid'),
   EMAIL_FROM: Joi.string().email().default('noreply@example.playaplan.app'),
   
-  // SendGrid configuration
-  SENDGRID_API_KEY: Joi.string().when('EMAIL_PROVIDER', {
-    is: 'sendgrid',
-    then: Joi.required(),
-    otherwise: Joi.optional(),
-  }),
-  
   // SMTP configuration
   MAIL_HOST: Joi.string().when('EMAIL_PROVIDER', {
     is: 'smtp',

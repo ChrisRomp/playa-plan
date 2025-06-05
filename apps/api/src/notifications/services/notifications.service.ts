@@ -76,6 +76,11 @@ export interface TemplateData {
       includeSmtpDetails?: boolean;
     };
   };
+  adminInfo?: {
+    name: string;
+    email: string;
+    reason: string;
+  };
   userId?: string;
   [key: string]: unknown;
 }
@@ -429,6 +434,14 @@ export class NotificationsService {
         }
         return this.getRegistrationConfirmationTemplate(data.registrationDetails, data.campName || '', data);
       case NotificationType.REGISTRATION_ERROR:
+        // Handle both error details and custom cancellation templates
+        if (data.customSubject && data.customText && data.customHtml) {
+          return {
+            subject: data.customSubject as string,
+            text: data.customText as string,
+            html: data.customHtml as string,
+          };
+        }
         if (!data.errorDetails) {
           throw new Error('Error details are required for registration error template');
         }
@@ -775,47 +788,71 @@ export class NotificationsService {
     
     const greeting = this.getGreeting(data?.name, data?.playaName);
     const friendlyStatus = this.getFriendlyRegistrationStatus(status);
-    const statusMessage = this.getRegistrationStatusMessage(status);
     
-    const subject = 'Registration Confirmation';
-    const text = `
-      ${greeting}
+    // Check if this is an admin modification
+    const isAdminModification = Boolean(data?.adminInfo);
+    
+    const subject = isAdminModification 
+      ? `Registration Modified - ${campName} ${registrationDetails.year}`
+      : 'Registration Confirmation';
       
-      ${statusMessage}
+    const statusMessage = isAdminModification
+      ? `Your registration for ${campName} ${registrationDetails.year} has been modified by our administrative team.`
+      : this.getRegistrationStatusMessage(status);
+    
+    const duesLine = isAdminModification ? '' : `Total Dues: ${formattedAmount}\n`;
+    
+    const text = `${greeting}
       
-      Status: ${friendlyStatus}
-      Date: ${formattedDate}
-      Total Dues: ${formattedAmount}
+${statusMessage}
       
-      Selected Options:
-      ${campingOptions ? campingOptions.map(option => `- ${option.name}`).join('\n') : 'N/A'}
+Status: ${friendlyStatus}
+Date: ${formattedDate}
+${duesLine}      
+Selected Options:
+${campingOptions ? campingOptions.map(option => `- ${option.name}`).join('\n') : 'N/A'}
       
-      Work Shift(s):
-      ${jobs ? jobs.map(job => `- ${job.category}: ${this.getFriendlyDayName(job.shift.dayOfWeek)} ${job.shift.startTime}-${job.shift.endTime}`).join('\n') : 'N/A'}
+Work Shift(s):
+${jobs ? jobs.map(job => `- ${job.category}: ${this.getFriendlyDayName(job.shift.dayOfWeek)} ${job.shift.startTime}-${job.shift.endTime}`).join('\n') : 'N/A'}
       
-      Thank you for registering with ${campName}!
+${isAdminModification ? `If you have any questions about these changes, please contact us.` : 'Thank you for registering with ' + campName + '!'}
       
-      Best regards,
-      The ${campName} Team
-    `;
+Best regards,
+The ${campName} Team`;
+
+    const duesHtml = isAdminModification ? '' : `<p><strong>Total Dues:</strong> ${formattedAmount}</p>`;
+
     const html = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2>${subject}</h2>
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <h2 style="color: ${isAdminModification ? '#d97706' : '#059669'};">${subject}</h2>
         <p>${greeting}</p>
         <p>${statusMessage}</p>
-        <p><strong>Status:</strong> ${friendlyStatus}</p>
-        <p><strong>Date:</strong> ${formattedDate}</p>
-        <p><strong>Total Dues:</strong> ${formattedAmount}</p>
-        <p><strong>Selected Options:</strong></p>
-        <ul>
-          ${campingOptions ? campingOptions.map(option => `<li>${option.name}</li>`).join('') : '<li>N/A</li>'}
-        </ul>
-        <p><strong>Work Shift(s):</strong></p>
-        <ul>
-          ${jobs ? jobs.map(job => `<li>${job.category}: ${this.getFriendlyDayName(job.shift.dayOfWeek)} ${job.shift.startTime}-${job.shift.endTime}</li>`).join('') : '<li>N/A</li>'}
-        </ul>
-        <p>Thank you for registering with ${campName}!</p>
-        <p>Best regards,<br>The ${campName} Team</p>
+        
+        <div style="background-color: #f9fafb; padding: 15px; border-radius: 5px; margin: 20px 0;">
+          <h3 style="margin-top: 0; color: #374151;">Registration Details</h3>
+          <p><strong>Status:</strong> ${friendlyStatus}</p>
+          <p><strong>Date:</strong> ${formattedDate}</p>
+          ${duesHtml}
+        </div>
+        
+        <div style="background-color: #f0f9ff; padding: 15px; border-radius: 5px; margin: 20px 0;">
+          <h3 style="margin-top: 0; color: #0369a1;">Selected Options</h3>
+          <ul style="margin: 0; padding-left: 20px;">
+            ${campingOptions ? campingOptions.map(option => `<li>${option.name}</li>`).join('') : '<li>N/A</li>'}
+          </ul>
+        </div>
+        
+        <div style="background-color: #f0fdf4; padding: 15px; border-radius: 5px; margin: 20px 0;">
+          <h3 style="margin-top: 0; color: #166534;">Work Shift(s)</h3>
+          <ul style="margin: 0; padding-left: 20px;">
+            ${jobs ? jobs.map(job => `<li>${job.category}: ${this.getFriendlyDayName(job.shift.dayOfWeek)} ${job.shift.startTime}-${job.shift.endTime}</li>`).join('') : '<li>N/A</li>'}
+          </ul>
+        </div>
+        
+        <p>${isAdminModification ? `If you have any questions about these changes, please contact us.` : `Thank you for registering with ${campName}!`}</p>
+        
+        <p>Best regards,<br>
+        <strong>The ${campName} Team</strong></p>
       </div>
     `;
     

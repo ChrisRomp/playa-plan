@@ -13,6 +13,7 @@ const mockStripeInstance = {
   checkout: {
     sessions: {
       create: jest.fn(),
+      retrieve: jest.fn(),
     },
   },
   refunds: {
@@ -223,7 +224,7 @@ describe('StripeService', () => {
       expect(mockStripeInstance.refunds.create).toHaveBeenCalledWith({
         payment_intent: paymentIntentId,
         amount,
-        reason,
+        reason: 'requested_by_customer',
       });
       
       expect(loggerSpy.log).toHaveBeenCalledWith(
@@ -231,6 +232,125 @@ describe('StripeService', () => {
       );
       
       expect(result).toEqual(mockRefund);
+    });
+
+    it('should accept payment intent IDs directly', async () => {
+      const paymentIntentId = 'pi_1234567890';
+      const amount = 1000;
+      const mockRefund = { id: 're_123', amount: 1000 };
+      
+      mockStripeInstance.refunds.create.mockResolvedValue(mockRefund);
+      
+      const result = await service.createRefund(paymentIntentId, amount);
+      
+      expect(mockStripeInstance.refunds.create).toHaveBeenCalledWith({
+        payment_intent: paymentIntentId,
+        amount,
+      });
+      
+      expect(result).toEqual(mockRefund);
+    });
+
+    it('should convert checkout session IDs to payment intent IDs', async () => {
+      const sessionId = 'cs_1234567890';
+      const paymentIntentId = 'pi_0987654321';
+      const amount = 1500;
+      
+      const mockSession = {
+        id: sessionId,
+        payment_intent: paymentIntentId,
+      };
+      const mockRefund = { id: 're_456', amount: 1500 };
+      
+      mockStripeInstance.checkout.sessions.retrieve.mockResolvedValue(mockSession);
+      mockStripeInstance.refunds.create.mockResolvedValue(mockRefund);
+      
+      const result = await service.createRefund(sessionId, amount);
+      
+      expect(mockStripeInstance.checkout.sessions.retrieve).toHaveBeenCalledWith(sessionId, {
+        expand: ['payment_intent']
+      });
+      expect(mockStripeInstance.refunds.create).toHaveBeenCalledWith({
+        payment_intent: paymentIntentId,
+        amount,
+      });
+      
+      expect(result).toEqual(mockRefund);
+    });
+
+    it('should map custom reasons to valid Stripe reasons', async () => {
+      const paymentIntentId = 'pi_123';
+      
+      // Test duplicate reason mapping
+      mockStripeInstance.refunds.create.mockResolvedValue({ id: 're_123' });
+      await service.createRefund(paymentIntentId, 1000, 'duplicate payment');
+      expect(mockStripeInstance.refunds.create).toHaveBeenCalledWith({
+        payment_intent: paymentIntentId,
+        amount: 1000,
+        reason: 'duplicate',
+      });
+
+      // Test fraudulent reason mapping
+      mockStripeInstance.refunds.create.mockClear();
+      await service.createRefund(paymentIntentId, 1000, 'fraud detected');
+      expect(mockStripeInstance.refunds.create).toHaveBeenCalledWith({
+        payment_intent: paymentIntentId,
+        amount: 1000,
+        reason: 'fraudulent',
+      });
+
+      // Test default reason mapping
+      mockStripeInstance.refunds.create.mockClear();
+      await service.createRefund(paymentIntentId, 1000, 'registration cancelled');
+      expect(mockStripeInstance.refunds.create).toHaveBeenCalledWith({
+        payment_intent: paymentIntentId,
+        amount: 1000,
+        reason: 'requested_by_customer',
+      });
+    });
+
+    it('should handle expanded payment intent objects in session response', async () => {
+      const sessionId = 'cs_1234567890';
+      const paymentIntentId = 'pi_0987654321';
+      
+      const mockSession = {
+        id: sessionId,
+        payment_intent: {
+          id: paymentIntentId,
+          status: 'succeeded',
+          amount: 2000,
+        },
+      };
+      const mockRefund = { id: 're_789', amount: 2000 };
+      
+      mockStripeInstance.checkout.sessions.retrieve.mockResolvedValue(mockSession);
+      mockStripeInstance.refunds.create.mockResolvedValue(mockRefund);
+      
+      const result = await service.createRefund(sessionId, 2000);
+      
+      expect(mockStripeInstance.refunds.create).toHaveBeenCalledWith({
+        payment_intent: paymentIntentId,
+        amount: 2000,
+      });
+      
+      expect(result).toEqual(mockRefund);
+    });
+
+    it('should fail appropriately when session has no payment intent', async () => {
+      const sessionId = 'cs_1234567890';
+      
+      const mockSession = {
+        id: sessionId,
+        payment_intent: null,
+      };
+      
+      mockStripeInstance.checkout.sessions.retrieve.mockResolvedValue(mockSession);
+      
+      await expect(service.createRefund(sessionId, 1000)).rejects.toThrow(
+        `Checkout session ${sessionId} has no associated payment intent`
+      );
+      
+      expect(mockStripeInstance.refunds.create).not.toHaveBeenCalled();
     });
     
     it('should throw an error if refund creation fails', async () => {
@@ -270,6 +390,43 @@ describe('StripeService', () => {
       
       expect(loggerSpy.error).toHaveBeenCalledWith(
         'Failed to retrieve payment intent: Stripe API error'
+      );
+    });
+  });
+
+  describe('getCheckoutSession', () => {
+    it('should expand payment intent data correctly', async () => {
+      const sessionId = 'cs_1234567890';
+      const mockSession = {
+        id: sessionId,
+        payment_intent: {
+          id: 'pi_0987654321',
+          status: 'succeeded',
+          amount: 2000,
+        },
+      };
+      
+      mockStripeInstance.checkout.sessions.retrieve.mockResolvedValue(mockSession);
+      
+      const result = await service.getCheckoutSession(sessionId);
+      
+      expect(mockStripeInstance.checkout.sessions.retrieve).toHaveBeenCalledWith(sessionId, {
+        expand: ['payment_intent']
+      });
+      
+      expect(result).toEqual(mockSession);
+    });
+
+    it('should handle checkout session retrieval errors appropriately', async () => {
+      const sessionId = 'cs_invalid';
+      const mockError = new Error('No such checkout session');
+      
+      mockStripeInstance.checkout.sessions.retrieve.mockRejectedValue(mockError);
+      
+      await expect(service.getCheckoutSession(sessionId)).rejects.toThrow('No such checkout session');
+      
+      expect(loggerSpy.error).toHaveBeenCalledWith(
+        'Failed to retrieve checkout session: No such checkout session'
       );
     });
   });

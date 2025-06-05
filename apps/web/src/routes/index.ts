@@ -101,6 +101,12 @@ export const ROUTES = {
     requiresAuth: true,
     allowedRoles: [ROLES.ADMIN],
   },
+  ADMIN_MANAGE_REGISTRATIONS: {
+    path: '/admin/manage-registrations',
+    name: 'Manage Registrations',
+    requiresAuth: true,
+    allowedRoles: [ROLES.ADMIN],
+  },
   SHIFTS: {
     path: '/shifts',
     name: 'Shifts',
