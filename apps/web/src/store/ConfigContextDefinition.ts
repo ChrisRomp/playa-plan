@@ -13,6 +13,10 @@ export interface ConfigContextType {
   isLoading: boolean;
   error: string | null;
   refreshConfig: () => Promise<void>;
+  // Connection state
+  isConnecting: boolean;
+  isConnected: boolean;
+  connectionError: string | null;
 }
 
 // Create the context with default values
@@ -21,6 +25,10 @@ export const ConfigContext = createContext<ConfigContextType>({
   isLoading: true,
   error: null,
   refreshConfig: async () => { /* default implementation */ },
+  // Connection state defaults
+  isConnecting: true,
+  isConnected: false,
+  connectionError: null,
 });
 
 // Hook for component access to the config context

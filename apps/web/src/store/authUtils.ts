@@ -12,6 +12,10 @@ export interface AuthContextType {
   isLoading: boolean;
   error: string | null;
   isAuthenticated: boolean;
+  // Connection state
+  isConnecting: boolean;
+  isConnected: boolean;
+  connectionError: string | null;
 }
 
 /**
@@ -25,6 +29,10 @@ export const AuthContext = createContext<AuthContextType>({
   requestVerificationCode: async () => false,
   verifyCode: async () => {},
   logout: async () => {},
+  // Connection state defaults
+  isConnecting: true,
+  isConnected: false,
+  connectionError: null,
 });
 
 /**
