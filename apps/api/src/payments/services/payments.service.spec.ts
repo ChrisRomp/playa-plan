@@ -1401,6 +1401,245 @@ describe('PaymentsService', () => {
         success: true,
       });
     });
+
+    // Task 5.6.6: Test processRefund() correctly formats refund amounts for different providers
+    describe('refund amount formatting', () => {
+      it('should format Stripe refund amounts as cents', async () => {
+        const mockPayment = {
+          id: 'payment-id',
+          amount: 123.45, // $123.45 in dollars
+          status: PaymentStatus.COMPLETED,
+          provider: PaymentProvider.STRIPE,
+          providerRefId: 'pi_stripe123',
+          userId: 'user-id',
+          registrationId: 'registration-id',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          registration: {
+            id: 'registration-id',
+            userId: 'user-id',
+            status: 'CONFIRMED',
+          },
+        };
+
+        const mockRefundDto = {
+          paymentId: 'payment-id',
+          reason: 'Amount formatting test',
+        };
+
+        const mockStripeRefund = {
+          id: 're_stripe123',
+          amount: 12345, // Stripe returns amount in cents
+          status: 'succeeded',
+        };
+
+        // Setup mocks
+        mockPrismaService.payment.findUnique.mockResolvedValue(mockPayment);
+        mockStripeService.createRefund.mockResolvedValue(mockStripeRefund);
+        mockPrismaService.payment.update.mockResolvedValue({
+          ...mockPayment,
+          status: PaymentStatus.REFUNDED,
+        });
+        mockPrismaService.registration.update.mockResolvedValue({
+          ...mockPayment.registration,
+          status: 'CANCELLED',
+        });
+
+        // Execute
+        const result = await service.processRefund(mockRefundDto);
+
+        // Assert - Stripe should receive amount in cents (123.45 * 100 = 12345)
+        expect(mockStripeService.createRefund).toHaveBeenCalledWith(
+          'pi_stripe123',
+          12345, // $123.45 converted to cents
+          'Amount formatting test'
+        );
+
+        expect(result).toEqual({
+          paymentId: 'payment-id',
+          refundAmount: 123.45, // Result should be in dollars
+          providerRefundId: 're_stripe123',
+          success: true,
+        });
+      });
+
+      it('should format PayPal refund amounts as dollars', async () => {
+        const mockPayment = {
+          id: 'payment-id',
+          amount: 87.65, // $87.65 in dollars
+          status: PaymentStatus.COMPLETED,
+          provider: PaymentProvider.PAYPAL,
+          providerRefId: 'PAYID-PAYPAL456',
+          userId: 'user-id',
+          registrationId: 'registration-id',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          registration: {
+            id: 'registration-id',
+            userId: 'user-id',
+            status: 'CONFIRMED',
+          },
+        };
+
+        const mockRefundDto = {
+          paymentId: 'payment-id',
+          reason: 'PayPal amount test',
+        };
+
+        const mockPaypalRefund = {
+          id: 'REFUND-PAYPAL456',
+          amount: {
+            currency_code: 'USD',
+            value: '87.65', // PayPal returns amount as string
+          },
+          status: 'COMPLETED',
+        };
+
+        // Setup mocks
+        mockPrismaService.payment.findUnique.mockResolvedValue(mockPayment);
+        mockPaypalService.createRefund.mockResolvedValue(mockPaypalRefund);
+        mockPrismaService.payment.update.mockResolvedValue({
+          ...mockPayment,
+          status: PaymentStatus.REFUNDED,
+        });
+        mockPrismaService.registration.update.mockResolvedValue({
+          ...mockPayment.registration,
+          status: 'CANCELLED',
+        });
+
+        // Execute
+        const result = await service.processRefund(mockRefundDto);
+
+        // Assert - PayPal should receive amount in dollars (no conversion)
+        expect(mockPaypalService.createRefund).toHaveBeenCalledWith(
+          'PAYID-PAYPAL456',
+          87.65, // $87.65 as dollars (no conversion)
+          'PayPal amount test'
+        );
+
+        expect(result).toEqual({
+          paymentId: 'payment-id',
+          refundAmount: 87.65,
+          providerRefundId: 'REFUND-PAYPAL456',
+          success: true,
+        });
+      });
+
+      it('should handle MANUAL payment amounts without external API calls', async () => {
+        const mockPayment = {
+          id: 'payment-id',
+          amount: 99.99, // $99.99 in dollars
+          status: PaymentStatus.COMPLETED,
+          provider: PaymentProvider.MANUAL,
+          providerRefId: 'MANUAL-789',
+          userId: 'user-id',
+          registrationId: 'registration-id',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          registration: {
+            id: 'registration-id',
+            userId: 'user-id',
+            status: 'CONFIRMED',
+          },
+        };
+
+        const mockRefundDto = {
+          paymentId: 'payment-id',
+          reason: 'Manual amount test',
+        };
+
+        // Setup mocks
+        mockPrismaService.payment.findUnique.mockResolvedValue(mockPayment);
+        mockPrismaService.payment.update.mockResolvedValue({
+          ...mockPayment,
+          status: PaymentStatus.REFUNDED,
+        });
+        mockPrismaService.registration.update.mockResolvedValue({
+          ...mockPayment.registration,
+          status: 'CANCELLED',
+        });
+
+        // Execute
+        const result = await service.processRefund(mockRefundDto);
+
+        // Assert - No external API calls for MANUAL payments
+        expect(mockStripeService.createRefund).not.toHaveBeenCalled();
+        expect(mockPaypalService.createRefund).not.toHaveBeenCalled();
+
+        // Amount should be preserved as-is in result
+        expect(result).toEqual({
+          paymentId: 'payment-id',
+          refundAmount: 99.99, // Amount preserved as dollars
+          providerRefundId: expect.stringMatching(/^manual-refund-\d+$/),
+          success: true,
+        });
+      });
+
+      it('should handle decimal precision correctly for Stripe cents conversion', async () => {
+        const testCases = [
+          { dollars: 10.00, expectedCents: 1000 },
+          { dollars: 10.01, expectedCents: 1001 },
+          { dollars: 10.99, expectedCents: 1099 },
+          { dollars: 0.01, expectedCents: 1 },
+          { dollars: 999.99, expectedCents: 99999 },
+        ];
+
+        for (const testCase of testCases) {
+          // Clear previous calls
+          jest.clearAllMocks();
+
+          const mockPayment = {
+            id: 'payment-id',
+            amount: testCase.dollars,
+            status: PaymentStatus.COMPLETED,
+            provider: PaymentProvider.STRIPE,
+            providerRefId: 'pi_precision_test',
+            userId: 'user-id',
+            registrationId: 'registration-id',
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            registration: {
+              id: 'registration-id',
+              userId: 'user-id',
+              status: 'CONFIRMED',
+            },
+          };
+
+          const mockRefundDto = {
+            paymentId: 'payment-id',
+            reason: `Precision test for $${testCase.dollars}`,
+          };
+
+          const mockStripeRefund = {
+            id: 're_precision_test',
+            amount: testCase.expectedCents,
+            status: 'succeeded',
+          };
+
+          // Setup mocks
+          mockPrismaService.payment.findUnique.mockResolvedValue(mockPayment);
+          mockStripeService.createRefund.mockResolvedValue(mockStripeRefund);
+          mockPrismaService.payment.update.mockResolvedValue({
+            ...mockPayment,
+            status: PaymentStatus.REFUNDED,
+          });
+          mockPrismaService.registration.update.mockResolvedValue({
+            ...mockPayment.registration,
+            status: 'CANCELLED',
+          });
+
+          // Execute
+          await service.processRefund(mockRefundDto);
+
+          // Assert precise conversion to cents
+          expect(mockStripeService.createRefund).toHaveBeenCalledWith(
+            'pi_precision_test',
+            testCase.expectedCents,
+            `Precision test for $${testCase.dollars}`
+          );
+        }
+      });
+    });
   });
 
   // Additional tests would follow the same pattern for other methods

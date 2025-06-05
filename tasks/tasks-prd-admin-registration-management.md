@@ -167,7 +167,7 @@ Based on `prd-admin-registration-management.md`
     - [x] 5.6.3 Test processRefund() maps custom refund reasons to valid Stripe reasons
     - [x] 5.6.4 Test processRefund() handles PayPal refunds with dollar amounts
     - [x] 5.6.5 Test processRefund() handles MANUAL payment refunds (database-only updates)
-    - [ ] 5.6.6 Test processRefund() correctly formats refund amounts for different providers
+    - [x] 5.6.6 Test processRefund() correctly formats refund amounts for different providers
     - [ ] 5.6.7 Test processRefund() fails gracefully when Stripe session has no payment intent
     - [ ] 5.6.8 Test processRefund() handles Stripe API errors appropriately
   - [ ] 5.7 StripeService Unit Tests  
