@@ -1062,6 +1062,153 @@ describe('PaymentsService', () => {
         success: true,
       });
     });
+
+    // Task 5.6.4: Test processRefund() handles PayPal refunds with dollar amounts
+    it('should handle PayPal refunds with dollar amounts', async () => {
+      const mockPayment = {
+        id: 'payment-id',
+        amount: 150.00, // $150.00 in dollars
+        status: PaymentStatus.COMPLETED,
+        provider: PaymentProvider.PAYPAL,
+        providerRefId: 'PAYID-PAYPAL123',
+        userId: 'user-id',
+        registrationId: 'registration-id',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        registration: {
+          id: 'registration-id',
+          userId: 'user-id',
+          status: 'CONFIRMED',
+        },
+      };
+
+      const mockRefundDto = {
+        paymentId: 'payment-id',
+        reason: 'Event cancellation',
+      };
+
+      const mockPaypalRefund = {
+        id: 'REFUND-PAYPAL123',
+        amount: {
+          currency_code: 'USD',
+          value: '150.00', // PayPal returns amount as string with decimals
+        },
+        status: 'COMPLETED',
+      };
+
+      // Setup mocks
+      mockPrismaService.payment.findUnique.mockResolvedValue(mockPayment);
+      mockPaypalService.createRefund.mockResolvedValue(mockPaypalRefund);
+      mockPrismaService.payment.update.mockResolvedValue({
+        ...mockPayment,
+        status: PaymentStatus.REFUNDED,
+      });
+      mockPrismaService.registration.update.mockResolvedValue({
+        ...mockPayment.registration,
+        status: 'CANCELLED',
+      });
+
+      // Execute
+      const result = await service.processRefund(mockRefundDto);
+
+      // Assert
+      expect(mockPrismaService.payment.findUnique).toHaveBeenCalledWith({
+        where: { id: 'payment-id' },
+        include: { 
+          user: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+            },
+          },
+          registration: true 
+        },
+      });
+      
+      // PayPal service should be called with dollar amount (not cents)
+      expect(mockPaypalService.createRefund).toHaveBeenCalledWith(
+        'PAYID-PAYPAL123',
+        150.00, // $150.00 as dollars (not converted to cents like Stripe)
+        'Event cancellation'
+      );
+      
+      expect(mockPrismaService.payment.update).toHaveBeenCalledWith({
+        where: { id: 'payment-id' },
+        data: { status: PaymentStatus.REFUNDED },
+      });
+      
+      expect(mockPrismaService.registration.update).toHaveBeenCalledWith({
+        where: { id: 'registration-id' },
+        data: { status: 'CANCELLED' },
+      });
+      
+      expect(result).toEqual({
+        paymentId: 'payment-id',
+        refundAmount: 150.00,
+        providerRefundId: 'REFUND-PAYPAL123',
+        success: true,
+      });
+    });
+
+    // Test PayPal refund without registration
+    it('should handle PayPal refunds without registration', async () => {
+      const mockPayment = {
+        id: 'payment-id',
+        amount: 75.50,
+        status: PaymentStatus.COMPLETED,
+        provider: PaymentProvider.PAYPAL,
+        providerRefId: 'PAYID-NOREG123',
+        userId: 'user-id',
+        registrationId: null, // No registration
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        registration: null,
+      };
+
+      const mockRefundDto = {
+        paymentId: 'payment-id',
+        reason: 'Duplicate payment',
+      };
+
+      const mockPaypalRefund = {
+        id: 'REFUND-NOREG123',
+        amount: {
+          currency_code: 'USD',
+          value: '75.50',
+        },
+        status: 'COMPLETED',
+      };
+
+      // Setup mocks
+      mockPrismaService.payment.findUnique.mockResolvedValue(mockPayment);
+      mockPaypalService.createRefund.mockResolvedValue(mockPaypalRefund);
+      mockPrismaService.payment.update.mockResolvedValue({
+        ...mockPayment,
+        status: PaymentStatus.REFUNDED,
+      });
+
+      // Execute
+      const result = await service.processRefund(mockRefundDto);
+
+      // Assert
+      expect(mockPaypalService.createRefund).toHaveBeenCalledWith(
+        'PAYID-NOREG123',
+        75.50, // Dollar amount for PayPal
+        'Duplicate payment'
+      );
+      
+      // Should not call registration update when no registration
+      expect(mockPrismaService.registration.update).not.toHaveBeenCalled();
+      
+      expect(result).toEqual({
+        paymentId: 'payment-id',
+        refundAmount: 75.50,
+        providerRefundId: 'REFUND-NOREG123',
+        success: true,
+      });
+    });
   });
 
   // Additional tests would follow the same pattern for other methods
