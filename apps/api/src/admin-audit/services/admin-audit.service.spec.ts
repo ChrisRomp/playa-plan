@@ -1763,6 +1763,93 @@ describe('AdminAuditService', () => {
         ).rejects.toThrow('Invalid parameters provided');
       });
     });
+
+    describe('5.1.7 - Test graceful error handling with throwOnError: false', () => {
+      it('should return fallback audit record when throwOnError is false and database fails', async () => {
+        // Arrange
+        const createData: CreateAuditRecordDto = {
+          adminUserId: 'admin-user-1',
+          actionType: AdminAuditActionType.REGISTRATION_EDIT,
+          targetRecordType: AdminAuditTargetType.REGISTRATION,
+          targetRecordId: 'registration-1',
+          oldValues: { status: 'PENDING' },
+          newValues: { status: 'CONFIRMED' },
+          reason: 'Non-critical audit',
+          throwOnError: false, // Allow graceful failure
+        };
+
+        const dbError = new Error('Database connection failed');
+        (prismaService.adminAudit.create as jest.Mock).mockRejectedValue(dbError);
+
+        // Act
+        const result = await service.createAuditRecord(createData);
+
+        // Assert - Should return fallback record instead of throwing
+        expect(result).toBeDefined();
+        expect(result.id).toBe(''); // Fallback record has empty ID
+        expect(result.adminUserId).toBe('admin-user-1');
+        expect(result.actionType).toBe(AdminAuditActionType.REGISTRATION_EDIT);
+        expect(result.targetRecordType).toBe(AdminAuditTargetType.REGISTRATION);
+        expect(result.targetRecordId).toBe('registration-1');
+        expect(result.reason).toBe('Non-critical audit');
+        expect(result.oldValues).toBeNull();
+        expect(result.newValues).toBeNull();
+        expect(result.createdAt).toBeInstanceOf(Date);
+      });
+
+      it('should return fallback audit record for various error types when throwOnError is false', async () => {
+        // Test constraint violation error
+        const constraintCreateData: CreateAuditRecordDto = {
+          adminUserId: 'invalid-uuid',
+          actionType: AdminAuditActionType.REGISTRATION_EDIT,
+          targetRecordType: AdminAuditTargetType.REGISTRATION,
+          targetRecordId: 'registration-1',
+          throwOnError: false,
+        };
+
+        const constraintError = new Error('Foreign key constraint failed');
+        (prismaService.adminAudit.create as jest.Mock).mockRejectedValue(constraintError);
+
+        const result = await service.createAuditRecord(constraintCreateData);
+        expect(result.id).toBe(''); // Fallback record
+        expect(result.adminUserId).toBe('invalid-uuid');
+        expect(result.targetRecordId).toBe('registration-1');
+      });
+
+      it('should still throw errors when throwOnError is explicitly true', async () => {
+        // Arrange
+        const createData: CreateAuditRecordDto = {
+          adminUserId: 'admin-user-1',
+          actionType: AdminAuditActionType.REGISTRATION_EDIT,
+          targetRecordType: AdminAuditTargetType.REGISTRATION,
+          targetRecordId: 'registration-1',
+          throwOnError: true, // Explicitly request error throwing
+        };
+
+        const dbError = new Error('Database connection failed');
+        (prismaService.adminAudit.create as jest.Mock).mockRejectedValue(dbError);
+
+        // Act & Assert - Should throw error as requested
+        await expect(service.createAuditRecord(createData)).rejects.toThrow('Database connection failed');
+      });
+
+      it('should still throw errors when throwOnError is undefined (default behavior)', async () => {
+        // Arrange - Default behavior should throw errors
+        const createData: CreateAuditRecordDto = {
+          adminUserId: 'admin-user-1',
+          actionType: AdminAuditActionType.REGISTRATION_EDIT,
+          targetRecordType: AdminAuditTargetType.REGISTRATION,
+          targetRecordId: 'registration-1',
+          // throwOnError not specified - should default to throwing
+        };
+
+        const dbError = new Error('Database connection failed');
+        (prismaService.adminAudit.create as jest.Mock).mockRejectedValue(dbError);
+
+        // Act & Assert - Should throw error by default
+        await expect(service.createAuditRecord(createData)).rejects.toThrow('Database connection failed');
+      });
+    });
   });
 
   describe('PII Protection and Admin User Joins', () => {

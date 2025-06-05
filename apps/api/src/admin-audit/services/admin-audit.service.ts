@@ -12,6 +12,7 @@ export interface CreateAuditRecordDto {
   newValues?: Prisma.InputJsonValue;
   reason?: string;
   transactionId?: string;
+  throwOnError?: boolean;
 }
 
 export interface AdminAuditWithUser extends AdminAudit {
@@ -35,7 +36,7 @@ export class AdminAuditService {
   /**
    * Create a new audit record
    * @param data - Audit record data
-   * @returns The created audit record
+   * @returns The created audit record, or fallback record if error occurs and throwOnError is false
    */
   async createAuditRecord(data: CreateAuditRecordDto): Promise<AdminAudit> {
     try {
@@ -54,8 +55,26 @@ export class AdminAuditService {
     } catch (error: unknown) {
       const err = error as Error;
       this.logger.error(`Failed to create audit record: ${err.message}`, err.stack);
-      // Don't throw error - audit logging should not block main operations
-      throw error;
+      
+      // If throwOnError is explicitly set to true, or not specified (defaults to true for critical operations)
+      if (data.throwOnError !== false) {
+        throw error;
+      }
+      
+      // For non-critical operations, return a minimal audit record to indicate failure
+      // This prevents audit logging from blocking main operations
+      return {
+        id: '',
+        adminUserId: data.adminUserId,
+        actionType: data.actionType,
+        targetRecordType: data.targetRecordType,
+        targetRecordId: data.targetRecordId,
+        oldValues: null,
+        newValues: null,
+        reason: data.reason || null,
+        transactionId: data.transactionId || null,
+        createdAt: new Date(),
+      } as AdminAudit;
     }
   }
 

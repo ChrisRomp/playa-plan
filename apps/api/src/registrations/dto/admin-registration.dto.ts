@@ -44,7 +44,7 @@ export class AdminEditRegistrationDto {
   @IsUUID(4, { each: true, message: 'Each camping option ID must be a valid UUID' })
   campingOptionIds?: string[];
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     description: 'Notes or reason for the administrative action',
     example: 'User requested change due to vehicle breakdown',
   })

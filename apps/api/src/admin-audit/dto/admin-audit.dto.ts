@@ -1,4 +1,5 @@
-import { IsEnum, IsNotEmpty, IsOptional, IsString, IsUUID, IsObject } from 'class-validator';
+import { IsEnum, IsNotEmpty, IsOptional, IsString, IsUUID, IsObject, IsInt, Min } from 'class-validator';
+import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { AdminAuditActionType, AdminAuditTargetType, Prisma } from '@prisma/client';
 
@@ -125,6 +126,9 @@ export class AdminAuditQueryDto {
     default: 1,
   })
   @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: 'Page must be an integer' })
+  @Min(1, { message: 'Page must be 1 or greater' })
   page?: number;
 
   @ApiPropertyOptional({
@@ -133,5 +137,8 @@ export class AdminAuditQueryDto {
     default: 50,
   })
   @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: 'Limit must be an integer' })
+  @Min(1, { message: 'Limit must be 1 or greater' })
   limit?: number;
 } 
