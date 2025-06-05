@@ -37,6 +37,8 @@ export class ConnectionManager {
    * 401 responses indicate the API is working (just not authenticated)
    */
   async testConnection(): Promise<boolean> {
+    this.updateConnectionState('connecting');
+    
     try {
       // Create a request with a shorter timeout for connection testing
       const response = await api.get('/auth/test', { timeout: this.timeout });
