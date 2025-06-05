@@ -1,4 +1,4 @@
-import { Injectable, ConflictException, Logger, BadRequestException } from '@nestjs/common';
+import { Injectable, ConflictException, Logger, BadRequestException, HttpException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../common/prisma/prisma.service';
@@ -83,6 +83,13 @@ export class AuthService {
       return result;
     } catch (error: unknown) {
       this.logger.error(`Error during user registration: ${this.getErrorMessage(error)}`);
+      
+      // Re-throw HTTP exceptions (like ConflictException) as-is
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      
+      // For non-HTTP exceptions, wrap in BadRequestException
       throw new BadRequestException('User registration failed');
     }
   }

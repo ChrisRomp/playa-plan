@@ -445,6 +445,16 @@ describe('UserService', () => {
             firstName: 'Updated',
           },
         });
+        expect(notificationsService.sendEmailChangeNotificationToOldEmail).toHaveBeenCalledWith(
+          mockUser.email,
+          'updated@example.playaplan.app',
+          'test-uuid',
+        );
+        expect(notificationsService.sendEmailChangeNotificationToNewEmail).toHaveBeenCalledWith(
+          'updated@example.playaplan.app',
+          mockUser.email,
+          'test-uuid',
+        );
       });
 
       it('should detect email conflict with different case during update', async () => {

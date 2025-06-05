@@ -5,7 +5,7 @@ import { PrismaService } from '../common/prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { NotificationsService } from '../notifications/services/notifications.service';
-import { BadRequestException, ConflictException } from '@nestjs/common';
+import { ConflictException } from '@nestjs/common';
 import { normalizeEmail } from '../common/utils/email.utils';
 
 describe('Email Case Insensitivity Integration', () => {
@@ -100,7 +100,7 @@ describe('Email Case Insensitivity Integration', () => {
       mockPrismaService.user.findUnique.mockResolvedValue(existingUser);
 
       // Act & Assert
-      await expect(authService.register(registerDto)).rejects.toThrow(BadRequestException);
+      await expect(authService.register(registerDto)).rejects.toThrow(ConflictException);
 
       // Verify that the database was queried with normalized email
       expect(mockPrismaService.user.findUnique).toHaveBeenCalledWith({

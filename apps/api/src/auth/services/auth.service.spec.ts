@@ -791,7 +791,7 @@ describe('AuthService', () => {
         mockPrismaService.user.findUnique.mockResolvedValue(mockUser);
 
         // Act & Assert
-        await expect(service.register(registerDto)).rejects.toThrow(BadRequestException);
+        await expect(service.register(registerDto)).rejects.toThrow(ConflictException);
         expect(mockPrismaService.user.findUnique).toHaveBeenCalledWith({
           where: { email: 'test@example.playaplan.app' },
         });

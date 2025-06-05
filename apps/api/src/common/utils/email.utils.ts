@@ -5,7 +5,7 @@
 /**
  * Normalizes an email address to lowercase for consistent storage and comparison
  * @param email - The email address to normalize
- * @returns The email address in lowercase
+ * @returns The trimmed, lowercased email address
  */
 export function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
