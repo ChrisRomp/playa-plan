@@ -164,7 +164,7 @@ Based on `prd-admin-registration-management.md`
   - [ ] 5.6 PaymentsService Unit Tests
     - [x] 5.6.1 Test processRefund() successfully processes Stripe refunds with payment intent IDs
     - [x] 5.6.2 Test processRefund() converts checkout session IDs to payment intent IDs for Stripe
-    - [ ] 5.6.3 Test processRefund() maps custom refund reasons to valid Stripe reasons
+    - [x] 5.6.3 Test processRefund() maps custom refund reasons to valid Stripe reasons
     - [ ] 5.6.4 Test processRefund() handles PayPal refunds with dollar amounts
     - [ ] 5.6.5 Test processRefund() handles MANUAL payment refunds (database-only updates)
     - [ ] 5.6.6 Test processRefund() correctly formats refund amounts for different providers

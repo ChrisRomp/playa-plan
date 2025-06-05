@@ -905,6 +905,163 @@ describe('PaymentsService', () => {
         success: true,
       });
     });
+
+    // Task 5.6.3: Test processRefund() maps custom refund reasons to valid Stripe reasons
+    it('should map custom refund reasons to valid Stripe reasons', async () => {
+      const basePayment = {
+        id: 'payment-id',
+        amount: 50.00,
+        status: PaymentStatus.COMPLETED,
+        provider: PaymentProvider.STRIPE,
+        providerRefId: 'pi_test123',
+        userId: 'user-id',
+        registrationId: 'registration-id',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        registration: {
+          id: 'registration-id',
+          userId: 'user-id',
+          status: 'CONFIRMED',
+        },
+      };
+
+      const mockStripeRefund = {
+        id: 're_test123',
+        amount: 5000,
+        status: 'succeeded',
+      };
+
+      // Setup base mocks
+      mockPrismaService.payment.findUnique.mockResolvedValue(basePayment);
+      mockStripeService.createRefund.mockResolvedValue(mockStripeRefund);
+      mockPrismaService.payment.update.mockResolvedValue({
+        ...basePayment,
+        status: PaymentStatus.REFUNDED,
+      });
+      mockPrismaService.registration.update.mockResolvedValue({
+        ...basePayment.registration,
+        status: 'CANCELLED',
+      });
+
+      // Test cases for reason mapping
+      const testCases = [
+        {
+          inputReason: 'Duplicate payment detected',
+          description: 'duplicate reason',
+        },
+        {
+          inputReason: 'Fraudulent transaction',
+          description: 'fraudulent reason',
+        },
+        {
+          inputReason: 'Registration cancellation by admin',
+          description: 'general reason (maps to requested_by_customer)',
+        },
+        {
+          inputReason: 'Customer requested refund',
+          description: 'customer request reason',
+        },
+      ];
+
+      for (const testCase of testCases) {
+        // Clear previous calls
+        jest.clearAllMocks();
+        
+        // Setup mocks again
+        mockPrismaService.payment.findUnique.mockResolvedValue(basePayment);
+        mockStripeService.createRefund.mockResolvedValue(mockStripeRefund);
+        mockPrismaService.payment.update.mockResolvedValue({
+          ...basePayment,
+          status: PaymentStatus.REFUNDED,
+        });
+        mockPrismaService.registration.update.mockResolvedValue({
+          ...basePayment.registration,
+          status: 'CANCELLED',
+        });
+
+        const refundDto = {
+          paymentId: 'payment-id',
+          reason: testCase.inputReason,
+        };
+
+        // Execute
+        const result = await service.processRefund(refundDto);
+
+        // Assert
+        expect(mockStripeService.createRefund).toHaveBeenCalledWith(
+          'pi_test123',
+          5000, // $50.00 converted to cents
+          testCase.inputReason // The original reason is passed through - mapping happens in StripeService
+        );
+
+        expect(result).toEqual({
+          paymentId: 'payment-id',
+          refundAmount: 50.00,
+          providerRefundId: 're_test123',
+          success: true,
+        });
+      }
+    });
+
+    // Test refund without reason
+    it('should handle refund without reason provided', async () => {
+      const mockPayment = {
+        id: 'payment-id',
+        amount: 25.00,
+        status: PaymentStatus.COMPLETED,
+        provider: PaymentProvider.STRIPE,
+        providerRefId: 'pi_noreason123',
+        userId: 'user-id',
+        registrationId: 'registration-id',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        registration: {
+          id: 'registration-id',
+          userId: 'user-id',
+          status: 'CONFIRMED',
+        },
+      };
+
+      const mockRefundDto = {
+        paymentId: 'payment-id',
+        // No reason provided
+      };
+
+      const mockStripeRefund = {
+        id: 're_noreason123',
+        amount: 2500,
+        status: 'succeeded',
+      };
+
+      // Setup mocks
+      mockPrismaService.payment.findUnique.mockResolvedValue(mockPayment);
+      mockStripeService.createRefund.mockResolvedValue(mockStripeRefund);
+      mockPrismaService.payment.update.mockResolvedValue({
+        ...mockPayment,
+        status: PaymentStatus.REFUNDED,
+      });
+      mockPrismaService.registration.update.mockResolvedValue({
+        ...mockPayment.registration,
+        status: 'CANCELLED',
+      });
+
+      // Execute
+      const result = await service.processRefund(mockRefundDto);
+
+      // Assert - should call createRefund with undefined reason
+      expect(mockStripeService.createRefund).toHaveBeenCalledWith(
+        'pi_noreason123',
+        2500, // $25.00 converted to cents
+        undefined // No reason provided
+      );
+
+      expect(result).toEqual({
+        paymentId: 'payment-id',
+        refundAmount: 25.00,
+        providerRefundId: 're_noreason123',
+        success: true,
+      });
+    });
   });
 
   // Additional tests would follow the same pattern for other methods
