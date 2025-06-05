@@ -741,5 +741,89 @@ describe('PaymentsService', () => {
     });
   });
 
+  // Task 5.6: PaymentsService Unit Tests for processRefund
+  describe('processRefund', () => {
+    // Task 5.6.1: Test processRefund() successfully processes Stripe refunds with payment intent IDs
+    it('should successfully process Stripe refunds with payment intent IDs', async () => {
+      const mockPayment = {
+        id: 'payment-id',
+        amount: 100.00, // $100.00 in dollars
+        status: PaymentStatus.COMPLETED,
+        provider: PaymentProvider.STRIPE,
+        providerRefId: 'pi_stripe123',
+        userId: 'user-id',
+        registrationId: 'registration-id',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        registration: {
+          id: 'registration-id',
+          userId: 'user-id',
+          status: 'CONFIRMED',
+        },
+      };
+
+      const mockRefundDto = {
+        paymentId: 'payment-id',
+        reason: 'Customer requested refund',
+      };
+
+      const mockStripeRefund = {
+        id: 're_stripe123',
+        amount: 10000, // Stripe returns amount in cents
+        status: 'succeeded',
+      };
+
+      // Setup mocks
+      mockPrismaService.payment.findUnique.mockResolvedValue(mockPayment);
+      mockStripeService.createRefund.mockResolvedValue(mockStripeRefund);
+      mockPrismaService.payment.update.mockResolvedValue({
+        ...mockPayment,
+        status: PaymentStatus.REFUNDED,
+      });
+      mockPrismaService.registration.update.mockResolvedValue({
+        ...mockPayment.registration,
+        status: 'CANCELLED',
+      });
+
+      // Execute
+      const result = await service.processRefund(mockRefundDto);
+
+      // Assert
+      expect(mockPrismaService.payment.findUnique).toHaveBeenCalledWith({
+        where: { id: 'payment-id' },
+        include: { 
+          user: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+            },
+          },
+          registration: true 
+        },
+      });
+      expect(mockStripeService.createRefund).toHaveBeenCalledWith(
+        'pi_stripe123',
+        10000, // $100.00 converted to cents
+        'Customer requested refund'
+      );
+      expect(mockPrismaService.payment.update).toHaveBeenCalledWith({
+        where: { id: 'payment-id' },
+        data: { status: PaymentStatus.REFUNDED },
+      });
+      expect(mockPrismaService.registration.update).toHaveBeenCalledWith({
+        where: { id: 'registration-id' },
+        data: { status: 'CANCELLED' },
+      });
+      expect(result).toEqual({
+        paymentId: 'payment-id',
+        refundAmount: 100.00,
+        providerRefundId: 're_stripe123',
+        success: true,
+      });
+    });
+  });
+
   // Additional tests would follow the same pattern for other methods
 });

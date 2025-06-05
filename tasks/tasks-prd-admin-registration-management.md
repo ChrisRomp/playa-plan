@@ -47,6 +47,7 @@ Based on `prd-admin-registration-management.md`
 - `apps/web/src/lib/api/admin-registrations.ts` - API client for admin registration operations (COMPLETED)
 - `apps/web/src/routes/index.ts` - Route configuration for admin registration management (COMPLETED)
 - `apps/web/src/pages/AdminPage.tsx` - Updated admin panel with registration management link (COMPLETED)
+- `apps/api/src/payments/services/payments.service.spec.ts` - Unit tests for PaymentsService (COMPLETED: processRefund tests)
 
 ### Notes
 
@@ -161,7 +162,7 @@ Based on `prd-admin-registration-management.md`
     - [x] 5.5.7 Test cancellation notifications use generic "contact us" instead of admin email
     - [x] 5.5.8 Test cancellation notifications include refund amount when processed automatically
   - [ ] 5.6 PaymentsService Unit Tests
-    - [ ] 5.6.1 Test processRefund() successfully processes Stripe refunds with payment intent IDs
+    - [x] 5.6.1 Test processRefund() successfully processes Stripe refunds with payment intent IDs
     - [ ] 5.6.2 Test processRefund() converts checkout session IDs to payment intent IDs for Stripe
     - [ ] 5.6.3 Test processRefund() maps custom refund reasons to valid Stripe reasons
     - [ ] 5.6.4 Test processRefund() handles PayPal refunds with dollar amounts
