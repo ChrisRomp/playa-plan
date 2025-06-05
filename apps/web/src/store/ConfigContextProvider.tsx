@@ -3,6 +3,7 @@ import { CampConfig } from '../types';
 import { config as configApi } from '../lib/api';
 import { fallbackConfig, mapApiConfigToFrontend } from '../utils/configUtils';
 import { ConfigContext } from './ConfigContextDefinition';
+import { connectionManager, ConnectionStatus } from '../lib/connectionManager';
 
 
 // Provider component that wraps the application
@@ -10,6 +11,11 @@ export const ConfigProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const [config, setConfig] = useState<CampConfig | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // Connection state
+  const [isConnecting, setIsConnecting] = useState(true);
+  const [isConnected, setIsConnected] = useState(false);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
 
   const fetchConfig = useCallback(async () => {
     setIsLoading(true);
@@ -47,8 +53,32 @@ export const ConfigProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Intentionally omit fetchConfig to prevent repeated calls
 
+  // Set up connection manager listener
+  useEffect(() => {
+    const handleConnectionStatusChange = (status: ConnectionStatus) => {
+      setIsConnecting(status.isConnecting);
+      setIsConnected(status.isConnected);
+      setConnectionError(status.connectionError);
+    };
+
+    connectionManager.addListener(handleConnectionStatusChange);
+
+    return () => {
+      connectionManager.removeListener(handleConnectionStatusChange);
+    };
+  }, []);
+
   return (
-    <ConfigContext.Provider value={{ config, isLoading, error, refreshConfig: fetchConfig }}>
+    <ConfigContext.Provider value={{ 
+      config, 
+      isLoading, 
+      error, 
+      refreshConfig: fetchConfig,
+      // Connection state
+      isConnecting,
+      isConnected,
+      connectionError,
+    }}>
       {children}
     </ConfigContext.Provider>
   );

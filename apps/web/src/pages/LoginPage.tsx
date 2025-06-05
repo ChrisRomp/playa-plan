@@ -1,7 +1,9 @@
 import { useEffect, lazy, Suspense } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../store/authUtils';
+import { useConfig } from '../store/ConfigContext';
 import { PATHS } from '../routes';
+import { ConnectionStatus } from '../components/common/ConnectionStatus';
 
 /**
  * Login page wrapper component
@@ -11,6 +13,7 @@ const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { isAuthenticated } = useAuth();
+  const { isLoading: configLoading, error: configError } = useConfig();
   
   // Extract the returnTo path from URL query params if present
   const searchParams = new URLSearchParams(location.search);
@@ -29,9 +32,11 @@ const LoginPage: React.FC = () => {
   
   return (
     <div className="container mx-auto px-4 py-8">
-      <Suspense fallback={<div>Loading...</div>}>
-        <LoginForm />
-      </Suspense>
+      <ConnectionStatus isConnecting={configLoading} connectionError={configError}>
+        <Suspense fallback={<div>Loading...</div>}>
+          <LoginForm />
+        </Suspense>
+      </ConnectionStatus>
     </div>
   );
 };

@@ -3,6 +3,7 @@ import { User } from '../types';
 import { auth, clearJwtToken, JWT_TOKEN_STORAGE_KEY } from '../lib/api';
 import cookieService from '../lib/cookieService';
 import { AuthContext, mapApiRoleToClientRole } from './authUtils';
+import { connectionManager, ConnectionStatus } from '../lib/connectionManager';
 
 
 
@@ -16,10 +17,32 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [error, setError] = useState<string | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   
+  // Connection state
+  const [isConnecting, setIsConnecting] = useState(true);
+  const [isConnected, setIsConnected] = useState(false);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
+  
   // Reset loading state on component mount
   useEffect(() => {
     // Always reset loading state when component mounts
     setIsLoading(false);
+  }, []);
+
+  // Set up connection manager listener
+  useEffect(() => {
+    const handleConnectionStatusChange = (status: ConnectionStatus) => {
+      setIsConnecting(status.isConnecting);
+      setIsConnected(status.isConnected);
+      setConnectionError(status.connectionError);
+    };
+
+    connectionManager.addListener(handleConnectionStatusChange);
+    connectionManager.startPeriodicCheck();
+
+    return () => {
+      connectionManager.removeListener(handleConnectionStatusChange);
+      connectionManager.stopPeriodicCheck();
+    };
   }, []);
 
   // Check authentication status when the component mounts
@@ -202,7 +225,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         logout, 
         isLoading, 
         error, 
-        isAuthenticated 
+        isAuthenticated,
+        // Connection state
+        isConnecting,
+        isConnected,
+        connectionError,
       }}
     >
       {children}

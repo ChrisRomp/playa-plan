@@ -26,6 +26,7 @@ export const api = axios.create({
     'Content-Type': 'application/json',
   },
   withCredentials: true, // Important: this ensures cookies are sent with requests
+  timeout: 10000, // 10 second timeout
 });
 
 // Log API configuration for debugging
