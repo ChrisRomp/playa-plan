@@ -234,7 +234,7 @@ export class AdminNotificationsService {
     const refundInfo = templateData.refundInfo as RefundInfo | undefined;
     
     const refundMessage = refundInfo?.processed 
-      ? `A refund of $${(refundInfo.amount / 100).toFixed(2)} has been processed. If paid by credit card, your refund will appear on your payment method within 5-10 business days.`
+      ? `A refund of $${refundInfo.amount.toFixed(2)} has been processed. If paid by credit card, your refund will appear on your payment method within 5-10 business days.`
       : '';
 
     const subject = `Registration Cancelled - ${templateData.campName} ${templateData.registrationDetails?.year}`;
