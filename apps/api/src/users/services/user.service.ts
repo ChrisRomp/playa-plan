@@ -3,7 +3,6 @@ import { PrismaService } from '../../common/prisma/prisma.service';
 import { NotificationsService } from '../../notifications/services/notifications.service';
 import { CreateUserDto } from '../dto/create-user.dto';
 import { UpdateUserDto } from '../dto/update-user.dto';
-import { User } from '../entities/user.entity';
 import { User as PrismaUser } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { normalizeEmail } from '../../common/utils/email.utils';

@@ -7,7 +7,7 @@ import { RegisterDto } from '../dto/register.dto';
 import { User, UserRole } from '@prisma/client';
 import { NotificationsService } from '../../notifications/services/notifications.service';
 import { v4 as uuidv4 } from 'uuid';
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ConflictException } from '@nestjs/common';
 
 // Mock external dependencies
 jest.mock('uuid');
@@ -134,8 +134,7 @@ describe('AuthService', () => {
       mockPrismaService.user.findUnique.mockResolvedValue(mockUser);
       
       // Act & Assert
-      await expect(service.register(registerDto)).rejects.toThrow(BadRequestException);
-      // Note: The real error is caught and a BadRequestException is thrown instead
+      await expect(service.register(registerDto)).rejects.toThrow(ConflictException);
       
       expect(mockPrismaService.user.findUnique).toHaveBeenCalledWith({
         where: { email: 'new@example.playaplan.app' },
