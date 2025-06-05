@@ -30,17 +30,7 @@ describe('AdminRegistrationsController', () => {
     role: UserRole.ADMIN,
   };
 
-  const mockParticipantUser = {
-    id: 'participant-123',
-    email: 'participant@example.com',
-    role: UserRole.PARTICIPANT,
-  };
 
-  const mockStaffUser = {
-    id: 'staff-123',
-    email: 'staff@example.com',
-    role: UserRole.STAFF,
-  };
 
   const mockRegistration = {
     id: 'reg-123',
@@ -386,13 +376,6 @@ describe('AdminRegistrationsController', () => {
   });
 
   describe('Authorization and Access Control', () => {
-    let mockJwtAuthGuard: jest.Mock;
-    let mockRolesGuard: jest.Mock;
-
-    beforeEach(() => {
-      mockJwtAuthGuard = jest.fn();
-      mockRolesGuard = jest.fn();
-    });
 
     // Task 5.4.5: Test unauthorized access returns proper HTTP status codes
     // Task 5.4.9: Test unauthenticated requests receive 401 Unauthorized for all endpoints

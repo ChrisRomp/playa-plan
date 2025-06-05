@@ -24,7 +24,6 @@ describe('RegistrationAdminService', () => {
   let service: RegistrationAdminService;
   let prismaService: jest.Mocked<PrismaService>;
   let adminAuditService: jest.Mocked<AdminAuditService>;
-  let adminNotificationsService: jest.Mocked<AdminNotificationsService>;
   let cleanupService: jest.Mocked<RegistrationCleanupService>;
   let paymentsService: jest.Mocked<PaymentsService>;
 
@@ -48,13 +47,7 @@ describe('RegistrationAdminService', () => {
     payments: [],
   };
 
-  const mockAdminUser = {
-    id: 'admin-123',
-    email: 'admin@example.com',
-    firstName: 'Admin',
-    lastName: 'User',
-    role: UserRole.ADMIN,
-  };
+
 
   const mockPayment = {
     id: 'payment-123',
@@ -141,7 +134,6 @@ describe('RegistrationAdminService', () => {
     service = module.get<RegistrationAdminService>(RegistrationAdminService);
     prismaService = module.get(PrismaService);
     adminAuditService = module.get(AdminAuditService);
-    adminNotificationsService = module.get(AdminNotificationsService);
     cleanupService = module.get(RegistrationCleanupService);
     paymentsService = module.get(PaymentsService);
   });

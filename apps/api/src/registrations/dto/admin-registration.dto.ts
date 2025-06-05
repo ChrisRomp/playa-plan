@@ -6,7 +6,6 @@ import {
   IsArray, 
   IsNotEmpty,
   IsBoolean,
-  IsNumber,
   IsInt,
   Min
 } from 'class-validator';

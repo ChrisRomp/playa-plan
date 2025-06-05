@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { RegistrationCleanupService, CleanupResult } from './registration-cleanup.service';
+import { RegistrationCleanupService } from './registration-cleanup.service';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { AdminAuditService } from '../../admin-audit/services/admin-audit.service';
 import { AdminAuditActionType, AdminAuditTargetType, RegistrationStatus, UserRole } from '@prisma/client';
@@ -120,12 +120,6 @@ describe('RegistrationCleanupService', () => {
   describe('cleanupRegistration', () => {
     // Task 5.3.1: Test cleanupRegistration() deletes associated work shifts
     it('should delete associated work shifts', async () => {
-      const expectedResult: CleanupResult = {
-        workShiftsRemoved: 2,
-        campingOptionsReleased: 2,
-        auditRecords: ['audit-1', 'audit-2', 'audit-3', 'audit-4'],
-      };
-
       prismaService.$transaction.mockImplementation(async (callback) => {
         return await callback(prismaService);
       });
@@ -152,12 +146,6 @@ describe('RegistrationCleanupService', () => {
 
     // Task 5.3.2: Test cleanupRegistration() releases camping option allocations
     it('should release camping option allocations', async () => {
-      const expectedResult: CleanupResult = {
-        workShiftsRemoved: 0,
-        campingOptionsReleased: 2,
-        auditRecords: ['audit-1', 'audit-2'],
-      };
-
       const registrationWithNoCampingJobs = {
         ...mockRegistration,
         jobs: [], // No work shifts
@@ -197,12 +185,6 @@ describe('RegistrationCleanupService', () => {
           ...mockRegistration.user,
           campingOptionRegistrations: [],
         },
-      };
-
-      const expectedResult: CleanupResult = {
-        workShiftsRemoved: 0,
-        campingOptionsReleased: 0,
-        auditRecords: [],
       };
 
       prismaService.$transaction.mockImplementation(async (callback) => {
