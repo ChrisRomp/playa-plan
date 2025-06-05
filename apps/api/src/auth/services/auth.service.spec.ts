@@ -7,7 +7,7 @@ import { RegisterDto } from '../dto/register.dto';
 import { User, UserRole } from '@prisma/client';
 import { NotificationsService } from '../../notifications/services/notifications.service';
 import { v4 as uuidv4 } from 'uuid';
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ConflictException } from '@nestjs/common';
 
 // Mock external dependencies
 jest.mock('uuid');
@@ -134,8 +134,7 @@ describe('AuthService', () => {
       mockPrismaService.user.findUnique.mockResolvedValue(mockUser);
       
       // Act & Assert
-      await expect(service.register(registerDto)).rejects.toThrow(BadRequestException);
-      // Note: The real error is caught and a BadRequestException is thrown instead
+      await expect(service.register(registerDto)).rejects.toThrow(ConflictException);
       
       expect(mockPrismaService.user.findUnique).toHaveBeenCalledWith({
         where: { email: 'new@example.playaplan.app' },
@@ -735,6 +734,159 @@ describe('AuthService', () => {
           loginCodeExpiry: null,
           isEmailVerified: true,
         },
+      });
+    });
+  });
+
+  describe('Email Case Insensitivity', () => {
+    describe('register', () => {
+      it('should normalize email to lowercase during registration', async () => {
+        // Arrange
+        const registerDto: RegisterDto = {
+          email: 'NEW@EXAMPLE.PLAYAPLAN.APP',
+          firstName: 'New',
+          lastName: 'User',
+          playaName: 'NewUser',
+        };
+
+        mockPrismaService.user.findUnique.mockResolvedValue(null);
+        mockPrismaService.user.create.mockResolvedValue({
+          ...mockUser,
+          id: 'new-user-id',
+          email: 'new@example.playaplan.app',
+          firstName: 'New',
+          lastName: 'User',
+          playaName: 'NewUser',
+        });
+
+        // Act
+        const result = await service.register(registerDto);
+
+        // Assert
+        expect(mockPrismaService.user.findUnique).toHaveBeenCalledWith({
+          where: { email: 'new@example.playaplan.app' },
+        });
+        expect(mockPrismaService.user.create).toHaveBeenCalledWith({
+          data: {
+            email: 'new@example.playaplan.app',
+            firstName: 'New',
+            lastName: 'User',
+            playaName: 'NewUser',
+            role: UserRole.PARTICIPANT,
+            verificationToken: expect.any(String),
+          },
+        });
+        expect(result.email).toBe('new@example.playaplan.app');
+      });
+
+      it('should detect existing user with different case email', async () => {
+        // Arrange
+        const registerDto: RegisterDto = {
+          email: 'TEST@EXAMPLE.PLAYAPLAN.APP',
+          firstName: 'Test',
+          lastName: 'User',
+        };
+
+        mockPrismaService.user.findUnique.mockResolvedValue(mockUser);
+
+        // Act & Assert
+        await expect(service.register(registerDto)).rejects.toThrow(ConflictException);
+        expect(mockPrismaService.user.findUnique).toHaveBeenCalledWith({
+          where: { email: 'test@example.playaplan.app' },
+        });
+      });
+    });
+
+    describe('generateLoginCode', () => {
+      it('should normalize email to lowercase when generating login code', async () => {
+        // Arrange
+        mockPrismaService.user.findUnique.mockResolvedValue(mockUser);
+        mockPrismaService.user.update.mockResolvedValue(mockUser);
+        mockNotificationsService.sendLoginCodeEmail.mockResolvedValue(true);
+
+        // Act
+        const result = await service.generateLoginCode('TEST@EXAMPLE.PLAYAPLAN.APP');
+
+        // Assert
+        expect(result).toBe(true);
+        expect(mockPrismaService.user.findUnique).toHaveBeenCalledWith({
+          where: { email: 'test@example.playaplan.app' },
+        });
+        expect(mockNotificationsService.sendLoginCodeEmail).toHaveBeenCalledWith(
+          'test@example.playaplan.app',
+          expect.any(String),
+          mockUser.id
+        );
+      });
+
+      it('should create new user with normalized email when user does not exist', async () => {
+        // Arrange
+        mockPrismaService.user.findUnique.mockResolvedValue(null);
+        mockPrismaService.user.create.mockResolvedValue({
+          ...mockUser,
+          email: 'new@example.playaplan.app',
+          id: 'new-user-id',
+        });
+        mockNotificationsService.sendLoginCodeEmail.mockResolvedValue(true);
+
+        // Act
+        const result = await service.generateLoginCode('NEW@EXAMPLE.PLAYAPLAN.APP');
+
+        // Assert
+        expect(result).toBe(true);
+        expect(mockPrismaService.user.findUnique).toHaveBeenCalledWith({
+          where: { email: 'new@example.playaplan.app' },
+        });
+        expect(mockPrismaService.user.create).toHaveBeenCalledWith({
+          data: {
+            email: 'new@example.playaplan.app',
+            loginCode: expect.any(String),
+            loginCodeExpiry: expect.any(Date),
+            role: UserRole.PARTICIPANT,
+            firstName: '',
+            lastName: '',
+            isEmailVerified: false,
+          },
+        });
+      });
+    });
+
+    describe('validateLoginCode', () => {
+      it('should normalize email to lowercase when validating login code', async () => {
+        // Arrange
+        const futureDate = new Date();
+        futureDate.setMinutes(futureDate.getMinutes() + 10);
+        
+        const mockUserWithCode = {
+          ...mockUser,
+          email: 'test@example.playaplan.app',
+          loginCode: '123456',
+          loginCodeExpiry: futureDate,
+        };
+
+        mockPrismaService.user.findFirst.mockResolvedValue(mockUserWithCode);
+        mockPrismaService.user.count.mockResolvedValue(1);
+        mockPrismaService.user.update.mockResolvedValue({
+          ...mockUserWithCode,
+          loginCode: null,
+          loginCodeExpiry: null,
+          isEmailVerified: true,
+        });
+
+        // Act
+        const result = await service.validateLoginCode('TEST@EXAMPLE.PLAYAPLAN.APP', '123456');
+
+        // Assert
+        expect(result).toBeDefined();
+        expect(mockPrismaService.user.findFirst).toHaveBeenCalledWith({
+          where: {
+            email: 'test@example.playaplan.app',
+            loginCode: '123456',
+            loginCodeExpiry: {
+              gt: expect.any(Date),
+            },
+          },
+        });
       });
     });
   });
