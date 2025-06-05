@@ -50,6 +50,7 @@ Based on `prd-admin-registration-management.md`
 - `apps/web/src/routes/index.ts` - Route configuration for admin registration management (COMPLETED)
 - `apps/web/src/pages/AdminPage.tsx` - Updated admin panel with registration management link (COMPLETED)
 - `apps/api/src/payments/services/payments.service.spec.ts` - Unit tests for PaymentsService (COMPLETED: processRefund tests)
+- `apps/api/src/payments/services/stripe.service.spec.ts` - Unit tests for StripeService (COMPLETED)
 
 ### Notes
 
@@ -172,13 +173,13 @@ Based on `prd-admin-registration-management.md`
     - [x] 5.6.6 Test processRefund() correctly formats refund amounts for different providers
     - [x] 5.6.7 Test processRefund() fails gracefully when Stripe session has no payment intent
     - [x] 5.6.8 Test processRefund() handles Stripe API errors appropriately
-  - [ ] 5.7 StripeService Unit Tests  
-    - [ ] 5.7.1 Test createRefund() accepts payment intent IDs directly
-    - [ ] 5.7.2 Test createRefund() converts checkout session IDs to payment intent IDs
-    - [ ] 5.7.3 Test createRefund() maps custom reasons to valid Stripe refund reasons
-    - [ ] 5.7.4 Test createRefund() handles expanded payment intent objects in session response
-    - [ ] 5.7.5 Test createRefund() fails appropriately when session has no payment intent
-    - [ ] 5.7.6 Test getCheckoutSession() expands payment intent data correctly
+  - [x] 5.7 StripeService Unit Tests  
+    - [x] 5.7.1 Test createRefund() accepts payment intent IDs directly
+    - [x] 5.7.2 Test createRefund() converts checkout session IDs to payment intent IDs
+    - [x] 5.7.3 Test createRefund() maps custom reasons to valid Stripe refund reasons
+    - [x] 5.7.4 Test createRefund() handles expanded payment intent objects in session response
+    - [x] 5.7.5 Test createRefund() fails appropriately when session has no payment intent
+    - [x] 5.7.6 Test getCheckoutSession() expands payment intent data correctly
   - [x] 5.8 Frontend Component Unit Tests
     - [x] 5.8.1 Test RegistrationEditForm renders correctly with current registration data
     - [x] 5.8.2 Test RegistrationEditForm handles camping option changes with validation
