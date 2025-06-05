@@ -823,6 +823,88 @@ describe('PaymentsService', () => {
         success: true,
       });
     });
+
+    // Task 5.6.2: Test processRefund() converts checkout session IDs to payment intent IDs for Stripe
+    it('should convert checkout session IDs to payment intent IDs for Stripe', async () => {
+      const mockPayment = {
+        id: 'payment-id',
+        amount: 75.00, // $75.00 in dollars
+        status: PaymentStatus.COMPLETED,
+        provider: PaymentProvider.STRIPE,
+        providerRefId: 'cs_test_session123', // Checkout session ID
+        userId: 'user-id',
+        registrationId: 'registration-id',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        registration: {
+          id: 'registration-id',
+          userId: 'user-id',
+          status: 'CONFIRMED',
+        },
+      };
+
+      const mockRefundDto = {
+        paymentId: 'payment-id',
+        reason: 'Registration cancellation',
+      };
+
+      const mockStripeSession = {
+        id: 'cs_test_session123',
+        payment_intent: 'pi_converted123', // String payment intent ID
+      };
+
+      const mockStripeRefund = {
+        id: 're_stripe456',
+        amount: 7500, // Stripe returns amount in cents
+        status: 'succeeded',
+      };
+
+      // Setup mocks
+      mockPrismaService.payment.findUnique.mockResolvedValue(mockPayment);
+      mockStripeService.getCheckoutSession.mockResolvedValue(mockStripeSession);
+      mockStripeService.createRefund.mockResolvedValue(mockStripeRefund);
+      mockPrismaService.payment.update.mockResolvedValue({
+        ...mockPayment,
+        status: PaymentStatus.REFUNDED,
+      });
+      mockPrismaService.registration.update.mockResolvedValue({
+        ...mockPayment.registration,
+        status: 'CANCELLED',
+      });
+
+      // Execute
+      const result = await service.processRefund(mockRefundDto);
+
+      // Assert
+      expect(mockPrismaService.payment.findUnique).toHaveBeenCalledWith({
+        where: { id: 'payment-id' },
+        include: { 
+          user: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+            },
+          },
+          registration: true 
+        },
+      });
+      
+      // Should call createRefund with checkout session ID, which internally converts to payment intent
+      expect(mockStripeService.createRefund).toHaveBeenCalledWith(
+        'cs_test_session123', // The original checkout session ID
+        7500, // $75.00 converted to cents
+        'Registration cancellation'
+      );
+      
+      expect(result).toEqual({
+        paymentId: 'payment-id',
+        refundAmount: 75.00,
+        providerRefundId: 're_stripe456',
+        success: true,
+      });
+    });
   });
 
   // Additional tests would follow the same pattern for other methods
