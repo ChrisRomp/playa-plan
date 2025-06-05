@@ -7,6 +7,7 @@ import { User, UserRole } from '@prisma/client';
 import { v4 as uuidv4 } from 'uuid';
 import { NotificationsService } from '../../notifications/services/notifications.service';
 import { randomInt } from 'crypto';
+import { normalizeEmail } from '../../common/utils/email.utils';
 
 /**
  * Authentication service responsible for user registration, login, and token management
@@ -43,15 +44,16 @@ export class AuthService {
    */
   async register(registerDto: RegisterDto): Promise<Omit<User, 'password'>> {
     const { email, firstName, lastName, playaName } = registerDto;
+    const normalizedEmail = normalizeEmail(email);
 
     try {
       // Check if user with this email already exists
       const existingUser = await this.prisma.user.findUnique({
-        where: { email },
+        where: { email: normalizedEmail },
       });
 
       if (existingUser) {
-        this.logger.warn(`Registration failed: User with email ${email} already exists`);
+        this.logger.warn(`Registration failed: User with email ${normalizedEmail} already exists`);
         throw new ConflictException('User with this email already exists');
       }
 
@@ -61,7 +63,7 @@ export class AuthService {
       // Create new user (always as PARTICIPANT initially - admin promotion happens on first authentication)
       const newUser = await this.prisma.user.create({
         data: {
-          email,
+          email: normalizedEmail,
           firstName,
           lastName,
           playaName,
@@ -167,15 +169,16 @@ export class AuthService {
    */
   private async sendVerificationEmail(email: string, token: string): Promise<boolean> {
     try {
+      const normalizedEmail = normalizeEmail(email);
       // Try to get user ID for audit trail
       const user = await this.prisma.user.findUnique({
-        where: { email },
+        where: { email: normalizedEmail },
         select: { id: true },
       });
       
-      const result = await this.notificationsService.sendEmailVerificationEmail(email, token, user?.id);
+      const result = await this.notificationsService.sendEmailVerificationEmail(normalizedEmail, token, user?.id);
       if (!result) {
-        this.logger.warn(`Failed to send verification email to ${email}`);
+        this.logger.warn(`Failed to send verification email to ${normalizedEmail}`);
       }
       return result;
     } catch (error: unknown) {
@@ -192,9 +195,10 @@ export class AuthService {
    */
   async generateLoginCode(email: string): Promise<boolean> {
     try {
+      const normalizedEmail = normalizeEmail(email);
       // Find user by email
       const user = await this.prisma.user.findUnique({
-        where: { email },
+        where: { email: normalizedEmail },
       });
 
       // We'll generate and send a code regardless of whether the user exists
@@ -207,7 +211,7 @@ export class AuthService {
         : randomInt(100000, 1000000).toString(); // Cryptographically secure random 6-digit code
       
       if (isDevelopment) {
-        this.logger.log(`Development mode: Using fixed login code '123456' for ${email}`);
+        this.logger.log(`Development mode: Using fixed login code '123456' for ${normalizedEmail}`);
       }
       
       // Set expiry time (15 minutes from now)
@@ -229,7 +233,7 @@ export class AuthService {
         
         await this.prisma.user.create({
           data: {
-            email,
+            email: normalizedEmail,
             loginCode,
             loginCodeExpiry,
             role: UserRole.PARTICIPANT, // Always PARTICIPANT initially - admin promotion happens on authentication
@@ -239,11 +243,11 @@ export class AuthService {
           },
         });
         
-        this.logger.log(`Created new user with email: ${email} (pending verification)`);
+        this.logger.log(`Created new user with email: ${normalizedEmail} (pending verification)`);
       }
 
       // Send login code email
-      await this.sendLoginCodeEmail(email, loginCode);
+      await this.sendLoginCodeEmail(normalizedEmail, loginCode);
 
       return true;
     } catch (error: unknown) {
@@ -260,15 +264,16 @@ export class AuthService {
    */
   private async sendLoginCodeEmail(email: string, code: string): Promise<boolean> {
     try {
+      const normalizedEmail = normalizeEmail(email);
       // Try to get user ID for audit trail
       const user = await this.prisma.user.findUnique({
-        where: { email },
+        where: { email: normalizedEmail },
         select: { id: true },
       });
       
-      const result = await this.notificationsService.sendLoginCodeEmail(email, code, user?.id);
+      const result = await this.notificationsService.sendLoginCodeEmail(normalizedEmail, code, user?.id);
       if (!result) {
-        this.logger.warn(`Failed to send login code email to ${email}`);
+        this.logger.warn(`Failed to send login code email to ${normalizedEmail}`);
       }
       return result;
     } catch (error: unknown) {
@@ -287,11 +292,12 @@ export class AuthService {
   async validateLoginCode(email: string, code: string): Promise<Omit<User, 'password'> | null> {
     try {
       const now = new Date();
+      const normalizedEmail = normalizeEmail(email);
 
       // Step 1: Find user with matching email and authorization code
       let user = await this.prisma.user.findFirst({
         where: {
-          email,
+          email: normalizedEmail,
           loginCode: code,
           loginCodeExpiry: {
             gt: now,

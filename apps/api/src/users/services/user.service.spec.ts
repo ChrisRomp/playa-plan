@@ -31,6 +31,7 @@ type MockPrismaService = {
 describe('UserService', () => {
   let service: UserService;
   let prismaServiceMock: MockPrismaService;
+  let notificationsService: NotificationsService;
 
   const mockUser = {
     id: 'test-uuid',
@@ -75,14 +76,15 @@ describe('UserService', () => {
         {
           provide: NotificationsService,
           useValue: {
-            sendEmailChangeNotificationOld: jest.fn().mockResolvedValue(true),
-            sendEmailChangeNotificationNew: jest.fn().mockResolvedValue(true),
+            sendEmailChangeNotificationToOldEmail: jest.fn().mockResolvedValue(true),
+            sendEmailChangeNotificationToNewEmail: jest.fn().mockResolvedValue(true),
           },
         },
       ],
     }).compile();
 
     service = module.get<UserService>(UserService);
+    notificationsService = module.get<NotificationsService>(NotificationsService);
   });
 
   afterEach(() => {
@@ -331,6 +333,149 @@ describe('UserService', () => {
         where: { id: 'non-existent-id' },
       });
       expect(prismaServiceMock.user.delete).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Email Case Insensitivity', () => {
+    describe('findByEmail', () => {
+      it('should normalize email to lowercase when finding user', async () => {
+        // Arrange
+        prismaServiceMock.user.findUnique.mockResolvedValue(mockUser);
+
+        // Act
+        const result = await service.findByEmail('TEST@EXAMPLE.PLAYAPLAN.APP');
+
+        // Assert
+        expect(result).toEqual(mockUser);
+        expect(prismaServiceMock.user.findUnique).toHaveBeenCalledWith({
+          where: { email: 'test@example.playaplan.app' },
+        });
+      });
+    });
+
+    describe('create', () => {
+      it('should normalize email to lowercase when creating user', async () => {
+        // Arrange
+        const createUserDto = {
+          email: 'NEW@EXAMPLE.PLAYAPLAN.APP',
+          firstName: 'New',
+          lastName: 'User',
+          role: UserRole.PARTICIPANT,
+        };
+
+        prismaServiceMock.user.findUnique.mockResolvedValue(null);
+        prismaServiceMock.user.create.mockResolvedValue({
+          ...mockUser,
+          email: 'new@example.playaplan.app',
+          firstName: 'New',
+          lastName: 'User',
+        });
+
+        // Act
+        const result = await service.create(createUserDto);
+
+        // Assert
+        expect(result.email).toBe('new@example.playaplan.app');
+        expect(prismaServiceMock.user.findUnique).toHaveBeenCalledWith({
+          where: { email: 'new@example.playaplan.app' },
+        });
+        expect(prismaServiceMock.user.create).toHaveBeenCalledWith({
+          data: {
+            email: 'new@example.playaplan.app',
+            firstName: 'New',
+            lastName: 'User',
+            role: UserRole.PARTICIPANT,
+          },
+        });
+      });
+
+      it('should detect existing user with different case email', async () => {
+        // Arrange
+        const createUserDto = {
+          email: 'TEST@EXAMPLE.PLAYAPLAN.APP',
+          firstName: 'Test',
+          lastName: 'User',
+          role: UserRole.PARTICIPANT,
+        };
+
+        prismaServiceMock.user.findUnique.mockResolvedValue(mockUser);
+
+        // Act & Assert
+        await expect(service.create(createUserDto)).rejects.toThrow(ConflictException);
+        expect(prismaServiceMock.user.findUnique).toHaveBeenCalledWith({
+          where: { email: 'test@example.playaplan.app' },
+        });
+        expect(prismaServiceMock.user.create).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('update', () => {
+      it('should normalize email to lowercase when updating user', async () => {
+        // Arrange
+        const updateUserDto = {
+          email: 'UPDATED@EXAMPLE.PLAYAPLAN.APP',
+          firstName: 'Updated',
+        };
+
+        prismaServiceMock.user.findUnique
+          .mockResolvedValueOnce(mockUser) // findById call
+          .mockResolvedValueOnce(null); // findByEmail call for conflict check
+
+        prismaServiceMock.user.update.mockResolvedValue({
+          ...mockUser,
+          email: 'updated@example.playaplan.app',
+          firstName: 'Updated',
+        });
+
+        (notificationsService.sendEmailChangeNotificationToOldEmail as jest.Mock).mockResolvedValue(true);
+        (notificationsService.sendEmailChangeNotificationToNewEmail as jest.Mock).mockResolvedValue(true);
+
+        // Act
+        const result = await service.update('test-uuid', updateUserDto);
+
+        // Assert
+        expect(result.email).toBe('updated@example.playaplan.app');
+        expect(prismaServiceMock.user.findUnique).toHaveBeenCalledWith({
+          where: { email: 'updated@example.playaplan.app' },
+        });
+        expect(prismaServiceMock.user.update).toHaveBeenCalledWith({
+          where: { id: 'test-uuid' },
+          data: {
+            email: 'updated@example.playaplan.app',
+            firstName: 'Updated',
+          },
+        });
+      });
+
+      it('should detect email conflict with different case during update', async () => {
+        // Arrange
+        const updateUserDto = {
+          email: 'EXISTING@EXAMPLE.PLAYAPLAN.APP',
+        };
+
+        const currentUser = {
+          ...mockUser,
+          id: 'test-uuid',
+          email: 'test@example.playaplan.app', // different from the one being updated to
+        };
+
+        const existingUser = {
+          ...mockUser,
+          id: 'existing-user-id',
+          email: 'existing@example.playaplan.app', // This conflicts with the update
+        };
+
+        prismaServiceMock.user.findUnique
+          .mockResolvedValueOnce(currentUser) // findById call
+          .mockResolvedValueOnce(existingUser); // findByEmail call for conflict check
+
+        // Act & Assert
+        await expect(service.update('test-uuid', updateUserDto)).rejects.toThrow(ConflictException);
+        expect(prismaServiceMock.user.findUnique).toHaveBeenCalledWith({
+          where: { email: 'existing@example.playaplan.app' },
+        });
+        expect(prismaServiceMock.user.update).not.toHaveBeenCalled();
+      });
     });
   });
 });

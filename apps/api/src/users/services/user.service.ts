@@ -6,6 +6,7 @@ import { UpdateUserDto } from '../dto/update-user.dto';
 import { User } from '../entities/user.entity';
 import { User as PrismaUser } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import { normalizeEmail } from '../../common/utils/email.utils';
 
 /**
  * Service for handling user related operations
@@ -46,8 +47,9 @@ export class UserService {
    * @returns The user or null if not found
    */
   async findByEmail(email: string): Promise<PrismaUser | null> {
+    const normalizedEmail = normalizeEmail(email);
     return this.prisma.user.findUnique({
-      where: { email },
+      where: { email: normalizedEmail },
     });
   }
 
@@ -59,9 +61,10 @@ export class UserService {
    */
   async create(createUserDto: CreateUserDto): Promise<PrismaUser> {
     const { email, ...userData } = createUserDto;
+    const normalizedEmail = normalizeEmail(email);
     
     // Check if user already exists
-    const existingUser = await this.findByEmail(email);
+    const existingUser = await this.findByEmail(normalizedEmail);
     
     if (existingUser) {
       throw new ConflictException('Email already registered');
@@ -70,7 +73,7 @@ export class UserService {
     // Create the user without password (auth is via email verification codes)
     return this.prisma.user.create({
       data: {
-        email,
+        email: normalizedEmail,
         ...userData,
       },
     });
@@ -94,11 +97,12 @@ export class UserService {
     
     // Store old email for notifications if email is being changed
     const oldEmail = user.email;
-    const isEmailChanging = updateUserDto.email && updateUserDto.email !== user.email;
+    const normalizedNewEmail = updateUserDto.email ? normalizeEmail(updateUserDto.email) : null;
+    const isEmailChanging = normalizedNewEmail && normalizedNewEmail !== user.email;
     
     // If trying to update email, check if the new email is already in use
     if (isEmailChanging) {
-      const existingUser = await this.findByEmail(updateUserDto.email!);
+      const existingUser = await this.findByEmail(normalizedNewEmail!);
       if (existingUser) {
         throw new ConflictException('Email address is already in use');
       }
@@ -114,8 +118,14 @@ export class UserService {
         const typedKey = key as keyof UpdateUserDto;
         const value = updateUserDto[typedKey];
         if (value !== undefined) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (updateData as any)[key] = value;
+          // Normalize email if it's being updated
+          if (key === 'email' && typeof value === 'string') {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (updateData as any)[key] = normalizeEmail(value);
+          } else {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (updateData as any)[key] = value;
+          }
         }
       }
     });
@@ -132,8 +142,8 @@ export class UserService {
     });
     
     // Send email change notifications if email was changed
-    if (isEmailChanging && updateUserDto.email) {
-      await this.sendEmailChangeNotifications(oldEmail, updateUserDto.email, id);
+    if (isEmailChanging && normalizedNewEmail) {
+      await this.sendEmailChangeNotifications(oldEmail, normalizedNewEmail, id);
     }
     
     return updatedUser;
