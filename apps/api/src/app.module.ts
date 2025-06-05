@@ -87,6 +87,6 @@ export class AppModule implements NestModule {
    */
   configure(consumer: MiddlewareConsumer) {
     // Apply security headers middleware to all routes
-    consumer.apply(SecurityHeadersMiddleware).forRoutes('*');
+    consumer.apply(SecurityHeadersMiddleware).forRoutes('{*splat}');
   }
 }

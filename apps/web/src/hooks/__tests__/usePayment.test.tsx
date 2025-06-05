@@ -1,4 +1,4 @@
-import { renderHook, act } from '@testing-library/react-hooks';
+import { renderHook, act, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { usePayment } from '../usePayment';
 import { redirectToStripeCheckout } from '../../lib/stripe';
@@ -141,17 +141,17 @@ describe('usePayment', () => {
 
       const { result } = renderHook(() => usePayment(), { wrapper });
 
-      try {
-        await act(async () => {
+      await expect(
+        act(async () => {
           await result.current.processStripePayment({
             amount: 100,
           });
-        });
-      } catch (error) {
-        expect(error).toEqual(new Error('Stripe payments are not configured'));
-      }
+        })
+      ).rejects.toThrow('Stripe payments are not configured');
 
-      expect(result.current.error).toBe('Stripe payments are not configured');
+      await waitFor(() => {
+        expect(result.current.error).toBe('Stripe payments are not configured');
+      }, { timeout: 5000 });
     });
 
     it('should handle payment errors', async () => {
@@ -169,7 +169,9 @@ describe('usePayment', () => {
         })
       ).rejects.toThrow('Payment failed');
 
-      expect(result.current.error).toBe('Payment failed');
+      await waitFor(() => {
+        expect(result.current.error).toBe('Payment failed');
+      }, { timeout: 5000 });
       expect(result.current.isProcessing).toBe(false);
     });
 
@@ -242,7 +244,9 @@ describe('usePayment', () => {
         })
       ).rejects.toThrow('PayPal payments not yet implemented');
 
-      expect(result.current.error).toBe('PayPal payments not yet implemented');
+      await waitFor(() => {
+        expect(result.current.error).toBe('PayPal payments not yet implemented');
+      }, { timeout: 5000 });
     });
 
     it('should handle PayPal not configured', async () => {
@@ -323,15 +327,15 @@ describe('usePayment', () => {
       const { result } = renderHook(() => usePayment(), { wrapper });
 
       // Create an error
-      try {
-        await act(async () => {
+      await expect(
+        act(async () => {
           await result.current.processStripePayment({ amount: 100 });
-        });
-      } catch {
-        // Expected to throw
-      }
+        })
+      ).rejects.toThrow('Payment failed');
 
-      expect(result.current.error).toBe('Payment failed');
+      await waitFor(() => {
+        expect(result.current.error).toBe('Payment failed');
+      }, { timeout: 5000 });
 
       // Clear the error
       act(() => {
