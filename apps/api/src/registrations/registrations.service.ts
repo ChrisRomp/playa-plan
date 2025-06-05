@@ -955,7 +955,8 @@ export class RegistrationsService {
       campingOptions: campingOptionRegistrations,
       customFieldValues,
       jobRegistrations,
-      hasRegistration: campingOptionRegistrations.length > 0 || jobRegistrations.length > 0,
+      hasRegistration: campingOptionRegistrations.length > 0 || 
+        jobRegistrations.some(reg => reg.status !== RegistrationStatus.CANCELLED),
     };
   }
 }

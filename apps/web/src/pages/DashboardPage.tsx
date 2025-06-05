@@ -34,12 +34,19 @@ const DashboardPage: React.FC = () => {
 
   // Get current year registration
   const currentYear = config?.currentYear || new Date().getFullYear();
-  const currentRegistration = registrations?.find(reg => reg.year === currentYear);
+  const currentRegistration = registrations?.find(reg => 
+    reg.year === currentYear && reg.status !== 'CANCELLED'
+  );
   
-  // Check registration access status
-  const hasCurrentRegistration = !!currentRegistration;
+  // Get cancelled registrations for history display
+  const cancelledRegistrations = registrations?.filter(reg => 
+    reg.status === 'CANCELLED'
+  ) || [];
+  
+  // Check registration access status - only consider active registrations
+  const hasActiveRegistration = !!currentRegistration;
   const canAccessRegistration = isRegistrationAccessible(config, user);
-  const registrationStatusMessage = getRegistrationStatusMessage(config, user, hasCurrentRegistration);
+  const registrationStatusMessage = getRegistrationStatusMessage(config, user, hasActiveRegistration);
   
   return (
     <div className="max-w-4xl mx-auto">
@@ -230,6 +237,81 @@ const DashboardPage: React.FC = () => {
               </div>
             )}
           </div>
+
+          {/* Registration History Section */}
+          {cancelledRegistrations.length > 0 && (
+            <div className="mb-8">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Registration History</h3>
+              <div className="space-y-4">
+                {cancelledRegistrations.map((registration) => (
+                  <div key={registration.id} className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                    {/* Registration Status */}
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="font-medium text-gray-900">{registration.year} Registration</h4>
+                      <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">
+                        {registration.status}
+                      </span>
+                    </div>
+
+                    {/* Work Shifts Section */}
+                    {registration.jobs.length > 0 && (
+                      <div className="mb-4">
+                        <h5 className="font-medium text-sm text-gray-700 mb-2">Work Shifts</h5>
+                        <div className="space-y-2">
+                          {registration.jobs.map((registrationJob) => (
+                            <div key={registrationJob.id} className="border border-gray-100 rounded p-3 bg-white">
+                              <div className="text-sm">
+                                <p className="font-medium text-gray-900">{registrationJob.job?.name}</p>
+                                <p className="text-gray-600">{registrationJob.job?.category?.description}</p>
+                                {registrationJob.job?.location && (
+                                  <p className="text-gray-500">Location: {registrationJob.job.location}</p>
+                                )}
+                                {registrationJob.job?.shift && (
+                                  <p className="text-gray-500">
+                                    {getFriendlyDayName(registrationJob.job.shift.dayOfWeek)} | {formatTime(registrationJob.job.shift.startTime)} - {formatTime(registrationJob.job.shift.endTime)}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Payments Section */}
+                    {registration.payments.length > 0 && (
+                      <div>
+                        <h5 className="font-medium text-sm text-gray-700 mb-2">Payments</h5>
+                        <div className="space-y-1">
+                          {registration.payments.map((payment) => (
+                            <div key={payment.id} className="flex items-center justify-between bg-white border border-gray-100 rounded p-2">
+                              <div>
+                                <p className="text-sm font-medium text-gray-900">
+                                  ${payment.amount.toFixed(2)} {payment.currency}
+                                </p>
+                                <p className="text-xs text-gray-500">
+                                  {new Date(payment.createdAt).toLocaleDateString()}
+                                </p>
+                              </div>
+                              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                payment.status === 'COMPLETED' ? 'bg-green-100 text-green-800' :
+                                payment.status === 'REFUNDED' ? 'bg-blue-100 text-blue-800' :
+                                payment.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' :
+                                payment.status === 'FAILED' ? 'bg-red-100 text-red-800' :
+                                'bg-gray-100 text-gray-800'
+                              }`}>
+                                {payment.status}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Camping Options Section */}
           <div className="mb-8">

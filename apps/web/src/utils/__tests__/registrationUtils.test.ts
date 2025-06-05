@@ -54,10 +54,17 @@ describe('registrationUtils', () => {
       expect(message).toBe('Configuration not available. Please try again later.');
     });
 
-    it('should return already registered message when user has existing registration', () => {
+    it('should return already registered message when user has active registration', () => {
       const config = { ...mockConfig, registrationOpen: true };
       const message = getRegistrationStatusMessage(config, mockUser, true);
       expect(message).toBe('You are already registered for 2025. You can view your registration details on the dashboard.');
+    });
+
+    it('should return registration open message when user has only cancelled registrations', () => {
+      const config = { ...mockConfig, registrationOpen: true };
+      const hasActiveRegistration = false; // No active registration
+      const message = getRegistrationStatusMessage(config, mockUser, hasActiveRegistration);
+      expect(message).toBe('Registration for 2025 is open!');
     });
 
     it('should return registration not available when neither is open', () => {
@@ -67,27 +74,35 @@ describe('registrationUtils', () => {
   });
 
   describe('canUserRegister', () => {
-    it('should prevent registration when user already has registration', () => {
+    it('should prevent registration when user already has active registration', () => {
       const config = { ...mockConfig, registrationOpen: true };
-      const hasExistingRegistration = true;
+      const hasActiveRegistration = true;
       
-      const result = canUserRegister(config, mockUser, hasExistingRegistration);
+      const result = canUserRegister(config, mockUser, hasActiveRegistration);
       expect(result).toBe(false);
     });
 
-    it('should allow registration when registration is open and user has no existing registration', () => {
+    it('should allow registration when registration is open and user has no active registration', () => {
       const config = { ...mockConfig, registrationOpen: true };
-      const hasExistingRegistration = false;
+      const hasActiveRegistration = false;
       
-      const result = canUserRegister(config, mockUser, hasExistingRegistration);
+      const result = canUserRegister(config, mockUser, hasActiveRegistration);
+      expect(result).toBe(true);
+    });
+
+    it('should allow registration when user has only cancelled registration', () => {
+      const config = { ...mockConfig, registrationOpen: true };
+      const hasActiveRegistration = false; // Key: only cancelled registrations don't count as active
+      
+      const result = canUserRegister(config, mockUser, hasActiveRegistration);
       expect(result).toBe(true);
     });
 
     it('should prevent registration when registration is closed', () => {
       const config = { ...mockConfig, registrationOpen: false };
-      const hasExistingRegistration = false;
+      const hasActiveRegistration = false;
       
-      const result = canUserRegister(config, mockUser, hasExistingRegistration);
+      const result = canUserRegister(config, mockUser, hasActiveRegistration);
       expect(result).toBe(false);
     });
   });

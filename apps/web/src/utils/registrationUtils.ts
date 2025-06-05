@@ -40,19 +40,19 @@ export function isRegistrationAccessible(config: ConfigType, user: UserType | nu
 
 /**
  * Check if user should be allowed to start a new registration
- * This checks both if registration is open AND if the user isn't already registered
+ * This checks both if registration is open AND if the user doesn't have an active registration
  * @param config - The core configuration or camp configuration
  * @param user - The current user (optional)
- * @param hasExistingRegistration - Whether the user already has a registration
+ * @param hasActiveRegistration - Whether the user already has an active (non-cancelled) registration
  * @returns True if user can start registration, false otherwise
  */
 export function canUserRegister(
   config: ConfigType, 
   user: UserType | null, 
-  hasExistingRegistration: boolean
+  hasActiveRegistration: boolean
 ): boolean {
-  // If user already has a registration, they can't register again
-  if (hasExistingRegistration) return false;
+  // If user already has an active registration, they can't register again
+  if (hasActiveRegistration) return false;
   
   // Otherwise, check if registration is accessible
   return isRegistrationAccessible(config, user);
@@ -62,13 +62,13 @@ export function canUserRegister(
  * Get the appropriate message for why registration is not accessible
  * @param config - The core configuration or camp configuration
  * @param user - The current user (optional)
- * @param hasExistingRegistration - Whether the user already has a registration
+ * @param hasActiveRegistration - Whether the user already has an active (non-cancelled) registration
  * @returns Message explaining why registration is not accessible
  */
 export function getRegistrationStatusMessage(
   config: ConfigType,
   user: UserType | null,
-  hasExistingRegistration: boolean
+  hasActiveRegistration: boolean
 ): string {
   if (!config) {
     return 'Configuration not available. Please try again later.';
@@ -79,7 +79,7 @@ export function getRegistrationStatusMessage(
                'currentYear' in config ? config.currentYear : 
                new Date().getFullYear();
   
-  if (hasExistingRegistration) {
+  if (hasActiveRegistration) {
     return `You are already registered for ${year}. You can view your registration details on the dashboard.`;
   }
   
