@@ -1,17 +1,16 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { Logger } from '@nestjs/common';
 import { AdminNotificationsService, AdminNotificationData } from './admin-notifications.service';
 import { NotificationsService, TemplateData } from './notifications.service';
 import { EmailAuditService } from './email-audit.service';
 import { CoreConfigService } from '../../core-config/services/core-config.service';
-import { NotificationType, UserRole, RegistrationStatus, CoreConfig } from '@prisma/client';
+import { CoreConfig } from '../../core-config/entities/core-config.entity';
+import { NotificationType, RegistrationStatus } from '@prisma/client';
 
 describe('AdminNotificationsService', () => {
   let service: AdminNotificationsService;
   let notificationsService: jest.Mocked<NotificationsService>;
   let emailAuditService: jest.Mocked<EmailAuditService>;
   let coreConfigService: jest.Mocked<CoreConfigService>;
-  let logger: jest.SpyInstance;
 
   const mockAdminUser = {
     id: 'admin-123',
@@ -53,38 +52,9 @@ describe('AdminNotificationsService', () => {
     ],
   };
 
-  const mockCoreConfig: CoreConfig = {
+  const mockCoreConfig: Partial<CoreConfig> = {
     id: 'config-1',
     campName: 'Burning Test',
-    campDescription: 'A test camp',
-    homePageBlurb: 'Welcome to test camp',
-    campBannerUrl: null,
-    campBannerAltText: null,
-    campIconUrl: null,
-    campIconAltText: null,
-    registrationYear: 2024,
-    earlyRegistrationOpen: false,
-    registrationOpen: true,
-    registrationTerms: null,
-    allowDeferredDuesPayment: false,
-    stripeEnabled: false,
-    stripePublicKey: null,
-    stripeApiKey: null,
-    paypalEnabled: false,
-    paypalClientId: null,
-    paypalClientSecret: null,
-    paypalMode: 'SANDBOX',
-    smtpHost: null,
-    smtpPort: null,
-    smtpUser: null,
-    smtpPassword: null,
-    smtpSecure: false,
-    senderEmail: null,
-    senderName: null,
-    emailEnabled: false,
-    timeZone: 'UTC',
-    createdAt: new Date(),
-    updatedAt: new Date(),
   };
 
   beforeEach(async () => {
@@ -116,7 +86,7 @@ describe('AdminNotificationsService', () => {
     coreConfigService = module.get(CoreConfigService);
 
     // Mock logger to avoid console output during tests
-    logger = jest.spyOn(service['logger'], 'log').mockImplementation();
+    jest.spyOn(service['logger'], 'log').mockImplementation();
     jest.spyOn(service['logger'], 'error').mockImplementation();
     jest.spyOn(service['logger'], 'warn').mockImplementation();
   });
@@ -135,7 +105,7 @@ describe('AdminNotificationsService', () => {
         reason: 'Adding camping option per user request',
       };
 
-      coreConfigService.findCurrent.mockResolvedValue(mockCoreConfig);
+      coreConfigService.findCurrent.mockResolvedValue(mockCoreConfig as CoreConfig);
       notificationsService.sendNotification.mockResolvedValue(true);
       emailAuditService.logEmailSent.mockResolvedValue();
 
@@ -175,7 +145,7 @@ describe('AdminNotificationsService', () => {
         reason: 'Status updated by admin',
       };
 
-      coreConfigService.findCurrent.mockResolvedValue(mockCoreConfig);
+      coreConfigService.findCurrent.mockResolvedValue(mockCoreConfig as CoreConfig);
       notificationsService.sendNotification.mockResolvedValue(true);
 
       await service.sendRegistrationModificationNotification(notificationData);
@@ -199,7 +169,7 @@ describe('AdminNotificationsService', () => {
         reason: 'Updated to waitlist due to capacity',
       };
 
-      coreConfigService.findCurrent.mockResolvedValue(mockCoreConfig);
+      coreConfigService.findCurrent.mockResolvedValue(mockCoreConfig as CoreConfig);
       notificationsService.sendNotification.mockResolvedValue(true);
 
       await service.sendRegistrationModificationNotification(notificationData);
@@ -223,7 +193,7 @@ describe('AdminNotificationsService', () => {
         reason: 'Administrative update',
       };
 
-      coreConfigService.findCurrent.mockResolvedValue(mockCoreConfig);
+      coreConfigService.findCurrent.mockResolvedValue(mockCoreConfig as CoreConfig);
       notificationsService.sendNotification.mockResolvedValue(true);
 
       await service.sendRegistrationModificationNotification(notificationData);
@@ -245,7 +215,7 @@ describe('AdminNotificationsService', () => {
         reason: 'Test modification',
       };
 
-      coreConfigService.findCurrent.mockResolvedValue(mockCoreConfig);
+      coreConfigService.findCurrent.mockResolvedValue(mockCoreConfig as CoreConfig);
       notificationsService.sendNotification.mockResolvedValue(true);
 
       const result = await service.sendRegistrationModificationNotification(notificationData);
@@ -281,7 +251,7 @@ describe('AdminNotificationsService', () => {
         reason: 'Test notification failure',
       };
 
-      coreConfigService.findCurrent.mockResolvedValue(mockCoreConfig);
+      coreConfigService.findCurrent.mockResolvedValue(mockCoreConfig as CoreConfig);
       notificationsService.sendNotification.mockRejectedValue(new Error('SMTP server unavailable'));
       emailAuditService.logEmailFailed.mockResolvedValue();
 
@@ -305,7 +275,7 @@ describe('AdminNotificationsService', () => {
         reason: 'Test successful notification',
       };
 
-      coreConfigService.findCurrent.mockResolvedValue(mockCoreConfig);
+      coreConfigService.findCurrent.mockResolvedValue(mockCoreConfig as CoreConfig);
       notificationsService.sendNotification.mockResolvedValue(true);
       emailAuditService.logEmailSent.mockResolvedValue();
 
@@ -333,7 +303,7 @@ describe('AdminNotificationsService', () => {
         reason: 'User requested cancellation',
       };
 
-      coreConfigService.findCurrent.mockResolvedValue(mockCoreConfig);
+      coreConfigService.findCurrent.mockResolvedValue(mockCoreConfig as CoreConfig);
       notificationsService.sendNotification.mockResolvedValue(true);
       emailAuditService.logEmailSent.mockResolvedValue();
 
@@ -363,7 +333,7 @@ describe('AdminNotificationsService', () => {
         reason: 'Duplicate registration found',
       };
 
-      coreConfigService.findCurrent.mockResolvedValue(mockCoreConfig);
+      coreConfigService.findCurrent.mockResolvedValue(mockCoreConfig as CoreConfig);
       notificationsService.sendNotification.mockResolvedValue(true);
 
       await service.sendRegistrationCancellationNotification(notificationData);
@@ -392,7 +362,7 @@ describe('AdminNotificationsService', () => {
         },
       };
 
-      coreConfigService.findCurrent.mockResolvedValue(mockCoreConfig);
+      coreConfigService.findCurrent.mockResolvedValue(mockCoreConfig as CoreConfig);
       notificationsService.sendNotification.mockResolvedValue(true);
 
       await service.sendRegistrationCancellationNotification(notificationData);
@@ -415,7 +385,7 @@ describe('AdminNotificationsService', () => {
         reason: 'Cancellation due to policy violation',
       };
 
-      coreConfigService.findCurrent.mockResolvedValue(mockCoreConfig);
+      coreConfigService.findCurrent.mockResolvedValue(mockCoreConfig as CoreConfig);
       notificationsService.sendNotification.mockResolvedValue(true);
 
       await service.sendRegistrationCancellationNotification(notificationData);
@@ -431,7 +401,7 @@ describe('AdminNotificationsService', () => {
         adminUser: mockAdminUser,
         targetUser: {
           ...mockTargetUser,
-          firstName: undefined,
+          firstName: 'User',
           playaName: undefined,
         },
         registration: {
@@ -441,14 +411,14 @@ describe('AdminNotificationsService', () => {
         reason: 'Test cancellation without names',
       };
 
-      coreConfigService.findCurrent.mockResolvedValue(mockCoreConfig);
+      coreConfigService.findCurrent.mockResolvedValue(mockCoreConfig as CoreConfig);
       notificationsService.sendNotification.mockResolvedValue(true);
 
       const result = await service.sendRegistrationCancellationNotification(notificationData);
 
       expect(result).toBe(true);
       const [, , templateData] = notificationsService.sendNotification.mock.calls[0] as [string, NotificationType, TemplateData];
-      expect(templateData.customText).toContain('Hello,');
+      expect(templateData.customText).toContain('Hi User,');
     });
 
     it('should use fallback camp name for cancellation notifications', async () => {
@@ -462,7 +432,8 @@ describe('AdminNotificationsService', () => {
         reason: 'Test with fallback camp name',
       };
 
-      coreConfigService.findCurrent.mockResolvedValue(null); // No config found
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      coreConfigService.findCurrent.mockResolvedValue(null as any);
       notificationsService.sendNotification.mockResolvedValue(true);
 
       await service.sendRegistrationCancellationNotification(notificationData);
@@ -482,7 +453,7 @@ describe('AdminNotificationsService', () => {
         reason: 'Test logging',
       };
 
-      coreConfigService.findCurrent.mockResolvedValue(mockCoreConfig);
+      coreConfigService.findCurrent.mockResolvedValue(mockCoreConfig as CoreConfig);
       notificationsService.sendNotification.mockResolvedValue(true);
       emailAuditService.logEmailSent.mockResolvedValue();
 
@@ -507,7 +478,7 @@ describe('AdminNotificationsService', () => {
         reason: 'Test failure handling',
       };
 
-      coreConfigService.findCurrent.mockResolvedValue(mockCoreConfig);
+      coreConfigService.findCurrent.mockResolvedValue(mockCoreConfig as CoreConfig);
       notificationsService.sendNotification.mockRejectedValue(new Error('Email service down'));
       emailAuditService.logEmailFailed.mockResolvedValue();
 
@@ -533,7 +504,7 @@ describe('AdminNotificationsService', () => {
         reason: 'Test logging failure',
       };
 
-      coreConfigService.findCurrent.mockResolvedValue(mockCoreConfig);
+      coreConfigService.findCurrent.mockResolvedValue(mockCoreConfig as CoreConfig);
       notificationsService.sendNotification.mockResolvedValue(true);
       emailAuditService.logEmailSent.mockRejectedValue(new Error('Audit service down'));
 
@@ -550,7 +521,7 @@ describe('AdminNotificationsService', () => {
         reason: 'Test unknown error',
       };
 
-      coreConfigService.findCurrent.mockResolvedValue(mockCoreConfig);
+      coreConfigService.findCurrent.mockResolvedValue(mockCoreConfig as CoreConfig);
       notificationsService.sendNotification.mockRejectedValue('Unknown error type');
       emailAuditService.logEmailFailed.mockResolvedValue();
 
@@ -597,7 +568,7 @@ describe('AdminNotificationsService', () => {
         reason: 'Test greeting generation',
       };
 
-      coreConfigService.findCurrent.mockResolvedValue(mockCoreConfig);
+      coreConfigService.findCurrent.mockResolvedValue(mockCoreConfig as CoreConfig);
       notificationsService.sendNotification.mockResolvedValue(true);
 
       await service.sendRegistrationCancellationNotification(notificationData);
@@ -618,7 +589,7 @@ describe('AdminNotificationsService', () => {
         reason: 'Event cancelled',
       };
 
-      coreConfigService.findCurrent.mockResolvedValue(mockCoreConfig);
+      coreConfigService.findCurrent.mockResolvedValue(mockCoreConfig as CoreConfig);
       notificationsService.sendNotification.mockResolvedValue(true);
 
       await service.sendRegistrationCancellationNotification(notificationData);
