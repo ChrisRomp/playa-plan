@@ -161,15 +161,15 @@ Based on `prd-admin-registration-management.md`
     - [x] 5.5.6 Test modification notifications exclude dues information for admin changes
     - [x] 5.5.7 Test cancellation notifications use generic "contact us" instead of admin email
     - [x] 5.5.8 Test cancellation notifications include refund amount when processed automatically
-  - [ ] 5.6 PaymentsService Unit Tests
+  - [x] 5.6 PaymentsService Unit Tests
     - [x] 5.6.1 Test processRefund() successfully processes Stripe refunds with payment intent IDs
     - [x] 5.6.2 Test processRefund() converts checkout session IDs to payment intent IDs for Stripe
     - [x] 5.6.3 Test processRefund() maps custom refund reasons to valid Stripe reasons
     - [x] 5.6.4 Test processRefund() handles PayPal refunds with dollar amounts
     - [x] 5.6.5 Test processRefund() handles MANUAL payment refunds (database-only updates)
     - [x] 5.6.6 Test processRefund() correctly formats refund amounts for different providers
-    - [ ] 5.6.7 Test processRefund() fails gracefully when Stripe session has no payment intent
-    - [ ] 5.6.8 Test processRefund() handles Stripe API errors appropriately
+    - [x] 5.6.7 Test processRefund() fails gracefully when Stripe session has no payment intent
+    - [x] 5.6.8 Test processRefund() handles Stripe API errors appropriately
   - [ ] 5.7 StripeService Unit Tests  
     - [ ] 5.7.1 Test createRefund() accepts payment intent IDs directly
     - [ ] 5.7.2 Test createRefund() converts checkout session IDs to payment intent IDs

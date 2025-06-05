@@ -1640,6 +1640,447 @@ describe('PaymentsService', () => {
         }
       });
     });
+
+    // Task 5.6.7: Test processRefund() fails gracefully when Stripe session has no payment intent
+    it('should fail gracefully when Stripe session has no payment intent', async () => {
+      const mockPayment = {
+        id: 'payment-id',
+        amount: 100.00,
+        status: PaymentStatus.COMPLETED,
+        provider: PaymentProvider.STRIPE,
+        providerRefId: 'cs_no_intent123', // Checkout session without payment intent
+        userId: 'user-id',
+        registrationId: 'registration-id',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        registration: {
+          id: 'registration-id',
+          userId: 'user-id',
+          status: 'CONFIRMED',
+        },
+      };
+
+      const mockRefundDto = {
+        paymentId: 'payment-id',
+        reason: 'Session without payment intent test',
+      };
+
+      // Setup mocks
+      mockPrismaService.payment.findUnique.mockResolvedValue(mockPayment);
+      
+      // Mock StripeService to throw error when no payment intent exists
+      mockStripeService.createRefund.mockRejectedValue(
+        new Error('Checkout session cs_no_intent123 has no associated payment intent')
+      );
+
+      // Execute & Assert
+      await expect(service.processRefund(mockRefundDto)).rejects.toThrow(
+        'Checkout session cs_no_intent123 has no associated payment intent'
+      );
+
+      // Verify payment lookup occurred
+      expect(mockPrismaService.payment.findUnique).toHaveBeenCalledWith({
+        where: { id: 'payment-id' },
+        include: { 
+          user: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+            },
+          },
+          registration: true 
+        },
+      });
+
+      // Verify refund was attempted
+      expect(mockStripeService.createRefund).toHaveBeenCalledWith(
+        'cs_no_intent123',
+        10000, // $100.00 converted to cents
+        'Session without payment intent test'
+      );
+
+      // Verify database was NOT updated when refund fails
+      expect(mockPrismaService.payment.update).not.toHaveBeenCalled();
+      expect(mockPrismaService.registration.update).not.toHaveBeenCalled();
+    });
+
+    // Test checkout session with null payment intent
+    it('should fail gracefully when Stripe session has null payment intent', async () => {
+      const mockPayment = {
+        id: 'payment-id',
+        amount: 75.00,
+        status: PaymentStatus.COMPLETED,
+        provider: PaymentProvider.STRIPE,
+        providerRefId: 'cs_null_intent456',
+        userId: 'user-id',
+        registrationId: 'registration-id',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        registration: {
+          id: 'registration-id',
+          userId: 'user-id',
+          status: 'CONFIRMED',
+        },
+      };
+
+      const mockRefundDto = {
+        paymentId: 'payment-id',
+        reason: 'Null payment intent test',
+      };
+
+      // Setup mocks
+      mockPrismaService.payment.findUnique.mockResolvedValue(mockPayment);
+      
+      // Mock StripeService to throw specific error for null payment intent
+      mockStripeService.createRefund.mockRejectedValue(
+        new Error('Checkout session cs_null_intent456 has no associated payment intent')
+      );
+
+      // Execute & Assert
+      await expect(service.processRefund(mockRefundDto)).rejects.toThrow(
+        'Checkout session cs_null_intent456 has no associated payment intent'
+      );
+
+      // Verify correct API call was made
+      expect(mockStripeService.createRefund).toHaveBeenCalledWith(
+        'cs_null_intent456',
+        7500, // $75.00 converted to cents
+        'Null payment intent test'
+      );
+
+      // Verify no database updates on failure
+      expect(mockPrismaService.payment.update).not.toHaveBeenCalled();
+      expect(mockPrismaService.registration.update).not.toHaveBeenCalled();
+    });
+
+    // Test session that was never completed
+    it('should fail gracefully when Stripe session was never completed', async () => {
+      const mockPayment = {
+        id: 'payment-id',
+        amount: 50.00,
+        status: PaymentStatus.COMPLETED, // Payment marked complete but session wasn't
+        provider: PaymentProvider.STRIPE,
+        providerRefId: 'cs_incomplete789',
+        userId: 'user-id',
+        registrationId: null, // No registration for this payment
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        registration: null,
+      };
+
+      const mockRefundDto = {
+        paymentId: 'payment-id',
+        reason: 'Incomplete session test',
+      };
+
+      // Setup mocks
+      mockPrismaService.payment.findUnique.mockResolvedValue(mockPayment);
+      
+      // Mock error for incomplete session
+      mockStripeService.createRefund.mockRejectedValue(
+        new Error('Checkout session cs_incomplete789 has no associated payment intent')
+      );
+
+      // Execute & Assert
+      await expect(service.processRefund(mockRefundDto)).rejects.toThrow(
+        'Checkout session cs_incomplete789 has no associated payment intent'
+      );
+
+      // Verify correct parameters
+      expect(mockStripeService.createRefund).toHaveBeenCalledWith(
+        'cs_incomplete789',
+        5000, // $50.00 converted to cents
+        'Incomplete session test'
+      );
+
+      // Verify no database updates
+      expect(mockPrismaService.payment.update).not.toHaveBeenCalled();
+      expect(mockPrismaService.registration.update).not.toHaveBeenCalled();
+    });
+
+    // Task 5.6.8: Test processRefund() handles Stripe API errors appropriately
+    describe('Stripe API error handling', () => {
+      it('should handle Stripe network errors appropriately', async () => {
+        const mockPayment = {
+          id: 'payment-id',
+          amount: 125.00,
+          status: PaymentStatus.COMPLETED,
+          provider: PaymentProvider.STRIPE,
+          providerRefId: 'pi_network_error',
+          userId: 'user-id',
+          registrationId: 'registration-id',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          registration: {
+            id: 'registration-id',
+            userId: 'user-id',
+            status: 'CONFIRMED',
+          },
+        };
+
+        const mockRefundDto = {
+          paymentId: 'payment-id',
+          reason: 'Network error test',
+        };
+
+        // Setup mocks
+        mockPrismaService.payment.findUnique.mockResolvedValue(mockPayment);
+        
+        // Mock Stripe network error
+        mockStripeService.createRefund.mockRejectedValue(
+          new Error('Request failed with status code 500')
+        );
+
+        // Execute & Assert
+        await expect(service.processRefund(mockRefundDto)).rejects.toThrow(
+          'Request failed with status code 500'
+        );
+
+        // Verify refund was attempted
+        expect(mockStripeService.createRefund).toHaveBeenCalledWith(
+          'pi_network_error',
+          12500, // $125.00 converted to cents
+          'Network error test'
+        );
+
+        // Verify database was NOT updated when API fails
+        expect(mockPrismaService.payment.update).not.toHaveBeenCalled();
+        expect(mockPrismaService.registration.update).not.toHaveBeenCalled();
+      });
+
+      it('should handle Stripe authentication errors appropriately', async () => {
+        const mockPayment = {
+          id: 'payment-id',
+          amount: 200.00,
+          status: PaymentStatus.COMPLETED,
+          provider: PaymentProvider.STRIPE,
+          providerRefId: 'pi_auth_error',
+          userId: 'user-id',
+          registrationId: 'registration-id',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          registration: {
+            id: 'registration-id',
+            userId: 'user-id',
+            status: 'CONFIRMED',
+          },
+        };
+
+        const mockRefundDto = {
+          paymentId: 'payment-id',
+          reason: 'Auth error test',
+        };
+
+        // Setup mocks
+        mockPrismaService.payment.findUnique.mockResolvedValue(mockPayment);
+        
+        // Mock Stripe authentication error
+        mockStripeService.createRefund.mockRejectedValue(
+          new Error('Invalid API Key provided')
+        );
+
+        // Execute & Assert
+        await expect(service.processRefund(mockRefundDto)).rejects.toThrow(
+          'Invalid API Key provided'
+        );
+
+        expect(mockStripeService.createRefund).toHaveBeenCalledWith(
+          'pi_auth_error',
+          20000, // $200.00 converted to cents
+          'Auth error test'
+        );
+
+        // Verify no database changes on auth failure
+        expect(mockPrismaService.payment.update).not.toHaveBeenCalled();
+        expect(mockPrismaService.registration.update).not.toHaveBeenCalled();
+      });
+
+      it('should handle Stripe payment intent not found errors', async () => {
+        const mockPayment = {
+          id: 'payment-id',
+          amount: 89.99,
+          status: PaymentStatus.COMPLETED,
+          provider: PaymentProvider.STRIPE,
+          providerRefId: 'pi_not_found',
+          userId: 'user-id',
+          registrationId: 'registration-id',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          registration: {
+            id: 'registration-id',
+            userId: 'user-id',
+            status: 'CONFIRMED',
+          },
+        };
+
+        const mockRefundDto = {
+          paymentId: 'payment-id',
+          reason: 'Payment intent not found test',
+        };
+
+        // Setup mocks
+        mockPrismaService.payment.findUnique.mockResolvedValue(mockPayment);
+        
+        // Mock Stripe payment intent not found error
+        mockStripeService.createRefund.mockRejectedValue(
+          new Error('No such payment_intent: pi_not_found')
+        );
+
+        // Execute & Assert
+        await expect(service.processRefund(mockRefundDto)).rejects.toThrow(
+          'No such payment_intent: pi_not_found'
+        );
+
+        expect(mockStripeService.createRefund).toHaveBeenCalledWith(
+          'pi_not_found',
+          8999, // $89.99 converted to cents
+          'Payment intent not found test'
+        );
+
+        // Verify no database updates when payment intent doesn't exist
+        expect(mockPrismaService.payment.update).not.toHaveBeenCalled();
+        expect(mockPrismaService.registration.update).not.toHaveBeenCalled();
+      });
+
+      it('should handle Stripe already refunded errors', async () => {
+        const mockPayment = {
+          id: 'payment-id',
+          amount: 150.00,
+          status: PaymentStatus.COMPLETED,
+          provider: PaymentProvider.STRIPE,
+          providerRefId: 'pi_already_refunded',
+          userId: 'user-id',
+          registrationId: 'registration-id',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          registration: {
+            id: 'registration-id',
+            userId: 'user-id',
+            status: 'CONFIRMED',
+          },
+        };
+
+        const mockRefundDto = {
+          paymentId: 'payment-id',
+          reason: 'Already refunded test',
+        };
+
+        // Setup mocks
+        mockPrismaService.payment.findUnique.mockResolvedValue(mockPayment);
+        
+        // Mock Stripe already refunded error
+        mockStripeService.createRefund.mockRejectedValue(
+          new Error('This PaymentIntent has already been refunded.')
+        );
+
+        // Execute & Assert
+        await expect(service.processRefund(mockRefundDto)).rejects.toThrow(
+          'This PaymentIntent has already been refunded.'
+        );
+
+        expect(mockStripeService.createRefund).toHaveBeenCalledWith(
+          'pi_already_refunded',
+          15000, // $150.00 converted to cents
+          'Already refunded test'
+        );
+
+        // Verify no database updates for already refunded payments
+        expect(mockPrismaService.payment.update).not.toHaveBeenCalled();
+        expect(mockPrismaService.registration.update).not.toHaveBeenCalled();
+      });
+
+      it('should handle Stripe insufficient funds errors', async () => {
+        const mockPayment = {
+          id: 'payment-id',
+          amount: 300.00,
+          status: PaymentStatus.COMPLETED,
+          provider: PaymentProvider.STRIPE,
+          providerRefId: 'pi_insufficient_funds',
+          userId: 'user-id',
+          registrationId: null, // No registration for this payment
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          registration: null,
+        };
+
+        const mockRefundDto = {
+          paymentId: 'payment-id',
+          reason: 'Insufficient funds test',
+        };
+
+        // Setup mocks
+        mockPrismaService.payment.findUnique.mockResolvedValue(mockPayment);
+        
+        // Mock Stripe insufficient funds error
+        mockStripeService.createRefund.mockRejectedValue(
+          new Error('Insufficient funds in Stripe account for refund')
+        );
+
+        // Execute & Assert
+        await expect(service.processRefund(mockRefundDto)).rejects.toThrow(
+          'Insufficient funds in Stripe account for refund'
+        );
+
+        expect(mockStripeService.createRefund).toHaveBeenCalledWith(
+          'pi_insufficient_funds',
+          30000, // $300.00 converted to cents
+          'Insufficient funds test'
+        );
+
+        // Verify no database updates on insufficient funds
+        expect(mockPrismaService.payment.update).not.toHaveBeenCalled();
+        expect(mockPrismaService.registration.update).not.toHaveBeenCalled();
+      });
+
+      it('should handle generic Stripe API errors', async () => {
+        const mockPayment = {
+          id: 'payment-id',
+          amount: 99.00,
+          status: PaymentStatus.COMPLETED,
+          provider: PaymentProvider.STRIPE,
+          providerRefId: 'cs_generic_error',
+          userId: 'user-id',
+          registrationId: 'registration-id',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          registration: {
+            id: 'registration-id',
+            userId: 'user-id',
+            status: 'CONFIRMED',
+          },
+        };
+
+        const mockRefundDto = {
+          paymentId: 'payment-id',
+          reason: 'Generic error test',
+        };
+
+        // Setup mocks
+        mockPrismaService.payment.findUnique.mockResolvedValue(mockPayment);
+        
+        // Mock generic Stripe error
+        mockStripeService.createRefund.mockRejectedValue(
+          new Error('An unexpected error occurred while processing the refund')
+        );
+
+        // Execute & Assert
+        await expect(service.processRefund(mockRefundDto)).rejects.toThrow(
+          'An unexpected error occurred while processing the refund'
+        );
+
+        expect(mockStripeService.createRefund).toHaveBeenCalledWith(
+          'cs_generic_error',
+          9900, // $99.00 converted to cents
+          'Generic error test'
+        );
+
+        // Verify no database updates on generic errors
+        expect(mockPrismaService.payment.update).not.toHaveBeenCalled();
+        expect(mockPrismaService.registration.update).not.toHaveBeenCalled();
+      });
+    });
   });
 
   // Additional tests would follow the same pattern for other methods
