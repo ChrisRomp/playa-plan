@@ -356,7 +356,7 @@ describe('AdminNotificationsService', () => {
         },
         reason: 'Automatic cancellation due to payment failure',
         refundInfo: {
-          amount: 15000, // $150.00 in cents
+          amount: 150.00, // $150.00 in dollars (as stored in database)
           currency: 'USD',
           processed: true,
         },
@@ -372,6 +372,38 @@ describe('AdminNotificationsService', () => {
       expect(templateData.customText).toContain('within 5-10 business days');
       expect(templateData.customHtml).toContain('A refund of $150.00 has been processed');
       expect(templateData.customHtml).toContain('Refund Information');
+    });
+
+    // Test the fix for issue #67: Bug - Cancellation email with refund displays wrong amount
+    it.each([
+      { amount: 600.00, expected: '$600.00' },
+      { amount: 75.50, expected: '$75.50' },
+      { amount: 1234.99, expected: '$1234.99' },
+      { amount: 25.00, expected: '$25.00' },
+    ])('should display correct refund amounts for various dollar values: %o', async ({ amount, expected }) => {
+      const notificationData: AdminNotificationData = {
+        adminUser: mockAdminUser,
+        targetUser: mockTargetUser,
+        registration: {
+          ...mockRegistration,
+          status: 'CANCELLED',
+        },
+        reason: `Test refund amount formatting for ${expected}`,
+        refundInfo: {
+          amount,
+          currency: 'USD',
+          processed: true,
+        },
+      };
+
+      coreConfigService.findCurrent.mockResolvedValue(mockCoreConfig as CoreConfig);
+      notificationsService.sendNotification.mockResolvedValue(true);
+
+      await service.sendRegistrationCancellationNotification(notificationData);
+
+      const [, , templateData] = notificationsService.sendNotification.mock.calls[notificationsService.sendNotification.mock.calls.length - 1] as [string, NotificationType, TemplateData];
+      expect(templateData.customText).toContain(`A refund of ${expected} has been processed`);
+      expect(templateData.customHtml).toContain(`A refund of ${expected} has been processed`);
     });
 
     it('should not include refund information when no refund is processed', async () => {
