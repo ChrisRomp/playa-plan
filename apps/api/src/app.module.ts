@@ -36,7 +36,12 @@ class AppController {
     // Global configuration module with environment-specific settings
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: [`.env.${process.env.NODE_ENV}`, '../../.env'],
+      envFilePath: [
+        `../../.env.${process.env.NODE_ENV}`,
+        '../../.env',
+        `.env.${process.env.NODE_ENV}`,
+        '.env'
+      ],
       load: [configuration],
       validationSchema,
       validationOptions: {
