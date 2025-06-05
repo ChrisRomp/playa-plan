@@ -1209,6 +1209,198 @@ describe('PaymentsService', () => {
         success: true,
       });
     });
+
+    // Task 5.6.5: Test processRefund() handles MANUAL payment refunds with database-only updates
+    it('should handle MANUAL payment refunds with database-only updates', async () => {
+      const mockPayment = {
+        id: 'payment-id',
+        amount: 200.00, // $200.00 in dollars
+        status: PaymentStatus.COMPLETED,
+        provider: PaymentProvider.MANUAL, // Manual payment provider
+        providerRefId: 'MANUAL-PAYMENT-123',
+        userId: 'user-id',
+        registrationId: 'registration-id',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        registration: {
+          id: 'registration-id',
+          userId: 'user-id',
+          status: 'CONFIRMED',
+        },
+      };
+
+      const mockRefundDto = {
+        paymentId: 'payment-id',
+        reason: 'Manual refund requested by admin',
+      };
+
+      // Setup mocks
+      mockPrismaService.payment.findUnique.mockResolvedValue(mockPayment);
+      mockPrismaService.payment.update.mockResolvedValue({
+        ...mockPayment,
+        status: PaymentStatus.REFUNDED,
+      });
+      mockPrismaService.registration.update.mockResolvedValue({
+        ...mockPayment.registration,
+        status: 'CANCELLED',
+      });
+
+      // Execute
+      const result = await service.processRefund(mockRefundDto);
+
+      // Assert
+      expect(mockPrismaService.payment.findUnique).toHaveBeenCalledWith({
+        where: { id: 'payment-id' },
+        include: { 
+          user: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+            },
+          },
+          registration: true 
+        },
+      });
+      
+      // Should NOT call any external payment provider APIs
+      expect(mockStripeService.createRefund).not.toHaveBeenCalled();
+      expect(mockPaypalService.createRefund).not.toHaveBeenCalled();
+      
+      // Should update payment status to REFUNDED
+      expect(mockPrismaService.payment.update).toHaveBeenCalledWith({
+        where: { id: 'payment-id' },
+        data: { status: PaymentStatus.REFUNDED },
+      });
+      
+      // Should update registration status to CANCELLED
+      expect(mockPrismaService.registration.update).toHaveBeenCalledWith({
+        where: { id: 'registration-id' },
+        data: { status: 'CANCELLED' },
+      });
+      
+      expect(result).toEqual({
+        paymentId: 'payment-id',
+        refundAmount: 200.00,
+        providerRefundId: expect.stringMatching(/^manual-refund-\d+$/), // Generated manual refund ID
+        success: true,
+      });
+    });
+
+    // Test MANUAL refund without registration
+    it('should handle MANUAL payment refunds without registration', async () => {
+      const mockPayment = {
+        id: 'payment-id',
+        amount: 50.00,
+        status: PaymentStatus.COMPLETED,
+        provider: PaymentProvider.MANUAL,
+        providerRefId: 'MANUAL-STANDALONE-456',
+        userId: 'user-id',
+        registrationId: null, // No registration
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        registration: null,
+      };
+
+      const mockRefundDto = {
+        paymentId: 'payment-id',
+        reason: 'Administrative correction',
+      };
+
+      // Setup mocks
+      mockPrismaService.payment.findUnique.mockResolvedValue(mockPayment);
+      mockPrismaService.payment.update.mockResolvedValue({
+        ...mockPayment,
+        status: PaymentStatus.REFUNDED,
+      });
+
+      // Execute
+      const result = await service.processRefund(mockRefundDto);
+
+      // Assert
+      // Should NOT call any external payment provider APIs
+      expect(mockStripeService.createRefund).not.toHaveBeenCalled();
+      expect(mockPaypalService.createRefund).not.toHaveBeenCalled();
+      
+      // Should update payment status
+      expect(mockPrismaService.payment.update).toHaveBeenCalledWith({
+        where: { id: 'payment-id' },
+        data: { status: PaymentStatus.REFUNDED },
+      });
+      
+      // Should NOT call registration update when no registration
+      expect(mockPrismaService.registration.update).not.toHaveBeenCalled();
+      
+      expect(result).toEqual({
+        paymentId: 'payment-id',
+        refundAmount: 50.00,
+        providerRefundId: expect.stringMatching(/^manual-refund-\d+$/), // Generated manual refund ID
+        success: true,
+      });
+    });
+
+    // Test MANUAL refund with zero amount
+    it('should handle MANUAL payment refunds with zero amount', async () => {
+      const mockPayment = {
+        id: 'payment-id',
+        amount: 0.00, // Zero dollar payment (e.g., comp registration)
+        status: PaymentStatus.COMPLETED,
+        provider: PaymentProvider.MANUAL,
+        providerRefId: 'MANUAL-COMP-789',
+        userId: 'user-id',
+        registrationId: 'registration-id',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        registration: {
+          id: 'registration-id',
+          userId: 'user-id',
+          status: 'CONFIRMED',
+        },
+      };
+
+      const mockRefundDto = {
+        paymentId: 'payment-id',
+        reason: 'Comp registration cancellation',
+      };
+
+      // Setup mocks
+      mockPrismaService.payment.findUnique.mockResolvedValue(mockPayment);
+      mockPrismaService.payment.update.mockResolvedValue({
+        ...mockPayment,
+        status: PaymentStatus.REFUNDED,
+      });
+      mockPrismaService.registration.update.mockResolvedValue({
+        ...mockPayment.registration,
+        status: 'CANCELLED',
+      });
+
+      // Execute
+      const result = await service.processRefund(mockRefundDto);
+
+      // Assert
+      // Should NOT call any external payment provider APIs
+      expect(mockStripeService.createRefund).not.toHaveBeenCalled();
+      expect(mockPaypalService.createRefund).not.toHaveBeenCalled();
+      
+      // Should still update database records even for zero amount
+      expect(mockPrismaService.payment.update).toHaveBeenCalledWith({
+        where: { id: 'payment-id' },
+        data: { status: PaymentStatus.REFUNDED },
+      });
+      
+      expect(mockPrismaService.registration.update).toHaveBeenCalledWith({
+        where: { id: 'registration-id' },
+        data: { status: 'CANCELLED' },
+      });
+      
+      expect(result).toEqual({
+        paymentId: 'payment-id',
+        refundAmount: 0.00,
+        providerRefundId: expect.stringMatching(/^manual-refund-\d+$/), // Generated manual refund ID
+        success: true,
+      });
+    });
   });
 
   // Additional tests would follow the same pattern for other methods
