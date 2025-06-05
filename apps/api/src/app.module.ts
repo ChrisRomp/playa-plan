@@ -1,4 +1,4 @@
-import { Module, NestModule, MiddlewareConsumer, Controller, Get } from '@nestjs/common';
+import { Module, NestModule, MiddlewareConsumer, Controller, Get, RequestMethod } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { PrismaModule } from './common/prisma/prisma.module';
 import { UsersModule } from './users/users.module';
@@ -87,6 +87,6 @@ export class AppModule implements NestModule {
    */
   configure(consumer: MiddlewareConsumer) {
     // Apply security headers middleware to all routes
-    consumer.apply(SecurityHeadersMiddleware).forRoutes('*');
+    consumer.apply(SecurityHeadersMiddleware).forRoutes({ path: '*', method: RequestMethod.ALL });
   }
 }

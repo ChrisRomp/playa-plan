@@ -1,4 +1,4 @@
-import { renderHook, act } from '@testing-library/react-hooks';
+import { renderHook, act, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { usePayment } from '../usePayment';
 import { redirectToStripeCheckout } from '../../lib/stripe';
@@ -141,17 +141,22 @@ describe('usePayment', () => {
 
       const { result } = renderHook(() => usePayment(), { wrapper });
 
-      try {
-        await act(async () => {
+      let thrownError: Error | undefined;
+      
+      await act(async () => {
+        try {
           await result.current.processStripePayment({
             amount: 100,
           });
-        });
-      } catch (error) {
-        expect(error).toEqual(new Error('Stripe payments are not configured'));
-      }
+        } catch (error) {
+          thrownError = error as Error;
+        }
+      });
 
-      expect(result.current.error).toBe('Stripe payments are not configured');
+      expect(thrownError?.message).toBe('Stripe payments are not configured');
+      await waitFor(() => {
+        expect(result.current.error).toBe('Stripe payments are not configured');
+      });
     });
 
     it('should handle payment errors', async () => {
@@ -161,15 +166,22 @@ describe('usePayment', () => {
 
       const { result } = renderHook(() => usePayment(), { wrapper });
 
-      await expect(
-        act(async () => {
+      let thrownError: Error | undefined;
+      
+      await act(async () => {
+        try {
           await result.current.processStripePayment({
             amount: 100,
           });
-        })
-      ).rejects.toThrow('Payment failed');
+        } catch (error) {
+          thrownError = error as Error;
+        }
+      });
 
-      expect(result.current.error).toBe('Payment failed');
+      expect(thrownError?.message).toBe('Payment failed');
+      await waitFor(() => {
+        expect(result.current.error).toBe('Payment failed');
+      });
       expect(result.current.isProcessing).toBe(false);
     });
 
@@ -234,28 +246,41 @@ describe('usePayment', () => {
 
       const { result } = renderHook(() => usePayment(), { wrapper });
 
-      await expect(
-        act(async () => {
+      let thrownError: Error | undefined;
+      
+      await act(async () => {
+        try {
           await result.current.processPayPalPayment({
             amount: 100,
           });
-        })
-      ).rejects.toThrow('PayPal payments not yet implemented');
+        } catch (error) {
+          thrownError = error as Error;
+        }
+      });
 
-      expect(result.current.error).toBe('PayPal payments not yet implemented');
+      expect(thrownError?.message).toBe('PayPal payments not yet implemented');
+      await waitFor(() => {
+        expect(result.current.error).toBe('PayPal payments not yet implemented');
+      });
     });
 
     it('should handle PayPal not configured', async () => {
       const wrapper = createWrapper();
       const { result } = renderHook(() => usePayment(), { wrapper });
 
-      await expect(
-        act(async () => {
+      let thrownError: Error | undefined;
+      
+      await act(async () => {
+        try {
           await result.current.processPayPalPayment({
             amount: 100,
           });
-        })
-      ).rejects.toThrow('PayPal payments are not configured');
+        } catch (error) {
+          thrownError = error as Error;
+        }
+      });
+
+      expect(thrownError?.message).toBe('PayPal payments are not configured');
     });
   });
 
@@ -323,15 +348,20 @@ describe('usePayment', () => {
       const { result } = renderHook(() => usePayment(), { wrapper });
 
       // Create an error
-      try {
-        await act(async () => {
+      let thrownError: Error | undefined;
+      
+      await act(async () => {
+        try {
           await result.current.processStripePayment({ amount: 100 });
-        });
-      } catch {
-        // Expected to throw
-      }
+        } catch (error) {
+          thrownError = error as Error;
+        }
+      });
 
-      expect(result.current.error).toBe('Payment failed');
+      expect(thrownError?.message).toBe('Payment failed');
+      await waitFor(() => {
+        expect(result.current.error).toBe('Payment failed');
+      });
 
       // Clear the error
       act(() => {

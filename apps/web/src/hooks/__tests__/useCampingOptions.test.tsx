@@ -1,4 +1,4 @@
-import { renderHook, act } from '@testing-library/react-hooks';
+import { renderHook, act, waitFor } from '@testing-library/react';
 import { useCampingOptions } from '../useCampingOptions';
 import { campingOptions } from '../../lib/api';
 import axios, { AxiosHeaders, InternalAxiosRequestConfig } from 'axios';
@@ -50,7 +50,7 @@ describe('useCampingOptions', () => {
     
     (campingOptions.getAll as ReturnType<typeof vi.fn>).mockResolvedValue(mockOptions);
     
-    const { result, waitForNextUpdate } = renderHook(() => useCampingOptions());
+    const { result } = renderHook(() => useCampingOptions());
     
     act(() => {
       result.current.loadCampingOptions();
@@ -58,9 +58,9 @@ describe('useCampingOptions', () => {
     
     expect(result.current.loading).toBe(true);
     
-    await waitForNextUpdate();
-    
-    expect(result.current.loading).toBe(false);
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
     expect(result.current.options).toEqual(mockOptions);
     expect(result.current.error).toBe(null);
   });
@@ -68,15 +68,16 @@ describe('useCampingOptions', () => {
   it('should handle error when fetching camping options', async () => {
     (campingOptions.getAll as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('API error'));
     
-    const { result, waitForNextUpdate } = renderHook(() => useCampingOptions());
+    const { result } = renderHook(() => useCampingOptions());
     
     act(() => {
       result.current.loadCampingOptions();
     });
     
-    await waitForNextUpdate();
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
     
-    expect(result.current.loading).toBe(false);
     expect(result.current.error).toBe('Failed to load camping options');
   });
 
@@ -88,7 +89,7 @@ describe('useCampingOptions', () => {
     
     (campingOptions.getFields as ReturnType<typeof vi.fn>).mockResolvedValue(mockFields);
     
-    const { result, waitForNextUpdate } = renderHook(() => useCampingOptions());
+    const { result } = renderHook(() => useCampingOptions());
     
     act(() => {
       result.current.loadCampingOptionFields('123');
@@ -96,9 +97,10 @@ describe('useCampingOptions', () => {
     
     expect(result.current.loading).toBe(true);
     
-    await waitForNextUpdate();
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
     
-    expect(result.current.loading).toBe(false);
     expect(result.current.fields).toEqual(mockFields);
     expect(result.current.error).toBe(null);
   });
@@ -107,15 +109,16 @@ describe('useCampingOptions', () => {
     const apiError = new Error('API error');
     (campingOptions.getFields as ReturnType<typeof vi.fn>).mockRejectedValue(apiError);
     
-    const { result, waitForNextUpdate } = renderHook(() => useCampingOptions());
+    const { result } = renderHook(() => useCampingOptions());
     
     act(() => {
       result.current.loadCampingOptionFields('123');
     });
     
-    await waitForNextUpdate();
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
     
-    expect(result.current.loading).toBe(false);
     expect(result.current.error).toBe('Failed to load fields for camping option with ID 123');
   });
 
@@ -133,15 +136,16 @@ describe('useCampingOptions', () => {
     
     (campingOptions.getFields as ReturnType<typeof vi.fn>).mockRejectedValue(apiError);
     
-    const { result, waitForNextUpdate } = renderHook(() => useCampingOptions());
+    const { result } = renderHook(() => useCampingOptions());
     
     act(() => {
       result.current.loadCampingOptionFields('123');
     });
     
-    await waitForNextUpdate();
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
     
-    expect(result.current.loading).toBe(false);
     expect(result.current.error).toBe('Failed to load fields for camping option with ID 123');
   });
 
@@ -158,7 +162,7 @@ describe('useCampingOptions', () => {
     
     (campingOptions.createField as ReturnType<typeof vi.fn>).mockResolvedValue(mockField);
     
-    const { result, waitForNextUpdate } = renderHook(() => useCampingOptions());
+    const { result } = renderHook(() => useCampingOptions());
     
     act(() => {
       result.current.createCampingOptionField('123', {
@@ -170,9 +174,10 @@ describe('useCampingOptions', () => {
     
     expect(result.current.loading).toBe(true);
     
-    await waitForNextUpdate();
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
     
-    expect(result.current.loading).toBe(false);
     expect(result.current.fields).toEqual([mockField]);
     expect(result.current.error).toBe(null);
   });
@@ -191,7 +196,7 @@ describe('useCampingOptions', () => {
     
     (campingOptions.createField as ReturnType<typeof vi.fn>).mockRejectedValue(apiError);
     
-    const { result, waitForNextUpdate } = renderHook(() => useCampingOptions());
+    const { result } = renderHook(() => useCampingOptions());
     
     act(() => {
       result.current.createCampingOptionField('123', {
@@ -201,9 +206,10 @@ describe('useCampingOptions', () => {
       });
     });
     
-    await waitForNextUpdate();
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
     
-    expect(result.current.loading).toBe(false);
     expect(result.current.error).toBe('Failed to create field for camping option with ID 123');
   });
 
@@ -245,15 +251,16 @@ describe('useCampingOptions', () => {
     
     (campingOptions.deleteField as ReturnType<typeof vi.fn>).mockRejectedValue(apiError);
     
-    const { result, waitForNextUpdate } = renderHook(() => useCampingOptions());
+    const { result } = renderHook(() => useCampingOptions());
     
     act(() => {
       result.current.deleteCampingOptionField('123', '999');
     });
     
-    await waitForNextUpdate();
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
     
-    expect(result.current.loading).toBe(false);
     expect(result.current.error).toBe('Failed to delete field with ID 999');
   });
 }); 
