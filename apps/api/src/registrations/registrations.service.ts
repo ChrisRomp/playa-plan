@@ -307,12 +307,10 @@ export class RegistrationsService {
       throw new NotFoundException(`User with ID ${userId} not found`);
     }
 
-    return this.prisma.registration.findUnique({
+    return this.prisma.registration.findFirst({
       where: {
-        userId_year: {
-          userId,
-          year,
-        },
+        userId,
+        year,
       },
       include: {
         jobs: {
@@ -326,6 +324,9 @@ export class RegistrationsService {
           },
         },
         payments: true,
+      },
+      orderBy: {
+        createdAt: 'desc', // Return the most recent registration if multiple exist
       },
     });
   }
