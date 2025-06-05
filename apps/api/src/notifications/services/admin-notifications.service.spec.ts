@@ -375,39 +375,35 @@ describe('AdminNotificationsService', () => {
     });
 
     // Test the fix for issue #67: Bug - Cancellation email with refund displays wrong amount
-    it('should display correct refund amounts for various dollar values', async () => {
-      const testCases = [
-        { amount: 600.00, expected: '$600.00' },
-        { amount: 75.50, expected: '$75.50' },
-        { amount: 1234.99, expected: '$1234.99' },
-        { amount: 25.00, expected: '$25.00' },
-      ];
+    it.each([
+      { amount: 600.00, expected: '$600.00' },
+      { amount: 75.50, expected: '$75.50' },
+      { amount: 1234.99, expected: '$1234.99' },
+      { amount: 25.00, expected: '$25.00' },
+    ])('should display correct refund amounts for various dollar values: %o', async ({ amount, expected }) => {
+      const notificationData: AdminNotificationData = {
+        adminUser: mockAdminUser,
+        targetUser: mockTargetUser,
+        registration: {
+          ...mockRegistration,
+          status: 'CANCELLED',
+        },
+        reason: `Test refund amount formatting for ${expected}`,
+        refundInfo: {
+          amount,
+          currency: 'USD',
+          processed: true,
+        },
+      };
 
-      for (const testCase of testCases) {
-        const notificationData: AdminNotificationData = {
-          adminUser: mockAdminUser,
-          targetUser: mockTargetUser,
-          registration: {
-            ...mockRegistration,
-            status: 'CANCELLED',
-          },
-          reason: `Test refund amount formatting for ${testCase.expected}`,
-          refundInfo: {
-            amount: testCase.amount,
-            currency: 'USD',
-            processed: true,
-          },
-        };
+      coreConfigService.findCurrent.mockResolvedValue(mockCoreConfig as CoreConfig);
+      notificationsService.sendNotification.mockResolvedValue(true);
 
-        coreConfigService.findCurrent.mockResolvedValue(mockCoreConfig as CoreConfig);
-        notificationsService.sendNotification.mockResolvedValue(true);
+      await service.sendRegistrationCancellationNotification(notificationData);
 
-        await service.sendRegistrationCancellationNotification(notificationData);
-
-        const [, , templateData] = notificationsService.sendNotification.mock.calls[notificationsService.sendNotification.mock.calls.length - 1] as [string, NotificationType, TemplateData];
-        expect(templateData.customText).toContain(`A refund of ${testCase.expected} has been processed`);
-        expect(templateData.customHtml).toContain(`A refund of ${testCase.expected} has been processed`);
-      }
+      const [, , templateData] = notificationsService.sendNotification.mock.calls[notificationsService.sendNotification.mock.calls.length - 1] as [string, NotificationType, TemplateData];
+      expect(templateData.customText).toContain(`A refund of ${expected} has been processed`);
+      expect(templateData.customHtml).toContain(`A refund of ${expected} has been processed`);
     });
 
     it('should not include refund information when no refund is processed', async () => {
