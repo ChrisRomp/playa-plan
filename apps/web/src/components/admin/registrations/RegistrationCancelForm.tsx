@@ -59,11 +59,10 @@ export function RegistrationCancelForm({
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Calculate total paid amount
-  const totalPaid = registration.payments
-    .filter(p => p.status === 'COMPLETED')
-    .reduce((sum, p) => sum + p.amount, 0);
+  const completedPayments = registration.payments.filter(p => p.status === 'COMPLETED');
+  const totalPaid = completedPayments.reduce((sum, p) => sum + p.amount, 0);
 
-  const hasPayments = totalPaid > 0;
+  const hasPayments = completedPayments.length > 0;
 
   const handleReasonChange = (reason: string) => {
     setFormData(prev => ({ ...prev, reason }));
@@ -82,11 +81,9 @@ export function RegistrationCancelForm({
     const newErrors: Record<string, string> = {};
 
     if (!formData.reason.trim()) {
-      newErrors.reason = 'Please provide a reason for cancelling this registration.';
-    }
-
-    if (formData.reason.trim().length < 10) {
-      newErrors.reason = 'Please provide a more detailed reason (at least 10 characters).';
+      newErrors.reason = 'Please provide a reason for cancellation.';
+    } else if (formData.reason.trim().length < 10) {
+      newErrors.reason = 'Reason must be at least 10 characters long.';
     }
 
     setErrors(newErrors);
@@ -105,10 +102,15 @@ export function RegistrationCancelForm({
   if (registration.status === 'CANCELLED') {
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+        <div 
+          className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="already-cancelled-title"
+        >
           <div className="p-6">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-gray-900">Already Cancelled</h2>
+              <h2 id="already-cancelled-title" className="text-lg font-semibold text-gray-900">Already Cancelled</h2>
               <button
                 onClick={onClose}
                 className="text-gray-400 hover:text-gray-600"
@@ -136,7 +138,12 @@ export function RegistrationCancelForm({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 max-h-[90vh] flex flex-col">
+      <div 
+        className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 max-h-[90vh] flex flex-col"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="cancel-registration-title"
+      >
         <form onSubmit={handleSubmit} className="flex flex-col h-full min-h-0">
           {/* Header */}
           <div className="flex items-center justify-between p-6 border-b flex-shrink-0">
@@ -145,7 +152,7 @@ export function RegistrationCancelForm({
                 <Trash2 size={16} className="text-red-600" />
               </div>
               <div>
-                <h2 className="text-lg font-semibold text-gray-900">Cancel Registration</h2>
+                <h2 id="cancel-registration-title" className="text-lg font-semibold text-gray-900">Cancel Registration</h2>
                 <p className="text-sm text-gray-600">
                   {registration.user.firstName} {registration.user.lastName}
                 </p>
@@ -212,6 +219,7 @@ export function RegistrationCancelForm({
                           type="checkbox"
                           checked={formData.processRefund}
                           onChange={(e) => handleRefundToggle(e.target.checked)}
+                          disabled={loading}
                           className="h-4 w-4 text-amber-600 focus:ring-amber-500 border-gray-300 rounded"
                         />
                         <span className="ml-2 text-sm text-amber-800">
@@ -235,6 +243,7 @@ export function RegistrationCancelForm({
                 onChange={(e) => handleReasonChange(e.target.value)}
                 placeholder="Explain why this registration is being cancelled..."
                 rows={4}
+                disabled={loading}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-red-500 focus:border-red-500"
               />
               {errors.reason && <p className="mt-1 text-sm text-red-600">{errors.reason}</p>}
@@ -247,6 +256,7 @@ export function RegistrationCancelForm({
                   type="checkbox"
                   checked={formData.sendNotification}
                   onChange={(e) => handleNotificationToggle(e.target.checked)}
+                  disabled={loading}
                   className="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded mt-1"
                 />
                 <div className="ml-2">

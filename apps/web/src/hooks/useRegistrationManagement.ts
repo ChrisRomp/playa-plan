@@ -104,6 +104,8 @@ export function useRegistrationManagement(): UseRegistrationManagementReturn {
       ...prev,
       selectedRegistration: registration,
       editModalOpen: true,
+      cancelModalOpen: false,
+      auditTrailModalOpen: false,
       lastSuccessMessage: null,
       lastErrorMessage: null,
     }));
@@ -113,7 +115,9 @@ export function useRegistrationManagement(): UseRegistrationManagementReturn {
     setState(prev => ({
       ...prev,
       selectedRegistration: registration,
+      editModalOpen: false,
       cancelModalOpen: true,
+      auditTrailModalOpen: false,
       lastSuccessMessage: null,
       lastErrorMessage: null,
     }));
@@ -123,6 +127,8 @@ export function useRegistrationManagement(): UseRegistrationManagementReturn {
     setState(prev => ({
       ...prev,
       selectedRegistration: registration,
+      editModalOpen: false,
+      cancelModalOpen: false,
       auditTrailModalOpen: true,
       lastSuccessMessage: null,
       lastErrorMessage: null,

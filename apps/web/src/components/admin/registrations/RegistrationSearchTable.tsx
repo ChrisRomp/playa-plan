@@ -133,11 +133,11 @@ export function RegistrationSearchTable({
         id: 'payments',
         header: 'Payment',
         accessor: (row) => {
-          const totalPaid = row.payments
-            .filter(p => p.status === 'COMPLETED')
-            .reduce((sum, p) => sum + p.amount, 0);
+          const completedPayments = row.payments.filter(p => p.status === 'COMPLETED');
           
-          if (totalPaid === 0) return 'No payments';
+          if (completedPayments.length === 0) return 'No payments';
+          
+          const totalPaid = completedPayments.reduce((sum, p) => sum + p.amount, 0);
           return `$${totalPaid.toFixed(2)}`;
         },
         sortable: false,

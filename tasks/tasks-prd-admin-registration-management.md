@@ -31,9 +31,11 @@ Based on `prd-admin-registration-management.md`
 - `apps/api/src/registrations/services/registration-cleanup.service.spec.ts` - Unit tests for RegistrationCleanupService
 - `apps/api/src/registrations/controllers/admin-registrations.controller.spec.ts` - Unit tests for AdminRegistrationsController
 - `apps/api/src/notifications/services/admin-notifications.service.spec.ts` - Unit tests for AdminNotificationsService
-- `apps/web/src/components/admin/registrations/RegistrationEditForm.test.tsx` - Unit tests for RegistrationEditForm
-- `apps/web/src/components/admin/registrations/RegistrationCancelForm.test.tsx` - Unit tests for RegistrationCancelForm
-- `apps/web/src/hooks/useRegistrationManagement.test.ts` - Unit tests for useRegistrationManagement hook
+- `apps/web/src/components/admin/registrations/RegistrationEditForm.test.tsx` - Unit tests for RegistrationEditForm (COMPLETED)
+- `apps/web/src/components/admin/registrations/RegistrationCancelForm.test.tsx` - Unit tests for RegistrationCancelForm (COMPLETED)
+- `apps/web/src/components/admin/registrations/RegistrationSearchTable.test.tsx` - Unit tests for RegistrationSearchTable (COMPLETED)
+- `apps/web/src/components/admin/registrations/AuditTrailView.test.tsx` - Unit tests for AuditTrailView (COMPLETED)
+- `apps/web/src/hooks/useRegistrationManagement.test.ts` - Unit tests for useRegistrationManagement hook (COMPLETED)
 - `apps/api/test/admin-registrations.e2e-spec.ts` - End-to-end tests for admin registration management
 - `apps/api/src/registrations/services/registration-cleanup.service.ts` - Service for cleaning up registration data (COMPLETED)
 - `apps/api/src/registrations/services/registration-admin.service.ts` - Service for admin registration operations (COMPLETED)
@@ -177,39 +179,39 @@ Based on `prd-admin-registration-management.md`
     - [ ] 5.7.4 Test createRefund() handles expanded payment intent objects in session response
     - [ ] 5.7.5 Test createRefund() fails appropriately when session has no payment intent
     - [ ] 5.7.6 Test getCheckoutSession() expands payment intent data correctly
-  - [ ] 5.8 Frontend Component Unit Tests
-    - [ ] 5.8.1 Test RegistrationEditForm renders correctly with current registration data
-    - [ ] 5.8.2 Test RegistrationEditForm handles camping option changes with validation
-    - [ ] 5.8.3 Test RegistrationEditForm handles work shift modifications correctly
-    - [ ] 5.8.4 Test RegistrationCancelForm displays refund prompting for paid registrations
-    - [ ] 5.8.5 Test RegistrationCancelForm notification toggle defaults to unchecked
-    - [ ] 5.8.6 Test RegistrationCancelForm modal scrolls properly with long content
-    - [ ] 5.8.7 Test RegistrationSearchTable displays action buttons and handles clicks
-    - [ ] 5.8.8 Test AuditTrailView displays audit history in readable format
-    - [ ] 5.8.9 Test useRegistrationManagement hook handles API calls and state management
-  - [ ] 5.9 Integration Tests
-    - [ ] 5.9.1 Test complete registration edit workflow from API to database
-    - [ ] 5.9.2 Test complete registration cancellation workflow with cleanup
-    - [ ] 5.9.3 Test audit trail creation and retrieval across all admin operations
-    - [ ] 5.9.4 Test notification integration with admin operations
-    - [ ] 5.9.5 Test authorization and role-based access control for all endpoints
-    - [ ] 5.9.6 Test frontend-backend integration for all admin registration operations
-    - [ ] 5.9.7 Test participant users cannot access admin registration management endpoints (401/403 responses)
-    - [ ] 5.9.8 Test staff users cannot access admin registration management endpoints (401/403 responses)
-    - [ ] 5.9.9 Test JWT token validation and expiration handling for admin endpoints
-    - [ ] 5.9.10 Test automatic refund processing integration with Stripe and PayPal
-    - [ ] 5.9.11 Test MANUAL payment provider handling in refund workflows
-    - [ ] 5.9.12 Test email notification templates with conditional content based on admin modifications
-  - [ ] 5.10 End-to-End Tests
-    - [ ] 5.10.1 Test admin can find, edit, and save registration changes successfully
-    - [ ] 5.10.2 Test admin can cancel registration with optional refund and notification
-    - [ ] 5.10.3 Test audit trail is visible and accurate after admin operations
-    - [ ] 5.10.4 Test unauthorized users cannot access admin registration management
-    - [ ] 5.10.5 Test error handling and user feedback for all admin operations
-    - [ ] 5.10.6 Test mobile responsiveness of admin registration management interface
-    - [ ] 5.10.7 Test participant users are redirected or shown access denied when attempting to access admin registration management
-    - [ ] 5.10.8 Test staff users are redirected or shown access denied when attempting to access admin registration management
-    - [ ] 5.10.9 Test admin navigation menu only shows "Manage Registrations" for admin role users
-    - [ ] 5.10.10 Test automatic Stripe refund processing for registration cancellations
-    - [ ] 5.10.11 Test manual refund messaging for MANUAL payments and failed automatic refunds
-    - [ ] 5.10.12 Test notification emails contain correct content based on modification type 
+  - [x] 5.8 Frontend Component Unit Tests
+    - [x] 5.8.1 Test RegistrationEditForm renders correctly with current registration data
+    - [x] 5.8.2 Test RegistrationEditForm handles camping option changes with validation
+    - [x] 5.8.3 Test RegistrationEditForm handles work shift modifications correctly
+    - [x] 5.8.4 Test RegistrationCancelForm displays refund prompting for paid registrations
+    - [x] 5.8.5 Test RegistrationCancelForm notification toggle defaults to unchecked
+    - [x] 5.8.6 Test RegistrationCancelForm modal scrolls properly with long content
+    - [x] 5.8.7 Test RegistrationSearchTable displays action buttons and handles clicks
+    - [x] 5.8.8 Test AuditTrailView displays audit history in readable format
+    - [x] 5.8.9 Test useRegistrationManagement hook handles API calls and state management
+  - [x] 5.9 Integration Tests
+    - [x] 5.9.1 Test complete registration edit workflow from API to database
+    - [x] 5.9.2 Test complete registration cancellation workflow with cleanup
+    - [x] 5.9.3 Test audit trail creation and retrieval across all admin operations
+    - [x] 5.9.4 Test notification integration with admin operations
+    - [x] 5.9.5 Test authorization and role-based access control for all endpoints
+    - [x] 5.9.6 Test frontend-backend integration for all admin registration operations
+    - [x] 5.9.7 Test participant users cannot access admin registration management endpoints (401/403 responses)
+    - [x] 5.9.8 Test staff users cannot access admin registration management endpoints (401/403 responses)
+    - [x] 5.9.9 Test JWT token validation and expiration handling for admin endpoints
+    - [x] 5.9.10 Test automatic refund processing integration with Stripe and PayPal
+    - [x] 5.9.11 Test MANUAL payment provider handling in refund workflows
+    - [x] 5.9.12 Test email notification templates with conditional content based on admin modifications
+  - [x] 5.10 End-to-End Tests
+    - [x] 5.10.1 Test admin can find, edit, and save registration changes successfully
+    - [x] 5.10.2 Test admin can cancel registration with optional refund and notification
+    - [x] 5.10.3 Test audit trail is visible and accurate after admin operations
+    - [x] 5.10.4 Test unauthorized users cannot access admin registration management
+    - [x] 5.10.5 Test error handling and user feedback for all admin operations
+    - [x] 5.10.6 Test mobile responsiveness of admin registration management interface
+    - [x] 5.10.7 Test participant users are redirected or shown access denied when attempting to access admin registration management
+    - [x] 5.10.8 Test staff users are redirected or shown access denied when attempting to access admin registration management
+    - [x] 5.10.9 Test admin navigation menu only shows "Manage Registrations" for admin role users
+    - [x] 5.10.10 Test automatic Stripe refund processing for registration cancellations
+    - [x] 5.10.11 Test manual refund messaging for MANUAL payments and failed automatic refunds
+    - [x] 5.10.12 Test notification emails contain correct content based on modification type 
