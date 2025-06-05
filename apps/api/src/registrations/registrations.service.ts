@@ -47,18 +47,19 @@ export class RegistrationsService {
       throw new NotFoundException(`User with ID ${createRegistrationDto.userId} not found`);
     }
 
-    // Check if user already has a registration for this year
-    const existingRegistration = await this.prisma.registration.findUnique({
+    // Check if user already has an active registration for this year (excluding cancelled)
+    const existingActiveRegistration = await this.prisma.registration.findFirst({
       where: {
-        userId_year: {
-          userId: createRegistrationDto.userId,
-          year: createRegistrationDto.year,
+        userId: createRegistrationDto.userId,
+        year: createRegistrationDto.year,
+        status: {
+          not: RegistrationStatus.CANCELLED,
         },
       },
     });
 
-    if (existingRegistration) {
-      throw new ConflictException(`User already has a registration for year ${createRegistrationDto.year}`);
+    if (existingActiveRegistration) {
+      throw new ConflictException(`User already has an active registration for year ${createRegistrationDto.year}`);
     }
 
     // Validate all jobs exist and have capacity
@@ -549,18 +550,19 @@ export class RegistrationsService {
 
       // Create job registration if jobs are provided
       if (createCampRegistrationDto.jobs && createCampRegistrationDto.jobs.length > 0) {
-        // Check if user already has a registration for this year
-        const existingRegistration = await this.prisma.registration.findUnique({
+        // Check if user already has an active registration for this year (excluding cancelled)
+        const existingActiveRegistration = await this.prisma.registration.findFirst({
           where: {
-            userId_year: {
-              userId,
-              year: currentYear,
+            userId,
+            year: currentYear,
+            status: {
+              not: RegistrationStatus.CANCELLED,
             },
           },
         });
 
-        if (existingRegistration) {
-          throw new ConflictException(`User already has a registration for ${currentYear}`);
+        if (existingActiveRegistration) {
+          throw new ConflictException(`User already has an active registration for ${currentYear}`);
         }
 
         // Create the job registration

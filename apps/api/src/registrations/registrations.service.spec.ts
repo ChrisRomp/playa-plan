@@ -104,7 +104,7 @@ describe('RegistrationsService', () => {
 
     it('should create a registration successfully', async () => {
       mockPrismaService.user.findUnique.mockResolvedValue(mockUser);
-      mockPrismaService.registration.findUnique.mockResolvedValue(null);
+      mockPrismaService.registration.findFirst.mockResolvedValue(null);
       mockPrismaService.job.findUnique
         .mockResolvedValueOnce(mockJobs[0])
         .mockResolvedValueOnce(mockJobs[1]);
@@ -115,11 +115,12 @@ describe('RegistrationsService', () => {
       expect(mockPrismaService.user.findUnique).toHaveBeenCalledWith({
         where: { id: createDto.userId },
       });
-      expect(mockPrismaService.registration.findUnique).toHaveBeenCalledWith({
+      expect(mockPrismaService.registration.findFirst).toHaveBeenCalledWith({
         where: {
-          userId_year: {
-            userId: createDto.userId,
-            year: createDto.year,
+          userId: createDto.userId,
+          year: createDto.year,
+          status: {
+            not: RegistrationStatus.CANCELLED,
           },
         },
       });
@@ -142,15 +143,39 @@ describe('RegistrationsService', () => {
       await expect(service.create(createDto)).rejects.toThrow(NotFoundException);
     });
 
-    it('should throw ConflictException if user already has registration for year', async () => {
+    it('should throw ConflictException if user already has active registration for year', async () => {
       mockPrismaService.user.findUnique.mockResolvedValue(mockUser);
-      mockPrismaService.registration.findUnique.mockResolvedValue({
+      mockPrismaService.registration.findFirst.mockResolvedValue({
         id: 'existing-registration',
         userId: 'user-id',
         year: 2024,
+        status: RegistrationStatus.PENDING,
       });
 
       await expect(service.create(createDto)).rejects.toThrow(ConflictException);
+    });
+
+    it('should allow re-registration after cancellation', async () => {
+      mockPrismaService.user.findUnique.mockResolvedValue(mockUser);
+      // findFirst should return null because cancelled registrations are excluded
+      mockPrismaService.registration.findFirst.mockResolvedValue(null);
+      mockPrismaService.job.findUnique
+        .mockResolvedValueOnce(mockJobs[0])
+        .mockResolvedValueOnce(mockJobs[1]);
+      mockPrismaService.registration.create.mockResolvedValue(mockRegistration);
+
+      const result = await service.create(createDto);
+      
+      expect(mockPrismaService.registration.findFirst).toHaveBeenCalledWith({
+        where: {
+          userId: createDto.userId,
+          year: createDto.year,
+          status: {
+            not: RegistrationStatus.CANCELLED,
+          },
+        },
+      });
+      expect(result).toEqual(mockRegistration);
     });
 
     it('should set status to WAITLISTED if any job is at capacity', async () => {
@@ -161,7 +186,7 @@ describe('RegistrationsService', () => {
       };
       
       mockPrismaService.user.findUnique.mockResolvedValue(mockUser);
-      mockPrismaService.registration.findUnique.mockResolvedValue(null);
+      mockPrismaService.registration.findFirst.mockResolvedValue(null);
       mockPrismaService.job.findUnique
         .mockResolvedValueOnce(fullJob)
         .mockResolvedValueOnce(mockJobs[1]);
