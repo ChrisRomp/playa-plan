@@ -128,13 +128,6 @@ describe('RegistrationsService', () => {
     });
 
     it('should allow registration when user has only cancelled registrations', async () => {
-      const cancelledRegistration = {
-        id: 'cancelled-registration-id',
-        userId: 'user-id',
-        year: 2024,
-        status: RegistrationStatus.CANCELLED,
-      };
-
       mockPrismaService.user.findUnique.mockResolvedValue(mockUser);
       mockPrismaService.registration.findFirst.mockResolvedValue(null); // No active registrations
       mockPrismaService.job.findUnique
