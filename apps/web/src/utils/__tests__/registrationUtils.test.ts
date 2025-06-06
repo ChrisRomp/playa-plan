@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isRegistrationAccessible, getRegistrationStatusMessage, canUserRegister } from '../registrationUtils';
+import { isRegistrationAccessible, getRegistrationStatusMessage, canUserRegister, getActiveRegistrations, getCancelledRegistrations } from '../registrationUtils';
 import { User, CampConfig } from '../../types';
 
 describe('registrationUtils', () => {
@@ -89,6 +89,87 @@ describe('registrationUtils', () => {
       
       const result = canUserRegister(config, mockUser, hasActiveRegistration);
       expect(result).toBe(false);
+    });
+  });
+
+  describe('getActiveRegistrations', () => {
+    it('should filter out cancelled registrations', () => {
+      const registrations = [
+        { id: '1', status: 'PENDING' },
+        { id: '2', status: 'CONFIRMED' },
+        { id: '3', status: 'CANCELLED' },
+        { id: '4', status: 'WAITLISTED' },
+      ];
+
+      const activeRegistrations = getActiveRegistrations(registrations);
+      
+      expect(activeRegistrations).toHaveLength(3);
+      expect(activeRegistrations.map((r: { id: string }) => r.id)).toEqual(['1', '2', '4']);
+      expect(activeRegistrations.every((r: { status: string }) => r.status !== 'CANCELLED')).toBe(true);
+    });
+
+    it('should return empty array when all registrations are cancelled', () => {
+      const registrations = [
+        { id: '1', status: 'CANCELLED' },
+        { id: '2', status: 'CANCELLED' },
+      ];
+
+      const activeRegistrations = getActiveRegistrations(registrations);
+      
+      expect(activeRegistrations).toHaveLength(0);
+    });
+
+    it('should return all registrations when none are cancelled', () => {
+      const registrations = [
+        { id: '1', status: 'PENDING' },
+        { id: '2', status: 'CONFIRMED' },
+      ];
+
+      const activeRegistrations = getActiveRegistrations(registrations);
+      
+      expect(activeRegistrations).toHaveLength(2);
+      expect(activeRegistrations).toEqual(registrations);
+    });
+  });
+
+  describe('getCancelledRegistrations', () => {
+    it('should filter to only include cancelled registrations', () => {
+      const registrations = [
+        { id: '1', status: 'PENDING' },
+        { id: '2', status: 'CONFIRMED' },
+        { id: '3', status: 'CANCELLED' },
+        { id: '4', status: 'CANCELLED' },
+        { id: '5', status: 'WAITLISTED' },
+      ];
+
+      const cancelledRegistrations = getCancelledRegistrations(registrations);
+      
+      expect(cancelledRegistrations).toHaveLength(2);
+      expect(cancelledRegistrations.map((r: { id: string }) => r.id)).toEqual(['3', '4']);
+      expect(cancelledRegistrations.every((r: { status: string }) => r.status === 'CANCELLED')).toBe(true);
+    });
+
+    it('should return empty array when no registrations are cancelled', () => {
+      const registrations = [
+        { id: '1', status: 'PENDING' },
+        { id: '2', status: 'CONFIRMED' },
+      ];
+
+      const cancelledRegistrations = getCancelledRegistrations(registrations);
+      
+      expect(cancelledRegistrations).toHaveLength(0);
+    });
+
+    it('should return all registrations when all are cancelled', () => {
+      const registrations = [
+        { id: '1', status: 'CANCELLED' },
+        { id: '2', status: 'CANCELLED' },
+      ];
+
+      const cancelledRegistrations = getCancelledRegistrations(registrations);
+      
+      expect(cancelledRegistrations).toHaveLength(2);
+      expect(cancelledRegistrations).toEqual(registrations);
     });
   });
 }); 
