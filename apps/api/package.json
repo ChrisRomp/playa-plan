@@ -32,6 +32,7 @@
     "seed:dev:force": "FORCE_RESEED=true ts-node ./prisma/seeds/seed.ts",
     "seed:test": "dotenv -e .env.test -- ts-node ./prisma/seeds/seed.ts",
     "seed:test:force": "dotenv -e .env.test -- FORCE_RESEED=true ts-node ./prisma/seeds/seed.ts",
+    "seed:local": "ts-node ./prisma/seeds/seed.local.ts",
     "db:setup": "npm run prisma:generate && npm run prisma:migrate:dev && npm run seed:dev",
     "db:setup:test": "npm run prisma:generate && npm run prisma:migrate:test && npm run seed:test"
   },

@@ -19,6 +19,9 @@ yarn-error.log*
 apps/*/.env
 libs/*/.env
 
+# Local seed files (may contain secrets)
+**/seed.local.ts
+
 # OS generated files
 .DS_Store
 Thumbs.db

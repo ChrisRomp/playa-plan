@@ -145,9 +145,9 @@ export default function RegistrationPage() {
   // Check if user can register and redirect if not
   useEffect(() => {
     if (!authLoading && !campRegistrationLoading && config && user) {
-      const hasExistingRegistration = campRegistration?.hasRegistration || false;
+      const hasActiveRegistration = campRegistration?.hasRegistration || false;
       
-      if (!canUserRegister(config, user, hasExistingRegistration)) {
+      if (!canUserRegister(config, user, hasActiveRegistration)) {
         // User can't register, redirect to dashboard
         navigate(PATHS.DASHBOARD);
         return;
@@ -1348,14 +1348,14 @@ export default function RegistrationPage() {
 
   // Show message if user can't register
   if (config && user && campRegistration !== null) {
-    const hasExistingRegistration = campRegistration?.hasRegistration || false;
+    const hasActiveRegistration = campRegistration?.hasRegistration || false;
     
-    if (!canUserRegister(config, user, hasExistingRegistration)) {
+    if (!canUserRegister(config, user, hasActiveRegistration)) {
       return (
         <div className="max-w-4xl mx-auto p-6">
           <div className="bg-yellow-50 border border-yellow-400 rounded-lg p-6 text-center">
             <h2 className="text-xl font-semibold text-yellow-800 mb-2">Registration Not Available</h2>
-            <p className="text-yellow-700 mb-4">{getRegistrationStatusMessage(config, user, hasExistingRegistration)}</p>
+            <p className="text-yellow-700 mb-4">{getRegistrationStatusMessage(config, user, hasActiveRegistration)}</p>
             <button 
               onClick={() => navigate(PATHS.DASHBOARD)}
               className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"

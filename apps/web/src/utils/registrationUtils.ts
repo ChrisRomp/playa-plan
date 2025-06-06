@@ -2,6 +2,16 @@ import { CoreConfig } from '../lib/api';
 import { CampConfig, User } from '../types';
 
 /**
+ * Registration status enum to match backend
+ */
+export enum RegistrationStatus {
+  PENDING = 'PENDING',
+  CONFIRMED = 'CONFIRMED',
+  CANCELLED = 'CANCELLED',
+  WAITLISTED = 'WAITLISTED',
+}
+
+/**
  * Type union for configuration that includes both CoreConfig and CampConfig
  */
 type ConfigType = CoreConfig | CampConfig | null;
@@ -40,19 +50,19 @@ export function isRegistrationAccessible(config: ConfigType, user: UserType | nu
 
 /**
  * Check if user should be allowed to start a new registration
- * This checks both if registration is open AND if the user isn't already registered
+ * This checks both if registration is open AND if the user doesn't have an active registration
  * @param config - The core configuration or camp configuration
  * @param user - The current user (optional)
- * @param hasExistingRegistration - Whether the user already has a registration
+ * @param hasActiveRegistration - Whether the user already has an active (non-cancelled) registration
  * @returns True if user can start registration, false otherwise
  */
 export function canUserRegister(
   config: ConfigType, 
   user: UserType | null, 
-  hasExistingRegistration: boolean
+  hasActiveRegistration: boolean
 ): boolean {
-  // If user already has a registration, they can't register again
-  if (hasExistingRegistration) return false;
+  // If user already has an active registration, they can't register again
+  if (hasActiveRegistration) return false;
   
   // Otherwise, check if registration is accessible
   return isRegistrationAccessible(config, user);
@@ -62,13 +72,13 @@ export function canUserRegister(
  * Get the appropriate message for why registration is not accessible
  * @param config - The core configuration or camp configuration
  * @param user - The current user (optional)
- * @param hasExistingRegistration - Whether the user already has a registration
+ * @param hasActiveRegistration - Whether the user already has an active (non-cancelled) registration
  * @returns Message explaining why registration is not accessible
  */
 export function getRegistrationStatusMessage(
   config: ConfigType,
   user: UserType | null,
-  hasExistingRegistration: boolean
+  hasActiveRegistration: boolean
 ): string {
   if (!config) {
     return 'Configuration not available. Please try again later.';
@@ -79,7 +89,7 @@ export function getRegistrationStatusMessage(
                'currentYear' in config ? config.currentYear : 
                new Date().getFullYear();
   
-  if (hasExistingRegistration) {
+  if (hasActiveRegistration) {
     return `You are already registered for ${year}. You can view your registration details on the dashboard.`;
   }
   
@@ -105,4 +115,22 @@ export function getRegistrationStatusMessage(
   }
   
   return `Registration for ${year} is open!`;
+}
+
+/**
+ * Filter registrations to only include active (non-cancelled) ones
+ * @param registrations - Array of registrations
+ * @returns Array of active registrations
+ */
+export function getActiveRegistrations<T extends { status: string }>(registrations: T[]): T[] {
+  return registrations.filter(reg => reg.status !== RegistrationStatus.CANCELLED);
+}
+
+/**
+ * Filter registrations to only include cancelled ones
+ * @param registrations - Array of registrations
+ * @returns Array of cancelled registrations
+ */
+export function getCancelledRegistrations<T extends { status: string }>(registrations: T[]): T[] {
+  return registrations.filter(reg => reg.status === RegistrationStatus.CANCELLED);
 } 

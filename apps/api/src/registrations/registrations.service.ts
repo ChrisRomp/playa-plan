@@ -47,18 +47,17 @@ export class RegistrationsService {
       throw new NotFoundException(`User with ID ${createRegistrationDto.userId} not found`);
     }
 
-    // Check if user already has a registration for this year
-    const existingRegistration = await this.prisma.registration.findUnique({
+    // Check if user already has an active registration for this year
+    const existingActiveRegistration = await this.prisma.registration.findFirst({
       where: {
-        userId_year: {
-          userId: createRegistrationDto.userId,
-          year: createRegistrationDto.year,
-        },
+        userId: createRegistrationDto.userId,
+        year: createRegistrationDto.year,
+        status: { notIn: [RegistrationStatus.CANCELLED] }
       },
     });
 
-    if (existingRegistration) {
-      throw new ConflictException(`User already has a registration for year ${createRegistrationDto.year}`);
+    if (existingActiveRegistration) {
+      throw new ConflictException(`User already has an active registration for year ${createRegistrationDto.year}`);
     }
 
     // Validate all jobs exist and have capacity
@@ -291,12 +290,13 @@ export class RegistrationsService {
   }
 
   /**
-   * Get registrations for a specific user and year
+   * Get registration for a specific user and year
    * @param userId - The ID of the user
    * @param year - The year
+   * @param excludeCancelled - Whether to exclude cancelled registrations (default: false)
    * @returns The user's registration for that year, if any
    */
-  async findByUserAndYear(userId: string, year: number): Promise<Registration | null> {
+  async findByUserAndYear(userId: string, year: number, excludeCancelled = false): Promise<Registration | null> {
     // Check if user exists
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
@@ -306,13 +306,21 @@ export class RegistrationsService {
       throw new NotFoundException(`User with ID ${userId} not found`);
     }
 
-    return this.prisma.registration.findUnique({
-      where: {
-        userId_year: {
-          userId,
-          year,
-        },
-      },
+    const whereCondition: {
+      userId: string;
+      year: number;
+      status?: { notIn: RegistrationStatus[] };
+    } = {
+      userId,
+      year,
+    };
+
+    if (excludeCancelled) {
+      whereCondition.status = { notIn: [RegistrationStatus.CANCELLED] };
+    }
+
+    return this.prisma.registration.findFirst({
+      where: whereCondition,
       include: {
         jobs: {
           include: {
@@ -325,6 +333,9 @@ export class RegistrationsService {
           },
         },
         payments: true,
+      },
+      orderBy: {
+        createdAt: 'desc', // Get the most recent registration if multiple exist
       },
     });
   }
@@ -549,18 +560,17 @@ export class RegistrationsService {
 
       // Create job registration if jobs are provided
       if (createCampRegistrationDto.jobs && createCampRegistrationDto.jobs.length > 0) {
-        // Check if user already has a registration for this year
-        const existingRegistration = await this.prisma.registration.findUnique({
+        // Check if user already has an active registration for this year
+        const existingActiveRegistration = await this.prisma.registration.findFirst({
           where: {
-            userId_year: {
-              userId,
-              year: currentYear,
-            },
+            userId,
+            year: currentYear,
+            status: { notIn: [RegistrationStatus.CANCELLED] },
           },
         });
 
-        if (existingRegistration) {
-          throw new ConflictException(`User already has a registration for ${currentYear}`);
+        if (existingActiveRegistration) {
+          throw new ConflictException(`User already has an active registration for ${currentYear}`);
         }
 
         // Create the job registration
@@ -948,11 +958,16 @@ export class RegistrationsService {
       }))
     );
 
+    // Check if user has any active registrations (non-cancelled)
+    const activeJobRegistrations = jobRegistrations.filter(
+      reg => reg.status !== RegistrationStatus.CANCELLED
+    );
+
     return {
       campingOptions: campingOptionRegistrations,
       customFieldValues,
       jobRegistrations,
-      hasRegistration: campingOptionRegistrations.length > 0 || jobRegistrations.length > 0,
+      hasRegistration: campingOptionRegistrations.length > 0 || activeJobRegistrations.length > 0,
     };
   }
 }
