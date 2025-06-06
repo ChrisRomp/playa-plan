@@ -323,6 +323,11 @@ export default function RegistrationPage() {
             if (value === undefined || value === null || value === '') {
               errors[`field_${field.id}`] = `${field.displayName} is required`;
             }
+          } else if (field.dataType === 'BOOLEAN') {
+            // For boolean fields, require explicit true or false selection
+            if (value === undefined || value === null) {
+              errors[`field_${field.id}`] = `${field.displayName} is required`;
+            }
           } else {
             // For other field types, check if value is undefined or empty string
             if (value === undefined || value === '') {
@@ -801,7 +806,7 @@ export default function RegistrationPage() {
         <div className="space-y-4">
           {allCustomFields.map(field => {
             const fieldId = field.id;
-            const value = formData.customFields[fieldId] || '';
+            const value = formData.customFields[fieldId]; // Don't use default for boolean fields
             const error = formErrors[`field_${fieldId}`];
             
             return (
@@ -877,14 +882,37 @@ export default function RegistrationPage() {
                 )}
                 
                 {field.dataType === 'BOOLEAN' && (
-                  <div className="flex items-center">
-                    <input
-                      type="checkbox"
-                      checked={Boolean(value)}
-                      onChange={(e) => handleCustomFieldChange(fieldId, e.target.checked)}
-                      className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                    />
-                    <span className="ml-2 text-sm text-gray-900">Yes</span>
+                  <div className="space-y-2">
+                    <div className="flex items-center space-x-4">
+                      <div className="flex items-center">
+                        <input
+                          type="radio"
+                          id={`${fieldId}_yes`}
+                          name={`field_${fieldId}`}
+                          value="true"
+                          checked={value === true}
+                          onChange={(e) => handleCustomFieldChange(fieldId, e.target.value === 'true')}
+                          className="h-4 w-4 border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                        />
+                        <label htmlFor={`${fieldId}_yes`} className="ml-2 text-sm text-gray-900">
+                          Yes
+                        </label>
+                      </div>
+                      <div className="flex items-center">
+                        <input
+                          type="radio"
+                          id={`${fieldId}_no`}
+                          name={`field_${fieldId}`}
+                          value="false"
+                          checked={value === false}
+                          onChange={(e) => handleCustomFieldChange(fieldId, e.target.value === 'true')}
+                          className="h-4 w-4 border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                        />
+                        <label htmlFor={`${fieldId}_no`} className="ml-2 text-sm text-gray-900">
+                          No
+                        </label>
+                      </div>
+                    </div>
                   </div>
                 )}
                 
