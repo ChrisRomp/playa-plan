@@ -115,11 +115,11 @@ describe('CampingOptionField', () => {
         valid: false,
         message: 'Required Field is required'
       });
-      expect(field.validateValue(null as any)).toEqual({
+      expect(field.validateValue(null)).toEqual({
         valid: false,
         message: 'Required Field is required'
       });
-      expect(field.validateValue(undefined as any)).toEqual({
+      expect(field.validateValue(undefined)).toEqual({
         valid: false,
         message: 'Required Field is required'
       });
@@ -172,8 +172,8 @@ describe('CampingOptionField', () => {
       // Act & Assert
       // Empty values should be valid for optional fields (skip other validations)
       expect(field.validateValue('')).toEqual({ valid: true });
-      expect(field.validateValue(null as any)).toEqual({ valid: true });
-      expect(field.validateValue(undefined as any)).toEqual({ valid: true });
+      expect(field.validateValue(null)).toEqual({ valid: true });
+      expect(field.validateValue(undefined)).toEqual({ valid: true });
     });
   });
 });
