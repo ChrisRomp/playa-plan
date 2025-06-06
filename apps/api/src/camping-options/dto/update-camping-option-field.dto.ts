@@ -6,6 +6,7 @@ import {
   IsEnum, 
   IsOptional, 
   Min,
+  MinLength,
   ValidateIf
 } from 'class-validator';
 import { Type } from 'class-transformer';
@@ -21,9 +22,11 @@ export class UpdateCampingOptionFieldDto {
   @ApiProperty({
     description: 'Display name of the field',
     example: 'Dietary Restrictions',
+    minLength: 1,
     required: false,
   })
   @IsString()
+  @MinLength(1, { message: 'Display name must be at least 1 character long' })
   @IsOptional()
   displayName?: string;
   
@@ -33,9 +36,11 @@ export class UpdateCampingOptionFieldDto {
   @ApiProperty({
     description: 'Description of the field',
     example: 'Please list any dietary restrictions or allergies',
+    minLength: 1,
     required: false,
   })
   @IsString()
+  @MinLength(1, { message: 'Description must be at least 1 character long' })
   @IsOptional()
   description?: string;
   
@@ -78,6 +83,21 @@ export class UpdateCampingOptionFieldDto {
   @ValidateIf(o => !o.dataType || o.dataType === FieldType.STRING || o.dataType === FieldType.MULTILINE_STRING)
   @Type(() => Number)
   maxLength?: number;
+  
+  /**
+   * Minimum length for string fields
+   */
+  @ApiProperty({
+    description: 'Minimum length for string fields',
+    example: 1,
+    required: false,
+  })
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  @ValidateIf(o => !o.dataType || o.dataType === FieldType.STRING || o.dataType === FieldType.MULTILINE_STRING)
+  @Type(() => Number)
+  minLength?: number;
   
   /**
    * Minimum value for numeric fields

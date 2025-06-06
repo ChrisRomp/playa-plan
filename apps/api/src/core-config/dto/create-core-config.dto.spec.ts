@@ -72,5 +72,35 @@ describe('CreateCoreConfigDto', () => {
       expect(errors).toHaveLength(1);
       expect(errors[0].property).toBe('campName');
     });
+
+    it('should fail validation when campDescription is empty string', async () => {
+      const plainObject = {
+        campName: 'Test Camp',
+        registrationYear: 2025,
+        campDescription: '' // Empty string, min length is 1
+      };
+
+      const dto = plainToInstance(CreateCoreConfigDto, plainObject);
+      const errors = await validate(dto);
+
+      expect(errors).toHaveLength(1);
+      expect(errors[0].property).toBe('campDescription');
+      expect(errors[0].constraints).toHaveProperty('minLength');
+    });
+
+    it('should fail validation when homePageBlurb is empty string', async () => {
+      const plainObject = {
+        campName: 'Test Camp',
+        registrationYear: 2025,
+        homePageBlurb: '' // Empty string, min length is 1
+      };
+
+      const dto = plainToInstance(CreateCoreConfigDto, plainObject);
+      const errors = await validate(dto);
+
+      expect(errors).toHaveLength(1);
+      expect(errors[0].property).toBe('homePageBlurb');
+      expect(errors[0].constraints).toHaveProperty('minLength');
+    });
   });
 }); 

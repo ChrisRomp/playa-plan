@@ -9,6 +9,7 @@ import {
   Min, 
   Max, 
   Length, 
+  MinLength,
   IsInt
 } from 'class-validator';
 import { Type } from 'class-transformer';
@@ -35,9 +36,11 @@ export class CreateCoreConfigDto {
   @ApiProperty({
     description: 'Camp description (HTML allowed)',
     example: '<p>Welcome to Camp Awesome!</p>',
+    minLength: 1,
     required: false
   })
   @IsString()
+  @MinLength(1, { message: 'Camp description must be at least 1 character long' })
   @IsOptional()
   campDescription?: string;
 
@@ -47,9 +50,11 @@ export class CreateCoreConfigDto {
   @ApiProperty({
     description: 'Home page blurb (HTML allowed)',
     example: '<p>Register for our amazing camp!</p>',
+    minLength: 1,
     required: false
   })
   @IsString()
+  @MinLength(1, { message: 'Home page blurb must be at least 1 character long' })
   @IsOptional()
   homePageBlurb?: string;
 

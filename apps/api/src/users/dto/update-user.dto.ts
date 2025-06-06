@@ -28,9 +28,11 @@ export class UpdateUserDto {
   @ApiPropertyOptional({
     description: 'User first name',
     example: 'John',
+    minLength: 1,
     maxLength: 50,
   })
   @IsString()
+  @MinLength(1, { message: 'First name must be at least 1 character long' })
   @MaxLength(50, { message: 'First name must be at most 50 characters long' })
   @IsOptional()
   readonly firstName?: string;
@@ -38,9 +40,11 @@ export class UpdateUserDto {
   @ApiPropertyOptional({
     description: 'User last name',
     example: 'Doe',
+    minLength: 1,
     maxLength: 50,
   })
   @IsString()
+  @MinLength(1, { message: 'Last name must be at least 1 character long' })
   @MaxLength(50, { message: 'Last name must be at most 50 characters long' })
   @IsOptional()
   readonly lastName?: string;
@@ -48,9 +52,11 @@ export class UpdateUserDto {
   @ApiPropertyOptional({
     description: 'User playa name',
     example: 'Dusty',
+    minLength: 1,
     maxLength: 50,
   })
   @IsString()
+  @MinLength(1, { message: 'Playa name must be at least 1 character long' })
   @MaxLength(50, { message: 'Playa name must be at most 50 characters long' })
   @IsOptional()
   readonly playaName?: string;
@@ -58,9 +64,11 @@ export class UpdateUserDto {
   @ApiPropertyOptional({
     description: 'Phone number',
     example: '+1-555-123-4567',
+    minLength: 1,
     maxLength: 50,
   })
   @IsString()
+  @MinLength(1, { message: 'Phone number must be at least 1 character long' })
   @MaxLength(50, { message: 'Phone number must be at most 50 characters long' })
   @IsOptional()
   readonly phone?: string;
@@ -68,9 +76,11 @@ export class UpdateUserDto {
   @ApiPropertyOptional({
     description: 'City',
     example: 'San Francisco',
+    minLength: 1,
     maxLength: 50,
   })
   @IsString()
+  @MinLength(1, { message: 'City must be at least 1 character long' })
   @MaxLength(50, { message: 'City must be at most 50 characters long' })
   @IsOptional()
   readonly city?: string;
@@ -78,9 +88,11 @@ export class UpdateUserDto {
   @ApiPropertyOptional({
     description: 'State or province',
     example: 'CA',
+    minLength: 1,
     maxLength: 50,
   })
   @IsString()
+  @MinLength(1, { message: 'State/province must be at least 1 character long' })
   @MaxLength(50, { message: 'State/province must be at most 50 characters long' })
   @IsOptional()
   readonly stateProvince?: string;
@@ -88,9 +100,11 @@ export class UpdateUserDto {
   @ApiPropertyOptional({
     description: 'Country',
     example: 'United States',
+    minLength: 1,
     maxLength: 50,
   })
   @IsString()
+  @MinLength(1, { message: 'Country must be at least 1 character long' })
   @MaxLength(50, { message: 'Country must be at most 50 characters long' })
   @IsOptional()
   readonly country?: string;
@@ -98,9 +112,11 @@ export class UpdateUserDto {
   @ApiPropertyOptional({
     description: 'Emergency contact information',
     example: 'Jane Doe, +1-555-987-6543, relationship: sister',
+    minLength: 1,
     maxLength: 1024,
   })
   @IsString()
+  @MinLength(1, { message: 'Emergency contact must be at least 1 character long' })
   @MaxLength(1024, { message: 'Emergency contact must be at most 1024 characters long' })
   @IsOptional()
   readonly emergencyContact?: string;
@@ -108,9 +124,11 @@ export class UpdateUserDto {
   @ApiPropertyOptional({
     description: 'URL to user profile picture',
     example: 'https://mycamp.playaplan.app/profile.jpg',
+    minLength: 1,
     maxLength: 1024,
   })
   @IsString()
+  @MinLength(1, { message: 'Profile picture URL must be at least 1 character long' })
   @MaxLength(1024, { message: 'Profile picture URL must be at most 1024 characters long' })
   @IsOptional()
   readonly profilePicture?: string;
@@ -150,9 +168,11 @@ export class UpdateUserDto {
   @ApiPropertyOptional({
     description: 'Internal notes about the user (admin only)',
     example: 'Previous volunteer coordinator',
+    minLength: 1,
     maxLength: 1024,
   })
   @IsString()
+  @MinLength(1, { message: 'Internal notes must be at least 1 character long' })
   @MaxLength(1024, { message: 'Internal notes must be at most 1024 characters long' })
   @IsOptional()
   readonly internalNotes?: string;

@@ -251,4 +251,154 @@ describe('UpdateUserDto', () => {
     expect(errors[0].constraints).toHaveProperty('minLength');
     expect(errors[0].constraints?.minLength).toContain('at least 8 characters');
   });
+
+  it('should fail validation when firstName is empty string', async () => {
+    // Arrange
+    const dto = plainToInstance(UpdateUserDto, {
+      firstName: '' // Empty string, min length is 1
+    });
+
+    // Act
+    const errors = await validate(dto);
+
+    // Assert
+    expect(errors.length).toBeGreaterThan(0);
+    expect(errors[0].constraints).toHaveProperty('minLength');
+    expect(errors[0].constraints?.minLength).toContain('at least 1 character');
+  });
+
+  it('should fail validation when lastName is empty string', async () => {
+    // Arrange
+    const dto = plainToInstance(UpdateUserDto, {
+      lastName: '' // Empty string, min length is 1
+    });
+
+    // Act
+    const errors = await validate(dto);
+
+    // Assert
+    expect(errors.length).toBeGreaterThan(0);
+    expect(errors[0].constraints).toHaveProperty('minLength');
+    expect(errors[0].constraints?.minLength).toContain('at least 1 character');
+  });
+
+  it('should fail validation when playaName is empty string', async () => {
+    // Arrange
+    const dto = plainToInstance(UpdateUserDto, {
+      playaName: '' // Empty string, min length is 1
+    });
+
+    // Act
+    const errors = await validate(dto);
+
+    // Assert
+    expect(errors.length).toBeGreaterThan(0);
+    expect(errors[0].constraints).toHaveProperty('minLength');
+    expect(errors[0].constraints?.minLength).toContain('at least 1 character');
+  });
+
+  it('should fail validation when phone is empty string', async () => {
+    // Arrange
+    const dto = plainToInstance(UpdateUserDto, {
+      phone: '' // Empty string, min length is 1
+    });
+
+    // Act
+    const errors = await validate(dto);
+
+    // Assert
+    expect(errors.length).toBeGreaterThan(0);
+    expect(errors[0].constraints).toHaveProperty('minLength');
+    expect(errors[0].constraints?.minLength).toContain('at least 1 character');
+  });
+
+  it('should fail validation when city is empty string', async () => {
+    // Arrange
+    const dto = plainToInstance(UpdateUserDto, {
+      city: '' // Empty string, min length is 1
+    });
+
+    // Act
+    const errors = await validate(dto);
+
+    // Assert
+    expect(errors.length).toBeGreaterThan(0);
+    expect(errors[0].constraints).toHaveProperty('minLength');
+    expect(errors[0].constraints?.minLength).toContain('at least 1 character');
+  });
+
+  it('should fail validation when stateProvince is empty string', async () => {
+    // Arrange
+    const dto = plainToInstance(UpdateUserDto, {
+      stateProvince: '' // Empty string, min length is 1
+    });
+
+    // Act
+    const errors = await validate(dto);
+
+    // Assert
+    expect(errors.length).toBeGreaterThan(0);
+    expect(errors[0].constraints).toHaveProperty('minLength');
+    expect(errors[0].constraints?.minLength).toContain('at least 1 character');
+  });
+
+  it('should fail validation when country is empty string', async () => {
+    // Arrange
+    const dto = plainToInstance(UpdateUserDto, {
+      country: '' // Empty string, min length is 1
+    });
+
+    // Act
+    const errors = await validate(dto);
+
+    // Assert
+    expect(errors.length).toBeGreaterThan(0);
+    expect(errors[0].constraints).toHaveProperty('minLength');
+    expect(errors[0].constraints?.minLength).toContain('at least 1 character');
+  });
+
+  it('should fail validation when emergencyContact is empty string', async () => {
+    // Arrange
+    const dto = plainToInstance(UpdateUserDto, {
+      emergencyContact: '' // Empty string, min length is 1
+    });
+
+    // Act
+    const errors = await validate(dto);
+
+    // Assert
+    expect(errors.length).toBeGreaterThan(0);
+    expect(errors[0].constraints).toHaveProperty('minLength');
+    expect(errors[0].constraints?.minLength).toContain('at least 1 character');
+  });
+
+  it('should fail validation when profilePicture is empty string', async () => {
+    // Arrange
+    const dto = plainToInstance(UpdateUserDto, {
+      profilePicture: '' // Empty string, min length is 1
+    });
+
+    // Act
+    const errors = await validate(dto);
+
+    // Assert
+    expect(errors.length).toBeGreaterThan(0);
+    expect(errors[0].constraints).toHaveProperty('minLength');
+    expect(errors[0].constraints?.minLength).toContain('at least 1 character');
+  });
+
+  it('should fail validation when internalNotes is empty string', async () => {
+    // Arrange
+    const dto = plainToInstance(UpdateUserDto, {
+      internalNotes: '' // Empty string, min length is 1
+    });
+
+    // Act
+    const errors = await validate(dto);
+
+    // Assert
+    expect(errors.length).toBeGreaterThan(0);
+    expect(errors[0].constraints).toHaveProperty('minLength');
+    expect(errors[0].constraints?.minLength).toContain('at least 1 character');
+  });
 });
