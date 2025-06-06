@@ -5,7 +5,7 @@ import { useUserRegistrations } from '../hooks/useUserRegistrations';
 import { useCampRegistration } from '../hooks/useCampRegistration';
 import { useConfig } from '../store/ConfigContextDefinition';
 import { getFriendlyDayName, formatTime } from '../utils/shiftUtils';
-import { isRegistrationAccessible, getRegistrationStatusMessage } from '../utils/registrationUtils';
+import { isRegistrationAccessible, getRegistrationStatusMessage, getActiveRegistrations, getCancelledRegistrations } from '../utils/registrationUtils';
 import { PATHS } from '../routes';
 import PaymentButton from '../components/payment/PaymentButton';
 
@@ -32,14 +32,17 @@ const DashboardPage: React.FC = () => {
     );
   }
 
-  // Get current year registration
+  // Get current year registrations
   const currentYear = config?.currentYear || new Date().getFullYear();
-  const currentRegistration = registrations?.find(reg => reg.year === currentYear);
+  const currentYearRegistrations = registrations?.filter(reg => reg.year === currentYear) || [];
+  const activeCurrentRegistrations = getActiveRegistrations(currentYearRegistrations);
+  const cancelledCurrentRegistrations = getCancelledRegistrations(currentYearRegistrations);
+  const currentRegistration = activeCurrentRegistrations[0]; // Get the most recent active registration
   
   // Check registration access status
-  const hasCurrentRegistration = !!currentRegistration;
+  const hasActiveRegistration = activeCurrentRegistrations.length > 0;
   const canAccessRegistration = isRegistrationAccessible(config, user);
-  const registrationStatusMessage = getRegistrationStatusMessage(config, user, hasCurrentRegistration);
+  const registrationStatusMessage = getRegistrationStatusMessage(config, user, hasActiveRegistration);
   
   return (
     <div className="max-w-4xl mx-auto">
@@ -230,6 +233,67 @@ const DashboardPage: React.FC = () => {
               </div>
             )}
           </div>
+
+          {/* Registration History Section */}
+          {!registrationsLoading && !registrationsError && cancelledCurrentRegistrations.length > 0 && (
+            <div className="mb-8">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Registration History</h3>
+              <div className="space-y-4">
+                {cancelledCurrentRegistrations.map((registration) => (
+                  <div key={registration.id} className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="font-medium text-gray-900">Registration from {new Date(registration.createdAt).toLocaleDateString()}</h4>
+                      <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">
+                        {registration.status}
+                      </span>
+                    </div>
+                    
+                    {registration.jobs.length > 0 && (
+                      <div className="mb-3">
+                        <h5 className="text-sm font-medium text-gray-700 mb-2">Work Shifts</h5>
+                        <div className="space-y-2">
+                          {registration.jobs.map((registrationJob) => (
+                            <div key={registrationJob.id} className="text-sm text-gray-600">
+                              <span className="font-medium">{registrationJob.job?.name}</span>
+                              {registrationJob.job?.shift && (
+                                <span className="ml-2">
+                                  - {getFriendlyDayName(registrationJob.job.shift.dayOfWeek)} 
+                                  {formatTime(registrationJob.job.shift.startTime)} - {formatTime(registrationJob.job.shift.endTime)}
+                                </span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {registration.payments.length > 0 && (
+                      <div>
+                        <h5 className="text-sm font-medium text-gray-700 mb-2">Payments</h5>
+                        <div className="space-y-1">
+                          {registration.payments.map((payment) => (
+                            <div key={payment.id} className="flex items-center justify-between text-sm">
+                              <span className="text-gray-600">
+                                ${payment.amount.toFixed(2)} - {new Date(payment.createdAt).toLocaleDateString()}
+                              </span>
+                              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                payment.status === 'COMPLETED' ? 'bg-green-100 text-green-800' :
+                                payment.status === 'REFUNDED' ? 'bg-blue-100 text-blue-800' :
+                                payment.status === 'FAILED' ? 'bg-red-100 text-red-800' :
+                                'bg-gray-100 text-gray-800'
+                              }`}>
+                                {payment.status}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Camping Options Section */}
           <div className="mb-8">

@@ -54,7 +54,7 @@ describe('registrationUtils', () => {
       expect(message).toBe('Configuration not available. Please try again later.');
     });
 
-    it('should return already registered message when user has existing registration', () => {
+    it('should return already registered message when user has active registration', () => {
       const config = { ...mockConfig, registrationOpen: true };
       const message = getRegistrationStatusMessage(config, mockUser, true);
       expect(message).toBe('You are already registered for 2025. You can view your registration details on the dashboard.');
@@ -67,27 +67,27 @@ describe('registrationUtils', () => {
   });
 
   describe('canUserRegister', () => {
-    it('should prevent registration when user already has registration', () => {
+    it('should prevent registration when user already has active registration', () => {
       const config = { ...mockConfig, registrationOpen: true };
-      const hasExistingRegistration = true;
+      const hasActiveRegistration = true;
       
-      const result = canUserRegister(config, mockUser, hasExistingRegistration);
+      const result = canUserRegister(config, mockUser, hasActiveRegistration);
       expect(result).toBe(false);
     });
 
-    it('should allow registration when registration is open and user has no existing registration', () => {
+    it('should allow registration when registration is open and user has no active registration', () => {
       const config = { ...mockConfig, registrationOpen: true };
-      const hasExistingRegistration = false;
+      const hasActiveRegistration = false;
       
-      const result = canUserRegister(config, mockUser, hasExistingRegistration);
+      const result = canUserRegister(config, mockUser, hasActiveRegistration);
       expect(result).toBe(true);
     });
 
     it('should prevent registration when registration is closed', () => {
       const config = { ...mockConfig, registrationOpen: false };
-      const hasExistingRegistration = false;
+      const hasActiveRegistration = false;
       
-      const result = canUserRegister(config, mockUser, hasExistingRegistration);
+      const result = canUserRegister(config, mockUser, hasActiveRegistration);
       expect(result).toBe(false);
     });
   });

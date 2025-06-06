@@ -38,65 +38,48 @@ From `apps/web/src/pages/DashboardPage.tsx`:
 
 ### Implementation Plan
 
-#### Phase 1: Database Migration
+#### Phase 1: Database Migration ✅ COMPLETED
 ```sql
 -- Simple migration - remove unique constraint
 ALTER TABLE registrations DROP CONSTRAINT registrations_userId_year_key;
 ```
+**Status**: Migration `20250606011250_remove_unique_constraint_user_id_year` created and applied successfully.
 
-#### Phase 2: Backend Application Logic Updates
+#### Phase 2: Backend Application Logic Updates ✅ COMPLETED
 
-1. **Update Registration Service** (`apps/api/src/registrations/registrations.service.ts`):
-   ```typescript
-   async create(createRegistrationDto: CreateRegistrationDto): Promise<Registration> {
-     // Check for active registrations only (not cancelled)
-     const existingActiveRegistration = await this.prisma.registration.findFirst({
-       where: {
-         userId: createRegistrationDto.userId,
-         year: createRegistrationDto.year,
-         status: { notIn: [RegistrationStatus.CANCELLED] }
-       }
-     });
+1. **Update Registration Service** (`apps/api/src/registrations/registrations.service.ts`): ✅
+   - Updated `create()` method to check for active registrations only
+   - Updated `findByUserAndYear()` method with optional `excludeCancelled` parameter
+   - Updated `createCampRegistration()` method to use new logic
+   - Updated `getMyCampRegistration()` to distinguish active vs cancelled registrations
 
-     if (existingActiveRegistration) {
-       throw new ConflictException(`User already has an active registration for year ${createRegistrationDto.year}`);
-     }
+2. **Update All Service Methods**: ✅ 
+   - Added status filtering to queries that should exclude cancelled registrations
+   - Updated tests to use `findFirst` instead of `findUnique`
+   - Added comprehensive test case for re-registration after cancellation
 
-     // Create new registration (existing logic continues)
-     // ... rest of existing create method
-   }
-   ```
+#### Phase 3: Frontend Logic Updates ✅ COMPLETED
 
-2. **Update All Service Methods**: Add status filtering to queries that should exclude cancelled registrations
+1. **Update Registration Access Logic** (`apps/web/src/utils/registrationUtils.ts`): ✅
+   - Updated `canUserRegister()` to use `hasActiveRegistration` parameter
+   - Updated `getRegistrationStatusMessage()` to use active registration logic
+   - Added helper functions `getActiveRegistrations()` and `getCancelledRegistrations()`
+   - Added `RegistrationStatus` enum for consistency
 
-#### Phase 3: Frontend Logic Updates
+2. **Update Frontend Registration Checks**: ✅
+   - Modified `DashboardPage.tsx` to check for active (non-cancelled) registrations only
+   - Updated `RegistrationPage.tsx` to use the same logic
+   - Updated tests to reflect new parameter names and logic
 
-1. **Update Registration Access Logic** (`apps/web/src/utils/registrationUtils.ts`):
-   ```typescript
-   export function canUserRegister(
-     config: ConfigType, 
-     user: UserType | null, 
-     hasActiveRegistration: boolean  // Check for active registrations only
-   ): boolean {
-     // Allow registration if user only has cancelled registrations
-     if (hasActiveRegistration) return false;
-     
-     return isRegistrationAccessible(config, user);
-   }
-   ```
+#### Phase 4: Dashboard Display Strategy ✅ COMPLETED
 
-2. **Update Frontend Registration Checks**:
-   - Modify `DashboardPage.tsx` to check for active (non-cancelled) registrations only
-   - Update `RegistrationPage.tsx` to use the same logic
-   - Update hooks to distinguish between cancelled and active registrations
+**Approach**: Show cancelled registrations in separate "Registration History" section ✅
+- Clean current status display for active registrations ✅
+- Accessible history for cancelled registrations ✅
+- Maintains audit trail transparency ✅
+- Aligns with existing reporting patterns ✅
 
-#### Phase 4: Dashboard Display Strategy
-
-**Approach**: Show cancelled registrations in separate "Registration History" section
-- Clean current status display for active registrations
-- Accessible history for cancelled registrations
-- Maintains audit trail transparency
-- Aligns with existing reporting patterns
+**Implementation**: Added "Registration History" section to `DashboardPage.tsx` that displays cancelled registrations with their work shifts and payment history in a separate, clearly labeled section.
 
 ## Detailed Implementation Steps
 
