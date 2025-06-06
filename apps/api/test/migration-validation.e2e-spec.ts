@@ -249,7 +249,7 @@ describe('Migration Validation - Re-registration after cancellation', () => {
 
     it('should handle concurrent registration attempts correctly', async () => {
       // Create cancelled registration
-      const cancelledReg = await prisma.registration.create({
+      await prisma.registration.create({
         data: {
           userId: testUserId,
           year: testYear,
@@ -303,7 +303,11 @@ describe('Migration Validation - Re-registration after cancellation', () => {
 
     it('should handle pagination with multiple registrations per user', async () => {
       // Create many registrations for testing pagination
-      const registrationsData = [];
+      const registrationsData: Array<{
+        userId: string;
+        year: number;
+        status: RegistrationStatus;
+      }> = [];
       for (let i = 0; i < 5; i++) {
         registrationsData.push({
           userId: testUserId,
@@ -370,8 +374,10 @@ describe('Migration Validation - Re-registration after cancellation', () => {
         include: { registration: true }
       });
 
-      expect(oldPayment.registrationId).toBe(registration.id);
-      expect(oldPayment.registration.status).toBe(RegistrationStatus.CANCELLED);
+      expect(oldPayment).not.toBeNull();
+      expect(oldPayment!.registrationId).toBe(registration.id);
+      expect(oldPayment!.registration).not.toBeNull();
+      expect(oldPayment!.registration!.status).toBe(RegistrationStatus.CANCELLED);
 
       // Verify new registration has no payments
       const newRegPayments = await prisma.payment.findMany({
@@ -410,8 +416,8 @@ describe('Migration Validation - Re-registration after cancellation', () => {
         where: { id: newRegistration.id }
       });
 
-      expect(remaining).toBeDefined();
-      expect(remaining.status).toBe(RegistrationStatus.CONFIRMED);
+      expect(remaining).not.toBeNull();
+      expect(remaining!.status).toBe(RegistrationStatus.CONFIRMED);
     });
   });
 
@@ -433,7 +439,7 @@ describe('Migration Validation - Re-registration after cancellation', () => {
     testUserId = testUser.id;
 
     // Create admin user
-    const adminUser = await prisma.user.create({
+    await prisma.user.create({
       data: {
         email: 'migration-admin@example.com',
         firstName: 'Admin',
