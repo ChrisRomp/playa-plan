@@ -811,10 +811,12 @@ export default function RegistrationPage() {
             
             return (
               <div key={fieldId} className="space-y-2">
-                <label className="block text-sm font-medium text-gray-700">
-                  {field.displayName}
-                  {field.required && <span className="text-red-600 ml-1">*</span>}
-                </label>
+                {field.dataType !== 'BOOLEAN' && (
+                  <label className="block text-sm font-medium text-gray-700">
+                    {field.displayName}
+                    {field.required && <span className="text-red-600 ml-1">*</span>}
+                  </label>
+                )}
                 
                 {field.description && (
                   <p className="text-xs text-gray-500">{field.description}</p>
@@ -882,7 +884,11 @@ export default function RegistrationPage() {
                 )}
                 
                 {field.dataType === 'BOOLEAN' && (
-                  <div className="space-y-2">
+                  <fieldset className="space-y-2">
+                    <legend className="block text-sm font-medium text-gray-700">
+                      {field.displayName}
+                      {field.required && <span className="text-red-600 ml-1">*</span>}
+                    </legend>
                     <div className="flex items-center space-x-4">
                       <div className="flex items-center">
                         <input
@@ -913,7 +919,7 @@ export default function RegistrationPage() {
                         </label>
                       </div>
                     </div>
-                  </div>
+                  </fieldset>
                 )}
                 
                 {field.dataType === 'DATE' && (
