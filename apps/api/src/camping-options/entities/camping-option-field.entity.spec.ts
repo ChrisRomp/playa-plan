@@ -46,13 +46,13 @@ describe('CampingOptionField - Boolean Validation', () => {
     });
 
     it('should be invalid when required boolean field is null', () => {
-      const result = requiredBooleanField.validateValue(null as any);
+      const result = requiredBooleanField.validateValue(null);
       expect(result.valid).toBe(false);
       expect(result.message).toBe('Agree to Terms is required');
     });
 
     it('should be invalid when required boolean field is undefined', () => {
-      const result = requiredBooleanField.validateValue(undefined as any);
+      const result = requiredBooleanField.validateValue(undefined);
       expect(result.valid).toBe(false);
       expect(result.message).toBe('Agree to Terms is required');
     });
@@ -103,13 +103,13 @@ describe('CampingOptionField - Boolean Validation', () => {
     });
 
     it('should be valid when optional boolean field is null', () => {
-      const result = optionalBooleanField.validateValue(null as any);
+      const result = optionalBooleanField.validateValue(null);
       expect(result.valid).toBe(true);
       expect(result.message).toBeUndefined();
     });
 
     it('should be valid when optional boolean field is undefined', () => {
-      const result = optionalBooleanField.validateValue(undefined as any);
+      const result = optionalBooleanField.validateValue(undefined);
       expect(result.valid).toBe(true);
       expect(result.message).toBeUndefined();
     });
