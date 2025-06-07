@@ -847,7 +847,6 @@ export class RegistrationsService {
     try {
       const errorDetails = {
         error: error.constructor.name,
-        message: error.message,
         suggestions: this.getRegistrationErrorSuggestions(error),
       };
 

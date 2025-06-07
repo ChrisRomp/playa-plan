@@ -309,7 +309,6 @@ describe('NotificationsService', () => {
 
       const errorDetails = {
         error: 'PAYMENT_FAILED',
-        message: 'Your payment could not be processed',
         suggestions: ['Check your card details', 'Try a different payment method'],
       };
 

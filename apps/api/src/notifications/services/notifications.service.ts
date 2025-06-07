@@ -57,7 +57,6 @@ export interface TemplateData {
   };
   errorDetails?: {
     error: string;
-    message: string;
     suggestions?: string[];
   };
   testEmailDetails?: {
@@ -312,7 +311,7 @@ export class NotificationsService {
   /**
    * Send registration error notification email
    * @param email User email address
-   * @param errorDetails Error details with message and suggestions
+   * @param errorDetails Error details with suggestions
    * @param userId User ID for audit trail
    * @returns Promise resolving to true if email was sent successfully
    */
@@ -320,7 +319,6 @@ export class NotificationsService {
     email: string,
     errorDetails: {
       error: string;
-      message: string;
       suggestions?: string[];
     },
     userId: string
@@ -864,7 +862,6 @@ The ${campName} Team`;
    */
   private getRegistrationErrorTemplate(errorDetails: {
     error: string;
-    message: string;
     suggestions?: string[];
   }, campName: string): NotificationTemplate {
     const { error, suggestions } = errorDetails;
