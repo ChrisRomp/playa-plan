@@ -63,6 +63,16 @@ export class CampingOptionFieldResponseDto {
   maxLength!: number | null;
   
   /**
+   * Minimum length for string fields
+   */
+  @ApiProperty({
+    description: 'Minimum length for string fields',
+    example: 5,
+    nullable: true
+  })
+  minLength!: number | null;
+  
+  /**
    * Minimum value for numeric fields
    */
   @ApiProperty({

@@ -18,6 +18,7 @@ interface FieldFormData {
   dataType: 'STRING' | 'MULTILINE_STRING' | 'INTEGER' | 'NUMBER' | 'BOOLEAN' | 'DATE';
   required: boolean;
   maxLength: number | null;
+  minLength: number | null;
   minValue: number | null;
   maxValue: number | null;
   order?: number;
@@ -50,6 +51,7 @@ const AdminCampingOptionFieldsPage: React.FC = () => {
     dataType: 'STRING',
     required: false,
     maxLength: null,
+    minLength: null,
     minValue: null,
     maxValue: null
   });
@@ -78,6 +80,12 @@ const AdminCampingOptionFieldsPage: React.FC = () => {
     if (formData.dataType === 'STRING' || formData.dataType === 'MULTILINE_STRING') {
       if (formData.maxLength && formData.maxLength < 1) {
         errors.maxLength = 'Maximum length must be at least 1';
+      }
+      if (formData.minLength && formData.minLength < 0) {
+        errors.minLength = 'Minimum length cannot be negative';
+      }
+      if (formData.minLength !== null && formData.maxLength !== null && formData.minLength > formData.maxLength) {
+        errors.minLength = 'Minimum length cannot be greater than maximum length';
       }
     }
 
@@ -116,6 +124,7 @@ const AdminCampingOptionFieldsPage: React.FC = () => {
       ...formData,
       dataType,
       maxLength: null,
+      minLength: null,
       minValue: null,
       maxValue: null
     };
@@ -130,6 +139,7 @@ const AdminCampingOptionFieldsPage: React.FC = () => {
       dataType: 'STRING',
       required: false,
       maxLength: null,
+      minLength: null,
       minValue: null,
       maxValue: null
     });
@@ -145,6 +155,7 @@ const AdminCampingOptionFieldsPage: React.FC = () => {
       dataType: field.dataType,
       required: field.required,
       maxLength: field.maxLength ?? null,
+      minLength: field.minLength ?? null,
       minValue: field.minValue ?? null,
       maxValue: field.maxValue ?? null
     });
@@ -552,23 +563,42 @@ const AdminCampingOptionFieldsPage: React.FC = () => {
                 
                 {/* Additional fields based on data type */}
                 {(formData.dataType === 'STRING' || formData.dataType === 'MULTILINE_STRING') && (
-                  <div className="col-span-1">
-                    <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="maxLength">
-                      Maximum Length
-                    </label>
-                    <input
-                      type="number"
-                      id="maxLength"
-                      name="maxLength"
-                      value={formData.maxLength === null ? '' : formData.maxLength}
-                      onChange={handleInputChange}
-                      min={1}
-                      className={`w-full px-3 py-2 border rounded-md ${
-                        formErrors.maxLength ? 'border-red-500' : 'border-gray-300'
-                      }`}
-                    />
-                    {formErrors.maxLength && <p className="text-red-500 text-xs mt-1">{formErrors.maxLength}</p>}
-                  </div>
+                  <>
+                    <div className="col-span-1">
+                      <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="minLength">
+                        Minimum Length
+                      </label>
+                      <input
+                        type="number"
+                        id="minLength"
+                        name="minLength"
+                        value={formData.minLength === null ? '' : formData.minLength}
+                        onChange={handleInputChange}
+                        min={0}
+                        className={`w-full px-3 py-2 border rounded-md ${
+                          formErrors.minLength ? 'border-red-500' : 'border-gray-300'
+                        }`}
+                      />
+                      {formErrors.minLength && <p className="text-red-500 text-xs mt-1">{formErrors.minLength}</p>}
+                    </div>
+                    <div className="col-span-1">
+                      <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="maxLength">
+                        Maximum Length
+                      </label>
+                      <input
+                        type="number"
+                        id="maxLength"
+                        name="maxLength"
+                        value={formData.maxLength === null ? '' : formData.maxLength}
+                        onChange={handleInputChange}
+                        min={1}
+                        className={`w-full px-3 py-2 border rounded-md ${
+                          formErrors.maxLength ? 'border-red-500' : 'border-gray-300'
+                        }`}
+                      />
+                      {formErrors.maxLength && <p className="text-red-500 text-xs mt-1">{formErrors.maxLength}</p>}
+                    </div>
+                  </>
                 )}
                 
                 {(formData.dataType === 'NUMBER' || formData.dataType === 'INTEGER') && (

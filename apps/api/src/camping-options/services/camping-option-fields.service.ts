@@ -21,6 +21,7 @@ export class CampingOptionFieldsService {
     dataType: string;
     required: boolean;
     maxLength: number | null;
+    minLength: number | null;
     minValue: number | null;
     maxValue: number | null;
     order: number;
@@ -35,6 +36,7 @@ export class CampingOptionFieldsService {
       dataType: field.dataType as import('../entities/camping-option-field.entity').FieldType,
       required: field.required,
       maxLength: field.maxLength,
+      minLength: field.minLength,
       minValue: field.minValue,
       maxValue: field.maxValue,
       order: field.order,
@@ -75,6 +77,7 @@ export class CampingOptionFieldsService {
           dataType: createCampingOptionFieldDto.dataType,
           required: createCampingOptionFieldDto.required ?? false,
           maxLength: createCampingOptionFieldDto.maxLength ?? null,
+          minLength: createCampingOptionFieldDto.minLength ?? null,
           minValue: createCampingOptionFieldDto.minValue ?? null,
           maxValue: createCampingOptionFieldDto.maxValue ?? null,
           order: order,

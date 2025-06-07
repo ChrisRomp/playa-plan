@@ -76,6 +76,16 @@ export class CampingOptionField {
   maxLength!: number | null;
   
   /**
+   * Minimum length for string fields
+   */
+  @ApiProperty({
+    description: 'Minimum length for string fields',
+    example: 5,
+    nullable: true
+  })
+  minLength!: number | null;
+  
+  /**
    * Minimum value for numeric fields
    */
   @ApiProperty({
@@ -151,7 +161,16 @@ export class CampingOptionField {
     switch (this.dataType) {
       case FieldType.STRING:
       case FieldType.MULTILINE_STRING:
-        if (this.maxLength && value.toString().length > this.maxLength) {
+        const textLength = value.toString().length;
+        
+        if (this.minLength && textLength < this.minLength) {
+          return { 
+            valid: false, 
+            message: `${this.displayName} must be at least ${this.minLength} characters`
+          };
+        }
+        
+        if (this.maxLength && textLength > this.maxLength) {
           return { 
             valid: false, 
             message: `${this.displayName} must be at most ${this.maxLength} characters`

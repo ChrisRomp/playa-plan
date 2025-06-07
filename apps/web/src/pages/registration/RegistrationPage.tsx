@@ -341,8 +341,13 @@ export default function RegistrationPage() {
           switch (field.dataType) {
             case 'STRING':
             case 'MULTILINE_STRING': {
-              if (typeof value === 'string' && field.maxLength && value.length > field.maxLength) {
-                errors[`field_${field.id}`] = `${field.displayName} must be less than ${field.maxLength} characters`;
+              if (typeof value === 'string') {
+                if (field.minLength && value.length < field.minLength) {
+                  errors[`field_${field.id}`] = `${field.displayName} must be at least ${field.minLength} characters`;
+                }
+                if (field.maxLength && value.length > field.maxLength) {
+                  errors[`field_${field.id}`] = `${field.displayName} must be less than ${field.maxLength} characters`;
+                }
               }
               break;
             }

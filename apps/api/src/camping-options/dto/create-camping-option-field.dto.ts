@@ -77,6 +77,21 @@ export class CreateCampingOptionFieldDto {
   maxLength?: number;
   
   /**
+   * Minimum length for string fields
+   */
+  @ApiProperty({
+    description: 'Minimum length for string fields',
+    example: 5,
+    required: false,
+  })
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  @ValidateIf(o => o.dataType === FieldType.STRING || o.dataType === FieldType.MULTILINE_STRING)
+  @Type(() => Number)
+  minLength?: number;
+  
+  /**
    * Minimum value for numeric fields
    */
   @ApiProperty({
