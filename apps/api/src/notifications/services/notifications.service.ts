@@ -867,7 +867,7 @@ The ${campName} Team`;
     message: string;
     suggestions?: string[];
   }, campName: string): NotificationTemplate {
-    const { error, message, suggestions } = errorDetails;
+    const { error, suggestions } = errorDetails;
     
     const subject = 'Registration Error Notification';
     const text = `
@@ -876,7 +876,6 @@ The ${campName} Team`;
       We're sorry, but there was an error processing your registration.
       
       Error: ${error}
-      Message: ${message}
       
       Suggestions:
       ${suggestions ? suggestions.map(suggestion => `- ${suggestion}`).join('\n') : 'N/A'}
@@ -892,10 +891,9 @@ The ${campName} Team`;
         <p>Hi there,</p>
         <p>We're sorry, but there was an error processing your registration.</p>
         <p><strong>Error:</strong> ${error}</p>
-        <p><strong>Message:</strong> ${message}</p>
         <p><strong>Suggestions:</strong></p>
         <ul>
-          ${suggestions ? suggestions.map(suggestion => `<li>- ${suggestion}</li>`).join('') : '<li>N/A</li>'}
+          ${suggestions ? suggestions.map(suggestion => `<li>${suggestion}</li>`).join('') : '<li>N/A</li>'}
         </ul>
         <p>Please try again later or contact support for assistance.</p>
         <p>Best regards,<br>The ${campName} Team</p>
