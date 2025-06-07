@@ -363,7 +363,6 @@ const AdminCampingOptionFieldsPage: React.FC = () => {
                     <th className="py-2 px-4 border-b text-left">Field Name</th>
                     <th className="py-2 px-4 border-b text-left">Type</th>
                     <th className="py-2 px-4 border-b text-left">Required</th>
-                    <th className="py-2 px-4 border-b text-left">Constraints</th>
                     <th className="py-2 px-4 border-b text-center">Actions</th>
                   </tr>
                 </thead>
@@ -394,18 +393,6 @@ const AdminCampingOptionFieldsPage: React.FC = () => {
                           <span className="text-green-600">Required</span>
                         ) : (
                           <span className="text-gray-500">Optional</span>
-                        )}
-                      </td>
-                      <td className="py-2 px-4 border-b">
-                        {field.dataType === 'STRING' && field.maxLength !== null && (
-                          <span>Max length: {field.maxLength}</span>
-                        )}
-                        {field.dataType === 'NUMBER' && (
-                          <span>
-                            {field.minValue !== null && `Min: ${field.minValue}`}
-                            {field.minValue !== null && field.maxValue !== null && ', '}
-                            {field.maxValue !== null && `Max: ${field.maxValue}`}
-                          </span>
                         )}
                       </td>
                       <td className="py-2 px-4 border-b text-center">
