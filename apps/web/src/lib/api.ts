@@ -294,6 +294,7 @@ export const CampingOptionFieldSchema = z.object({
   dataType: z.enum(['STRING', 'MULTILINE_STRING', 'INTEGER', 'NUMBER', 'BOOLEAN', 'DATE']),
   required: z.boolean(),
   maxLength: z.number().nullable().optional(),
+  minLength: z.number().nullable().optional(),
   minValue: z.number().nullable().optional(),
   maxValue: z.number().nullable().optional(),
   order: z.number().optional(),

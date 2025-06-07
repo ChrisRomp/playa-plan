@@ -5,37 +5,6 @@ import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/common/prisma/prisma.service';
 import { UserRole, FieldType } from '@prisma/client';
 
-// Interface for raw camping option results
-interface RawCampingOption {
-  id: string;
-  name: string;
-  description: string | null;
-  enabled: boolean;
-  workShiftsRequired: number;
-  participantDues: number;
-  staffDues: number;
-  maxSignups: number;
-  campId: string;
-  jobCategoryIds: string[];
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// Interface for raw camping option field results
-interface RawCampingOptionField {
-  id: string;
-  displayName: string;
-  description: string | null;
-  dataType: FieldType;
-  required: boolean;
-  maxLength: number | null;
-  minValue: number | null;
-  maxValue: number | null;
-  campingOptionId: string;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
 // Mock SendGrid
 jest.mock('@sendgrid/mail', () => ({
   setApiKey: jest.fn(),
@@ -165,6 +134,33 @@ describe('CampingOptionFieldsController (e2e)', () => {
       expect(response.body.description).toBe(createFieldDto.description);
       expect(response.body.dataType).toBe(createFieldDto.dataType);
       expect(response.body.required).toBe(createFieldDto.required);
+      expect(response.body.maxLength).toBe(createFieldDto.maxLength);
+      expect(response.body.campingOptionId).toBe(createFieldDto.campingOptionId);
+    });
+
+    it('should create a camping option field with minLength (admin)', async () => {
+      const createFieldDto = {
+        displayName: 'Bio',
+        description: 'Tell us about yourself',
+        dataType: FieldType.MULTILINE_STRING,
+        required: false,
+        minLength: 10,
+        maxLength: 500,
+        campingOptionId: testCampingOptionId,
+      };
+
+      const response = await request(app.getHttpServer())
+        .post('/camping-option-fields')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send(createFieldDto)
+        .expect(201);
+
+      expect(response.body).toHaveProperty('id');
+      expect(response.body.displayName).toBe(createFieldDto.displayName);
+      expect(response.body.description).toBe(createFieldDto.description);
+      expect(response.body.dataType).toBe(createFieldDto.dataType);
+      expect(response.body.required).toBe(createFieldDto.required);
+      expect(response.body.minLength).toBe(createFieldDto.minLength);
       expect(response.body.maxLength).toBe(createFieldDto.maxLength);
       expect(response.body.campingOptionId).toBe(createFieldDto.campingOptionId);
     });

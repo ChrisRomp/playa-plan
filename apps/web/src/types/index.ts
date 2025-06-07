@@ -177,6 +177,7 @@ export interface CampingOptionField {
   dataType: 'STRING' | 'MULTILINE_STRING' | 'INTEGER' | 'NUMBER' | 'BOOLEAN' | 'DATE';
   required: boolean;
   maxLength?: number | null;
+  minLength?: number | null;
   minValue?: number | null;
   maxValue?: number | null;
   order?: number;

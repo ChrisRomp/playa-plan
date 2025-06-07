@@ -70,6 +70,7 @@ model CampingOptionField {
   dataType        FieldType
   required        Boolean                   @default(false)
   maxLength       Int?
+  minLength       Int?
   minValue        Float?
   maxValue        Float?
   order           Int                       @default(0)
