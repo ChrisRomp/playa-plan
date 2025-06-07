@@ -138,7 +138,7 @@ export class CampingOptionField {
   /**
    * Validates a value against this field's constraints
    */
-  validateValue(value: string | number | boolean | Date): { valid: boolean; message?: string } {
+  validateValue(value: string | number | boolean | Date | null | undefined): { valid: boolean; message?: string } {
     if (this.required && (value === null || value === undefined || value === '')) {
       return { valid: false, message: `${this.displayName} is required` };
     }
