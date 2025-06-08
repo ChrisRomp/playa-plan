@@ -243,6 +243,7 @@ async function main() {
             description: 'Please describe your camping footprint, space, etc. If you\'re not camping at Burning Sky, leave blank.',
             dataType: 'MULTILINE_STRING',
             required: false,
+            minLength: 10,
             maxLength: 1024,
             order: 0
           },
