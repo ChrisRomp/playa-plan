@@ -4,10 +4,14 @@ import { AppModule } from './app.module';
 import { GlobalValidationPipe } from './common/pipes/validation.pipe';
 import helmet from 'helmet';
 import { ConfigService } from '@nestjs/config';
+import { createMetricsServer } from './metrics-server';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const configService = app.get(ConfigService);
+  
+  // Start the internal metrics server (port 9464)
+  await createMetricsServer();
   
   // Apply helmet middleware for security headers
   app.use(helmet());
@@ -39,10 +43,11 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api/docs', app, document);
 
-  // Start server
+  // Start main API server
   const port = process.env.PORT || 3000;
   await app.listen(port);
-  console.log(`Application is running on: http://localhost:${port}`);
+  console.log(`🚀 API server running on: http://localhost:${port}`);
+  console.log(`📊 Metrics available internally at: http://localhost:9464/metrics`);
 }
 
 bootstrap();

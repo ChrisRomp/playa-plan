@@ -14,16 +14,25 @@ CREATE TYPE "RegistrationStatus" AS ENUM ('PENDING', 'CONFIRMED', 'CANCELLED', '
 CREATE TYPE "PaymentStatus" AS ENUM ('PENDING', 'COMPLETED', 'FAILED', 'REFUNDED');
 
 -- CreateEnum
-CREATE TYPE "PaymentProvider" AS ENUM ('STRIPE', 'PAYPAL');
+CREATE TYPE "PaymentProvider" AS ENUM ('STRIPE', 'PAYPAL', 'MANUAL');
 
 -- CreateEnum
-CREATE TYPE "NotificationType" AS ENUM ('EMAIL_VERIFICATION', 'PASSWORD_RESET', 'REGISTRATION_CONFIRMATION', 'PAYMENT_CONFIRMATION', 'SHIFT_REMINDER');
+CREATE TYPE "NotificationType" AS ENUM ('EMAIL_VERIFICATION', 'EMAIL_AUTHENTICATION', 'EMAIL_CHANGE', 'PASSWORD_RESET', 'REGISTRATION_CONFIRMATION', 'REGISTRATION_ERROR', 'PAYMENT_CONFIRMATION', 'SHIFT_REMINDER', 'EMAIL_TEST');
 
 -- CreateEnum
 CREATE TYPE "NotificationStatus" AS ENUM ('PENDING', 'SENT', 'FAILED');
 
 -- CreateEnum
+CREATE TYPE "EmailAuditStatus" AS ENUM ('SENT', 'FAILED', 'DISABLED');
+
+-- CreateEnum
 CREATE TYPE "PaypalMode" AS ENUM ('SANDBOX', 'LIVE');
+
+-- CreateEnum
+CREATE TYPE "AdminAuditActionType" AS ENUM ('REGISTRATION_EDIT', 'REGISTRATION_CANCEL', 'PAYMENT_REFUND', 'WORK_SHIFT_ADD', 'WORK_SHIFT_REMOVE', 'WORK_SHIFT_MODIFY', 'CAMPING_OPTION_ADD', 'CAMPING_OPTION_REMOVE', 'CAMPING_OPTION_MODIFY');
+
+-- CreateEnum
+CREATE TYPE "AdminAuditTargetType" AS ENUM ('REGISTRATION', 'USER', 'PAYMENT', 'WORK_SHIFT', 'CAMPING_OPTION');
 
 -- CreateTable
 CREATE TABLE "users" (
@@ -81,6 +90,7 @@ CREATE TABLE "camping_option_fields" (
     "dataType" "FieldType" NOT NULL,
     "required" BOOLEAN NOT NULL DEFAULT false,
     "maxLength" INTEGER,
+    "minLength" INTEGER,
     "minValue" DOUBLE PRECISION,
     "maxValue" DOUBLE PRECISION,
     "order" INTEGER NOT NULL DEFAULT 0,
@@ -220,6 +230,39 @@ CREATE TABLE "notifications" (
 );
 
 -- CreateTable
+CREATE TABLE "email_audit" (
+    "id" TEXT NOT NULL,
+    "recipientEmail" TEXT NOT NULL,
+    "ccEmails" TEXT,
+    "bccEmails" TEXT,
+    "subject" TEXT NOT NULL,
+    "notificationType" "NotificationType" NOT NULL,
+    "status" "EmailAuditStatus" NOT NULL,
+    "errorMessage" TEXT,
+    "sentAt" TIMESTAMP(3),
+    "userId" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "email_audit_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "admin_audit" (
+    "id" TEXT NOT NULL,
+    "adminUserId" TEXT NOT NULL,
+    "actionType" "AdminAuditActionType" NOT NULL,
+    "targetRecordType" "AdminAuditTargetType" NOT NULL,
+    "targetRecordId" TEXT NOT NULL,
+    "oldValues" JSONB,
+    "newValues" JSONB,
+    "reason" TEXT,
+    "transactionId" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "admin_audit_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "core_config" (
     "id" TEXT NOT NULL,
     "campName" TEXT NOT NULL,
@@ -248,6 +291,7 @@ CREATE TABLE "core_config" (
     "smtpSecure" BOOLEAN NOT NULL DEFAULT false,
     "senderEmail" TEXT,
     "senderName" TEXT,
+    "emailEnabled" BOOLEAN NOT NULL DEFAULT false,
     "timeZone" TEXT NOT NULL DEFAULT 'UTC',
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
@@ -263,9 +307,6 @@ CREATE UNIQUE INDEX "camping_option_job_categories_campingOptionId_jobCategoryId
 
 -- CreateIndex
 CREATE UNIQUE INDEX "job_categories_name_key" ON "job_categories"("name");
-
--- CreateIndex
-CREATE UNIQUE INDEX "registrations_userId_year_key" ON "registrations"("userId", "year");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "registration_jobs_registrationId_jobId_key" ON "registration_jobs"("registrationId", "jobId");
@@ -312,3 +353,8 @@ ALTER TABLE "payments" ADD CONSTRAINT "payments_userId_fkey" FOREIGN KEY ("userI
 -- AddForeignKey
 ALTER TABLE "payments" ADD CONSTRAINT "payments_registrationId_fkey" FOREIGN KEY ("registrationId") REFERENCES "registrations"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
+-- AddForeignKey
+ALTER TABLE "email_audit" ADD CONSTRAINT "email_audit_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "admin_audit" ADD CONSTRAINT "admin_audit_adminUserId_fkey" FOREIGN KEY ("adminUserId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
