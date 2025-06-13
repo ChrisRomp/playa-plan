@@ -22,7 +22,6 @@ WORKDIR /app
 COPY package*.json ./
 COPY apps/web/package*.json ./apps/web/
 COPY libs/ ./libs/
-COPY tsconfig*.json ./
 
 # Install all dependencies
 RUN npm install
@@ -67,6 +66,25 @@ RUN echo 'server { \
         expires 30d; \
         add_header Cache-Control "public, max-age=2592000"; \
     } \
+} \
+\
+# Internal metrics server \
+server { \
+    listen 9464; \
+    server_name localhost; \
+    \
+    # Only allow internal access \
+    allow 127.0.0.1; \
+    allow 172.16.0.0/12; \
+    allow 192.168.0.0/16; \
+    allow 10.0.0.0/8; \
+    deny all; \
+    \
+    # Expose nginx metrics \
+    location /metrics { \
+        stub_status on; \
+        access_log off; \
+    } \
 }' > /etc/nginx/conf.d/default.conf
 
 # Create a custom entrypoint script with environment variable substitution
@@ -79,5 +97,5 @@ RUN echo '#!/bin/sh' > /usr/local/bin/entrypoint.sh && \
     echo 'nginx -g "daemon off;"' >> /usr/local/bin/entrypoint.sh && \
     chmod +x /usr/local/bin/entrypoint.sh
 
-EXPOSE 5173
+EXPOSE 5173 9464
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
