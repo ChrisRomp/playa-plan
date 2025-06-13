@@ -7,7 +7,7 @@ const TermsSection = ({ registrationTerms }: { registrationTerms?: string }) => 
   return (
     <div>
       <h3 className="text-lg font-medium mb-2">Terms & Conditions</h3>
-      <div className="border p-4 rounded bg-gray-50 h-40 overflow-y-auto mb-4">
+      <div className="border p-4 rounded bg-gray-50 mb-4">
         {registrationTerms ? (
           <div dangerouslySetInnerHTML={{ __html: registrationTerms }} />
         ) : (

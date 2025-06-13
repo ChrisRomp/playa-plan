@@ -1176,7 +1176,7 @@ export default function RegistrationPage() {
         
         <div className="mb-6">
           <h3 className="text-lg font-medium mb-2">Terms & Conditions</h3>
-          <div className="border p-4 rounded bg-gray-50 h-40 overflow-y-auto mb-4">
+          <div className="border p-4 rounded bg-gray-50 mb-4">
             {config && config.registrationTerms ? (
               <div 
                 className="[&_a]:text-blue-600 [&_a]:underline [&_a:hover]:text-blue-800 [&_a]:cursor-pointer"
