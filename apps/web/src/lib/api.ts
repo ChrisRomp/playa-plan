@@ -1152,6 +1152,9 @@ export const reports = {
       if (filters?.status) params.append('status', filters.status);
       if (filters?.provider) params.append('provider', filters.provider);
       
+      // For reports, we want all payments, so set a high limit to avoid pagination
+      params.append('take', '10000');
+      
       const url = `/payments${params.toString() ? `?${params.toString()}` : ''}`;
       const response = await api.get(url);
       
