@@ -58,6 +58,11 @@ vi.mock('../api', () => {
     },
     JobCategorySchema: {
       parse: vi.fn(),
+    },
+    reports: {
+      getPayments: vi.fn(),
+      getRegistrations: vi.fn(),
+      getUsers: vi.fn(),
     }
   };
 });
@@ -69,6 +74,7 @@ import * as apiModule from '../api';
 const { 
   auth, 
   jobCategories, 
+  reports,
   setJwtToken, 
   clearJwtToken, 
   AuthResponseSchema,
@@ -282,6 +288,72 @@ describe('jobCategories API', () => {
       
       // Assert
       expect(jobCategories.update).toHaveBeenCalledWith('cat-1', updateData);
+    });
+  });
+});
+
+// Test reports API functions
+describe('reports API', () => {
+  const mockPayments = [
+    {
+      id: 'payment-1',
+      userId: 'user-1',
+      registrationId: 'reg-1',
+      amount: 100.00,
+      status: 'COMPLETED',
+      provider: 'STRIPE',
+      createdAt: '2024-01-01T00:00:00.000Z'
+    },
+    {
+      id: 'payment-2',
+      userId: 'user-2',
+      registrationId: 'reg-2',
+      amount: 150.00,
+      status: 'COMPLETED',
+      provider: 'PAYPAL',
+      createdAt: '2024-01-02T00:00:00.000Z'
+    }
+  ];
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    
+    // Set up our mock for payments
+    (reports.getPayments as Mock).mockResolvedValue(mockPayments);
+  });
+
+  describe('getPayments', () => {
+    it('should fetch all payments for reports', async () => {
+      // Act
+      const result = await reports.getPayments();
+      
+      // Assert
+      expect(reports.getPayments).toHaveBeenCalled();
+      expect(result).toEqual(mockPayments);
+    });
+
+    it('should fetch payments with filters', async () => {
+      // Arrange
+      const filters = {
+        userId: 'user-1',
+        status: 'COMPLETED',
+        provider: 'STRIPE'
+      };
+      
+      // Act
+      await reports.getPayments(filters);
+      
+      // Assert
+      expect(reports.getPayments).toHaveBeenCalledWith(filters);
+    });
+
+    it('should handle API errors gracefully', async () => {
+      // Setup error mock
+      const mockError = new Error('Failed to fetch payments');
+      (reports.getPayments as Mock).mockRejectedValue(mockError);
+      
+      // Act & Assert
+      await expect(reports.getPayments()).rejects.toThrow('Failed to fetch payments');
     });
   });
 });
