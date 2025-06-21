@@ -176,6 +176,9 @@ describe('EmailService', () => {
           user: 'test@example.com',
           pass: 'testpassword',
         },
+        connectionTimeout: 10000,
+        greetingTimeout: 5000,
+        socketTimeout: 30000,
       });
     });
 
@@ -505,6 +508,9 @@ describe('EmailService', () => {
           user: 'test@example.com',
           pass: 'testpassword',
         },
+        connectionTimeout: 10000,
+        greetingTimeout: 5000,
+        socketTimeout: 30000,
       });
     });
 
@@ -546,6 +552,9 @@ describe('EmailService', () => {
           user: 'custom@test.com',
           pass: 'custompass',
         },
+        connectionTimeout: 10000,
+        greetingTimeout: 5000,
+        socketTimeout: 30000,
       });
     });
 
