@@ -11,7 +11,7 @@ import {
   Length, 
   IsInt
 } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Type, Transform } from 'class-transformer';
 import { IsUrlOrRelativePath } from '../validators/is-url-or-relative-path.validator';
 
 /**
@@ -336,6 +336,7 @@ export class UpdateCoreConfigDto {
   })
   @IsOptional()
   @IsEmail()
+  @Transform(({ value }: { value: string }) => value === '' ? undefined : value)
   senderEmail?: string;
 
   /**
@@ -360,6 +361,7 @@ export class UpdateCoreConfigDto {
   })
   @IsOptional()
   @IsEmail()
+  @Transform(({ value }: { value: string }) => value === '' ? undefined : value)
   replyTo?: string;
 
   /**
