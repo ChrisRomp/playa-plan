@@ -206,4 +206,12 @@ export class TestSmtpConnectionDto {
   @IsOptional()
   @IsString()
   senderName?: string;
+
+  @ApiPropertyOptional({ 
+    description: 'Reply-to email address',
+    example: 'admin@example.com' 
+  })
+  @IsOptional()
+  @IsEmail()
+  replyToEmail?: string;
 }
