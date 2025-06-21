@@ -36,6 +36,7 @@ describe('CoreConfigService', () => {
     smtpUseSsl: false,
     senderEmail: 'noreply@example.playaplan.app',
     senderName: 'Test Camp',
+    replyToEmail: null,
     emailEnabled: false,
     timeZone: 'America/Los_Angeles',
     createdAt: new Date(),
@@ -209,6 +210,42 @@ describe('CoreConfigService', () => {
       expect(result.campName).toEqual('Updated Camp');
     });
 
+    it('should update email configuration including replyToEmail field', async () => {
+      const emailUpdateDto: UpdateCoreConfigDto = {
+        senderEmail: 'new-sender@example.com',
+        senderName: 'New Sender Name',
+        replyToEmail: 'replies@example.com',
+        emailEnabled: true,
+      };
+
+      const mockUpdatedConfig = {
+        ...mockCoreConfig,
+        senderEmail: 'new-sender@example.com',
+        senderName: 'New Sender Name',
+        replyToEmail: 'replies@example.com',
+        emailEnabled: true,
+        updatedAt: new Date(),
+      };
+
+      mockPrismaService.coreConfig.findUnique.mockResolvedValueOnce(mockCoreConfig);
+      mockPrismaService.coreConfig.update.mockResolvedValueOnce(mockUpdatedConfig);
+      
+      const result = await service.update(mockCoreConfig.id as string, emailUpdateDto);
+      
+      expect(mockPrismaService.coreConfig.findUnique).toHaveBeenCalled();
+      expect(mockPrismaService.coreConfig.update).toHaveBeenCalledWith({
+        where: { id: mockCoreConfig.id },
+        data: expect.objectContaining({
+          senderEmail: 'new-sender@example.com',
+          senderName: 'New Sender Name',
+          replyToEmail: 'replies@example.com',
+          emailEnabled: true,
+          updatedAt: expect.any(Date),
+        }),
+      });
+      expect(result).toBeInstanceOf(CoreConfig);
+    });
+
     it('should throw NotFoundException if config not found', async () => {
       mockPrismaService.coreConfig.findUnique.mockResolvedValueOnce(null);
       
@@ -284,6 +321,7 @@ describe('CoreConfigService', () => {
         smtpUseSsl: false, // Entity field name
         senderEmail: 'noreply@test.com',
         senderName: 'Test Camp',
+        replyToEmail: null,
       });
       expect(mockPrismaService.coreConfig.findMany).toHaveBeenCalled();
     });
@@ -305,6 +343,7 @@ describe('CoreConfigService', () => {
         smtpUseSsl: false,
         senderEmail: null,
         senderName: null,
+        replyToEmail: null,
       });
       expect(mockPrismaService.coreConfig.findMany).toHaveBeenCalled();
     });
@@ -326,6 +365,7 @@ describe('CoreConfigService', () => {
         smtpUseSsl: false,
         senderEmail: null,
         senderName: null,
+        replyToEmail: null,
       });
       expect(mockPrismaService.coreConfig.findMany).toHaveBeenCalled();
     });
@@ -360,6 +400,7 @@ describe('CoreConfigService', () => {
         smtpUseSsl: true, // Entity field name
         senderEmail: 'sender@mapped.com',
         senderName: 'Mapped Camp',
+        replyToEmail: null,
       });
     });
   });

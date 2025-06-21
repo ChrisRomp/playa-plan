@@ -100,6 +100,7 @@ export class CoreConfigService {
           smtpSecure: createCoreConfigDto.smtpUseSsl ?? false,
           senderEmail: createCoreConfigDto.senderEmail ?? null,
           senderName: createCoreConfigDto.senderName ?? null,
+          replyToEmail: createCoreConfigDto.replyToEmail ?? null,
           emailEnabled: createCoreConfigDto.emailEnabled ?? false,
           timeZone: createCoreConfigDto.timeZone ?? 'UTC',
         },
@@ -168,6 +169,7 @@ export class CoreConfigService {
       smtpUseSsl: false,
       senderEmail: null,
       senderName: null,
+      replyToEmail: null,
       emailEnabled: false,
       timeZone: 'UTC',
       createdAt: new Date(),
@@ -257,6 +259,7 @@ export class CoreConfigService {
       if (updateCoreConfigDto.smtpUseSsl !== undefined) data.smtpSecure = updateCoreConfigDto.smtpUseSsl;
       if (updateCoreConfigDto.senderEmail !== undefined) data.senderEmail = updateCoreConfigDto.senderEmail;
       if (updateCoreConfigDto.senderName !== undefined) data.senderName = updateCoreConfigDto.senderName;
+      if (updateCoreConfigDto.replyToEmail !== undefined) data.replyToEmail = updateCoreConfigDto.replyToEmail;
       if (updateCoreConfigDto.emailEnabled !== undefined) data.emailEnabled = updateCoreConfigDto.emailEnabled;
       if (updateCoreConfigDto.timeZone !== undefined) data.timeZone = updateCoreConfigDto.timeZone;
 
