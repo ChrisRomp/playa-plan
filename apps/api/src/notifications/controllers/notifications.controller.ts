@@ -382,9 +382,16 @@ export class NotificationsController {
       // For completeness validation, we need to check if we have the minimum required config
       // If form data is provided, we'll let the service handle the proper merging
       if (testSmtpDto) {
-        // Form data provided - let service handle validation with proper merging
+        // Form data provided - map DTO fields to EmailConfiguration format
+        const { replyTo, ...rest } = testSmtpDto;
+        const configOverride = {
+          ...rest,
+          // Map replyTo to replyToEmail for EmailConfiguration compatibility
+          ...(replyTo && { replyToEmail: replyTo })
+        };
+        
         const startTime = Date.now();
-        const result = await this.emailService.testSmtpConnection(testSmtpDto);
+        const result = await this.emailService.testSmtpConnection(configOverride);
         const connectionTime = Date.now() - startTime;
 
         if (result.success) {

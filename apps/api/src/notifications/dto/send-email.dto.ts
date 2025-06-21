@@ -213,5 +213,5 @@ export class TestSmtpConnectionDto {
   })
   @IsOptional()
   @IsEmail()
-  replyToEmail?: string;
+  replyTo?: string;
 }

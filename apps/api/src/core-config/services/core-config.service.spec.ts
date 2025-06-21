@@ -36,7 +36,7 @@ describe('CoreConfigService', () => {
     smtpUseSsl: false,
     senderEmail: 'noreply@example.playaplan.app',
     senderName: 'Test Camp',
-    replyToEmail: null,
+    replyTo: null,
     emailEnabled: false,
     timeZone: 'America/Los_Angeles',
     createdAt: new Date(),
@@ -210,11 +210,11 @@ describe('CoreConfigService', () => {
       expect(result.campName).toEqual('Updated Camp');
     });
 
-    it('should update email configuration including replyToEmail field', async () => {
+    it('should update email configuration including replyTo field', async () => {
       const emailUpdateDto: UpdateCoreConfigDto = {
         senderEmail: 'new-sender@example.com',
         senderName: 'New Sender Name',
-        replyToEmail: 'replies@example.com',
+        replyTo: 'replies@example.com',
         emailEnabled: true,
       };
 
@@ -222,7 +222,7 @@ describe('CoreConfigService', () => {
         ...mockCoreConfig,
         senderEmail: 'new-sender@example.com',
         senderName: 'New Sender Name',
-        replyToEmail: 'replies@example.com',
+        replyTo: 'replies@example.com',
         emailEnabled: true,
         updatedAt: new Date(),
       };
@@ -305,6 +305,7 @@ describe('CoreConfigService', () => {
         smtpSecure: false, // Database field name
         senderEmail: 'noreply@test.com',
         senderName: 'Test Camp',
+        replyToEmail: null, // Database field name
       };
       mockPrismaService.coreConfig.findMany.mockResolvedValueOnce([configWithEmail]);
 
@@ -382,6 +383,7 @@ describe('CoreConfigService', () => {
         smtpSecure: true, // DB field name (boolean)
         senderEmail: 'sender@mapped.com',
         senderName: 'Mapped Camp',
+        replyToEmail: null, // DB field name
       };
       
       // Mock what Prisma returns (database field names)

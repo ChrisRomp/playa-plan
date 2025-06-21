@@ -267,7 +267,7 @@ export class CoreConfig {
     example: 'replies@example.playaplan.app',
     required: false
   })
-  replyToEmail!: string | null;
+  replyTo!: string | null;
 
   /**
    * Whether email sending is enabled globally

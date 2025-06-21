@@ -946,7 +946,7 @@ describe('Test Email Functionality', () => {
         smtpUseSsl: false,
         senderEmail: 'sender@example.com',
         senderName: 'Test Sender',
-        replyToEmail: '',
+        replyTo: '',
       });
 
       // Check connection details are displayed
@@ -1005,7 +1005,7 @@ describe('Test Email Functionality', () => {
         smtpUseSsl: false,
         senderEmail: 'sender@example.com',
         senderName: 'Test Sender',
-        replyToEmail: '',
+        replyTo: '',
       });
 
       // Check error details are displayed

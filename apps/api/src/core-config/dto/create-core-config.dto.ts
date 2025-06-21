@@ -356,7 +356,7 @@ export class CreateCoreConfigDto {
   })
   @IsEmail()
   @IsOptional()
-  replyToEmail?: string;
+  replyTo?: string;
 
   /**
    * Whether email sending is enabled globally

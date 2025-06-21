@@ -52,7 +52,8 @@ export class CoreConfigController {
       updateDto.smtpPassword !== undefined ||
       updateDto.smtpUseSsl !== undefined ||
       updateDto.senderEmail !== undefined ||
-      updateDto.senderName !== undefined
+      updateDto.senderName !== undefined ||
+      updateDto.replyTo !== undefined
     );
   }
 
