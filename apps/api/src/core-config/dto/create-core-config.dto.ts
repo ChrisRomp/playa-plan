@@ -330,8 +330,8 @@ export class CreateCoreConfigDto {
     example: 'no-reply@example.playaplan.app',
     required: false
   })
-  @IsEmail()
   @IsOptional()
+  @IsEmail()
   senderEmail?: string;
 
   /**
@@ -354,8 +354,8 @@ export class CreateCoreConfigDto {
     example: 'replies@example.playaplan.app',
     required: false
   })
-  @IsEmail()
   @IsOptional()
+  @IsEmail()
   replyTo?: string;
 
   /**
