@@ -593,6 +593,169 @@ describe('EmailService', () => {
     });
   });
 
+  describe('Reply-To email functionality', () => {
+    const validEmailOptions: EmailOptions = {
+      to: 'test@example.com',
+      subject: 'Test Subject',
+      html: '<p>Test content</p>',
+      notificationType: NotificationType.EMAIL_VERIFICATION,
+      userId: 'user-123',
+    };
+
+    beforeEach(async () => {
+      // Initialize the service with valid config and clear any cached config
+      mockCoreConfigService.getEmailConfiguration.mockResolvedValue(mockEmailConfig);
+      await service.refreshConfiguration();
+      mockTransporter.sendMail.mockResolvedValue({ messageId: 'test-message-id' });
+    });
+
+    it('should use configured replyToEmail when available', async () => {
+      // Arrange
+      const configWithReplyTo: EmailConfiguration = {
+        ...mockEmailConfig,
+        replyToEmail: 'contact@playaplan.app',
+      };
+      mockCoreConfigService.getEmailConfiguration.mockResolvedValue(configWithReplyTo);
+      await service.refreshConfiguration();
+
+      // Act
+      const result = await service.sendEmail(validEmailOptions);
+
+      // Assert
+      expect(result).toBe(true);
+      expect(mockTransporter.sendMail).toHaveBeenCalledWith({
+        to: 'test@example.com',
+        from: 'PlayaPlan <noreply@playaplan.app>',
+        subject: 'Test Subject',
+        text: '',
+        html: '<p>Test content</p>',
+        replyTo: 'contact@playaplan.app',
+        cc: undefined,
+        bcc: undefined,
+      });
+    });
+
+    it('should fallback to sender email when replyToEmail is null', async () => {
+      // Arrange - mockEmailConfig already has replyToEmail: null
+      
+      // Act
+      const result = await service.sendEmail(validEmailOptions);
+
+      // Assert
+      expect(result).toBe(true);
+      expect(mockTransporter.sendMail).toHaveBeenCalledWith({
+        to: 'test@example.com',
+        from: 'PlayaPlan <noreply@playaplan.app>',
+        subject: 'Test Subject',
+        text: '',
+        html: '<p>Test content</p>',
+        replyTo: 'PlayaPlan <noreply@playaplan.app>', // Should fallback to sender
+        cc: undefined,
+        bcc: undefined,
+      });
+    });
+
+    it('should use explicit replyTo parameter with highest precedence', async () => {
+      // Arrange
+      const configWithReplyTo: EmailConfiguration = {
+        ...mockEmailConfig,
+        replyToEmail: 'contact@playaplan.app',
+      };
+      mockCoreConfigService.getEmailConfiguration.mockResolvedValue(configWithReplyTo);
+      await service.refreshConfiguration();
+
+      const optionsWithExplicitReplyTo: EmailOptions = {
+        ...validEmailOptions,
+        replyTo: 'support@playaplan.app',
+      };
+
+      // Act
+      const result = await service.sendEmail(optionsWithExplicitReplyTo);
+
+      // Assert
+      expect(result).toBe(true);
+      expect(mockTransporter.sendMail).toHaveBeenCalledWith({
+        to: 'test@example.com',
+        from: 'PlayaPlan <noreply@playaplan.app>',
+        subject: 'Test Subject',
+        text: '',
+        html: '<p>Test content</p>',
+        replyTo: 'support@playaplan.app', // Should use explicit parameter
+        cc: undefined,
+        bcc: undefined,
+      });
+    });
+
+    it('should follow priority hierarchy: options.replyTo > config.replyToEmail > emailFrom', async () => {
+      // Test case 1: No explicit replyTo, no config replyToEmail -> use emailFrom
+      const result1 = await service.sendEmail(validEmailOptions);
+      expect(result1).toBe(true);
+      expect(mockTransporter.sendMail).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          replyTo: 'PlayaPlan <noreply@playaplan.app>', // Falls back to emailFrom
+        })
+      );
+
+      // Test case 2: No explicit replyTo, config replyToEmail set -> use config
+      const configWithReplyTo: EmailConfiguration = {
+        ...mockEmailConfig,
+        replyToEmail: 'replies@playaplan.app',
+      };
+      mockCoreConfigService.getEmailConfiguration.mockResolvedValue(configWithReplyTo);
+      await service.refreshConfiguration();
+
+      const result2 = await service.sendEmail(validEmailOptions);
+      expect(result2).toBe(true);
+      expect(mockTransporter.sendMail).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          replyTo: 'replies@playaplan.app', // Uses config replyToEmail
+        })
+      );
+
+      // Test case 3: Explicit replyTo set -> use explicit (highest priority)
+      const optionsWithReplyTo = {
+        ...validEmailOptions,
+        replyTo: 'explicit@playaplan.app',
+      };
+
+      const result3 = await service.sendEmail(optionsWithReplyTo);
+      expect(result3).toBe(true);
+      expect(mockTransporter.sendMail).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          replyTo: 'explicit@playaplan.app', // Uses explicit parameter (highest priority)
+        })
+      );
+    });
+
+    it('should handle replyToEmail with different sender configurations', async () => {
+      // Arrange - Config with only sender email (no sender name) and reply-to
+      const configMinimal: EmailConfiguration = {
+        ...mockEmailConfig,
+        senderEmail: 'noreply@playaplan.app',
+        senderName: null,
+        replyToEmail: 'help@playaplan.app',
+      };
+      mockCoreConfigService.getEmailConfiguration.mockResolvedValue(configMinimal);
+      await service.refreshConfiguration();
+
+      // Act
+      const result = await service.sendEmail(validEmailOptions);
+
+      // Assert
+      expect(result).toBe(true);
+      expect(mockTransporter.sendMail).toHaveBeenCalledWith({
+        to: 'test@example.com',
+        from: 'noreply@playaplan.app', // No sender name
+        subject: 'Test Subject',
+        text: '',
+        html: '<p>Test content</p>',
+        replyTo: 'help@playaplan.app', // Uses configured reply-to
+        cc: undefined,
+        bcc: undefined,
+      });
+    });
+  });
+
   describe('testSmtpConnection', () => {
     it('should test SMTP connection successfully', async () => {
       const mockConfig = {
