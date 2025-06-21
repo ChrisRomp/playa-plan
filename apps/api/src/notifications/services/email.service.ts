@@ -138,6 +138,10 @@ export class EmailService implements OnModuleInit {
           user: config.smtpUsername,
           pass: config.smtpPassword,
         },
+        // Add connection timeout settings to prevent hanging
+        connectionTimeout: 10000, // 10 seconds
+        greetingTimeout: 5000,   // 5 seconds
+        socketTimeout: 30000,    // 30 seconds
       });
 
       this.logger.log(`SMTP email service initialized for ${config.smtpHost}:${config.smtpPort || 587}`);
@@ -346,7 +350,7 @@ export class EmailService implements OnModuleInit {
   }
 
   /**
-   * Send email via SMTP
+   * Send email via SMTP with timeout protection
    */
   private async sendViaSmtp(mailOptions: nodemailer.SendMailOptions): Promise<boolean> {
     try {
@@ -355,7 +359,17 @@ export class EmailService implements OnModuleInit {
         return false;
       }
       
-      await this.transporter.sendMail(mailOptions);
+      // Create a timeout promise to prevent hanging
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('Email send timeout after 30 seconds')), 30000);
+      });
+      
+      // Race between sending email and timeout
+      await Promise.race([
+        this.transporter.sendMail(mailOptions),
+        timeoutPromise
+      ]);
+      
       this.logger.log(`Email sent via SMTP to ${Array.isArray(mailOptions.to) ? mailOptions.to.join(', ') : mailOptions.to}`);
       return true;
     } catch (error: unknown) {
@@ -475,8 +489,15 @@ export class EmailService implements OnModuleInit {
         socketTimeout: 10000,     // 10 seconds
       });
 
-      // Test the connection
-      await testTransporter.verify();
+      // Test the connection with timeout protection
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('SMTP connection test timeout after 15 seconds')), 15000);
+      });
+      
+      await Promise.race([
+        testTransporter.verify(),
+        timeoutPromise
+      ]);
       
       return {
         success: true,
