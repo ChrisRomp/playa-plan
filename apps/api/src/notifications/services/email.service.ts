@@ -274,7 +274,7 @@ export class EmailService implements OnModuleInit {
       
       // Enhanced debug mode: Show all email parameters that will be sent
       if (isDebugMode) {
-        console.log('\n====== DEBUG: EMAIL PARAMETERS ======');
+        this.logger.debug('====== DEBUG: EMAIL PARAMETERS ======');
         console.log(`From: ${emailFrom}`);
         console.log(`To: ${Array.isArray(to) ? to.join(', ') : to}`);
         if (ccEmails && ccEmails.length > 0) console.log(`CC: ${ccEmails.join(', ')}`);
