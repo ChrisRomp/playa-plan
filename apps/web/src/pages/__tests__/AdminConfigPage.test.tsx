@@ -77,7 +77,10 @@ const renderWithProviders = (component: React.ReactElement) => {
     } as CampConfig,
     isLoading: false,
     error: null,
-    refreshConfig: vi.fn()
+    refreshConfig: vi.fn(),
+    isConnecting: false,
+    isConnected: true,
+    connectionError: null
   };
 
   return render(
@@ -656,7 +659,10 @@ describe('Email Configuration Form Submission', () => {
           } as CampConfig,
           isLoading: false,
           error: null,
-          refreshConfig: mockRefreshConfig
+          refreshConfig: mockRefreshConfig,
+          isConnecting: false,
+          isConnected: true,
+          connectionError: null
         }}>
           <AdminConfigPage />
         </ConfigContext.Provider>
@@ -1009,12 +1015,12 @@ describe('Test Email Functionality', () => {
       });
 
       // Check error details are displayed
-      const etimedoutElements = screen.getAllByText((content, element) => {
+      const etimedoutElements = screen.getAllByText((_content, element) => {
         return element?.textContent?.includes('ETIMEDOUT') || false;
       });
       expect(etimedoutElements.length).toBeGreaterThan(0);
       
-      const responseElements = screen.getAllByText((content, element) => {
+      const responseElements = screen.getAllByText((_content, element) => {
         return element?.textContent?.includes('421 Service not available') || false;
       });
       expect(responseElements.length).toBeGreaterThan(0);
