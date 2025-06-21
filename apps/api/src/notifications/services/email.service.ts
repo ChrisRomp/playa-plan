@@ -33,6 +33,7 @@ interface EmailConfiguration {
   smtpUseSsl: boolean;
   senderEmail: string | null;
   senderName: string | null;
+  replyToEmail: string | null;
 }
 
 /**
@@ -107,6 +108,7 @@ export class EmailService implements OnModuleInit {
         smtpUseSsl: false,
         senderEmail: null,
         senderName: null,
+        replyToEmail: null,
       };
       
       this.configCache = fallbackConfig;
@@ -262,6 +264,10 @@ export class EmailService implements OnModuleInit {
         : 'noreply@example.com';
       const emailFrom = from || defaultFrom;
       
+      // Determine reply-to address
+      const defaultReplyTo = config.replyToEmail || emailFrom;
+      const emailReplyTo = replyTo || defaultReplyTo;
+      
       // Enhanced debug mode: Show all email parameters that will be sent
       if (isDebugMode) {
         console.log('\n====== DEBUG: EMAIL PARAMETERS ======');
@@ -270,7 +276,7 @@ export class EmailService implements OnModuleInit {
         if (ccEmails && ccEmails.length > 0) console.log(`CC: ${ccEmails.join(', ')}`);
         if (bccEmails && bccEmails.length > 0) console.log(`BCC: ${bccEmails.join(', ')}`);
         console.log(`Subject: ${subject}`);
-        console.log(`Reply-To: ${replyTo || emailFrom}`);
+        console.log(`Reply-To: ${emailReplyTo}`);
         console.log('\n--- SMTP Configuration ---');
         console.log(`Host: ${config.smtpHost}`);
         console.log(`Port: ${config.smtpPort}`);
@@ -278,6 +284,7 @@ export class EmailService implements OnModuleInit {
         console.log(`Secure: ${config.smtpUseSsl}`);
         console.log(`Sender Email Config: ${config.senderEmail}`);
         console.log(`Sender Name Config: ${config.senderName}`);
+        console.log(`Reply-To Email Config: ${config.replyToEmail}`);
         console.log('=============================================\n');
       }
       
@@ -288,7 +295,7 @@ export class EmailService implements OnModuleInit {
         subject,
         text: text || '',
         html,
-        replyTo: replyTo || emailFrom,
+        replyTo: emailReplyTo,
         attachments,
         cc: ccEmails,
         bcc: bccEmails,
@@ -408,6 +415,9 @@ export class EmailService implements OnModuleInit {
             break;
           case 'senderName':
             result.senderName = value as string;
+            break;
+          case 'replyToEmail':
+            result.replyToEmail = value as string;
             break;
         }
       }

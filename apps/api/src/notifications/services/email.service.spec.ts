@@ -19,6 +19,7 @@ interface EmailConfiguration {
   smtpUseSsl: boolean;
   senderEmail: string | null;
   senderName: string | null;
+  replyToEmail: string | null;
 }
 
 interface MockError extends Error {
@@ -47,6 +48,7 @@ describe('EmailService', () => {
     smtpPassword: 'testpassword',
     senderEmail: 'noreply@playaplan.app',
     senderName: 'PlayaPlan',
+    replyToEmail: null,
   };
 
   beforeEach(async () => {
@@ -602,6 +604,7 @@ describe('EmailService', () => {
         smtpUseSsl: false,
         senderEmail: 'sender@example.com',
         senderName: 'Test Sender',
+        replyToEmail: null,
       };
 
       mockCoreConfigService.getEmailConfiguration.mockResolvedValue(mockConfig);
@@ -647,6 +650,7 @@ describe('EmailService', () => {
         smtpUseSsl: false,
         senderEmail: 'sender@example.com',
         senderName: 'Test Sender',
+        replyToEmail: null,
       };
 
       mockCoreConfigService.getEmailConfiguration.mockResolvedValue(mockConfig);
@@ -667,6 +671,7 @@ describe('EmailService', () => {
         smtpUseSsl: false,
         senderEmail: 'sender@example.com',
         senderName: 'Test Sender',
+        replyToEmail: null,
       };
 
       mockCoreConfigService.getEmailConfiguration.mockResolvedValue(mockConfig);
@@ -687,6 +692,7 @@ describe('EmailService', () => {
         smtpUseSsl: false,
         senderEmail: 'sender@example.com',
         senderName: 'Test Sender',
+        replyToEmail: null,
       };
 
       mockCoreConfigService.getEmailConfiguration.mockResolvedValue(mockConfig);
@@ -729,6 +735,7 @@ describe('EmailService', () => {
         smtpUseSsl: false,
         senderEmail: 'sender@example.com',
         senderName: 'Test Sender',
+        replyToEmail: null,
       };
 
       mockCoreConfigService.getEmailConfiguration.mockResolvedValue(mockConfig);
@@ -764,6 +771,7 @@ describe('EmailService', () => {
         smtpUseSsl: false,
         senderEmail: 'sender@example.com',
         senderName: 'Test Sender',
+        replyToEmail: null,
       };
 
       mockCoreConfigService.getEmailConfiguration.mockResolvedValue(mockConfig);
@@ -798,6 +806,7 @@ describe('EmailService', () => {
         smtpUseSsl: false,
         senderEmail: 'sender@example.com',
         senderName: 'Test Sender',
+        replyToEmail: null,
       };
 
       mockCoreConfigService.getEmailConfiguration.mockResolvedValue(mockConfig);
@@ -832,6 +841,7 @@ describe('EmailService', () => {
         smtpUseSsl: false,
         senderEmail: 'sender@example.com',
         senderName: 'Test Sender',
+        replyToEmail: null,
       };
 
       mockCoreConfigService.getEmailConfiguration.mockResolvedValue(mockConfig);
@@ -865,6 +875,7 @@ describe('EmailService', () => {
         smtpUseSsl: false,
         senderEmail: 'sender@example.com',
         senderName: 'Test Sender',
+        replyToEmail: null,
       };
 
       mockCoreConfigService.getEmailConfiguration.mockResolvedValue(mockConfig);
@@ -899,6 +910,7 @@ describe('EmailService', () => {
         smtpUseSsl: false,
         senderEmail: 'sender@example.com',
         senderName: 'Test Sender',
+        replyToEmail: null,
       };
 
       mockCoreConfigService.getEmailConfiguration.mockResolvedValue(mockConfig);
@@ -933,6 +945,7 @@ describe('EmailService', () => {
         smtpUseSsl: false,
         senderEmail: 'sender@example.com',
         senderName: 'Test Sender',
+        replyToEmail: null,
       };
 
       mockCoreConfigService.getEmailConfiguration.mockResolvedValue(mockConfig);
@@ -965,6 +978,7 @@ describe('EmailService', () => {
         smtpUseSsl: true,
         senderEmail: 'old-sender@example.com',
         senderName: 'Old Sender',
+        replyToEmail: null,
       };
 
       const mockConfigOverride = {
@@ -976,6 +990,7 @@ describe('EmailService', () => {
         smtpUseSsl: false,
         senderEmail: 'new-sender@example.com',
         senderName: 'New Sender',
+        replyToEmail: null,
       };
 
       mockCoreConfigService.getEmailConfiguration.mockResolvedValue(mockDbConfig);
@@ -1020,6 +1035,7 @@ describe('EmailService', () => {
         smtpUseSsl: true,
         senderEmail: 'old-sender@example.com',
         senderName: 'Old Sender',
+        replyToEmail: null,
       };
 
       const mockConfigOverride = {
@@ -1030,6 +1046,7 @@ describe('EmailService', () => {
         smtpUseSsl: false,
         senderEmail: 'form-sender@example.com',
         senderName: 'Form Sender',
+        replyToEmail: null,
         // Note: smtpPassword is not provided, should fallback to database value
       };
 
@@ -1075,6 +1092,7 @@ describe('EmailService', () => {
         smtpUseSsl: true,
         senderEmail: 'db-sender@example.com',
         senderName: 'DB Sender',
+        replyToEmail: null,
       };
 
       // Form data with empty strings (simulating frontend form submission)

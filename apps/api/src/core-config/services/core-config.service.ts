@@ -50,6 +50,7 @@ export class CoreConfigService {
       smtpUseSsl: config.smtpSecure,
       senderEmail: config.senderEmail,
       senderName: config.senderName,
+      replyToEmail: config.replyToEmail,
       emailEnabled: config.emailEnabled,
       timeZone: config.timeZone,
       createdAt: config.createdAt,
@@ -328,6 +329,7 @@ export class CoreConfigService {
     smtpUseSsl: boolean;
     senderEmail: string | null;
     senderName: string | null;
+    replyToEmail: string | null;
   }> {
     try {
       const config = await this.findCurrent();
@@ -341,6 +343,7 @@ export class CoreConfigService {
         smtpUseSsl: config.smtpUseSsl,
         senderEmail: config.senderEmail,
         senderName: config.senderName,
+        replyToEmail: config.replyToEmail,
       };
     } catch {
       this.logger.warn('Failed to retrieve email configuration, returning disabled state');
@@ -355,6 +358,7 @@ export class CoreConfigService {
         smtpUseSsl: false,
         senderEmail: null,
         senderName: null,
+        replyToEmail: null,
       };
     }
   }

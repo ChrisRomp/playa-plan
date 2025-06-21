@@ -94,6 +94,7 @@ const AdminConfigPage: React.FC = () => {
     smtpUseSsl: false,
     senderEmail: '',
     senderName: '',
+    replyToEmail: '',
     timeZone: 'UTC'
   });
 
@@ -141,6 +142,7 @@ const AdminConfigPage: React.FC = () => {
             smtpUseSsl: response.data.smtpUseSsl || false,
             senderEmail: response.data.senderEmail || '',
             senderName: response.data.senderName || '',
+            replyToEmail: response.data.replyToEmail || '',
             timeZone: response.data.timeZone || 'UTC'
           });
         }
@@ -201,6 +203,10 @@ const AdminConfigPage: React.FC = () => {
     // Email validation
     if (formData.senderEmail && !isValidEmail(formData.senderEmail)) {
       errors.push('Sender Email must be a valid email address');
+    }
+    
+    if (formData.replyToEmail && !isValidEmail(formData.replyToEmail)) {
+      errors.push('Reply-To Email must be a valid email address');
     }
     
     // Email configuration validation when email is enabled
@@ -349,6 +355,7 @@ const AdminConfigPage: React.FC = () => {
         smtpUseSsl: formData.smtpUseSsl,
         senderEmail: formData.senderEmail,
         senderName: formData.senderName,
+        replyToEmail: formData.replyToEmail,
       };
       
       const response = await api.post('/notifications/email/test-connection', testConfig);
@@ -433,6 +440,7 @@ const AdminConfigPage: React.FC = () => {
       smtpUseSsl: formData.smtpUseSsl,
       senderEmail: formData.senderEmail.trim(),
       senderName: formData.senderName,
+      replyToEmail: formData.replyToEmail.trim(),
       timeZone: formData.timeZone
     };
     
@@ -1044,6 +1052,31 @@ const AdminConfigPage: React.FC = () => {
                     disabled={!formData.emailEnabled}
                     className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
                   />
+                </div>
+                
+                <div className="mb-4">
+                  <label htmlFor="replyToEmail" className="block text-gray-700 font-medium mb-2">
+                    Reply-To Email (Optional)
+                  </label>
+                  <input
+                    type="email"
+                    id="replyToEmail"
+                    name="replyToEmail"
+                    value={formData.replyToEmail}
+                    onChange={handleInputChange}
+                    disabled={!formData.emailEnabled}
+                    className={`w-full px-3 py-2 border ${
+                      formData.replyToEmail && !isValidEmail(formData.replyToEmail)
+                        ? 'border-red-500'
+                        : 'border-gray-300'
+                    } rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed`}
+                  />
+                  {formData.replyToEmail && !isValidEmail(formData.replyToEmail) && (
+                    <p className="text-red-500 text-sm mt-1">Please enter a valid email address</p>
+                  )}
+                  <p className="text-sm text-gray-500 mt-1">
+                    When specified, recipients will reply to this address instead of the sender email.
+                  </p>
                 </div>
               </div>
             </div>

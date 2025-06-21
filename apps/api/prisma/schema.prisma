@@ -284,6 +284,7 @@ model CoreConfig {
   smtpSecure               Boolean    @default(false)
   senderEmail              String?
   senderName               String?
+  replyToEmail             String?
   emailEnabled             Boolean    @default(false)
   timeZone                 String     @default("UTC")
   createdAt                DateTime   @default(now())
