@@ -142,7 +142,7 @@ const AdminConfigPage: React.FC = () => {
             smtpUseSsl: response.data.smtpUseSsl || false,
             senderEmail: response.data.senderEmail || '',
             senderName: response.data.senderName || '',
-            replyTo: response.data.replyToEmail || '',
+            replyTo: response.data.replyTo || '',
             timeZone: response.data.timeZone || 'UTC'
           });
         }
@@ -440,7 +440,7 @@ const AdminConfigPage: React.FC = () => {
       smtpUseSsl: formData.smtpUseSsl,
       senderEmail: formData.senderEmail.trim(),
       senderName: formData.senderName,
-      replyTo: formData.replyTo.trim(),
+      replyTo: formData.replyTo.trim() || null,
       timeZone: formData.timeZone
     };
     
