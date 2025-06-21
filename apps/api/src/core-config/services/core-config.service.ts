@@ -50,6 +50,7 @@ export class CoreConfigService {
       smtpUseSsl: config.smtpSecure,
       senderEmail: config.senderEmail,
       senderName: config.senderName,
+      replyTo: config.replyToEmail,
       emailEnabled: config.emailEnabled,
       timeZone: config.timeZone,
       createdAt: config.createdAt,
@@ -99,6 +100,7 @@ export class CoreConfigService {
           smtpSecure: createCoreConfigDto.smtpUseSsl ?? false,
           senderEmail: createCoreConfigDto.senderEmail ?? null,
           senderName: createCoreConfigDto.senderName ?? null,
+          replyToEmail: createCoreConfigDto.replyTo ?? null,
           emailEnabled: createCoreConfigDto.emailEnabled ?? false,
           timeZone: createCoreConfigDto.timeZone ?? 'UTC',
         },
@@ -167,6 +169,7 @@ export class CoreConfigService {
       smtpUseSsl: false,
       senderEmail: null,
       senderName: null,
+      replyTo: null,
       emailEnabled: false,
       timeZone: 'UTC',
       createdAt: new Date(),
@@ -256,6 +259,7 @@ export class CoreConfigService {
       if (updateCoreConfigDto.smtpUseSsl !== undefined) data.smtpSecure = updateCoreConfigDto.smtpUseSsl;
       if (updateCoreConfigDto.senderEmail !== undefined) data.senderEmail = updateCoreConfigDto.senderEmail;
       if (updateCoreConfigDto.senderName !== undefined) data.senderName = updateCoreConfigDto.senderName;
+      if (updateCoreConfigDto.replyTo !== undefined) data.replyToEmail = updateCoreConfigDto.replyTo;
       if (updateCoreConfigDto.emailEnabled !== undefined) data.emailEnabled = updateCoreConfigDto.emailEnabled;
       if (updateCoreConfigDto.timeZone !== undefined) data.timeZone = updateCoreConfigDto.timeZone;
 
@@ -328,6 +332,7 @@ export class CoreConfigService {
     smtpUseSsl: boolean;
     senderEmail: string | null;
     senderName: string | null;
+    replyToEmail: string | null;
   }> {
     try {
       const config = await this.findCurrent();
@@ -341,6 +346,7 @@ export class CoreConfigService {
         smtpUseSsl: config.smtpUseSsl,
         senderEmail: config.senderEmail,
         senderName: config.senderName,
+        replyToEmail: config.replyTo,
       };
     } catch {
       this.logger.warn('Failed to retrieve email configuration, returning disabled state');
@@ -355,6 +361,7 @@ export class CoreConfigService {
         smtpUseSsl: false,
         senderEmail: null,
         senderName: null,
+        replyToEmail: null,
       };
     }
   }

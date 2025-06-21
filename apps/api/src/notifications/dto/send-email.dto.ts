@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsEmail, IsNotEmpty, IsOptional, IsString, ArrayMinSize, ValidateNested, IsArray, IsIn, IsBoolean, IsEnum, IsNumber, Min, Max } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Type, Transform } from 'class-transformer';
 import { NotificationType } from '@prisma/client';
 
 export class AttachmentDto {
@@ -197,6 +197,7 @@ export class TestSmtpConnectionDto {
   })
   @IsOptional()
   @IsEmail()
+  @Transform(({ value }: { value: string }) => value === '' ? undefined : value)
   senderEmail?: string;
 
   @ApiPropertyOptional({ 
@@ -206,4 +207,13 @@ export class TestSmtpConnectionDto {
   @IsOptional()
   @IsString()
   senderName?: string;
+
+  @ApiPropertyOptional({ 
+    description: 'Reply-to email address',
+    example: 'admin@example.com' 
+  })
+  @IsOptional()
+  @IsEmail()
+  @Transform(({ value }: { value: string }) => value === '' ? undefined : value)
+  replyTo?: string;
 }

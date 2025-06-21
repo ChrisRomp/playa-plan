@@ -260,6 +260,16 @@ export class CoreConfig {
   senderName!: string | null;
 
   /**
+   * Reply-to email address
+   */
+  @ApiProperty({
+    description: 'Reply-to email address',
+    example: 'replies@example.playaplan.app',
+    required: false
+  })
+  replyTo!: string | null;
+
+  /**
    * Whether email sending is enabled globally
    */
   @ApiProperty({

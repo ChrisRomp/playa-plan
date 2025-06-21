@@ -33,6 +33,7 @@ interface EmailConfiguration {
   smtpUseSsl: boolean;
   senderEmail: string | null;
   senderName: string | null;
+  replyToEmail: string | null;
 }
 
 /**
@@ -107,6 +108,7 @@ export class EmailService implements OnModuleInit {
         smtpUseSsl: false,
         senderEmail: null,
         senderName: null,
+        replyToEmail: null,
       };
       
       this.configCache = fallbackConfig;
@@ -136,6 +138,10 @@ export class EmailService implements OnModuleInit {
           user: config.smtpUsername,
           pass: config.smtpPassword,
         },
+        // Add connection timeout settings to prevent hanging
+        connectionTimeout: 10000, // 10 seconds
+        greetingTimeout: 5000,   // 5 seconds
+        socketTimeout: 30000,    // 30 seconds
       });
 
       this.logger.log(`SMTP email service initialized for ${config.smtpHost}:${config.smtpPort || 587}`);
@@ -262,15 +268,19 @@ export class EmailService implements OnModuleInit {
         : 'noreply@example.com';
       const emailFrom = from || defaultFrom;
       
+      // Determine reply-to address
+      const defaultReplyTo = config.replyToEmail || emailFrom;
+      const emailReplyTo = replyTo || defaultReplyTo;
+      
       // Enhanced debug mode: Show all email parameters that will be sent
       if (isDebugMode) {
-        console.log('\n====== DEBUG: EMAIL PARAMETERS ======');
+        this.logger.debug('====== DEBUG: EMAIL PARAMETERS ======');
         console.log(`From: ${emailFrom}`);
         console.log(`To: ${Array.isArray(to) ? to.join(', ') : to}`);
         if (ccEmails && ccEmails.length > 0) console.log(`CC: ${ccEmails.join(', ')}`);
         if (bccEmails && bccEmails.length > 0) console.log(`BCC: ${bccEmails.join(', ')}`);
         console.log(`Subject: ${subject}`);
-        console.log(`Reply-To: ${replyTo || emailFrom}`);
+        console.log(`Reply-To: ${emailReplyTo}`);
         console.log('\n--- SMTP Configuration ---');
         console.log(`Host: ${config.smtpHost}`);
         console.log(`Port: ${config.smtpPort}`);
@@ -278,6 +288,7 @@ export class EmailService implements OnModuleInit {
         console.log(`Secure: ${config.smtpUseSsl}`);
         console.log(`Sender Email Config: ${config.senderEmail}`);
         console.log(`Sender Name Config: ${config.senderName}`);
+        console.log(`Reply-To Email Config: ${config.replyToEmail}`);
         console.log('=============================================\n');
       }
       
@@ -288,7 +299,7 @@ export class EmailService implements OnModuleInit {
         subject,
         text: text || '',
         html,
-        replyTo: replyTo || emailFrom,
+        replyTo: emailReplyTo,
         attachments,
         cc: ccEmails,
         bcc: bccEmails,
@@ -339,7 +350,7 @@ export class EmailService implements OnModuleInit {
   }
 
   /**
-   * Send email via SMTP
+   * Send email via SMTP with timeout protection
    */
   private async sendViaSmtp(mailOptions: nodemailer.SendMailOptions): Promise<boolean> {
     try {
@@ -348,7 +359,17 @@ export class EmailService implements OnModuleInit {
         return false;
       }
       
-      await this.transporter.sendMail(mailOptions);
+      // Create a timeout promise to prevent hanging
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('Email send timeout after 30 seconds')), 30000);
+      });
+      
+      // Race between sending email and timeout
+      await Promise.race([
+        this.transporter.sendMail(mailOptions),
+        timeoutPromise
+      ]);
+      
       this.logger.log(`Email sent via SMTP to ${Array.isArray(mailOptions.to) ? mailOptions.to.join(', ') : mailOptions.to}`);
       return true;
     } catch (error: unknown) {
@@ -409,6 +430,9 @@ export class EmailService implements OnModuleInit {
           case 'senderName':
             result.senderName = value as string;
             break;
+          case 'replyToEmail':
+            result.replyToEmail = value as string;
+            break;
         }
       }
     });
@@ -465,8 +489,15 @@ export class EmailService implements OnModuleInit {
         socketTimeout: 10000,     // 10 seconds
       });
 
-      // Test the connection
-      await testTransporter.verify();
+      // Test the connection with timeout protection
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('SMTP connection test timeout after 15 seconds')), 15000);
+      });
+      
+      await Promise.race([
+        testTransporter.verify(),
+        timeoutPromise
+      ]);
       
       return {
         success: true,

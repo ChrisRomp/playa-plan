@@ -11,7 +11,7 @@ import {
   Length, 
   IsInt
 } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Type, Transform } from 'class-transformer';
 import { IsUrlOrRelativePath } from '../validators/is-url-or-relative-path.validator';
 
 /**
@@ -334,8 +334,9 @@ export class UpdateCoreConfigDto {
     example: 'no-reply@example.playaplan.app',
     required: false
   })
-  @IsEmail()
   @IsOptional()
+  @IsEmail()
+  @Transform(({ value }: { value: string }) => value === '' ? undefined : value)
   senderEmail?: string;
 
   /**
@@ -349,6 +350,19 @@ export class UpdateCoreConfigDto {
   @IsString()
   @IsOptional()
   senderName?: string;
+
+  /**
+   * Reply-to email address
+   */
+  @ApiProperty({
+    description: 'Reply-to email address',
+    example: 'replies@example.playaplan.app',
+    required: false
+  })
+  @IsOptional()
+  @IsEmail()
+  @Transform(({ value }: { value: string }) => value === '' ? undefined : value)
+  replyTo?: string;
 
   /**
    * Whether email sending is enabled globally
