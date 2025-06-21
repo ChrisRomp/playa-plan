@@ -1020,4 +1020,104 @@ describe('Test Email Functionality', () => {
       expect(responseElements.length).toBeGreaterThan(0);
     });
   });
+
+  describe('ReplyTo Field Functionality', () => {
+    it('should load replyTo field from API response', async () => {
+      // Mock API response with replyTo field
+      const mockConfigData = {
+        ...mockConfig,
+        emailEnabled: true,
+        replyTo: 'noreply@example.com'
+      };
+      
+      mockApiGet.mockResolvedValueOnce({ data: mockConfigData });
+      
+      renderWithProviders(<AdminConfigPage />);
+      
+      // Wait for the component to load
+      await waitFor(() => {
+        expect(mockApiGet).toHaveBeenCalledWith('/core-config/current');
+      });
+      
+      // Check that the replyTo field is populated
+      const replyToInput = screen.getByDisplayValue('noreply@example.com') as HTMLInputElement;
+      expect(replyToInput).toBeInTheDocument();
+      expect(replyToInput.name).toBe('replyTo');
+    });
+
+    it('should send null when replyTo field is cleared', async () => {
+      // Mock API response with replyTo field set and required email fields
+      const mockConfigData = {
+        ...mockConfig,
+        emailEnabled: true,
+        smtpHost: 'smtp.example.com',
+        senderEmail: 'test@example.com',
+        senderName: 'Test Sender',
+        replyTo: 'noreply@example.com'
+      };
+      
+      mockApiGet.mockResolvedValueOnce({ data: mockConfigData });
+      mockApiPatch.mockResolvedValueOnce({ data: { ...mockConfigData, replyTo: null } });
+      
+      renderWithProviders(<AdminConfigPage />);
+      
+      // Wait for the component to load
+      await waitFor(() => {
+        expect(mockApiGet).toHaveBeenCalledWith('/core-config/current');
+      });
+      
+      // Clear the replyTo field
+      const replyToInput = screen.getByDisplayValue('noreply@example.com') as HTMLInputElement;
+      fireEvent.change(replyToInput, { target: { value: '' } });
+      
+      // Submit the form
+      const submitButton = screen.getByRole('button', { name: /save configuration/i });
+      fireEvent.click(submitButton);
+      
+      // Wait for API call and verify null is sent for empty replyTo
+      await waitFor(() => {
+        expect(mockApiPatch).toHaveBeenCalledWith(
+          '/core-config/current',
+          expect.objectContaining({
+            replyTo: null
+          })
+        );
+      });
+    });
+
+    it('should handle replyTo field with whitespace correctly', async () => {
+      // Mock API response with email disabled to avoid validation errors
+      const mockConfigData = {
+        ...mockConfig,
+        emailEnabled: false
+      };
+      
+      mockApiGet.mockResolvedValueOnce({ data: mockConfigData });
+      mockApiPatch.mockResolvedValueOnce({ data: mockConfigData });
+      
+      renderWithProviders(<AdminConfigPage />);
+      
+      await waitFor(() => {
+        expect(mockApiGet).toHaveBeenCalledWith('/core-config/current');
+      });
+      
+      // Set replyTo field with whitespace
+      const replyToInput = screen.getByRole('textbox', { name: /reply-to email/i }) as HTMLInputElement;
+      fireEvent.change(replyToInput, { target: { value: '   ' } });
+      
+      // Submit the form
+      const submitButton = screen.getByRole('button', { name: /save configuration/i });
+      fireEvent.click(submitButton);
+      
+      // Wait for API call and verify whitespace is converted to null
+      await waitFor(() => {
+        expect(mockApiPatch).toHaveBeenCalledWith(
+          '/core-config/current',
+          expect.objectContaining({
+            replyTo: null
+          })
+        );
+      });
+    });
+  });
 });
