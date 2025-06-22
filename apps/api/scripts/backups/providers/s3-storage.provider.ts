@@ -1,7 +1,8 @@
+import * as fs from 'fs';
 import { S3Client, PutObjectCommand, ListObjectsV2Command, DeleteObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
-import { StorageProvider } from './storage.provider';
-import { BackupConfig } from '../config/backup-config';
-import { BackupResult, BackupFileMetadata } from '../types/backup.types';
+import { StorageProvider, BackupFileMetadata } from '../storage-provider.interface';
+import { BackupConfig } from '../backup-config';
+import { BackupResult } from '../backup-service';
 import { generateObjectKey, getBackupTypeFromFileName } from '../utils/storage-utils';
 
 /**
@@ -45,8 +46,8 @@ export class S3StorageProvider implements StorageProvider {
       const fileName = backupResult.fileName;
       const key = generateObjectKey(fileName, this.config.storage.s3?.prefix || '');
 
-      // Read file as buffer
-      const fileContent = await Bun.file(backupResult.filePath).arrayBuffer();
+      // Read file content
+      const fileContent = fs.readFileSync(backupResult.filePath);
       
       // Upload file to S3
       await this.s3Client.send(
@@ -56,8 +57,7 @@ export class S3StorageProvider implements StorageProvider {
           Body: fileContent,
           ContentType: 'application/octet-stream',
           Metadata: {
-            'backup-type': backupResult.type,
-            'database-name': backupResult.databaseName,
+            'backup-type': backupResult.backupType,
             'backup-date': backupResult.timestamp.toISOString(),
           },
         })
@@ -66,8 +66,7 @@ export class S3StorageProvider implements StorageProvider {
       // Update backup result with remote storage info
       return {
         ...backupResult,
-        storagePath: `s3://${bucketName}/${key}`,
-        storageProvider: 's3',
+        message: `Successfully uploaded to S3: s3://${bucketName}/${key}`,
       };
     } catch (error) {
       const err = error as Error;
@@ -115,11 +114,14 @@ export class S3StorageProvider implements StorageProvider {
         
         return {
           fileName,
-          fullPath: `s3://${bucketName}/${object.Key}`,
-          size: object.Size || 0,
+          filePath: object.Key,
+          fileSize: object.Size || 0,
           lastModified: object.LastModified || new Date(),
-          type: backupType,
-          storageProvider: 's3',
+          backupType,
+          metadata: {
+            bucket: bucketName,
+            etag: object.ETag,
+          },
         };
       });
     } catch (error) {
@@ -177,7 +179,7 @@ export class S3StorageProvider implements StorageProvider {
       );
       
       return true;
-    } catch (error) {
+    } catch {
       // Object doesn't exist or other error
       return false;
     }

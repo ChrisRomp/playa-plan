@@ -49,7 +49,7 @@ export class AzureStorageProvider implements StorageProvider {
       
       // Upload file to Azure Blob Storage
       const fileStream = fs.createReadStream(filePath);
-      const uploadResponse = await blockBlobClient.uploadStream(fileStream, undefined, undefined, {
+      await blockBlobClient.uploadStream(fileStream, undefined, undefined, {
         blobHTTPHeaders: {
           blobContentType: 'application/octet-stream',
         },
