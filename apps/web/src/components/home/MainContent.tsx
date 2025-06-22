@@ -1,5 +1,5 @@
 import { useAuth } from '../../store/authUtils';
-import { useConfig } from '../../store/ConfigContext';
+import { useConfig } from '../../hooks/useConfig';
 import { useProfile } from '../../hooks/useProfile';
 import LoginFormReset from '../auth/LoginFormReset';
 import UserDashboard from './UserDashboard';

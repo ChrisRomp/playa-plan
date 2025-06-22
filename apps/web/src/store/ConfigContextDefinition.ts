@@ -4,7 +4,7 @@
  * This file contains only the context definition and hook, separating it from
  * the provider component to ensure React Fast Refresh works correctly.
  */
-import { createContext, useContext } from 'react';
+import { createContext } from 'react';
 import { CampConfig } from '../types';
 
 // Define the shape of the context
@@ -30,6 +30,3 @@ export const ConfigContext = createContext<ConfigContextType>({
   isConnected: false,
   connectionError: null,
 });
-
-// Hook for component access to the config context
-export const useConfig = () => useContext(ConfigContext);

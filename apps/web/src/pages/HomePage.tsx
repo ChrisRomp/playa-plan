@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { useConfig } from '../store/ConfigContext';
+import { useConfig } from '../hooks/useConfig';
 import { useAuth } from '../store/authUtils';
 import { PATHS } from '../routes';
 import { ConnectionStatus } from '../components/common/ConnectionStatus';

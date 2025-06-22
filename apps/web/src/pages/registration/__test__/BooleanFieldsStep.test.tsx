@@ -7,7 +7,7 @@ import * as useRegistrationModule from '../../../hooks/useRegistration';
 import * as useCampingOptionsModule from '../../../hooks/useCampingOptions';
 import * as useProfileModule from '../../../hooks/useProfile';
 import * as useCampRegistrationModule from '../../../hooks/useCampRegistration';
-import * as useConfigModule from '../../../store/ConfigContext';
+import * as useConfigModule from '../../../hooks/useConfig';
 
 // Mock modules
 vi.mock('../../../hooks/useRegistration');
@@ -170,6 +170,9 @@ describe('Boolean Fields Step', () => {
       isLoading: false,
       error: null,
       refreshConfig: vi.fn(),
+      isConnecting: false,
+      isConnected: true,
+      connectionError: null,
     });
   });
 
@@ -191,7 +194,10 @@ describe('Boolean Fields Step', () => {
             logout: vi.fn(), 
             isLoading: false, 
             error: null, 
-            isAuthenticated 
+            isAuthenticated,
+            isConnecting: false,
+            isConnected: true,
+            connectionError: null,
           }}
         >
           <RegistrationPage />

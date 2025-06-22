@@ -4,7 +4,7 @@ import { useRegistration, RegistrationFormData } from '../../hooks/useRegistrati
 import { useCampingOptions } from '../../hooks/useCampingOptions';
 import { useProfile } from '../../hooks/useProfile';
 import { useCampRegistration } from '../../hooks/useCampRegistration';
-import { useConfig } from '../../store/ConfigContext';
+import { useConfig } from '../../hooks/useConfig';
 import { AuthContext } from '../../store/authUtils';
 import { JobCategory, Job, CampingOptionField } from '../../lib/api';
 import { getFriendlyDayName, formatTime } from '../../utils/shiftUtils';

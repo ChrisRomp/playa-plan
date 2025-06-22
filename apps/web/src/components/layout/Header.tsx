@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Menu, X } from 'lucide-react';
-import { useConfig } from '../../store/ConfigContext';
+import { useConfig } from '../../hooks/useConfig';
 import { PATHS } from '../../routes';
 import Navigation from './Navigation';
 

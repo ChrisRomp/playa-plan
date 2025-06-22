@@ -22,7 +22,7 @@ vi.mock('../../hooks/useCampRegistration', () => ({
   useCampRegistration: vi.fn(),
 }));
 
-vi.mock('../../store/ConfigContextDefinition', () => ({
+vi.mock('../../hooks/useConfig', () => ({
   useConfig: vi.fn(),
 }));
 
@@ -43,7 +43,7 @@ import { useAuth } from '../../store/authUtils';
 import { useProfile } from '../../hooks/useProfile';
 import { useUserRegistrations } from '../../hooks/useUserRegistrations';
 import { useCampRegistration } from '../../hooks/useCampRegistration';
-import { useConfig } from '../../store/ConfigContextDefinition';
+import { useConfig } from '../../hooks/useConfig';
 
 const mockUseAuth = vi.mocked(useAuth);
 const mockUseProfile = vi.mocked(useProfile);

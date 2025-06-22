@@ -1,4 +1,4 @@
-import { useConfig } from '../../store/ConfigContext';
+import { useConfig } from '../../hooks/useConfig';
 
 const Footer: React.FC = () => {
   const { config } = useConfig();
