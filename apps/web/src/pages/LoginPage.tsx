@@ -1,7 +1,7 @@
 import { useEffect, lazy, Suspense } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../store/authUtils';
-import { useConfig } from '../store/ConfigContext';
+import { useConfig } from '../hooks/useConfig';
 import { PATHS } from '../routes';
 import { ConnectionStatus } from '../components/common/ConnectionStatus';
 

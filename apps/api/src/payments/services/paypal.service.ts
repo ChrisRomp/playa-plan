@@ -2,6 +2,37 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { CreatePaypalPaymentDto } from '../dto';
 
+interface PayPalRefundData {
+  amount?: {
+    value: string;
+    currency_code: string;
+  };
+  note_to_payer?: string;
+}
+
+interface PayPalRefundResponse {
+  id: string;
+  status: string;
+  amount?: {
+    currency_code: string;
+    value: string;
+  };
+}
+
+interface PayPalOrderDetails {
+  id: string;
+  status: string;
+  intent: string;
+  purchase_units: PayPalPurchaseUnit[];
+  create_time: string;
+  update_time: string;
+  links: Array<{
+    href: string;
+    rel: string;
+    method: string;
+  }>;
+}
+
 /**
  * PayPal API response types
  */
@@ -26,11 +57,49 @@ interface PayPalOrderResponse {
   }>;
 }
 
+interface PayPalPaymentSource {
+  paypal?: {
+    account_id?: string;
+    account_status?: string;
+    email_address?: string;
+    phone_number?: {
+      country_code?: string;
+      national_number?: string;
+    };
+    name?: {
+      given_name?: string;
+      surname?: string;
+    };
+  };
+}
+
+interface PayPalPurchaseUnit {
+  reference_id?: string;
+  amount: {
+    currency_code: string;
+    value: string;
+  };
+  payee?: {
+    email_address?: string;
+    merchant_id?: string;
+  };
+  payments?: {
+    captures?: Array<{
+      id: string;
+      status: string;
+      amount: {
+        currency_code: string;
+        value: string;
+      };
+    }>;
+  };
+}
+
 interface PayPalCaptureResponse {
   id: string;
   status: string;
-  payment_source: Record<string, any>;
-  purchase_units: Array<Record<string, any>>;
+  payment_source: PayPalPaymentSource;
+  purchase_units: PayPalPurchaseUnit[];
 }
 
 /**
@@ -81,8 +150,10 @@ export class PaypalService {
       
       const data = await response.json() as PayPalTokenResponse;
       return data.access_token;
-    } catch (error: any) {
-      this.logger.error(`Failed to get PayPal access token: ${error.message}`, error.stack);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      this.logger.error(`Failed to get PayPal access token: ${errorMessage}`, errorStack);
       throw error;
     }
   }
@@ -92,7 +163,7 @@ export class PaypalService {
    * @param paymentData - The payment data
    * @returns Order details including approval URL
    */
-  async createOrder(paymentData: CreatePaypalPaymentDto): Promise<any> {
+  async createOrder(paymentData: CreatePaypalPaymentDto): Promise<PayPalOrderResponse> {
     try {
       this.logger.log(`Creating PayPal order for user ${paymentData.userId} for amount ${paymentData.amount}`);
       
@@ -137,8 +208,10 @@ export class PaypalService {
       this.logger.log(`Created PayPal order ${order.id}`);
       
       return order;
-    } catch (error: any) {
-      this.logger.error(`Failed to create PayPal order: ${error.message}`, error.stack);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      this.logger.error(`Failed to create PayPal order: ${errorMessage}`, errorStack);
       throw error;
     }
   }
@@ -148,7 +221,7 @@ export class PaypalService {
    * @param orderId - The PayPal order ID
    * @returns Capture details
    */
-  async capturePayment(orderId: string): Promise<any> {
+  async capturePayment(orderId: string): Promise<PayPalCaptureResponse> {
     try {
       this.logger.log(`Capturing payment for PayPal order ${orderId}`);
       
@@ -171,8 +244,10 @@ export class PaypalService {
       this.logger.log(`Captured payment for order ${orderId}, status: ${captureData.status}`);
       
       return captureData;
-    } catch (error: any) {
-      this.logger.error(`Failed to capture PayPal payment: ${error.message}`, error.stack);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      this.logger.error(`Failed to capture PayPal payment: ${errorMessage}`, errorStack);
       throw error;
     }
   }
@@ -182,7 +257,7 @@ export class PaypalService {
    * @param orderId - The PayPal order ID
    * @returns Order details
    */
-  async getOrderDetails(orderId: string): Promise<any> {
+  async getOrderDetails(orderId: string): Promise<PayPalOrderDetails> {
     try {
       const accessToken = await this.getAccessToken();
       
@@ -199,9 +274,11 @@ export class PaypalService {
         throw new Error(`PayPal order details error: ${JSON.stringify(errorData)}`);
       }
       
-      return response.json();
-    } catch (error: any) {
-      this.logger.error(`Failed to get PayPal order details: ${error.message}`, error.stack);
+      return response.json() as Promise<PayPalOrderDetails>;
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      this.logger.error(`Failed to get PayPal order details: ${errorMessage}`, errorStack);
       throw error;
     }
   }
@@ -213,13 +290,13 @@ export class PaypalService {
    * @param note - Optional note about the refund
    * @returns Refund details
    */
-  async createRefund(captureId: string, amount?: number, note?: string): Promise<any> {
+  async createRefund(captureId: string, amount?: number, note?: string): Promise<PayPalRefundResponse> {
     try {
       this.logger.log(`Creating refund for PayPal capture ${captureId}`);
       
       const accessToken = await this.getAccessToken();
       
-      const refundData: any = {};
+      const refundData: PayPalRefundData = {};
       
       if (amount) {
         refundData.amount = {
@@ -246,12 +323,14 @@ export class PaypalService {
         throw new Error(`PayPal refund error: ${JSON.stringify(errorData)}`);
       }
       
-      const refundDetails = await response.json() as { id: string; status: string };
+      const refundDetails = await response.json() as PayPalRefundResponse;
       this.logger.log(`Created refund for capture ${captureId}, status: ${refundDetails.status}`);
       
       return refundDetails;
-    } catch (error: any) {
-      this.logger.error(`Failed to process PayPal refund: ${error.message}`, error.stack);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      this.logger.error(`Failed to process PayPal refund: ${errorMessage}`, errorStack);
       throw error;
     }
   }

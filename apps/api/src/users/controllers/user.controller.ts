@@ -7,13 +7,10 @@ import {
   Delete,
   UseGuards,
   Put,
-  UnauthorizedException,
   UseInterceptors,
   ClassSerializerInterceptor,
   HttpCode,
   HttpStatus,
-  ParseUUIDPipe,
-  BadRequestException,
   NotFoundException,
   ForbiddenException,
   Request,
@@ -26,7 +23,6 @@ import { RolesGuard } from '../guards/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
 import { UserRole } from '@prisma/client';
 import { SelfOrAdminGuard } from '../guards/self-or-admin.guard';
-import { UserTransformInterceptor } from '../interceptors/user-transform.interceptor';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { User } from '../entities/user.entity';
 
@@ -67,7 +63,7 @@ export class UserController {
     isArray: true
   })
   @ApiResponse({ status: 403, description: 'Forbidden - Insufficient privileges' })
-  async findAll(@Request() req: AuthRequest): Promise<User[]> {
+  async findAll(): Promise<User[]> {
     const users = await this.userService.findAll();
     return users.map(user => new User(user));
   }

@@ -1,10 +1,16 @@
-import * as fs from 'fs';
 import * as path from 'path';
 import { Storage, GetFilesOptions } from '@google-cloud/storage';
 import { BackupConfig } from '../backup-config';
 import { StorageProvider, BackupFileMetadata } from '../storage-provider.interface';
 import { BackupResult } from '../backup-service';
 import { generateObjectKey, getBackupTypeFromFileName } from '../utils/storage-utils';
+
+/**
+ * Configuration options for Google Cloud Storage client
+ */
+interface StorageOptions {
+  keyFilename?: string;
+}
 
 /**
  * Google Cloud Storage provider for database backups
@@ -25,7 +31,7 @@ export class GCSStorageProvider implements StorageProvider {
     const { bucket, keyFilePath } = config.storage.gcs;
     
     // Initialize GCS client
-    const options: Record<string, any> = {};
+    const options: StorageOptions = {};
     if (keyFilePath) {
       options.keyFilename = keyFilePath;
     }
@@ -45,7 +51,7 @@ export class GCSStorageProvider implements StorageProvider {
       const objectName = this.getObjectName(fileName);
       
       // Upload file to GCS
-      const [file] = await this.storage.bucket(this.bucketName).upload(filePath, {
+      await this.storage.bucket(this.bucketName).upload(filePath, {
         destination: objectName,
         metadata: {
           contentType: 'application/octet-stream',

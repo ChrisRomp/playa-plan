@@ -1,6 +1,6 @@
 import { useState, useContext } from 'react';
 import { redirectToStripeCheckout } from '../lib/stripe';
-import { useConfig } from '../store/ConfigContext';
+import { useConfig } from './useConfig';
 import { AuthContext } from '../store/authUtils';
 import { StripePaymentRequest } from '../types';
 

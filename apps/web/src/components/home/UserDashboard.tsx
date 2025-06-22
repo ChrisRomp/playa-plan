@@ -1,6 +1,6 @@
 import React, { useContext } from 'react';
 import { AuthContext } from '../../store/authUtils';
-import { useConfig } from '../../store/ConfigContext';
+import { useConfig } from '../../hooks/useConfig';
 import { Tent, Calendar } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { isRegistrationAccessible, getRegistrationStatusMessage } from '../../utils/registrationUtils';

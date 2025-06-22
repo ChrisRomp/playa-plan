@@ -2,7 +2,6 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ShiftsService } from './shifts.service';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { NotFoundException } from '@nestjs/common';
-import { CreateShiftDto } from './dto';
 import { DayOfWeek } from '../common/enums/day-of-week.enum';
 
 describe('ShiftsService', () => {

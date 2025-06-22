@@ -260,10 +260,6 @@ describe('UsersController (e2e)', () => {
       it('should deny staff access to admin profiles', () => {
         // Arrange
         const staffToken = getAuthToken(mockStaff);
-        const mockUserWithResult = {
-          ...mockUser,
-          role: UserRole.ADMIN
-        };
         
         prismaMock.user.findUnique.mockImplementation(async (args: Prisma.UserFindUniqueArgs) => {
           if (args.where?.id === mockAdmin.id) {

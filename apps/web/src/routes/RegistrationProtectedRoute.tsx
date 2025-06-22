@@ -1,6 +1,6 @@
 import { Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from '../store/authUtils';
-import { useConfig } from '../store/ConfigContextDefinition';
+import { useConfig } from '../hooks/useConfig';
 import { isRegistrationAccessible } from '../utils/registrationUtils';
 import { PATHS } from './index';
 

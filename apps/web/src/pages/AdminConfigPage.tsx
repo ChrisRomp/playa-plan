@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useConfig } from '../store/ConfigContext';
+import { useConfig } from '../hooks/useConfig';
 import { api } from '../lib/api';
 import { useNavigate } from 'react-router-dom';
 import { PATHS } from '../routes';

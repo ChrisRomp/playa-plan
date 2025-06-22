@@ -5,12 +5,17 @@ import { ModuleMetadata } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 
 /**
+ * Type for provider overrides in testing modules
+ */
+type ProviderOverrides = Record<string, unknown>;
+
+/**
  * Creates a testing module with optional overrides.
  * Useful for creating test modules with mocked dependencies.
  */
 export async function createTestingModule(
   metadata: ModuleMetadata,
-  overrides: Record<string, any> = {}
+  overrides: ProviderOverrides = {}
 ): Promise<TestingModule> {
   const builder = Test.createTestingModule(metadata);
 
@@ -32,10 +37,40 @@ export function createMock<T>(mockProperties: Partial<T> = {}): jest.Mocked<T> {
 }
 
 /**
+ * Interface for Prisma model mock methods
+ */
+interface PrismaModelMock {
+  findUnique: jest.Mock;
+  findMany: jest.Mock;
+  findFirst: jest.Mock;
+  create: jest.Mock;
+  update: jest.Mock;
+  delete: jest.Mock;
+  count: jest.Mock;
+}
+
+/**
+ * Interface for the complete Prisma mock
+ */
+interface PrismaMock {
+  $connect: jest.Mock;
+  $disconnect: jest.Mock;
+  $transaction: jest.Mock;
+  user: PrismaModelMock;
+  camp: PrismaModelMock;
+  job: PrismaModelMock;
+  shift: PrismaModelMock;
+  registration: PrismaModelMock;
+  payment: PrismaModelMock;
+  notification: PrismaModelMock;
+  [key: string]: unknown;
+}
+
+/**
  * Creates a mock for PrismaService with specified method mocks
  * @param mockMethods - Methods to mock on the PrismaService
  */
-export function createPrismaMock(mockMethods: Record<string, any> = {}): any {
+export function createPrismaMock(mockMethods: Record<string, unknown> = {}): PrismaMock {
   // Create a base mock with common prisma structure
   const baseMock = {
     $connect: jest.fn().mockResolvedValue(undefined),

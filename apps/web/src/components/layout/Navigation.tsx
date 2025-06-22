@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../store/authUtils';
-import { useConfig } from '../../store/ConfigContextDefinition';
+import { useConfig } from '../../hooks/useConfig';
 import { LogOut, User, Tent, FileText, Settings } from 'lucide-react';
 import { PATHS } from '../../routes';
 import { isRegistrationAccessible } from '../../utils/registrationUtils';

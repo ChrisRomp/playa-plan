@@ -38,14 +38,28 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
 
   /**
    * Handle unauthorized requests
-   * @param err Error object
-   * @returns Never - throws an UnauthorizedException
+   * @param err Error object from authentication process
+   * @param user User object from successful authentication  
+   * @param _info Additional info from authentication strategy
+   * @param _context Execution context
+   * @param _status Optional status
+   * @returns User object if authentication succeeded
+   * @throws UnauthorizedException if authentication failed
    */
-  handleRequest(err: any, user: any): any {
+  handleRequest<TUser = unknown>(
+    err: unknown, 
+    user: unknown, 
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _info: unknown, 
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _context: ExecutionContext, 
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _status?: unknown
+  ): TUser {
     // You can throw a custom exception here based on either "err" or "user" params
     if (err || !user) {
       throw err || new UnauthorizedException('You are not authorized to access this resource');
     }
-    return user;
+    return user as TUser;
   }
 }

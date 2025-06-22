@@ -1,5 +1,5 @@
 import { HttpException, HttpStatus } from '@nestjs/common';
-import { GlobalExceptionFilter, ErrorResponse } from './http-exception.filter';
+import { GlobalExceptionFilter } from './http-exception.filter';
 import { Request, Response } from 'express';
 import { ArgumentsHost } from '@nestjs/common';
 

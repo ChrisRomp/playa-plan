@@ -89,10 +89,11 @@ export abstract class BackupService {
       }
 
       // Build pg_dump command with schema-only flag
-      const command = this.buildPgDumpCommand(localFilePath, true);
+      const { command, args } = this.buildPgDumpCommand(localFilePath, true);
+      const fullCommand = `${command} ${args.join(' ')}`;
       
       // Execute pg_dump
-      execSync(command, { stdio: 'inherit' });
+      execSync(fullCommand, { stdio: 'inherit' });
       
       // Get file size
       const stats = fs.statSync(localFilePath);
@@ -207,7 +208,7 @@ export abstract class BackupService {
    * @returns pg_dump command string
    */
   protected buildPgDumpCommand(outputFile: string, schemaOnly = false): { command: string, args: string[] } {
-    const { host, port, name, username, password, schema } = this.config.database;
+    const { host, port, name, username, schema } = this.config.database;
     const compression = this.config.storage.compression;
     
     const command = 'pg_dump';

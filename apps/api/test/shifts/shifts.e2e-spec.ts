@@ -11,7 +11,6 @@ describe('ShiftsController (e2e)', () => {
   let adminToken: string;
   let userToken: string;
   let campId: string;
-  let jobId: string;
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -71,7 +70,7 @@ describe('ShiftsController (e2e)', () => {
     const categoryId = createCategoryResponse.body.id;
 
     // Create a test job
-    const createJobResponse = await supertest(app.getHttpServer())
+    await supertest(app.getHttpServer())
       .post('/jobs')
       .set('Authorization', `Bearer ${adminToken}`)
       .send({
@@ -80,8 +79,6 @@ describe('ShiftsController (e2e)', () => {
         location: 'Test Job Location',
         categoryId: categoryId,
       });
-
-    jobId = createJobResponse.body.id;
   });
 
   afterAll(async () => {

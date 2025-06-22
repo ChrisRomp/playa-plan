@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { CampingOptionFieldsController } from './camping-option-fields.controller';
 import { CampingOptionFieldsService } from '../services/camping-option-fields.service';
-import { CreateCampingOptionFieldDto, UpdateCampingOptionFieldDto, CampingOptionFieldResponseDto } from '../dto';
+import { CreateCampingOptionFieldDto, UpdateCampingOptionFieldDto } from '../dto';
 import { NotFoundException } from '@nestjs/common';
 import { FieldType } from '../entities/camping-option-field.entity';
 

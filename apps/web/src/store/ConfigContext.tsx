@@ -9,5 +9,5 @@
 // Re-export the provider component
 export { ConfigProvider } from './ConfigContextProvider';
 
-// Re-export the context definition and hook
-export { ConfigContext, useConfig, type ConfigContextType } from './ConfigContextDefinition';
+// Re-export the context definition and types
+export { ConfigContext, type ConfigContextType } from './ConfigContextDefinition';

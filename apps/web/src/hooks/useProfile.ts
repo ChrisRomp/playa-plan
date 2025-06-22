@@ -1,5 +1,5 @@
 import { useContext } from 'react';
-import { ProfileContext } from '../store/ProfileContext';
+import { ProfileContext } from '../store/ProfileContextDefinition';
 
 /**
  * Hook to access the profile context
