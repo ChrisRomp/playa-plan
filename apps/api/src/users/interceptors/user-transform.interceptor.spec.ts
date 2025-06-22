@@ -44,23 +44,26 @@ describe('UserTransformInterceptor', () => {
 
     // Test interceptor transforms data
     interceptor.intercept(mockContext, mockCallHandler).subscribe(result => {
+      // Type assertion to handle the interceptor's return type
+      const transformedUser = result as Record<string, unknown>;
+      
       // Check it's a plain object, not a User entity instance (after instanceToPlain)
-      expect(typeof result).toBe('object');
-      expect(result).not.toBeInstanceOf(User);
+      expect(typeof transformedUser).toBe('object');
+      expect(transformedUser).not.toBeInstanceOf(User);
       
       // Check properties are preserved
-      expect(result.id).toBe(mockPrismaUser.id);
-      expect(result.email).toBe(mockPrismaUser.email);
-      expect(result.firstName).toBe(mockPrismaUser.firstName);
-      expect(result.lastName).toBe(mockPrismaUser.lastName);
-      expect(result.playaName).toBe(mockPrismaUser.playaName);
-      expect(result.role).toBe(mockPrismaUser.role);
+      expect(transformedUser.id).toBe(mockPrismaUser.id);
+      expect(transformedUser.email).toBe(mockPrismaUser.email);
+      expect(transformedUser.firstName).toBe(mockPrismaUser.firstName);
+      expect(transformedUser.lastName).toBe(mockPrismaUser.lastName);
+      expect(transformedUser.playaName).toBe(mockPrismaUser.playaName);
+      expect(transformedUser.role).toBe(mockPrismaUser.role);
       
       // Check sensitive fields are excluded
-      expect(result.password).toBeUndefined();
-      expect(result.verificationToken).toBeUndefined();
-      expect(result.resetToken).toBeUndefined();
-      expect(result.resetTokenExpiry).toBeUndefined();
+      expect(transformedUser.password).toBeUndefined();
+      expect(transformedUser.verificationToken).toBeUndefined();
+      expect(transformedUser.resetToken).toBeUndefined();
+      expect(transformedUser.resetTokenExpiry).toBeUndefined();
       
       done();
     });
@@ -110,12 +113,15 @@ describe('UserTransformInterceptor', () => {
 
     // Test interceptor transforms array data
     interceptor.intercept(mockContext, mockCallHandler).subscribe(result => {
+      // Type assertion to handle the interceptor's return type for arrays
+      const transformedUsers = result as Record<string, unknown>[];
+      
       // Check we have an array with the right length
-      expect(Array.isArray(result)).toBe(true);
-      expect(result.length).toBe(2);
+      expect(Array.isArray(transformedUsers)).toBe(true);
+      expect(transformedUsers.length).toBe(2);
       
       // Check all items have expected properties and excluded fields
-      result.forEach((item: any, index: number) => {
+      transformedUsers.forEach((item: Record<string, unknown>, index: number) => {
         expect(typeof item).toBe('object');
         expect(item).not.toBeInstanceOf(User);
         expect(item.id).toBe(mockPrismaUsers[index].id);
@@ -170,16 +176,19 @@ describe('UserTransformInterceptor', () => {
     };
 
     interceptor.intercept(mockContext, mockCallHandler).subscribe(result => {
+      // Type assertion to handle the interceptor's return type
+      const transformedUser = result as Record<string, unknown>;
+      
       // Should be a plain object, not a User entity
-      expect(typeof result).toBe('object');
-      expect(result).not.toBeInstanceOf(User);
-      expect(result.id).toBe(userEntity.id);
-      expect(result.email).toBe(userEntity.email);
+      expect(typeof transformedUser).toBe('object');
+      expect(transformedUser).not.toBeInstanceOf(User);
+      expect(transformedUser.id).toBe(userEntity.id);
+      expect(transformedUser.email).toBe(userEntity.email);
       
       // Check that sensitive fields are excluded
-      expect(result.password).toBeUndefined();
-      expect(result.verificationToken).toBeUndefined();
-      expect(result.resetToken).toBeUndefined();
+      expect(transformedUser.password).toBeUndefined();
+      expect(transformedUser.verificationToken).toBeUndefined();
+      expect(transformedUser.resetToken).toBeUndefined();
       
       done();
     });
