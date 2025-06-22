@@ -1,9 +1,8 @@
-import { Module, DynamicModule, ExecutionContext } from '@nestjs/common';
+import { Module, DynamicModule } from '@nestjs/common';
 import { 
   ThrottlerModule, 
   ThrottlerModuleOptions,
-  ThrottlerStorage,
-  ThrottlerOptions
+  ThrottlerStorage
 } from '@nestjs/throttler';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlingGuard } from './throttling.guard';

@@ -128,7 +128,7 @@ describe('UserController', () => {
       userServiceMock.findAll.mockResolvedValue(expectedUsers);
 
       // Act
-      const result = await controller.findAll(mockAdminRequest());
+      const result = await controller.findAll();
 
       // Assert
       expect(result).toEqual(expectedUsers.map(() => expect.any(User)));
