@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { Type, Expose } from 'class-transformer';
+import { Expose } from 'class-transformer';
 import { CampingOption } from '../entities/camping-option.entity';
 
 /**

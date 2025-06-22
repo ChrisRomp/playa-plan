@@ -45,7 +45,7 @@ export class CategoriesService {
           jobs: true,
         },
       });
-    } catch (error) {
+    } catch {
       throw new NotFoundException(`Category with ID ${id} not found`);
     }
   }

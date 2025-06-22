@@ -7,7 +7,6 @@ import { CoreConfig } from '../entities/core-config.entity';
 
 describe('CoreConfigService', () => {
   let service: CoreConfigService;
-  let prismaService: PrismaService;
 
   // Mock configuration for testing
   const mockCoreConfig: Partial<CoreConfig> = {
@@ -72,7 +71,6 @@ describe('CoreConfigService', () => {
     }).compile();
 
     service = module.get<CoreConfigService>(CoreConfigService);
-    prismaService = module.get<PrismaService>(PrismaService);
 
     // Reset mock calls before each test
     jest.clearAllMocks();
