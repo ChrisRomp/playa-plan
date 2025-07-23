@@ -15,7 +15,7 @@ declare module 'axios' {
 }
 
 // Prioritize runtime config over build-time env vars, but skip unprocessed templates
-const runtimeApiUrl = window.RUNTIME_CONFIG?.API_URL;
+const runtimeApiUrl = typeof window !== 'undefined' ? window.RUNTIME_CONFIG?.API_URL : undefined;
 const isTemplate = runtimeApiUrl?.includes('${');
 const API_URL = (!isTemplate && runtimeApiUrl) || import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
@@ -206,7 +206,9 @@ api.interceptors.response.use(
           processQueue(new Error('Refresh token failed'));
           
           // Redirect to login page
-          window.location.href = '/login';
+          if (typeof window !== 'undefined') {
+            window.location.href = '/login';
+          }
           return Promise.reject(error);
         }
       } catch (refreshError) {
@@ -214,7 +216,9 @@ api.interceptors.response.use(
         processQueue(refreshError instanceof Error ? refreshError : new Error('Unknown refresh error'));
         
         // Redirect to login page
-        window.location.href = '/login';
+        if (typeof window !== 'undefined') {
+          window.location.href = '/login';
+        }
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;
