@@ -7,7 +7,7 @@
  * This generates more than 50 registrations to test the unlimited pagination
  */
 
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, RegistrationStatus } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
@@ -57,7 +57,7 @@ async function generateTestRegistrations() {
             lastName: 'User',
             playaName: `TestUser${userIndex}`,
             role: 'PARTICIPANT',
-            email_verified: true,
+            isEmailVerified: true,
           },
         });
 
@@ -66,7 +66,7 @@ async function generateTestRegistrations() {
           data: {
             userId: user.id,
             year: currentYear,
-            status: ['CONFIRMED', 'PENDING', 'WAITLISTED'][userIndex % 3] as any,
+            status: [RegistrationStatus.CONFIRMED, RegistrationStatus.PENDING, RegistrationStatus.WAITLISTED][userIndex % 3],
           },
         });
 
