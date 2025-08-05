@@ -689,6 +689,7 @@ describe('RegistrationAdminService', () => {
       const mockRegistrations = [mockRegistration];
 
       (prismaService.registration.findMany as jest.Mock).mockResolvedValue(mockRegistrations);
+      (prismaService.registration.count as jest.Mock).mockResolvedValue(1);
 
       const result = await service.getRegistrations(query);
 
@@ -707,6 +708,12 @@ describe('RegistrationAdminService', () => {
         orderBy: { createdAt: 'desc' },
         // No skip/take parameters - returns all matching records
       });
+      expect(prismaService.registration.count).toHaveBeenCalledWith({
+        where: {
+          status: RegistrationStatus.CONFIRMED,
+          year: 2024,
+        },
+      });
     });
 
     it('should handle search by email and name (no pagination)', async () => {
@@ -717,6 +724,7 @@ describe('RegistrationAdminService', () => {
 
       const mockRegistrations: typeof mockRegistration[] = [];
       (prismaService.registration.findMany as jest.Mock).mockResolvedValue(mockRegistrations);
+      (prismaService.registration.count as jest.Mock).mockResolvedValue(0);
 
       const result = await service.getRegistrations(query);
 
@@ -747,6 +755,7 @@ describe('RegistrationAdminService', () => {
       const mockRegistrations = [mockRegistration, { ...mockRegistration, id: 'reg-456' }];
 
       (prismaService.registration.findMany as jest.Mock).mockResolvedValue(mockRegistrations);
+      (prismaService.registration.count as jest.Mock).mockResolvedValue(2);
 
       const result = await service.getRegistrations(query);
 
@@ -781,6 +790,7 @@ describe('RegistrationAdminService', () => {
       }));
 
       (prismaService.registration.findMany as jest.Mock).mockResolvedValue(mockRegistrations);
+      (prismaService.registration.count as jest.Mock).mockResolvedValue(75);
 
       const result = await service.getRegistrations(query);
 

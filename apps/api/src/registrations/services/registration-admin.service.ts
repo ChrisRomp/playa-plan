@@ -92,38 +92,39 @@ export class RegistrationAdminService {
       }
     }
 
-    // Get all registrations without pagination for admin interface
-    const registrations = await this.prisma.registration.findMany({
-      where,
-      include: {
-        user: {
-          select: {
-            id: true,
-            email: true,
-            firstName: true,
-            lastName: true,
-            playaName: true,
-            role: true,
+    // Get total count and all registrations in parallel for better performance
+    const [registrations, total] = await Promise.all([
+      this.prisma.registration.findMany({
+        where,
+        include: {
+          user: {
+            select: {
+              id: true,
+              email: true,
+              firstName: true,
+              lastName: true,
+              playaName: true,
+              role: true,
+            },
           },
-        },
-        jobs: {
-          include: {
-            job: {
-              include: {
-                category: true,
-                shift: true,
+          jobs: {
+            include: {
+              job: {
+                include: {
+                  category: true,
+                  shift: true,
+                },
               },
             },
           },
+          payments: true,
         },
-        payments: true,
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-    });
-
-    const total = registrations.length;
+        orderBy: {
+          createdAt: 'desc',
+        },
+      }),
+      this.prisma.registration.count({ where }),
+    ]);
 
     return {
       registrations,
