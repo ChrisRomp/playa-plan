@@ -9,8 +9,8 @@
 // Using variables for consistent naming across the application
 export const AUTH_STATUS_COOKIE = 'auth_state';
 
-// Default cookie settings
-const DEFAULT_COOKIE_OPTIONS = {
+// Function to get default cookie options with safe window access
+const getDefaultCookieOptions = () => ({
   // Note: httpOnly cannot be set via client-side JavaScript
   // It can only be set by the server in HTTP responses
   // Only sent over HTTPS (except in development)
@@ -19,10 +19,12 @@ const DEFAULT_COOKIE_OPTIONS = {
   // This is important when API and frontend are on different domains/ports
   sameSite: 'lax' as const,
   // Domain scoped to application domain
-  domain: window.location.hostname === 'localhost' ? 'localhost' : window.location.hostname,
+  domain: typeof window !== 'undefined' && window.location 
+    ? (window.location.hostname === 'localhost' ? 'localhost' : window.location.hostname)
+    : 'localhost',
   // Default path
   path: '/'
-};
+});
 
 /**
  * Cookie options interface
@@ -46,7 +48,12 @@ export interface CookieOptions {
  * This attribute is included in the interface for documentation purposes only.
  */
 export function setCookie(name: string, value: string, options: CookieOptions = {}): void {
-  const cookieOptions = { ...DEFAULT_COOKIE_OPTIONS, ...options };
+  // Return early if document is not available (e.g., in Node.js environment)
+  if (typeof document === 'undefined') {
+    return;
+  }
+
+  const cookieOptions = { ...getDefaultCookieOptions(), ...options };
   
   let cookieString = `${encodeURIComponent(name)}=${encodeURIComponent(value)}`;
   
@@ -86,6 +93,10 @@ export function setCookie(name: string, value: string, options: CookieOptions = 
  * Note: This will only work for non-HTTP-only cookies
  */
 export function getCookie(name: string): string | null {
+  if (typeof document === 'undefined') {
+    return null;
+  }
+  
   const nameString = `${encodeURIComponent(name)}=`;
   const cookies = document.cookie.split(';');
   
