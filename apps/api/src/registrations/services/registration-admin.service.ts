@@ -52,9 +52,9 @@ export class RegistrationAdminService {
   ) {}
 
   /**
-   * Get registrations with filters and pagination for admin interface
-   * @param query - Query parameters for filtering and pagination
-   * @returns Paginated registration results
+   * Get registrations with filters for admin interface
+   * @param query - Query parameters for filtering (pagination parameters ignored - returns all matching records)
+   * @returns All matching registration results
    */
   async getRegistrations(query: AdminRegistrationQueryDto): Promise<{
     registrations: Registration[];
@@ -63,10 +63,6 @@ export class RegistrationAdminService {
     limit: number;
     totalPages: number;
   }> {
-    const page = query.page || 1;
-    const limit = query.limit || 50;
-    const skip = (page - 1) * limit;
-
     const where: Prisma.RegistrationWhereInput = {};
 
     if (query.userId) {
@@ -96,6 +92,7 @@ export class RegistrationAdminService {
       }
     }
 
+    // Get total count and all registrations in parallel for better performance
     const [registrations, total] = await Promise.all([
       this.prisma.registration.findMany({
         where,
@@ -125,8 +122,6 @@ export class RegistrationAdminService {
         orderBy: {
           createdAt: 'desc',
         },
-        skip,
-        take: limit,
       }),
       this.prisma.registration.count({ where }),
     ]);
@@ -134,9 +129,9 @@ export class RegistrationAdminService {
     return {
       registrations,
       total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit),
+      page: 1,
+      limit: 0, // 0 indicates unlimited
+      totalPages: 1,
     };
   }
 
