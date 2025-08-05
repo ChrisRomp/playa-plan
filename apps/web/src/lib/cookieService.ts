@@ -48,6 +48,11 @@ export interface CookieOptions {
  * This attribute is included in the interface for documentation purposes only.
  */
 export function setCookie(name: string, value: string, options: CookieOptions = {}): void {
+  // Return early if document is not available (e.g., in Node.js environment)
+  if (typeof document === 'undefined') {
+    return;
+  }
+
   const cookieOptions = { ...getDefaultCookieOptions(), ...options };
   
   let cookieString = `${encodeURIComponent(name)}=${encodeURIComponent(value)}`;
@@ -80,9 +85,7 @@ export function setCookie(name: string, value: string, options: CookieOptions = 
     cookieString += `; Expires=${cookieOptions.expires.toUTCString()}`;
   }
   
-  if (typeof document !== 'undefined') {
-    document.cookie = cookieString;
-  }
+  document.cookie = cookieString;
 }
 
 /**

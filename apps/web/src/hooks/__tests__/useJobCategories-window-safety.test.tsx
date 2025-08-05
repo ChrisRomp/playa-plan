@@ -51,7 +51,7 @@ describe('useJobCategories window safety', () => {
     }));
 
     // Create a controlled promise
-    let resolvePromise: (value: any) => void;
+    let resolvePromise: ((value: Array<{ id: string; name: string; description: string; staffOnly: boolean; alwaysRequired: boolean }>) => void) | undefined;
     const controlledPromise = new Promise((resolve) => {
       resolvePromise = resolve;
     });
@@ -67,9 +67,11 @@ describe('useJobCategories window safety', () => {
     unmount();
     
     // Now resolve the promise - this should not cause unhandled errors
-    resolvePromise!([
-      { id: '1', name: 'Test', description: 'Test', staffOnly: false, alwaysRequired: false }
-    ]);
+    if (resolvePromise) {
+      resolvePromise([
+        { id: '1', name: 'Test', description: 'Test', staffOnly: false, alwaysRequired: false }
+      ]);
+    }
 
     // Wait a bit to ensure any async cleanup happens
     await new Promise(resolve => setTimeout(resolve, 10));
