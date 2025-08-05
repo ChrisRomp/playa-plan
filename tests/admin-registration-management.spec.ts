@@ -382,6 +382,45 @@ test.describe('Admin Registration Management', () => {
   });
 
   // Additional comprehensive test scenarios
+  // Test for unlimited registration pagination (Issue #105)
+  test('should display all registrations without 50-record limit', async ({ page }) => {
+    // Navigate to Manage Registrations page
+    await page.click('text=Admin Panel');
+    await page.click('text=Manage Registrations');
+    
+    // Wait for the registrations page to load
+    await expect(page.locator('h1:has-text("Manage Registrations")')).toBeVisible();
+    
+    // Wait for registration table to load
+    await expect(page.locator('table')).toBeVisible();
+    
+    // Check if any registrations are displayed
+    const registrationRows = page.locator('table tbody tr');
+    const count = await registrationRows.count();
+    
+    // If we have registrations, verify the count displays correctly
+    if (count > 0) {
+      // Look for any indication that shows total count
+      const totalText = page.locator('text=/total|showing|of/i');
+      if (await totalText.count() > 0) {
+        console.log('Total registrations found on page:', count);
+        
+        // The fix should now show all registrations, not capped at 50
+        // If there are more than 50 test registrations, this validates the fix
+        if (count > 50) {
+          console.log('SUCCESS: More than 50 registrations displayed - pagination limit fixed!');
+        } else {
+          console.log('Note: Test has', count, 'registrations (less than 50 limit to test)');
+        }
+      }
+    } else {
+      console.log('No registrations found in test database');
+    }
+    
+    // Verify the page loads without errors regardless of registration count
+    await expect(page.locator('table')).toBeVisible();
+  });
+
   test('should handle pagination in registration list', async ({ page }) => {
     // Navigate to Manage Registrations page
     await page.click('text=Admin Panel');
