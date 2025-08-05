@@ -2,10 +2,14 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import AdminCampingOptionsPage from './AdminCampingOptionsPage';
 import { useCampingOptions } from '../hooks/useCampingOptions';
+import { useJobCategories } from '../hooks/useJobCategories';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 
 // Mock the useCampingOptions hook
 vi.mock('../hooks/useCampingOptions');
+
+// Mock the useJobCategories hook  
+vi.mock('../hooks/useJobCategories');
 
 // Mock react-router-dom
 vi.mock('react-router-dom', async () => {
@@ -68,7 +72,7 @@ describe('AdminCampingOptionsPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     
-    // Mock the hook implementation with all required functions
+    // Mock the useCampingOptions hook implementation
     (useCampingOptions as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
       options: mockCampingOptions,
       loading: false,
@@ -84,6 +88,20 @@ describe('AdminCampingOptionsPage', () => {
       createCampingOptionField: vi.fn(),
       updateCampingOptionField: vi.fn(),
       deleteCampingOptionField: vi.fn()
+    });
+
+    // Mock the useJobCategories hook implementation
+    (useJobCategories as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
+      categories: [
+        { id: 'job1', name: 'Kitchen', description: 'Kitchen jobs', staffOnly: false, alwaysRequired: false },
+        { id: 'job2', name: 'Security', description: 'Security jobs', staffOnly: true, alwaysRequired: false }
+      ],
+      loading: false,
+      error: null,
+      fetchCategories: vi.fn(),
+      createCategory: vi.fn(),
+      updateCategory: vi.fn(),
+      deleteCategory: vi.fn()
     });
   });
   
@@ -136,6 +154,16 @@ describe('AdminCampingOptionsPage', () => {
       updateCampingOptionField: vi.fn(),
       deleteCampingOptionField: vi.fn()
     });
+
+    (useJobCategories as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
+      categories: [],
+      loading: false,
+      error: null,
+      fetchCategories: vi.fn(),
+      createCategory: vi.fn(),
+      updateCategory: vi.fn(),
+      deleteCategory: vi.fn()
+    });
     
     renderWithRouter(<AdminCampingOptionsPage />);
     expect(screen.getByText('Loading camping options...')).toBeInTheDocument();
@@ -159,6 +187,16 @@ describe('AdminCampingOptionsPage', () => {
       updateCampingOptionField: vi.fn(),
       deleteCampingOptionField: vi.fn()
     });
+
+    (useJobCategories as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
+      categories: [],
+      loading: false,
+      error: null,
+      fetchCategories: vi.fn(),
+      createCategory: vi.fn(),
+      updateCategory: vi.fn(),
+      deleteCategory: vi.fn()
+    });
     
     renderWithRouter(<AdminCampingOptionsPage />);
     expect(screen.getByText('Failed to load camping options')).toBeInTheDocument();
@@ -181,6 +219,16 @@ describe('AdminCampingOptionsPage', () => {
       createCampingOptionField: vi.fn(),
       updateCampingOptionField: vi.fn(),
       deleteCampingOptionField: vi.fn()
+    });
+
+    (useJobCategories as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
+      categories: [],
+      loading: false,
+      error: null,
+      fetchCategories: vi.fn(),
+      createCategory: vi.fn(),
+      updateCategory: vi.fn(),
+      deleteCategory: vi.fn()
     });
     
     renderWithRouter(<AdminCampingOptionsPage />);
@@ -209,6 +257,19 @@ describe('AdminCampingOptionsPage', () => {
       createCampingOptionField: vi.fn(),
       updateCampingOptionField: vi.fn(),
       deleteCampingOptionField: vi.fn()
+    });
+
+    (useJobCategories as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
+      categories: [
+        { id: 'job1', name: 'Kitchen', description: 'Kitchen jobs', staffOnly: false, alwaysRequired: false },
+        { id: 'job2', name: 'Security', description: 'Security jobs', staffOnly: true, alwaysRequired: false }
+      ],
+      loading: false,
+      error: null,
+      fetchCategories: vi.fn(),
+      createCategory: vi.fn(),
+      updateCategory: vi.fn(),
+      deleteCategory: vi.fn()
     });
     
     renderWithRouter(<AdminCampingOptionsPage />);
@@ -255,6 +316,16 @@ describe('AdminCampingOptionsPage', () => {
       updateCampingOptionField: vi.fn(),
       deleteCampingOptionField: vi.fn()
     });
+
+    (useJobCategories as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
+      categories: [],
+      loading: false,
+      error: null,
+      fetchCategories: vi.fn(),
+      createCategory: vi.fn(),
+      updateCategory: vi.fn(),
+      deleteCategory: vi.fn()
+    });
     
     renderWithRouter(<AdminCampingOptionsPage />);
     
@@ -289,6 +360,16 @@ describe('AdminCampingOptionsPage', () => {
       createCampingOptionField: vi.fn(),
       updateCampingOptionField: vi.fn(),
       deleteCampingOptionField: vi.fn()
+    });
+
+    (useJobCategories as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
+      categories: [],
+      loading: false,
+      error: null,
+      fetchCategories: vi.fn(),
+      createCategory: vi.fn(),
+      updateCategory: vi.fn(),
+      deleteCategory: vi.fn()
     });
     
     renderWithRouter(<AdminCampingOptionsPage />);

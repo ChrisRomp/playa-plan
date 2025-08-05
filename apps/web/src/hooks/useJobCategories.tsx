@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import { jobCategories, JobCategory } from '../lib/api';
 
 interface UseJobCategoriesResult {
@@ -15,68 +15,103 @@ export function useJobCategories(): UseJobCategoriesResult {
   const [categories, setCategories] = useState<JobCategory[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const mountedRef = useRef(true);
 
   const fetchCategories = useCallback(async () => {
+    if (!mountedRef.current) return;
     setLoading(true);
     setError(null);
     try {
       const data = await jobCategories.getAll();
-      setCategories(data);
+      if (mountedRef.current) {
+        setCategories(data);
+      }
     } catch {
-      setError('Failed to fetch job categories');
+      if (mountedRef.current) {
+        setError('Failed to fetch job categories');
+      }
     } finally {
-      setLoading(false);
+      if (mountedRef.current) {
+        setLoading(false);
+      }
     }
   }, []);
 
   const createCategory = useCallback(async (data: Omit<JobCategory, 'id'>) => {
+    if (!mountedRef.current) return null;
     setLoading(true);
     setError(null);
     try {
       const created = await jobCategories.create(data);
-      setCategories((prev) => [...prev, created]);
+      if (mountedRef.current) {
+        setCategories((prev) => [...prev, created]);
+      }
       return created;
     } catch {
-      setError('Failed to create job category');
+      if (mountedRef.current) {
+        setError('Failed to create job category');
+      }
       return null;
     } finally {
-      setLoading(false);
+      if (mountedRef.current) {
+        setLoading(false);
+      }
     }
   }, []);
 
   const updateCategory = useCallback(async (id: string, data: Partial<Omit<JobCategory, 'id'>>) => {
+    if (!mountedRef.current) return null;
     setLoading(true);
     setError(null);
     try {
       const updated = await jobCategories.update(id, data);
-      setCategories((prev) => prev.map((cat) => (cat.id === id ? updated : cat)));
+      if (mountedRef.current) {
+        setCategories((prev) => prev.map((cat) => (cat.id === id ? updated : cat)));
+      }
       return updated;
     } catch {
-      setError('Failed to update job category');
+      if (mountedRef.current) {
+        setError('Failed to update job category');
+      }
       return null;
     } finally {
-      setLoading(false);
+      if (mountedRef.current) {
+        setLoading(false);
+      }
     }
   }, []);
 
   const deleteCategory = useCallback(async (id: string) => {
+    if (!mountedRef.current) return false;
     setLoading(true);
     setError(null);
     try {
       await jobCategories.delete(id);
-      setCategories((prev) => prev.filter((cat) => cat.id !== id));
+      if (mountedRef.current) {
+        setCategories((prev) => prev.filter((cat) => cat.id !== id));
+      }
       return true;
     } catch {
-      setError('Failed to delete job category');
+      if (mountedRef.current) {
+        setError('Failed to delete job category');
+      }
       return false;
     } finally {
-      setLoading(false);
+      if (mountedRef.current) {
+        setLoading(false);
+      }
     }
   }, []);
 
   useEffect(() => {
     fetchCategories();
   }, [fetchCategories]);
+
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   return {
     categories,
