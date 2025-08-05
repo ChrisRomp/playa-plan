@@ -64,8 +64,10 @@ export class RegistrationAdminService {
     totalPages: number;
   }> {
     const page = query.page || 1;
-    const limit = query.limit || 50;
-    const skip = (page - 1) * limit;
+    // Support unlimited results: undefined/null defaults to 0 (unlimited), 0 means unlimited
+    const limit = query.limit === undefined || query.limit === null ? 0 : query.limit;
+    const isUnlimited = limit === 0;
+    const skip = isUnlimited ? 0 : (page - 1) * limit;
 
     const where: Prisma.RegistrationWhereInput = {};
 
@@ -96,38 +98,45 @@ export class RegistrationAdminService {
       }
     }
 
-    const [registrations, total] = await Promise.all([
-      this.prisma.registration.findMany({
-        where,
-        include: {
-          user: {
-            select: {
-              id: true,
-              email: true,
-              firstName: true,
-              lastName: true,
-              playaName: true,
-              role: true,
-            },
+    // Build the query options
+    const queryOptions: Prisma.RegistrationFindManyArgs = {
+      where,
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            playaName: true,
+            role: true,
           },
-          jobs: {
-            include: {
-              job: {
-                include: {
-                  category: true,
-                  shift: true,
-                },
+        },
+        jobs: {
+          include: {
+            job: {
+              include: {
+                category: true,
+                shift: true,
               },
             },
           },
-          payments: true,
         },
-        orderBy: {
-          createdAt: 'desc',
-        },
-        skip,
-        take: limit,
-      }),
+        payments: true,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    };
+
+    // Only add skip/take for paginated results
+    if (!isUnlimited) {
+      queryOptions.skip = skip;
+      queryOptions.take = limit;
+    }
+
+    const [registrations, total] = await Promise.all([
+      this.prisma.registration.findMany(queryOptions),
       this.prisma.registration.count({ where }),
     ]);
 
@@ -136,7 +145,7 @@ export class RegistrationAdminService {
       total,
       page,
       limit,
-      totalPages: Math.ceil(total / limit),
+      totalPages: isUnlimited ? 1 : Math.ceil(total / limit),
     };
   }
 

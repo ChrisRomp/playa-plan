@@ -733,6 +733,114 @@ describe('RegistrationAdminService', () => {
             ],
           },
         },
+        include: {
+          user: {
+            select: {
+              id: true,
+              email: true,
+              firstName: true,
+              lastName: true,
+              playaName: true,
+              role: true,
+            },
+          },
+          jobs: {
+            include: {
+              job: {
+                include: {
+                  category: true,
+                  shift: true,
+                },
+              },
+            },
+          },
+          payments: true,
+        },
+        orderBy: { createdAt: 'desc' },
+        // No skip/take for unlimited results (default limit is 0)
+      });
+    });
+
+    it('should return all registrations when no limit is specified for admin interface', async () => {
+      const query: AdminRegistrationQueryDto = {};
+
+      // Create mock data for 100 registrations to simulate scenario with more than 50 records
+      const mockRegistrations = Array.from({ length: 100 }, (_, i) => ({
+        ...mockRegistration,
+        id: `reg-${i + 1}`,
+        user: {
+          ...mockRegistration.user,
+          id: `user-${i + 1}`,
+          email: `user${i + 1}@example.com`,
+        },
+      }));
+
+      (prismaService.registration.findMany as jest.Mock).mockResolvedValue(mockRegistrations);
+      (prismaService.registration.count as jest.Mock).mockResolvedValue(100);
+
+      const result = await service.getRegistrations(query);
+
+      expect(result.registrations).toHaveLength(100);
+      expect(result.total).toBe(100);
+      expect(result.limit).toBe(0); // Expect 0 to indicate unlimited
+      
+      expect(prismaService.registration.findMany).toHaveBeenCalledWith({
+        where: {},
+        include: expect.any(Object),
+        orderBy: { createdAt: 'desc' },
+        // Should not have skip or take properties for unlimited results
+      });
+    });
+
+    it('should support unlimited results when limit is set to 0', async () => {
+      const query: AdminRegistrationQueryDto = {
+        limit: 0, // 0 should mean unlimited
+      };
+
+      const mockRegistrations = Array.from({ length: 75 }, (_, i) => ({
+        ...mockRegistration,
+        id: `reg-${i + 1}`,
+      }));
+
+      (prismaService.registration.findMany as jest.Mock).mockResolvedValue(mockRegistrations);
+      (prismaService.registration.count as jest.Mock).mockResolvedValue(75);
+
+      const result = await service.getRegistrations(query);
+
+      expect(result.registrations).toHaveLength(75);
+      expect(result.total).toBe(75);
+      expect(result.limit).toBe(0);
+      
+      expect(prismaService.registration.findMany).toHaveBeenCalledWith({
+        where: {},
+        include: expect.any(Object),
+        orderBy: { createdAt: 'desc' },
+        // Should not have skip or take properties for unlimited results
+      });
+    });
+
+    it('should default to limited results (50) when explicitly requested', async () => {
+      const query: AdminRegistrationQueryDto = {
+        limit: 50,
+      };
+
+      const mockRegistrations = Array.from({ length: 50 }, (_, i) => ({
+        ...mockRegistration,
+        id: `reg-${i + 1}`,
+      }));
+
+      (prismaService.registration.findMany as jest.Mock).mockResolvedValue(mockRegistrations);
+      (prismaService.registration.count as jest.Mock).mockResolvedValue(100); // More records exist
+
+      const result = await service.getRegistrations(query);
+
+      expect(result.registrations).toHaveLength(50);
+      expect(result.total).toBe(100);
+      expect(result.limit).toBe(50);
+      expect(result.totalPages).toBe(2);
+      
+      expect(prismaService.registration.findMany).toHaveBeenCalledWith({
+        where: {},
         include: expect.any(Object),
         orderBy: { createdAt: 'desc' },
         skip: 0,

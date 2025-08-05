@@ -152,14 +152,14 @@ export class AdminRegistrationQueryDto {
   page?: number;
 
   @ApiPropertyOptional({
-    description: 'Number of records per page',
+    description: 'Number of records per page (0 for unlimited)',
     example: 50,
-    default: 50,
+    default: 0,
   })
   @IsOptional()
   @Type(() => Number)
   @IsInt({ message: 'Limit must be an integer' })
-  @Min(1, { message: 'Limit must be 1 or greater' })
+  @Min(0, { message: 'Limit must be 0 or greater (0 means unlimited)' })
   limit?: number;
 }
 

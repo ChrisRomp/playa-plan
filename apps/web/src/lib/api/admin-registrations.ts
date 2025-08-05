@@ -150,7 +150,10 @@ export const adminRegistrationsApi = {
     if (filters.email) params.append('email', filters.email);
     if (filters.name) params.append('name', filters.name);
     if (filters.page) params.append('page', filters.page.toString());
-    if (filters.limit) params.append('limit', filters.limit.toString());
+    // Only add limit if explicitly set (default behavior is now unlimited)
+    if (filters.limit !== undefined && filters.limit !== null) {
+      params.append('limit', filters.limit.toString());
+    }
 
     const response = await api.get(`/admin/registrations?${params.toString()}`);
     return response.data;
