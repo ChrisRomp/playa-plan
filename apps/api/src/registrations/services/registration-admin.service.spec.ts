@@ -678,10 +678,10 @@ describe('RegistrationAdminService', () => {
   });
 
   describe('getRegistrations', () => {
-    it('should return paginated registrations with filters', async () => {
+    it('should return all registrations with filters (no pagination)', async () => {
       const query: AdminRegistrationQueryDto = {
-        page: 1,
-        limit: 10,
+        page: 1, // This parameter is now ignored
+        limit: 10, // This parameter is now ignored
         status: RegistrationStatus.CONFIRMED,
         year: 2024,
       };
@@ -689,14 +689,13 @@ describe('RegistrationAdminService', () => {
       const mockRegistrations = [mockRegistration];
 
       (prismaService.registration.findMany as jest.Mock).mockResolvedValue(mockRegistrations);
-      (prismaService.registration.count as jest.Mock).mockResolvedValue(1);
 
       const result = await service.getRegistrations(query);
 
       expect(result.registrations).toEqual(mockRegistrations);
       expect(result.total).toBe(1);
       expect(result.page).toBe(1);
-      expect(result.limit).toBe(10);
+      expect(result.limit).toBe(0); // 0 indicates unlimited
       expect(result.totalPages).toBe(1);
 
       expect(prismaService.registration.findMany).toHaveBeenCalledWith({
@@ -706,21 +705,25 @@ describe('RegistrationAdminService', () => {
         },
         include: expect.any(Object),
         orderBy: { createdAt: 'desc' },
-        skip: 0,
-        take: 10,
+        // No skip/take parameters - returns all matching records
       });
     });
 
-    it('should handle search by email and name', async () => {
+    it('should handle search by email and name (no pagination)', async () => {
       const query: AdminRegistrationQueryDto = {
         email: 'test@example.com',
         name: 'John',
       };
 
-      (prismaService.registration.findMany as jest.Mock).mockResolvedValue([]);
-      (prismaService.registration.count as jest.Mock).mockResolvedValue(0);
+      const mockRegistrations: typeof mockRegistration[] = [];
+      (prismaService.registration.findMany as jest.Mock).mockResolvedValue(mockRegistrations);
 
-      await service.getRegistrations(query);
+      const result = await service.getRegistrations(query);
+
+      expect(result.registrations).toEqual(mockRegistrations);
+      expect(result.total).toBe(0);
+      expect(result.limit).toBe(0); // 0 indicates unlimited
+      expect(result.totalPages).toBe(1);
 
       expect(prismaService.registration.findMany).toHaveBeenCalledWith({
         where: {
@@ -735,8 +738,64 @@ describe('RegistrationAdminService', () => {
         },
         include: expect.any(Object),
         orderBy: { createdAt: 'desc' },
-        skip: 0,
-        take: 50,
+        // No skip/take parameters - returns all matching records
+      });
+    });
+
+    it('should return all registrations without filters', async () => {
+      const query: AdminRegistrationQueryDto = {};
+      const mockRegistrations = [mockRegistration, { ...mockRegistration, id: 'reg-456' }];
+
+      (prismaService.registration.findMany as jest.Mock).mockResolvedValue(mockRegistrations);
+
+      const result = await service.getRegistrations(query);
+
+      expect(result.registrations).toEqual(mockRegistrations);
+      expect(result.total).toBe(2);
+      expect(result.page).toBe(1);
+      expect(result.limit).toBe(0); // 0 indicates unlimited
+      expect(result.totalPages).toBe(1);
+
+      expect(prismaService.registration.findMany).toHaveBeenCalledWith({
+        where: {},
+        include: expect.any(Object),
+        orderBy: { createdAt: 'desc' },
+        // No skip/take parameters - returns all matching records
+      });
+    });
+
+    it('should return all registrations even when count exceeds previous 50-record limit', async () => {
+      const query: AdminRegistrationQueryDto = {
+        year: 2024,
+        // Old implementation would have limited this to 50 with default limit
+      };
+      
+      // Create 75 mock registrations to test beyond the old 50-record limit
+      const mockRegistrations = Array.from({ length: 75 }, (_, i) => ({
+        ...mockRegistration,
+        id: `reg-${i + 1}`,
+        user: {
+          ...mockRegistration.user,
+          email: `user${i + 1}@example.com`,
+        },
+      }));
+
+      (prismaService.registration.findMany as jest.Mock).mockResolvedValue(mockRegistrations);
+
+      const result = await service.getRegistrations(query);
+
+      expect(result.registrations).toHaveLength(75);
+      expect(result.total).toBe(75);
+      expect(result.page).toBe(1);
+      expect(result.limit).toBe(0); // 0 indicates unlimited
+      expect(result.totalPages).toBe(1);
+
+      // Verify no pagination parameters were used
+      expect(prismaService.registration.findMany).toHaveBeenCalledWith({
+        where: { year: 2024 },
+        include: expect.any(Object),
+        orderBy: { createdAt: 'desc' },
+        // Critically: no skip or take parameters that would limit to 50
       });
     });
   });

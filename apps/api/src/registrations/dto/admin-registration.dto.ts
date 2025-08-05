@@ -141,9 +141,9 @@ export class AdminRegistrationQueryDto {
   name?: string;
 
   @ApiPropertyOptional({
-    description: 'Page number for pagination (1-based)',
+    description: 'Page number for pagination (ignored - returns all records for admin interface)',
     example: 1,
-    default: 1,
+    deprecated: true,
   })
   @IsOptional()
   @Type(() => Number)
@@ -152,9 +152,9 @@ export class AdminRegistrationQueryDto {
   page?: number;
 
   @ApiPropertyOptional({
-    description: 'Number of records per page',
+    description: 'Number of records per page (ignored - returns all records for admin interface)',
     example: 50,
-    default: 50,
+    deprecated: true,
   })
   @IsOptional()
   @Type(() => Number)
