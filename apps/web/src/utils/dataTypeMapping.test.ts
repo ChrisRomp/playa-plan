@@ -11,6 +11,6 @@ describe('getDataTypeFriendlyName', () => {
   });
 
   it('should return the original value for unmapped types', () => {
-    expect(getDataTypeFriendlyName('UNKNOWN' as any)).toBe('UNKNOWN');
+    expect(getDataTypeFriendlyName('INVALID_TYPE' as never)).toBe('INVALID_TYPE');
   });
 });
