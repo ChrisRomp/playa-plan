@@ -41,7 +41,7 @@ const mockFields = [
     id: 'field-1',
     displayName: 'Test Field 1',
     description: 'A test field',
-    dataType: 'TEXT',
+    dataType: 'STRING',
     required: true,
     maxLength: 100,
     minValue: null,
@@ -154,8 +154,8 @@ describe('AdminCampingOptionFieldsPage', () => {
     renderWithRouter(<AdminCampingOptionFieldsPage />);
     expect(screen.getByText('Test Field 1')).toBeInTheDocument();
     expect(screen.getByText('Test Field 2')).toBeInTheDocument();
-    expect(screen.getByText('TEXT')).toBeInTheDocument();
-    expect(screen.getByText('NUMBER')).toBeInTheDocument();
+    expect(screen.getByText('Text')).toBeInTheDocument();
+    expect(screen.getByText('Number')).toBeInTheDocument();
   });
 
   it('should open the modal when Add Custom Field button is clicked', () => {
