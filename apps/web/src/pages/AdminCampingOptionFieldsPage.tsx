@@ -4,6 +4,7 @@ import { useCampingOptions } from '../hooks/useCampingOptions';
 import { CampingOptionField } from '../lib/api';
 import axios, { AxiosError } from 'axios';
 import { PATHS } from '../routes';
+import { getDataTypeFriendlyName } from '../utils/dataTypeMapping';
 
 // Define type for API error response
 interface ApiErrorResponse {
@@ -387,7 +388,7 @@ const AdminCampingOptionFieldsPage: React.FC = () => {
                         </span>
                       </td>
                       <td className="py-2 px-4 border-b">{field.displayName}</td>
-                      <td className="py-2 px-4 border-b">{field.dataType}</td>
+                      <td className="py-2 px-4 border-b">{getDataTypeFriendlyName(field.dataType)}</td>
                       <td className="py-2 px-4 border-b">
                         {field.required ? (
                           <span className="text-green-600">Required</span>

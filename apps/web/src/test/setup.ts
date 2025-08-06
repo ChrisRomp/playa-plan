@@ -15,7 +15,9 @@ const localStorageMock = {
 global.localStorage = localStorageMock as unknown as Storage;
 
 // Clean up after each test
-afterEach(() => {
+afterEach(async () => {
   cleanup();
   vi.clearAllMocks();
+  // Clear any pending timers
+  vi.clearAllTimers();
 });
