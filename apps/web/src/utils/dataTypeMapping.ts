@@ -1,4 +1,6 @@
-type DataType = 'STRING' | 'MULTILINE_STRING' | 'INTEGER' | 'NUMBER' | 'BOOLEAN' | 'DATE';
+import type { CampingOptionField } from '../lib/api';
+
+type DataType = CampingOptionField['dataType'];
 
 /**
  * Maps data type enum values to user-friendly display names
