@@ -12,7 +12,7 @@ export default defineConfig({
     testTimeout: 10000,
     hookTimeout: 10000,
     // Ensure proper cleanup of resources
-    onConsoleLog: (log: string, type: 'stdout' | 'stderr'): boolean => {
+    onConsoleLog: (log: string): boolean => {
       // Don't fail tests on React warnings about state updates after unmount in test env
       if (log.includes('Warning: Can\'t perform a React state update on an unmounted component')) {
         return false;
