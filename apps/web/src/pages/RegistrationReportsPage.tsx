@@ -29,7 +29,7 @@ export function RegistrationReportsPage() {
     setLoading(true);
     setError(null);
     try {
-      const data = await reports.getRegistrations(filters);
+      const data = await reports.getRegistrations();
       setRegistrations(data);
     } catch (err) {
       setError('Failed to fetch registrations data');
@@ -37,11 +37,38 @@ export function RegistrationReportsPage() {
     } finally {
       setLoading(false);
     }
-  }, [filters]);
+  }, []);
 
   useEffect(() => {
     fetchRegistrations();
   }, [fetchRegistrations]);
+
+  // Apply client-side filtering
+  const filteredRegistrations = useMemo(() => {
+    return registrations.filter(registration => {
+      // Year filter
+      if (filters.year && registration.year !== filters.year) {
+        return false;
+      }
+      
+      // Status filter
+      if (filters.status && registration.status !== filters.status) {
+        return false;
+      }
+      
+      // User ID filter (for future use)
+      if (filters.userId && registration.user?.id !== filters.userId) {
+        return false;
+      }
+      
+      // Job ID filter (for future use)
+      if (filters.jobId && !registration.jobs.some(job => job.job.id === filters.jobId)) {
+        return false;
+      }
+      
+      return true;
+    });
+  }, [registrations, filters]);
 
   // Get unique years for filter dropdown
   const availableYears = useMemo(() => {
@@ -128,7 +155,7 @@ export function RegistrationReportsPage() {
       'Registered Date'
     ];
 
-    const csvData = registrations.map(registration => [
+    const csvData = filteredRegistrations.map(registration => [
       registration.user ? `${registration.user.firstName} ${registration.user.lastName}` : 'Unknown User',
       registration.user?.email || '',
       registration.jobs.map(rj => rj.job.name).join('; ') || '',
@@ -287,7 +314,7 @@ export function RegistrationReportsPage() {
         {/* Data Table */}
         <div className="bg-white rounded-lg shadow">
           <DataTable
-            data={registrations}
+            data={filteredRegistrations}
             columns={columns}
             getRowKey={(row) => row.id}
             filterable={true}
@@ -305,24 +332,24 @@ export function RegistrationReportsPage() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
             <div>
               <span className="font-medium">Total Registrations:</span>
-              <span className="ml-2">{registrations.length}</span>
+              <span className="ml-2">{filteredRegistrations.length}</span>
             </div>
             <div>
               <span className="font-medium">Confirmed:</span>
               <span className="ml-2 text-green-600">
-                {registrations.filter(r => r.status === 'CONFIRMED').length}
+                {filteredRegistrations.filter(r => r.status === 'CONFIRMED').length}
               </span>
             </div>
             <div>
               <span className="font-medium">Pending:</span>
               <span className="ml-2 text-yellow-600">
-                {registrations.filter(r => r.status === 'PENDING').length}
+                {filteredRegistrations.filter(r => r.status === 'PENDING').length}
               </span>
             </div>
             <div>
               <span className="font-medium">Cancelled:</span>
               <span className="ml-2 text-red-600">
-                {registrations.filter(r => r.status === 'CANCELLED').length}
+                {filteredRegistrations.filter(r => r.status === 'CANCELLED').length}
               </span>
             </div>
           </div>
