@@ -94,8 +94,7 @@ const AdminConfigPage: React.FC = () => {
     smtpUseSsl: false,
     senderEmail: '',
     senderName: '',
-    replyTo: '',
-    timeZone: 'UTC'
+    replyTo: ''
   });
 
   // Load current configuration data when component mounts
@@ -142,8 +141,7 @@ const AdminConfigPage: React.FC = () => {
             smtpUseSsl: response.data.smtpUseSsl || false,
             senderEmail: response.data.senderEmail || '',
             senderName: response.data.senderName || '',
-            replyTo: response.data.replyTo || '',
-            timeZone: response.data.timeZone || 'UTC'
+            replyTo: response.data.replyTo || ''
           });
         }
       } catch (err) {
@@ -440,8 +438,7 @@ const AdminConfigPage: React.FC = () => {
       smtpUseSsl: formData.smtpUseSsl,
       senderEmail: formData.senderEmail.trim(),
       senderName: formData.senderName,
-      replyTo: formData.replyTo.trim() || null,
-      timeZone: formData.timeZone
+      replyTo: formData.replyTo.trim() || null
     };
     
     // Only include sensitive keys if they have been provided (not empty)
@@ -1433,26 +1430,6 @@ const AdminConfigPage: React.FC = () => {
           
           <div className="mb-8">
             <h2 className="text-xl font-semibold mb-4 pb-2 border-b">System Settings</h2>
-            
-            <div className="mb-4">
-              <label htmlFor="timeZone" className="block text-gray-700 font-medium mb-2">
-                Time Zone
-              </label>
-              <select
-                id="timeZone"
-                name="timeZone"
-                value={formData.timeZone}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="UTC">UTC</option>
-                <option value="America/Los_Angeles">Pacific Time</option>
-                <option value="America/Denver">Mountain Time</option>
-                <option value="America/Chicago">Central Time</option>
-                <option value="America/New_York">Eastern Time</option>
-                {/* Add more time zones as needed */}
-              </select>
-            </div>
           </div>
           
           <div className="flex justify-end space-x-4 mt-8">

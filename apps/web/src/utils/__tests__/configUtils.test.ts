@@ -24,7 +24,6 @@ describe('configUtils', () => {
         paypalEnabled: false,
         paypalClientId: '',
         paypalMode: 'sandbox',
-        timeZone: 'America/Los_Angeles',
         createdAt: '2024-01-01T00:00:00Z',
         updatedAt: '2024-01-01T00:00:00Z'
       };
@@ -68,7 +67,6 @@ describe('configUtils', () => {
         paypalEnabled: false,
         paypalClientId: null,
         paypalMode: 'sandbox',
-        timeZone: 'UTC',
         createdAt: '2024-01-01T00:00:00Z',
         updatedAt: '2024-01-01T00:00:00Z'
       };
