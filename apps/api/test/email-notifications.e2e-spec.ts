@@ -109,7 +109,6 @@ describe('Email Notifications (e2e)', () => {
         id: uuidv4(),
         campName: 'Test Camp',
         registrationYear: 2024,
-        timeZone: 'UTC',
         emailEnabled: true,
         smtpHost: 'smtp.test.com',
         smtpPort: 587,

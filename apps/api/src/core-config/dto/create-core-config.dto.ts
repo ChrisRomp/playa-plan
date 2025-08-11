@@ -372,16 +372,4 @@ export class CreateCoreConfigDto {
   @IsOptional()
   @Type(() => Boolean)
   emailEnabled?: boolean = false;
-
-  /**
-   * Site time zone
-   */
-  @ApiProperty({
-    description: 'Site time zone',
-    example: 'America/Los_Angeles',
-    default: 'UTC'
-  })
-  @IsString()
-  @IsOptional()
-  timeZone?: string = 'UTC';
 } 

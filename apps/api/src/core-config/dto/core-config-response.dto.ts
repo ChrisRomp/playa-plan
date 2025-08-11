@@ -241,15 +241,6 @@ export class CoreConfigResponseDto {
   senderName!: string | null;
 
   /**
-   * Site time zone
-   */
-  @ApiProperty({
-    description: 'Site time zone',
-    example: 'America/Los_Angeles'
-  })
-  timeZone!: string;
-
-  /**
    * Date when the configuration was created
    */
   @ApiProperty({
