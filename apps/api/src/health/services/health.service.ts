@@ -13,7 +13,6 @@ export class HealthService {
   ) {}
 
   async getHealthStatus(): Promise<HealthResponseDto> {
-    
     try {
       const [databaseResult, paymentsResult, emailResult, systemResult] = 
         await Promise.allSettled([
