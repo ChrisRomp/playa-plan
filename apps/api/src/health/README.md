@@ -38,7 +38,7 @@ The Health Check module provides comprehensive monitoring capabilities for the P
 ### System Resources
 - **Memory Usage:** Monitors heap memory utilization
 - **Uptime:** Reports process uptime
-- Returns unhealthy if memory usage > 90%, degraded if > 80%
+- Returns unhealthy if memory usage > 95%, degraded if > 90%
 
 ## Response Format
 
