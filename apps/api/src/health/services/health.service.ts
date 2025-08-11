@@ -55,10 +55,11 @@ export class HealthService {
     const startTime = Date.now();
     
     try {
-      await Promise.race([
+      await this.withTimeout(
         this.prisma.$queryRaw`SELECT 1`,
-        this.timeoutPromise(3000, 'Database check timeout'),
-      ]);
+        3000,
+        'Database check timeout'
+      );
       
       const responseTime = `${Date.now() - startTime}ms`;
       return {
@@ -117,7 +118,7 @@ export class HealthService {
       throw new Error('Stripe not configured');
     }
     
-    await Promise.race([
+    await this.withTimeout(
       fetch('https://api.stripe.com/v1/account', {
         method: 'GET',
         headers: { 'Authorization': `Bearer ${stripeKey}` },
@@ -126,8 +127,9 @@ export class HealthService {
           throw new Error(`Stripe API returned ${response.status}`);
         }
       }),
-      this.timeoutPromise(2000, 'Stripe API timeout'),
-    ]);
+      2000,
+      'Stripe API timeout'
+    );
   }
 
   private async checkPayPalHealth(): Promise<void> {
@@ -137,7 +139,7 @@ export class HealthService {
     }
     
     const baseUrl = this.configService.get<string>('paypal.baseUrl');
-    await Promise.race([
+    await this.withTimeout(
       fetch(`${baseUrl}/v1/oauth2/token`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -147,8 +149,9 @@ export class HealthService {
           throw new Error(`PayPal API returned ${response.status}`);
         }
       }),
-      this.timeoutPromise(2000, 'PayPal API timeout'),
-    ]);
+      2000,
+      'PayPal API timeout'
+    );
   }
 
   private async checkEmailService(): Promise<HealthCheckResult> {
@@ -204,10 +207,15 @@ export class HealthService {
     };
   }
 
-  private timeoutPromise<T>(ms: number, message: string): Promise<T> {
-    return new Promise((_, reject) => {
-      setTimeout(() => reject(new Error(message)), ms);
+  private withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+    let timeoutId: NodeJS.Timeout | undefined;
+    const timeout = new Promise<never>((_, reject) => {
+      timeoutId = setTimeout(() => reject(new Error(message)), ms);
     });
+    return Promise.race([promise, timeout])
+      .finally(() => {
+        if (timeoutId) clearTimeout(timeoutId);
+      });
   }
 
   private extractResult(settledResult: PromiseSettledResult<HealthCheckResult | SystemInfo>): HealthCheckResult | SystemInfo {

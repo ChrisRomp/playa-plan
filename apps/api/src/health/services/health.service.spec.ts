@@ -11,8 +11,9 @@ describe('HealthService', () => {
     $queryRaw: jest.fn(),
   };
 
+  const configValues: Record<string, unknown> = {};
   const mockConfigService = {
-    get: jest.fn(),
+    get: jest.fn((key: string) => configValues[key]),
   };
 
   beforeEach(async () => {
@@ -32,7 +33,28 @@ describe('HealthService', () => {
 
     service = module.get<HealthService>(HealthService);
 
-    jest.clearAllMocks();
+  jest.clearAllMocks();
+  for (const k of Object.keys(configValues)) delete configValues[k];
+  jest.useRealTimers();
+  });
+
+  afterEach(() => {
+    if (typeof global.fetch === 'function') {
+      try {
+        (global.fetch as jest.Mock).mockClear?.();
+      } catch {
+        /* ignore */
+      }
+    }
+    delete (global as { fetch?: unknown }).fetch;
+    jest.useRealTimers();
+  });
+
+  afterAll(() => {
+    const timers = (service as unknown as { __timers?: NodeJS.Timeout[] }).__timers;
+    if (timers) {
+      for (const t of timers) clearTimeout(t);
+    }
   });
 
   it('should be defined', () => {
@@ -41,12 +63,12 @@ describe('HealthService', () => {
 
   describe('getHealthStatus', () => {
     it('should return healthy status when all checks pass', async () => {
-      mockPrismaService.$queryRaw.mockResolvedValue([{ '?column?': 1 }]);
-      mockConfigService.get
-        .mockReturnValueOnce({ secretKey: 'test-stripe-key' })
-        .mockReturnValueOnce({ clientId: 'test-paypal-id' })
-        .mockReturnValueOnce('https://api.paypal.com')
-        .mockReturnValueOnce({ host: 'smtp.test.com' });
+  mockPrismaService.$queryRaw.mockResolvedValue([{ '?column?': 1 }]);
+  // Stable key-based config mocks
+  configValues['stripe.secretKey'] = 'test-stripe-key';
+  configValues['paypal.clientId'] = 'test-paypal-id';
+  configValues['paypal.baseUrl'] = 'https://api.paypal.com';
+  configValues['email'] = { host: 'smtp.test.com' };
 
       global.fetch = jest.fn()
         .mockResolvedValueOnce({ ok: true })
@@ -63,12 +85,11 @@ describe('HealthService', () => {
     });
 
     it('should return unhealthy status when database fails', async () => {
-      mockPrismaService.$queryRaw.mockRejectedValue(new Error('Connection failed'));
-      mockConfigService.get
-        .mockReturnValueOnce({ secretKey: 'test-stripe-key' })
-        .mockReturnValueOnce({ clientId: 'test-paypal-id' })
-        .mockReturnValueOnce('https://api.paypal.com')
-        .mockReturnValueOnce({ host: 'smtp.test.com' });
+  mockPrismaService.$queryRaw.mockRejectedValue(new Error('Connection failed'));
+  configValues['stripe.secretKey'] = 'test-stripe-key';
+  configValues['paypal.clientId'] = 'test-paypal-id';
+  configValues['paypal.baseUrl'] = 'https://api.paypal.com';
+  configValues['email'] = { host: 'smtp.test.com' };
 
       global.fetch = jest.fn()
         .mockResolvedValueOnce({ ok: true })
@@ -82,12 +103,11 @@ describe('HealthService', () => {
     });
 
     it('should return degraded status when payment services partially fail', async () => {
-      mockPrismaService.$queryRaw.mockResolvedValue([{ '?column?': 1 }]);
-      mockConfigService.get
-        .mockReturnValueOnce({ secretKey: 'test-stripe-key' })
-        .mockReturnValueOnce({ clientId: 'test-paypal-id' })
-        .mockReturnValueOnce('https://api.paypal.com')
-        .mockReturnValueOnce({ host: 'smtp.test.com' });
+  mockPrismaService.$queryRaw.mockResolvedValue([{ '?column?': 1 }]);
+  configValues['stripe.secretKey'] = 'test-stripe-key';
+  configValues['paypal.clientId'] = 'test-paypal-id';
+  configValues['paypal.baseUrl'] = 'https://api.paypal.com';
+  configValues['email'] = { host: 'smtp.test.com' };
 
       global.fetch = jest.fn()
         .mockRejectedValueOnce(new Error('Stripe failed'))
@@ -101,12 +121,11 @@ describe('HealthService', () => {
     });
 
     it('should return degraded status when email service is not configured', async () => {
-      mockPrismaService.$queryRaw.mockResolvedValue([{ '?column?': 1 }]);
-      mockConfigService.get
-        .mockReturnValueOnce({ secretKey: 'test-stripe-key' })
-        .mockReturnValueOnce({ clientId: 'test-paypal-id' })
-        .mockReturnValueOnce('https://api.paypal.com')
-        .mockReturnValueOnce(null);
+  mockPrismaService.$queryRaw.mockResolvedValue([{ '?column?': 1 }]);
+  configValues['stripe.secretKey'] = 'test-stripe-key';
+  configValues['paypal.clientId'] = 'test-paypal-id';
+  configValues['paypal.baseUrl'] = 'https://api.paypal.com';
+  // Intentionally omit email config to simulate not configured
 
       global.fetch = jest.fn()
         .mockResolvedValueOnce({ ok: true })
@@ -120,28 +139,28 @@ describe('HealthService', () => {
     });
 
     it('should handle timeouts gracefully', async () => {
-      mockPrismaService.$queryRaw.mockImplementation(
-        () => new Promise((resolve) => setTimeout(resolve, 5000))
-      );
-      mockConfigService.get
-        .mockReturnValueOnce({ secretKey: 'test-stripe-key' })
-        .mockReturnValueOnce({ clientId: 'test-paypal-id' })
-        .mockReturnValueOnce('https://api.paypal.com')
-        .mockReturnValueOnce({ host: 'smtp.test.com' });
+  jest.useFakeTimers();
+  mockPrismaService.$queryRaw.mockImplementation(() => new Promise((resolve) => setTimeout(resolve, 5000)));
+  configValues['stripe.secretKey'] = 'test-stripe-key';
+  configValues['paypal.clientId'] = 'test-paypal-id';
+  configValues['paypal.baseUrl'] = 'https://api.paypal.com';
+  configValues['email'] = { host: 'smtp.test.com' };
 
       global.fetch = jest.fn()
         .mockResolvedValueOnce({ ok: true })
         .mockResolvedValueOnce({ ok: false, status: 401 });
-
-      const actualResult = await service.getHealthStatus();
+  const healthPromise = service.getHealthStatus();
+  jest.advanceTimersByTime(3100);
+  const actualResult = await healthPromise;
 
       expect(actualResult.checks.database.status).toBe(HealthStatus.UNHEALTHY);
       expect(actualResult.checks.database.error).toBe('Database connectivity failed');
     });
 
     it('should include system metrics', async () => {
-      mockPrismaService.$queryRaw.mockResolvedValue([{ '?column?': 1 }]);
-      mockConfigService.get.mockReturnValue(null);
+  mockPrismaService.$queryRaw.mockResolvedValue([{ '?column?': 1 }]);
+  // Return null for any config requests to force minimal environment
+  mockConfigService.get.mockImplementation(() => null);
 
       const actualResult = await service.getHealthStatus();
 
