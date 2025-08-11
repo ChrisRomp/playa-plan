@@ -42,6 +42,30 @@ export function UserReportsPage() {
     fetchUsers();
   }, [fetchUsers]);
 
+  // Apply client-side filtering
+  const filteredUsers = useMemo(() => {
+    return users.filter(user => {
+      // Role filter
+      if (filters.role && user.role !== filters.role) {
+        return false;
+      }
+      
+      // Status filter (email verification)
+      if (filters.status) {
+        if (filters.status === 'verified' && !user.isEmailVerified) {
+          return false;
+        }
+        if (filters.status === 'unverified' && user.isEmailVerified) {
+          return false;
+        }
+      }
+      
+      // Year filter would need user registration data - skip for now as users don't have year field
+      
+      return true;
+    });
+  }, [users, filters]);
+
   // Get unique years for filter dropdown (assuming users have a registration year)
   const availableYears = useMemo(() => {
     const currentYear = new Date().getFullYear();
@@ -52,16 +76,16 @@ export function UserReportsPage() {
     return years.sort((a, b) => b - a);
   }, []);
 
-  // Calculate summary statistics
+  // Calculate summary statistics based on filtered data
   const summaryStats = useMemo(() => {
-    const total = users.length;
-    const admins = users.filter(user => user.role === 'ADMIN').length;
-    const staff = users.filter(user => user.role === 'STAFF').length;
-    const participants = users.filter(user => user.role === 'PARTICIPANT').length;
-    const verified = users.filter(user => user.isEmailVerified).length;
+    const total = filteredUsers.length;
+    const admins = filteredUsers.filter(user => user.role === 'ADMIN').length;
+    const staff = filteredUsers.filter(user => user.role === 'STAFF').length;
+    const participants = filteredUsers.filter(user => user.role === 'PARTICIPANT').length;
+    const verified = filteredUsers.filter(user => user.isEmailVerified).length;
     
     return { total, admins, staff, participants, verified };
-  }, [users]);
+  }, [filteredUsers]);
 
   // Define table columns
   const columns: DataTableColumn<User>[] = [
@@ -144,7 +168,7 @@ export function UserReportsPage() {
       'Joined Date'
     ];
 
-    const csvData = users.map(user => [
+    const csvData = filteredUsers.map(user => [
       user.firstName,
       user.lastName,
       user.email,
@@ -350,8 +374,8 @@ export function UserReportsPage() {
                   className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                 >
                   <option value="">All Statuses</option>
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
+                  <option value="verified">Email Verified</option>
+                  <option value="unverified">Email Unverified</option>
                 </select>
               </div>
             </div>
@@ -379,7 +403,7 @@ export function UserReportsPage() {
         {users.length > 0 ? (
           <div className="bg-white shadow rounded-lg overflow-hidden">
             <DataTable
-              data={users}
+              data={filteredUsers}
               columns={columns}
               getRowKey={(row) => row.id}
               filterable={true}

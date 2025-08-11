@@ -252,13 +252,13 @@ describe('RegistrationReportsPage', () => {
       expect(summarySection).toHaveTextContent('Cancelled:1');
     });
 
-    it('should call getRegistrations on mount with empty filters', async () => {
+    it('should call getRegistrations on mount without filters', async () => {
       const mockGetRegistrations = vi.mocked(reports.getRegistrations);
       
       renderComponent();
 
       await waitFor(() => {
-        expect(mockGetRegistrations).toHaveBeenCalledWith({});
+        expect(mockGetRegistrations).toHaveBeenCalledWith();
       });
     });
   });
@@ -333,6 +333,30 @@ describe('RegistrationReportsPage', () => {
 
     it('should filter by year when year filter is changed', async () => {
       const mockGetRegistrations = vi.mocked(reports.getRegistrations);
+      // Mock multiple registrations with different years
+      const multiYearRegistrations: Registration[] = [
+        ...mockRegistrations,
+        {
+          id: '4',
+          userId: 'user4',
+          year: 2023,
+          status: 'CONFIRMED' as const,
+          createdAt: '2023-01-01T00:00:00Z',
+          updatedAt: '2023-01-01T00:00:00Z',
+          user: {
+            id: 'user4',
+            firstName: 'Jane',
+            lastName: 'Smith',
+            email: 'jane@example.com',
+            role: 'PARTICIPANT' as const,
+            isEmailVerified: true,
+            createdAt: '2023-01-01T00:00:00Z',
+            updatedAt: '2023-01-01T00:00:00Z',
+          },
+          jobs: []
+        }
+      ];
+      mockGetRegistrations.mockResolvedValue(multiYearRegistrations);
       
       renderComponent();
 
@@ -340,21 +364,53 @@ describe('RegistrationReportsPage', () => {
         expect(screen.getByText('Filters')).toBeInTheDocument();
       });
 
+      // Verify all registrations are initially shown
+      await waitFor(() => {
+        expect(screen.getByTestId('registration-1')).toBeInTheDocument();
+        expect(screen.getByTestId('registration-4')).toBeInTheDocument();
+      });
+
       // Open filters panel
       const filtersButton = screen.getByText('Filters');
       fireEvent.click(filtersButton);
 
-      // Change year filter
+      // Change year filter to 2024
       const yearSelect = screen.getByLabelText('Year');
       fireEvent.change(yearSelect, { target: { value: '2024' } });
 
+      // Verify only 2024 registrations are shown (client-side filtering)
       await waitFor(() => {
-        expect(mockGetRegistrations).toHaveBeenCalledWith({ year: 2024 });
+        expect(screen.getByTestId('registration-1')).toBeInTheDocument();
+        expect(screen.queryByTestId('registration-4')).not.toBeInTheDocument();
       });
     });
 
     it('should filter by status when status filter is changed', async () => {
       const mockGetRegistrations = vi.mocked(reports.getRegistrations);
+      // Mock multiple registrations with different statuses
+      const multiStatusRegistrations: Registration[] = [
+        ...mockRegistrations,
+        {
+          id: '5',
+          userId: 'user5',
+          year: 2024,
+          status: 'PENDING' as const,
+          createdAt: '2024-01-02T00:00:00Z',
+          updatedAt: '2024-01-02T00:00:00Z',
+          user: {
+            id: 'user5',
+            firstName: 'Bob',
+            lastName: 'Wilson',
+            email: 'bob@example.com',
+            role: 'PARTICIPANT' as const,
+            isEmailVerified: true,
+            createdAt: '2024-01-02T00:00:00Z',
+            updatedAt: '2024-01-02T00:00:00Z',
+          },
+          jobs: []
+        }
+      ];
+      mockGetRegistrations.mockResolvedValue(multiStatusRegistrations);
       
       renderComponent();
 
@@ -362,16 +418,24 @@ describe('RegistrationReportsPage', () => {
         expect(screen.getByText('Filters')).toBeInTheDocument();
       });
 
+      // Verify all registrations are initially shown
+      await waitFor(() => {
+        expect(screen.getByTestId('registration-1')).toBeInTheDocument();
+        expect(screen.getByTestId('registration-5')).toBeInTheDocument();
+      });
+
       // Open filters panel
       const filtersButton = screen.getByText('Filters');
       fireEvent.click(filtersButton);
 
-      // Change status filter
+      // Change status filter to CONFIRMED
       const statusSelect = screen.getByLabelText('Status');
       fireEvent.change(statusSelect, { target: { value: 'CONFIRMED' } });
 
+      // Verify only CONFIRMED registrations are shown (client-side filtering)
       await waitFor(() => {
-        expect(mockGetRegistrations).toHaveBeenCalledWith({ status: 'CONFIRMED' });
+        expect(screen.getByTestId('registration-1')).toBeInTheDocument();
+        expect(screen.queryByTestId('registration-5')).not.toBeInTheDocument();
       });
     });
 

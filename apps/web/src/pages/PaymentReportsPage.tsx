@@ -66,10 +66,35 @@ export function PaymentReportsPage() {
     return years.sort((a, b) => b - a); // Sort descending
   }, [payments]);
 
-  // Calculate summary statistics
+  // Apply client-side filtering
+  const filteredPayments = useMemo(() => {
+    if (!Array.isArray(payments)) return [];
+    
+    return payments.filter(payment => {
+      // Year filter
+      if (filters.year) {
+        const paymentYear = new Date(payment.createdAt).getFullYear();
+        if (paymentYear !== filters.year) return false;
+      }
+      
+      // Status filter
+      if (filters.status && payment.status !== filters.status) {
+        return false;
+      }
+      
+      // Provider filter
+      if (filters.provider && payment.provider !== filters.provider) {
+        return false;
+      }
+      
+      return true;
+    });
+  }, [payments, filters]);
+
+  // Calculate summary statistics based on filtered data
   const summaryStats = useMemo(() => {
-    // Make sure payments is an array
-    if (!Array.isArray(payments)) {
+    // Make sure filteredPayments is an array
+    if (!Array.isArray(filteredPayments)) {
       return {
         total: 0,
         completed: 0,
@@ -80,17 +105,17 @@ export function PaymentReportsPage() {
       };
     }
     
-    const total = payments.length;
-    const completed = payments.filter(payment => payment.status === 'COMPLETED').length;
-    const pending = payments.filter(payment => payment.status === 'PENDING').length;
-    const failed = payments.filter(payment => payment.status === 'FAILED').length;
-    const refunded = payments.filter(payment => payment.status === 'REFUNDED').length;
-    const totalAmount = payments
+    const total = filteredPayments.length;
+    const completed = filteredPayments.filter(payment => payment.status === 'COMPLETED').length;
+    const pending = filteredPayments.filter(payment => payment.status === 'PENDING').length;
+    const failed = filteredPayments.filter(payment => payment.status === 'FAILED').length;
+    const refunded = filteredPayments.filter(payment => payment.status === 'REFUNDED').length;
+    const totalAmount = filteredPayments
       .filter(payment => payment.status === 'COMPLETED')
       .reduce((sum, payment) => sum + payment.amount, 0);
     
     return { total, completed, pending, failed, refunded, totalAmount };
-  }, [payments]);
+  }, [filteredPayments]);
 
   // Define table columns
   const columns: DataTableColumn<Payment>[] = [
@@ -174,7 +199,7 @@ export function PaymentReportsPage() {
       'Registration ID'
     ];
 
-    const csvData = payments.map(payment => {
+    const csvData = filteredPayments.map(payment => {
       const date = new Date(payment.createdAt);
       const dateTime = `${date.toLocaleDateString()} ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
       
@@ -433,7 +458,7 @@ export function PaymentReportsPage() {
         {payments.length > 0 ? (
           <div className="bg-white shadow rounded-lg overflow-hidden">
             <DataTable
-              data={payments}
+              data={filteredPayments}
               columns={columns}
               getRowKey={(row) => row.id}
               filterable={true}
