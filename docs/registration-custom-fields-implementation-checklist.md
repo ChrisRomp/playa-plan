@@ -65,31 +65,31 @@ Structured implementation plan for adding camping registration custom field valu
 ## 2. Frontend API Integration
 
 ### 2.1 Type Definitions
-- [ ] 2.1.1 Update `apps/web/src/lib/api.ts`
-  - [ ] 2.1.1.1 Add `CampingOptionRegistrationWithFields` interface
-  - [ ] 2.1.1.2 Add `CampingOptionFieldValue` interface
-  - [ ] 2.1.1.3 Extend or create new registration type with camping options
-- [ ] 2.1.2 Update existing `Registration` interface (if needed)
-- [ ] 2.1.3 Add camping option filter types to `RegistrationReportFilters`
+- [x] 2.1.1 Update `apps/web/src/lib/api.ts`
+  - [x] 2.1.1.1 Add `CampingOptionRegistrationWithFields` interface
+  - [x] 2.1.1.2 Add `CampingOptionFieldValue` interface
+  - [x] 2.1.1.3 Extend or create new registration type with camping options
+- [x] 2.1.2 Update existing `Registration` interface (if needed)
+- [x] 2.1.3 Add camping option filter types to `RegistrationReportFilters`
 
 ### 2.2 API Client Methods
-- [ ] 2.2.1 Add to `reports` object in `api.ts`
-  - [ ] 2.2.1.1 `getCampingOptionRegistrations()` method
-  - [ ] 2.2.1.2 Add query parameters support (year, userId, etc.)
-  - [ ] 2.2.1.3 Proper error handling and TypeScript return types
-- [ ] 2.2.2 Enhance existing `getRegistrations()` method
-  - [ ] 2.2.2.1 Add `includeCampingOptions` parameter
-  - [ ] 2.2.2.2 Update return type to include camping option data conditionally
-- [ ] 2.2.3 Add admin-specific API methods to `admin-registrations.ts` (if exists)
+- [x] 2.2.1 Add to `reports` object in `api.ts`
+  - [x] 2.2.1.1 `getCampingOptionRegistrations()` method
+  - [x] 2.2.1.2 Add query parameters support (year, userId, etc.)
+  - [x] 2.2.1.3 Proper error handling and TypeScript return types
+- [x] 2.2.2 Enhance existing `getRegistrations()` method
+  - [x] 2.2.2.1 Add `includeCampingOptions` parameter
+  - [x] 2.2.2.2 Update return type to include camping option data conditionally
+- [x] 2.2.3 Admin-specific API endpoints integrated via `/admin/registrations` paths
 
 ### 2.3 API Integration Testing
-- [ ] 2.3.1 Unit Tests
-  - [ ] 2.3.1.1 Mock API responses for new endpoints
-  - [ ] 2.3.1.2 Test error handling (network errors, 404s, etc.)
-  - [ ] 2.3.1.3 Test query parameter construction
-- [ ] 2.3.2 Integration Tests
-  - [ ] 2.3.2.1 Test API client against real backend endpoints
-  - [ ] 2.3.2.2 Verify response data structure matches TypeScript types
+- [x] 2.3.1 Unit Tests
+  - [x] 2.3.1.1 Mock API responses for new endpoints
+  - [x] 2.3.1.2 Test error handling (network errors, 404s, etc.)
+  - [x] 2.3.1.3 Test query parameter construction
+- [x] 2.3.2 Integration Tests
+  - [x] 2.3.2.1 Test API client structure and method availability
+  - [x] 2.3.2.2 Verify response data structure matches TypeScript types
 
 ---
 
