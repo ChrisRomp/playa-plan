@@ -27,6 +27,7 @@ import { RegistrationReportsPage } from '../pages/RegistrationReportsPage.tsx';
 import { PaymentReportsPage } from '../pages/PaymentReportsPage.tsx';
 import { UserReportsPage } from '../pages/UserReportsPage.tsx';
 import { WorkScheduleReportPage } from '../pages/WorkScheduleReportPage.tsx';
+import HealthCheckPage from '../pages/HealthCheckPage.tsx';
 import { ROLES } from '../types/auth.ts';
 
 /**
@@ -41,6 +42,7 @@ const AppRouter: React.FC = () => {
       {/* Public routes */}
       <Route path={ROUTES.HOME.path} element={<HomePage />} />
       <Route path={ROUTES.LOGIN.path} element={<LoginPage />} />
+      <Route path={ROUTES.HEALTH.path} element={<HealthCheckPage />} />
       
       {/* Protected routes that require authentication */}
       <Route element={<ProtectedRoute requiresAuth={true} />}>
