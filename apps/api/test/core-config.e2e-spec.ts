@@ -98,7 +98,6 @@ describe('CoreConfigController (e2e)', () => {
       const createDto = {
         campName: 'Test Camp',
         registrationYear: 2023,
-        timeZone: 'America/Los_Angeles',
         campBannerUrl: 'https://mycamp.playaplan.app/banner.jpg',
         campBannerAltText: 'Beautiful test camp banner',
         campIconUrl: 'https://mycamp.playaplan.app/icon.png',
@@ -115,7 +114,6 @@ describe('CoreConfigController (e2e)', () => {
       expect(response.body.id).toBeDefined();
       expect(response.body.campName).toBe(createDto.campName);
       expect(response.body.registrationYear).toBe(createDto.registrationYear);
-      expect(response.body.timeZone).toBe(createDto.timeZone);
       expect(response.body.campBannerUrl).toBe(createDto.campBannerUrl);
       expect(response.body.campBannerAltText).toBe(createDto.campBannerAltText);
       expect(response.body.campIconUrl).toBe(createDto.campIconUrl);
@@ -129,7 +127,6 @@ describe('CoreConfigController (e2e)', () => {
       const createDto = {
         campName: 'Test Camp 2',
         registrationYear: 2024,
-        timeZone: 'America/New_York',
       };
 
       return request(app.getHttpServer())
@@ -227,7 +224,6 @@ describe('CoreConfigController (e2e)', () => {
       const createDto = {
         campName: 'Test Camp',
         registrationYear: 2023,
-        timeZone: 'America/Los_Angeles',
       };
       
       const createResponse = await request(app.getHttpServer())

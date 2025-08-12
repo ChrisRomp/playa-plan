@@ -57,13 +57,15 @@ jobs:
         node-version: ${{ matrix.node-version }}
         cache: 'npm'
     
-    - name: Install dependencies
-      working-directory: apps/api
+    - name: Install workspace dependencies (root)
       run: npm ci
-    
+
+    # Ensure Prisma client is generated (root install places @prisma/client in root node_modules)
     - name: Generate Prisma client
       working-directory: apps/api
       run: npx prisma generate
+      env:
+        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/playa_plan_test?schema=public
     
     - name: Run migrations
       working-directory: apps/api
@@ -81,7 +83,7 @@ jobs:
       env:
         DATABASE_URL: postgresql://postgres:postgres@localhost:5432/playa_plan_test?schema=public
         JWT_SECRET: test_jwt_secret
-        JWT_EXPIRES_IN: 7d
+        JWT_EXPIRATION_TIME: 24h
 
   build-and-publish-container:
     name: Build and Publish API Container

@@ -286,7 +286,6 @@ export const CoreConfigSchema = z.object({
   // Fix for "Expected string, received null" error
   paypalClientId: z.string().nullable().optional(),
   paypalMode: z.enum(['sandbox', 'live']),
-  timeZone: z.string(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });

@@ -60,7 +60,6 @@ export class PublicConfigController {
         paypalEnabled: config.paypalEnabled,
         paypalClientId: config.paypalClientId,
         paypalMode: config.paypalMode,
-        timeZone: config.timeZone,
         // Convert Date objects to ISO strings to match Zod schema expectations
         createdAt: config.createdAt instanceof Date ? config.createdAt.toISOString() : config.createdAt,
         updatedAt: config.updatedAt instanceof Date ? config.updatedAt.toISOString() : config.updatedAt

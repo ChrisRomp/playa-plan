@@ -37,7 +37,6 @@ describe('CoreConfigService', () => {
     senderName: 'Test Camp',
     replyTo: null,
     emailEnabled: false,
-    timeZone: 'America/Los_Angeles',
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -96,7 +95,6 @@ describe('CoreConfigService', () => {
       stripePublicKey: 'pk_test_123',
       stripeApiKey: 'sk_test_123',
       paypalEnabled: false,
-      timeZone: 'America/Los_Angeles',
     };
 
     it('should create a new core configuration when none exists', async () => {

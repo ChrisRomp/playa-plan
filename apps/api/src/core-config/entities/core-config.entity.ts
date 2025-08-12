@@ -279,15 +279,6 @@ export class CoreConfig {
   emailEnabled!: boolean;
 
   /**
-   * Site time zone
-   */
-  @ApiProperty({
-    description: 'Site time zone',
-    example: 'America/Los_Angeles'
-  })
-  timeZone!: string;
-
-  /**
    * Date when the configuration was created
    */
   @ApiProperty({

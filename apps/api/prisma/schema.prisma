@@ -286,7 +286,6 @@ model CoreConfig {
   senderName               String?
   replyToEmail             String?
   emailEnabled             Boolean    @default(false)
-  timeZone                 String     @default("UTC")
   createdAt                DateTime   @default(now())
   updatedAt                DateTime   @updatedAt
 
