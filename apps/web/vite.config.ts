@@ -20,7 +20,7 @@ export default defineConfig({
                 'utf-8'
               );
               res.end(healthHtml);
-            } catch (error) {
+            } catch {
               res.statusCode = 500;
               res.end('Health check unavailable');
             }
