@@ -99,7 +99,7 @@ describe('RegistrationAdminService', () => {
         create: jest.fn(),
       },
       $transaction: jest.fn(),
-    } as jest.Mocked<PrismaService>;
+    } as unknown as jest.Mocked<PrismaService>;
 
     const mockAdminAuditService = {
       createAuditRecord: jest.fn(),

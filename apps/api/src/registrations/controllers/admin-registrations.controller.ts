@@ -47,6 +47,122 @@ interface AuthenticatedRequest {
 export class AdminRegistrationsController {
   constructor(private readonly adminService: RegistrationAdminService) {}
 
+  @Get('camping-options-with-fields')
+  @ApiOperation({
+    summary: 'Get camping option registrations with field values',
+    description: 'Retrieve all camping option registrations with their custom field values for admin reporting',
+  })
+  @ApiQuery({
+    name: 'year',
+    description: 'Filter by registration year',
+    required: false,
+    type: Number,
+  })
+  @ApiQuery({
+    name: 'userId',
+    description: 'Filter by user ID',
+    required: false,
+    type: String,
+  })
+  @ApiQuery({
+    name: 'campingOptionId',
+    description: 'Filter by camping option ID',
+    required: false,
+    type: String,
+  })
+  @ApiQuery({
+    name: 'includeInactive',
+    description: 'Include inactive camping options',
+    required: false,
+    type: Boolean,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Successfully retrieved camping option registrations with field values',
+    schema: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          id: { type: 'string' },
+          userId: { type: 'string' },
+          campingOptionId: { type: 'string' },
+          createdAt: { type: 'string', format: 'date-time' },
+          updatedAt: { type: 'string', format: 'date-time' },
+          user: {
+            type: 'object',
+            properties: {
+              id: { type: 'string' },
+              email: { type: 'string' },
+              firstName: { type: 'string' },
+              lastName: { type: 'string' },
+              playaName: { type: 'string' },
+            },
+          },
+          campingOption: {
+            type: 'object',
+            properties: {
+              id: { type: 'string' },
+              name: { type: 'string' },
+              description: { type: 'string' },
+              enabled: { type: 'boolean' },
+              fields: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    id: { type: 'string' },
+                    displayName: { type: 'string' },
+                    dataType: { type: 'string' },
+                    required: { type: 'boolean' },
+                    order: { type: 'number' },
+                  },
+                },
+              },
+            },
+          },
+          fieldValues: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                id: { type: 'string' },
+                value: { type: 'string' },
+                fieldId: { type: 'string' },
+                registrationId: { type: 'string' },
+                field: {
+                  type: 'object',
+                  properties: {
+                    id: { type: 'string' },
+                    displayName: { type: 'string' },
+                    dataType: { type: 'string' },
+                    required: { type: 'boolean' },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized - Invalid or missing JWT token' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Admin role required' })
+  async getCampingOptionRegistrationsWithFields(
+    @Query('year') year?: number,
+    @Query('userId') userId?: string,
+    @Query('campingOptionId') campingOptionId?: string,
+    @Query('includeInactive') includeInactive?: boolean,
+  ) {
+    const filters = {
+      year,
+      userId,
+      campingOptionId,
+      includeInactive,
+    };
+    return this.adminService.getCampingOptionRegistrationsWithFields(filters);
+  }
+
   @Get()
   @ApiOperation({
     summary: 'Get all registrations for admin management',
@@ -93,6 +209,12 @@ export class AdminRegistrationsController {
     description: 'Number of records per page',
     required: false,
     type: Number,
+  })
+  @ApiQuery({
+    name: 'includeCampingOptions',
+    description: 'Include camping option registrations and field values in the response',
+    required: false,
+    type: Boolean,
   })
   @ApiResponse({
     status: 200,

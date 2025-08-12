@@ -26,15 +26,15 @@ Structured implementation plan for adding camping registration custom field valu
   - [x] 1.2.2.3 Maintain backward compatibility
 
 ### 1.3 Controller Layer Implementation
-- [ ] 1.3.1 Add new endpoint to `AdminRegistrationsController`
-  - [ ] 1.3.1.1 Implement `GET /admin/registrations/camping-options-with-fields`
-  - [ ] 1.3.1.2 Add query parameter validation using DTOs
-  - [ ] 1.3.1.3 Add OpenAPI/Swagger documentation
-  - [ ] 1.3.1.4 Ensure proper ADMIN role authorization
-- [ ] 1.3.2 Enhance existing `getRegistrations` endpoint
-  - [ ] 1.3.2.1 Add `includeCampingOptions` query parameter
-  - [ ] 1.3.2.2 Update API documentation
-  - [ ] 1.3.2.3 Maintain response format compatibility
+- [x] 1.3.1 Add new endpoint to `AdminRegistrationsController`
+  - [x] 1.3.1.1 Implement `GET /admin/registrations/camping-options-with-fields`
+  - [x] 1.3.1.2 Add query parameter validation using DTOs
+  - [x] 1.3.1.3 Add OpenAPI/Swagger documentation
+  - [x] 1.3.1.4 Ensure proper ADMIN role authorization
+- [x] 1.3.2 Enhance existing `getRegistrations` endpoint
+  - [x] 1.3.2.1 Add `includeCampingOptions` query parameter
+  - [x] 1.3.2.2 Update API documentation
+  - [x] 1.3.2.3 Maintain response format compatibility
 
 ### 1.4 DTO Implementation
 - [ ] 1.4.1 Create new DTOs in `admin-registration.dto.ts`
