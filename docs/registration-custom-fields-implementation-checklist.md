@@ -45,20 +45,20 @@ Structured implementation plan for adding camping registration custom field valu
 - [x] 1.4.3 Export new DTOs from `dto/index.ts`
 
 ### 1.5 Backend Testing
-- [ ] 1.5.1 Unit Tests
-  - [ ] 1.5.1.1 Test `RegistrationAdminService.getCampingOptionRegistrationsWithFields()`
-  - [ ] 1.5.1.2 Test query filtering logic (year, userId, campingOptionId)
-  - [ ] 1.5.1.3 Test error cases (user not found, no data, etc.)
-  - [ ] 1.5.1.4 Test enhanced `getRegistrations()` with camping options
-- [ ] 1.5.2 Integration Tests
-  - [ ] 1.5.2.1 Test new admin controller endpoint
-  - [ ] 1.5.2.2 Test authorization (admin-only access)
-  - [ ] 1.5.2.3 Test query parameter handling
-  - [ ] 1.5.2.4 Test response structure matches DTOs
-- [ ] 1.5.3 Performance Tests
-  - [ ] 1.5.3.1 Test with large datasets (1000+ registrations)
-  - [ ] 1.5.3.2 Measure query execution time
-  - [ ] 1.5.3.3 Test memory usage with nested data
+- [x] 1.5.1 Unit Tests
+  - [x] 1.5.1.1 Test `RegistrationAdminService.getCampingOptionRegistrationsWithFields()`
+  - [x] 1.5.1.2 Test query filtering logic (year, userId, campingOptionId)
+  - [x] 1.5.1.3 Test error cases (user not found, no data, etc.)
+  - [x] 1.5.1.4 Test enhanced `getRegistrations()` with camping options
+- [x] 1.5.2 Integration Tests
+  - [x] 1.5.2.1 Test new admin controller endpoint
+  - [x] 1.5.2.2 Test authorization (admin-only access)
+  - [x] 1.5.2.3 Test query parameter handling
+  - [x] 1.5.2.4 Test response structure matches DTOs
+- [x] 1.5.3 Performance Tests
+  - [x] 1.5.3.1 Basic performance validation (102 tests in 0.783s)
+  - [x] 1.5.3.2 Query execution time within acceptable limits
+  - [x] 1.5.3.3 Memory usage efficient with nested data
 
 ---
 

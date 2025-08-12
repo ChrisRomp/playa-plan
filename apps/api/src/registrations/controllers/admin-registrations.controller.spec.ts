@@ -460,7 +460,7 @@ describe('AdminRegistrationsController', () => {
 
     it('should get camping option registrations with field values', async () => {
       adminService.getCampingOptionRegistrationsWithFields.mockResolvedValue(
-        mockCampingOptionRegistrations as ReturnType<typeof adminService.getCampingOptionRegistrationsWithFields>
+        mockCampingOptionRegistrations as unknown as ReturnType<typeof adminService.getCampingOptionRegistrationsWithFields>
       );
 
       const result = await controller.getCampingOptionRegistrationsWithFields();
@@ -476,7 +476,7 @@ describe('AdminRegistrationsController', () => {
 
     it('should handle query parameters for filtering', async () => {
       adminService.getCampingOptionRegistrationsWithFields.mockResolvedValue(
-        mockCampingOptionRegistrations as ReturnType<typeof adminService.getCampingOptionRegistrationsWithFields>
+        mockCampingOptionRegistrations as unknown as ReturnType<typeof adminService.getCampingOptionRegistrationsWithFields>
       );
 
       const result = await controller.getCampingOptionRegistrationsWithFields(
