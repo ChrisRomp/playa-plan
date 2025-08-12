@@ -37,12 +37,12 @@ Structured implementation plan for adding camping registration custom field valu
   - [x] 1.3.2.3 Maintain response format compatibility
 
 ### 1.4 DTO Implementation
-- [ ] 1.4.1 Create new DTOs in `admin-registration.dto.ts`
-  - [ ] 1.4.1.1 `CampingOptionRegistrationWithFieldsDto`
-  - [ ] 1.4.1.2 `CampingOptionFieldValueDto`
-  - [ ] 1.4.1.3 `AdminCampingOptionQueryDto` for query parameters
-- [ ] 1.4.2 Add validation decorators and OpenAPI documentation
-- [ ] 1.4.3 Export new DTOs from `dto/index.ts`
+- [x] 1.4.1 Create new DTOs in `admin-registration.dto.ts`
+  - [x] 1.4.1.1 `CampingOptionRegistrationWithFieldsDto`
+  - [x] 1.4.1.2 `CampingOptionFieldValueDto`
+  - [x] 1.4.1.3 `AdminCampingOptionQueryDto` for query parameters
+- [x] 1.4.2 Add validation decorators and OpenAPI documentation
+- [x] 1.4.3 Export new DTOs from `dto/index.ts`
 
 ### 1.5 Backend Testing
 - [ ] 1.5.1 Unit Tests

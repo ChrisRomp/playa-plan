@@ -6,4 +6,7 @@ export {
   AdminCancelRegistrationDto,
   AdminRegistrationResponseDto,
   AdminRegistrationQueryDto,
+  CampingOptionFieldValueDto,
+  CampingOptionRegistrationWithFieldsDto,
+  AdminCampingOptionQueryDto,
 } from './admin-registration.dto';
