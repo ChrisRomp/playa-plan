@@ -6,6 +6,8 @@ import { HealthStatus } from '../dto/health-response.dto';
 
 describe('HealthService', () => {
   let service: HealthService;
+  let memoryUsageSpy: jest.SpyInstance<NodeJS.MemoryUsage, []> | undefined;
+  let uptimeSpy: jest.SpyInstance<number, []> | undefined;
 
   const mockPrismaService = {
     $queryRaw: jest.fn(),
@@ -36,6 +38,16 @@ describe('HealthService', () => {
   jest.clearAllMocks();
   for (const k of Object.keys(configValues)) delete configValues[k];
   jest.useRealTimers();
+
+  // Default system metrics to a healthy state for deterministic tests
+  memoryUsageSpy = jest.spyOn(process, 'memoryUsage').mockReturnValue({
+    rss: 100_000_000,
+    heapTotal: 100_000_000,
+    heapUsed: 40_000_000, // 40% usage
+    external: 10_000_000,
+    arrayBuffers: 5_000_000,
+  } as unknown as NodeJS.MemoryUsage);
+  uptimeSpy = jest.spyOn(process, 'uptime').mockReturnValue(3600); // 1h
   });
 
   afterEach(() => {
@@ -48,6 +60,8 @@ describe('HealthService', () => {
     }
     delete (global as { fetch?: unknown }).fetch;
     jest.useRealTimers();
+  memoryUsageSpy?.mockRestore();
+  uptimeSpy?.mockRestore();
   });
 
   afterAll(() => {
