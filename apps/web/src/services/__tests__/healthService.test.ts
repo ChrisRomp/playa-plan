@@ -40,6 +40,7 @@ Object.defineProperty(window, 'performance', {
 Object.defineProperty(window, 'navigator', {
   value: mockWindow.navigator,
   writable: true,
+  configurable: true,
 });
 
 Object.defineProperty(window, 'localStorage', {
@@ -66,6 +67,13 @@ Object.defineProperty(document, 'scripts', {
 describe('HealthService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    
+    // Ensure navigator.cookieEnabled returns true in tests
+    Object.defineProperty(navigator, 'cookieEnabled', {
+      value: true,
+      writable: true,
+      configurable: true,
+    });
   });
 
   afterEach(() => {
