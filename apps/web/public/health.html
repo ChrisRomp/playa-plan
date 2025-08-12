@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Frontend Health Check</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .status-healthy { color: green; }
+        .status-degraded { color: orange; }
+        .status-unhealthy { color: red; }
+        .timestamp { font-size: 0.9em; color: #666; }
+        .component-list { margin: 10px 0; }
+        .component-list li { margin: 5px 0; }
+    </style>
+</head>
+<body data-testid="static-health-check">
+    <h1>Frontend Health Check</h1>
+    <div id="health-status">
+        <h2>Overall Status: <span id="overall-status" class="status-healthy">CHECKING</span></h2>
+        <p class="timestamp">Timestamp: <span id="timestamp"></span></p>
+        
+        <h3>Component Status:</h3>
+        <ul class="component-list">
+            <li data-testid="api-status" id="api-status">API: <span>CHECKING</span></li>
+            <li data-testid="client-status" id="client-status">Client: <span>CHECKING</span></li>
+            <li data-testid="routing-status" id="routing-status">Frontend: <span>CHECKING</span></li>
+            <li data-testid="assets-status" id="assets-status">Assets: <span>CHECKING</span></li>
+        </ul>
+    </div>
+    
+    <footer>
+        <p>
+            <small>
+                Static health endpoint for monitoring systems. 
+                For detailed interactive health check, visit <a href="/#/health">/#/health</a>
+            </small>
+        </p>
+    </footer>
+
+    <script>
+        // Perform health checks when page loads
+        document.addEventListener('DOMContentLoaded', async function() {
+            const timestamp = new Date().toISOString();
+            document.getElementById('timestamp').textContent = timestamp;
+            
+            try {
+                const results = await Promise.allSettled([
+                    checkAPI(),
+                    checkClient(),
+                    checkFrontend(),
+                    checkAssets()
+                ]);
+
+                const [apiResult, clientResult, frontendResult, assetsResult] = results;
+                
+                updateStatus('api-status', apiResult.status === 'fulfilled' ? apiResult.value : { status: 'UNHEALTHY', error: apiResult.reason.message });
+                updateStatus('client-status', clientResult.status === 'fulfilled' ? clientResult.value : { status: 'UNHEALTHY', error: clientResult.reason.message });
+                updateStatus('routing-status', frontendResult.status === 'fulfilled' ? frontendResult.value : { status: 'UNHEALTHY', error: frontendResult.reason.message });
+                updateStatus('assets-status', assetsResult.status === 'fulfilled' ? assetsResult.value : { status: 'UNHEALTHY', error: assetsResult.reason.message });
+                
+                // Determine overall status
+                const allResults = [
+                    apiResult.status === 'fulfilled' ? apiResult.value : { status: 'UNHEALTHY' },
+                    clientResult.status === 'fulfilled' ? clientResult.value : { status: 'UNHEALTHY' },
+                    frontendResult.status === 'fulfilled' ? frontendResult.value : { status: 'UNHEALTHY' },
+                    assetsResult.status === 'fulfilled' ? assetsResult.value : { status: 'UNHEALTHY' }
+                ];
+                
+                const overallStatus = determineOverallStatus(allResults);
+                const overallElement = document.getElementById('overall-status');
+                overallElement.textContent = overallStatus;
+                overallElement.className = `status-${overallStatus.toLowerCase()}`;
+                document.body.setAttribute('data-status', overallStatus.toLowerCase());
+                
+                // Update document title for monitoring systems
+                document.title = overallStatus === 'UNHEALTHY' 
+                    ? 'Health Check - UNHEALTHY' 
+                    : 'Health Check - OK';
+                    
+            } catch (error) {
+                console.error('Health check failed:', error);
+                document.getElementById('overall-status').textContent = 'ERROR';
+                document.title = 'Health Check - ERROR';
+            }
+        });
+
+        async function checkAPI() {
+            const start = performance.now();
+            try {
+                // Use the same API URL logic as the main React app
+                const runtimeApiUrl = window.RUNTIME_CONFIG?.API_URL;
+                const isTemplate = runtimeApiUrl?.includes('${');
+                const apiBaseUrl = (!isTemplate && runtimeApiUrl) || 'http://localhost:3000';
+                const apiUrl = `${apiBaseUrl}/health`;
+                    
+                const response = await fetch(apiUrl, { 
+                    method: 'GET',
+                    headers: { 'Accept': 'application/json' }
+                });
+                
+                const time = Math.round(performance.now() - start);
+                
+                if (!response.ok) {
+                    return { status: 'UNHEALTHY', responseTime: `${time}ms`, error: `HTTP ${response.status}` };
+                }
+                
+                return { status: 'HEALTHY', responseTime: `${time}ms` };
+            } catch (error) {
+                const time = Math.round(performance.now() - start);
+                return { status: 'UNHEALTHY', responseTime: `${time}ms`, error: 'Connection failed' };
+            }
+        }
+
+        function checkClient() {
+            const issues = [];
+            let status = 'HEALTHY';
+            
+            // Check browser capabilities
+            if (!navigator.cookieEnabled) {
+                issues.push('cookies disabled');
+                status = 'DEGRADED';
+            }
+            
+            // Check localStorage
+            try {
+                localStorage.setItem('__health_test__', 'test');
+                localStorage.removeItem('__health_test__');
+            } catch (e) {
+                issues.push('localStorage unavailable');
+                status = 'DEGRADED';
+            }
+            
+            return { 
+                status, 
+                capabilities: {
+                    cookies: navigator.cookieEnabled,
+                    localStorage: checkLocalStorage(),
+                    performance: 'performance' in window
+                },
+                error: issues.length > 0 ? issues.join(', ') : undefined
+            };
+        }
+
+        function checkLocalStorage() {
+            try {
+                localStorage.setItem('__health_test__', 'test');
+                localStorage.removeItem('__health_test__');
+                return true;
+            } catch (e) {
+                return false;
+            }
+        }
+
+        function checkFrontend() {
+            const start = performance.now();
+            
+            // For static health endpoint, check if we can access the main React app
+            // by attempting to load a simple asset or checking if the main app would be accessible
+            const isStaticHealthPage = document.body.hasAttribute('data-testid') && 
+                                       document.body.getAttribute('data-testid') === 'static-health-check';
+            
+            if (isStaticHealthPage) {
+                // Static health page - check if frontend infrastructure is available
+                if (!window.history || !window.history.pushState) {
+                    return { status: 'UNHEALTHY', responseTime: '0ms', error: 'History API unavailable' };
+                }
+                
+                // Check if we can theoretically navigate to the main app
+                try {
+                    const testUrl = new URL('/#/health', window.location.origin);
+                    const time = Math.round(performance.now() - start);
+                    return { status: 'HEALTHY', responseTime: `${time}ms`, info: 'Static health endpoint' };
+                } catch (error) {
+                    const time = Math.round(performance.now() - start);
+                    return { status: 'UNHEALTHY', responseTime: `${time}ms`, error: 'URL construction failed' };
+                }
+            } else {
+                // Inside React app - check for React root
+                const reactRoot = document.querySelector('#root');
+                if (!reactRoot) {
+                    return { status: 'UNHEALTHY', responseTime: '0ms', error: 'React root not found' };
+                }
+                
+                // Check if routing would work
+                if (!window.history || !window.history.pushState) {
+                    return { status: 'UNHEALTHY', responseTime: '0ms', error: 'History API unavailable' };
+                }
+                
+                const time = Math.round(performance.now() - start);
+                return { status: 'HEALTHY', responseTime: `${time}ms` };
+            }
+        }
+
+        function checkAssets() {
+            const start = performance.now();
+            
+            // Check if basic assets loaded
+            const stylesheets = document.styleSheets.length;
+            const scripts = document.scripts.length;
+            
+            if (stylesheets === 0 && scripts <= 1) { // Only this script
+                const time = Math.round(performance.now() - start);
+                return { status: 'DEGRADED', responseTime: `${time}ms`, error: 'Minimal assets loaded' };
+            }
+            
+            const time = Math.round(performance.now() - start);
+            return { status: 'HEALTHY', responseTime: `${time}ms` };
+        }
+
+        function updateStatus(elementId, result) {
+            const element = document.getElementById(elementId);
+            let statusText = result.status;
+            
+            if (result.responseTime) {
+                statusText += ` (${result.responseTime})`;
+            }
+            
+            if (result.error) {
+                statusText += ` - ${result.error}`;
+            } else if (result.info) {
+                statusText += ` - ${result.info}`;
+            }
+            
+            element.innerHTML = element.innerHTML.split(':')[0] + ': ' + statusText;
+            element.className = `status-${result.status.toLowerCase()}`;
+        }
+
+        function determineOverallStatus(results) {
+            const statuses = results.map(r => r.status);
+            
+            if (statuses.includes('UNHEALTHY')) return 'UNHEALTHY';
+            if (statuses.includes('DEGRADED')) return 'DEGRADED';
+            return 'HEALTHY';
+        }
+    </script>
+</body>
+</html>

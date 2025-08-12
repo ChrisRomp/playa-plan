@@ -142,6 +142,11 @@ export const ROUTES = {
     requiresAuth: true,
     allowedRoles: [ROLES.ADMIN],
   },
+  HEALTH: {
+    path: '/health',
+    name: 'Health Check',
+    requiresAuth: false,
+  },
   NOT_FOUND: {
     path: '*',
     name: 'Not Found',
