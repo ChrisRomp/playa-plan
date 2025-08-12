@@ -995,7 +995,6 @@ async function main() {
       smtpSecure: false,
       senderEmail: 'camp@example.playaplan.app',
       senderName: 'Playa Plan',
-      timeZone: 'America/Los_Angeles',
     },
   });
 

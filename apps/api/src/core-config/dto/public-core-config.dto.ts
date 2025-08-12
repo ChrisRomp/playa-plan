@@ -170,15 +170,6 @@ export class PublicCoreConfigDto {
   paypalMode!: string;
 
   /**
-   * Site time zone
-   */
-  @ApiProperty({
-    description: 'Site time zone',
-    example: 'America/Los_Angeles'
-  })
-  timeZone!: string;
-
-  /**
    * Date when the configuration was created (ISO string)
    */
   @ApiProperty({

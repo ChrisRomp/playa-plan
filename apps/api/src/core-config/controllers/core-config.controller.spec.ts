@@ -37,7 +37,6 @@ describe('CoreConfigController', () => {
     smtpUseSsl: false,
     senderEmail: 'noreply@example.playaplan.app',
     senderName: 'Test Camp',
-    timeZone: 'America/Los_Angeles',
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -67,7 +66,6 @@ describe('CoreConfigController', () => {
     smtpUseSsl: false,
     senderEmail: 'noreply@example.playaplan.app',
     senderName: 'Test Camp',
-    timeZone: 'America/Los_Angeles',
   };
 
   const mockUpdateConfigDto: UpdateCoreConfigDto = {

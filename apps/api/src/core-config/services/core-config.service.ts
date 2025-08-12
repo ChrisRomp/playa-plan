@@ -52,7 +52,6 @@ export class CoreConfigService {
       senderName: config.senderName,
       replyTo: config.replyToEmail,
       emailEnabled: config.emailEnabled,
-      timeZone: config.timeZone,
       createdAt: config.createdAt,
       updatedAt: config.updatedAt,
     });
@@ -102,7 +101,6 @@ export class CoreConfigService {
           senderName: createCoreConfigDto.senderName ?? null,
           replyToEmail: createCoreConfigDto.replyTo ?? null,
           emailEnabled: createCoreConfigDto.emailEnabled ?? false,
-          timeZone: createCoreConfigDto.timeZone ?? 'UTC',
         },
       });
       
@@ -171,7 +169,6 @@ export class CoreConfigService {
       senderName: null,
       replyTo: null,
       emailEnabled: false,
-      timeZone: 'UTC',
       createdAt: new Date(),
       updatedAt: new Date(),
     });
@@ -261,7 +258,6 @@ export class CoreConfigService {
       if (updateCoreConfigDto.senderName !== undefined) data.senderName = updateCoreConfigDto.senderName;
       if (updateCoreConfigDto.replyTo !== undefined) data.replyToEmail = updateCoreConfigDto.replyTo;
       if (updateCoreConfigDto.emailEnabled !== undefined) data.emailEnabled = updateCoreConfigDto.emailEnabled;
-      if (updateCoreConfigDto.timeZone !== undefined) data.timeZone = updateCoreConfigDto.timeZone;
 
       // Always update the updatedAt field
       data.updatedAt = new Date();

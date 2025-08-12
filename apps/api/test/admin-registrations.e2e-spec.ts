@@ -233,7 +233,6 @@ describe('Admin Registration Management (Integration Tests)', () => {
       data: {
         campName: 'Integration Test Camp',
         registrationYear: 2024,
-        timeZone: 'UTC',
         emailEnabled: false, // Disable email for integration tests
         senderEmail: 'test@example.com',
         senderName: 'Test Camp',

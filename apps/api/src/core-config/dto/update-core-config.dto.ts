@@ -376,16 +376,4 @@ export class UpdateCoreConfigDto {
   @IsOptional()
   @Type(() => Boolean)
   emailEnabled?: boolean;
-
-  /**
-   * Site time zone
-   */
-  @ApiProperty({
-    description: 'Site time zone',
-    example: 'America/Los_Angeles',
-    required: false
-  })
-  @IsString()
-  @IsOptional()
-  timeZone?: string;
 } 
