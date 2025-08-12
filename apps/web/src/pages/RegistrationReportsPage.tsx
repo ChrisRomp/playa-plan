@@ -2,16 +2,9 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { ArrowLeft, Download, Filter, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { DataTable, DataTableColumn } from '../components/common/DataTable/DataTable';
-import { reports, Registration } from '../lib/api';
+import { reports, Registration, RegistrationReportFilters, CampingOptionRegistrationWithFields } from '../lib/api';
 import { PATHS } from '../routes';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
-
-interface RegistrationReportFilters {
-  year?: number;
-  userId?: string;
-  jobId?: string;
-  status?: string;
-}
 
 /**
  * Registration Reports page
@@ -23,13 +16,21 @@ export function RegistrationReportsPage() {
   const [error, setError] = useState<string | null>(null);
   const [filters, setFilters] = useState<RegistrationReportFilters>({});
   const [showFilters, setShowFilters] = useState(false);
+  const [showCampingOptions, setShowCampingOptions] = useState(() => {
+    // Restore from localStorage
+    return localStorage.getItem('registrationReports_showCampingOptions') === 'true';
+  });
+  const [campingOptionData, setCampingOptionData] = useState<CampingOptionRegistrationWithFields[]>([]);
+  const [campingOptionsLoading, setCampingOptionsLoading] = useState(false);
 
   // Fetch registrations data
   const fetchRegistrations = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await reports.getRegistrations();
+      const data = await reports.getRegistrations({ 
+        includeCampingOptions: showCampingOptions 
+      });
       setRegistrations(data);
     } catch (err) {
       setError('Failed to fetch registrations data');
@@ -37,11 +38,39 @@ export function RegistrationReportsPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [showCampingOptions]);
+
+  // Fetch camping option registrations with field values
+  const fetchCampingOptionData = useCallback(async () => {
+    if (!showCampingOptions) {
+      setCampingOptionData([]);
+      return;
+    }
+
+    setCampingOptionsLoading(true);
+    try {
+      const data = await reports.getCampingOptionRegistrations(filters);
+      setCampingOptionData(data);
+    } catch (err) {
+      console.error('Error fetching camping option data:', err);
+      // Don't set main error state for camping options - fail gracefully
+    } finally {
+      setCampingOptionsLoading(false);
+    }
+  }, [showCampingOptions, filters]);
 
   useEffect(() => {
     fetchRegistrations();
   }, [fetchRegistrations]);
+
+  useEffect(() => {
+    fetchCampingOptionData();
+  }, [fetchCampingOptionData]);
+
+  // Save toggle state to localStorage
+  useEffect(() => {
+    localStorage.setItem('registrationReports_showCampingOptions', showCampingOptions.toString());
+  }, [showCampingOptions]);
 
   // Apply client-side filtering
   const filteredRegistrations = useMemo(() => {
@@ -76,8 +105,34 @@ export function RegistrationReportsPage() {
     return years;
   }, [registrations]);
 
+  // Helper function to format camping option data for a user
+  const formatCampingOptionData = useCallback((registration: Registration) => {
+    if (!showCampingOptions || !registration.campingOptions || registration.campingOptions.length === 0) {
+      return 'No camping options';
+    }
+
+    return registration.campingOptions.map(co => {
+      // Find matching detailed data
+      const detailData = campingOptionData.find(detail => 
+        detail.userId === registration.userId && detail.campingOptionId === co.campingOptionId
+      );
+
+      let result = co.campingOption?.name || 'Unknown Option';
+      
+      if (detailData && detailData.fieldValues.length > 0) {
+        const fieldData = detailData.fieldValues
+          .map(fv => `${fv.field.displayName}: ${fv.value}`)
+          .join(', ');
+        result += ` (${fieldData})`;
+      }
+      
+      return result;
+    }).join('; ');
+  }, [showCampingOptions, campingOptionData]);
+
   // Define table columns
-  const columns: DataTableColumn<Registration>[] = [
+  const columns: DataTableColumn<Registration>[] = useMemo(() => {
+    const baseColumns: DataTableColumn<Registration>[] = [
     {
       id: 'user',
       header: 'User',
@@ -133,6 +188,29 @@ export function RegistrationReportsPage() {
     },
   ];
 
+    // Add camping options column if enabled
+    if (showCampingOptions) {
+      // Insert camping options column before status
+      const statusIndex = baseColumns.findIndex(col => col.id === 'status');
+      baseColumns.splice(statusIndex, 0, {
+        id: 'campingOptions',
+        header: 'Registration Fields',
+        accessor: (row) => (
+          <div className="max-w-xs">
+            <span className="text-sm">{formatCampingOptionData(row)}</span>
+            {campingOptionsLoading && (
+              <span className="ml-2 text-xs text-gray-500">(loading...)</span>
+            )}
+          </div>
+        ),
+        sortable: false,
+        hideOnMobile: true,
+      });
+    }
+
+    return baseColumns;
+  }, [showCampingOptions, formatCampingOptionData, campingOptionsLoading]);
+
   const handleFilterChange = (key: keyof RegistrationReportFilters, value: string) => {
     setFilters(prev => ({
       ...prev,
@@ -142,11 +220,12 @@ export function RegistrationReportsPage() {
 
   const clearFilters = () => {
     setFilters({});
+    setShowCampingOptions(false);
   };
 
   const exportData = () => {
     // Convert registrations data to CSV format
-    const headers = [
+    const baseHeaders = [
       'User Name',
       'Email',
       'Shift',
@@ -155,14 +234,33 @@ export function RegistrationReportsPage() {
       'Registered Date'
     ];
 
-    const csvData = filteredRegistrations.map(registration => [
-      registration.user ? `${registration.user.firstName} ${registration.user.lastName}` : 'Unknown User',
-      registration.user?.email || '',
-      registration.jobs.map(rj => rj.job.name).join('; ') || '',
-      registration.status,
-      registration.year.toString(),
-      new Date(registration.createdAt).toLocaleDateString()
-    ]);
+    // Add camping options header if enabled
+    const headers = showCampingOptions 
+      ? [...baseHeaders.slice(0, 3), 'Registration Fields', ...baseHeaders.slice(3)]
+      : baseHeaders;
+
+    const csvData = filteredRegistrations.map(registration => {
+      const baseData = [
+        registration.user ? `${registration.user.firstName} ${registration.user.lastName}` : 'Unknown User',
+        registration.user?.email || '',
+        registration.jobs.map(rj => rj.job.name).join('; ') || '',
+        registration.status,
+        registration.year.toString(),
+        new Date(registration.createdAt).toLocaleDateString()
+      ];
+
+      // Add camping options data if enabled
+      if (showCampingOptions) {
+        const campingOptionText = formatCampingOptionData(registration);
+        return [
+          ...baseData.slice(0, 2), // User Name, Email
+          campingOptionText, // Registration Fields
+          ...baseData.slice(2) // Shift, Status, Year, Registered Date
+        ];
+      }
+
+      return baseData;
+    });
 
     // Create CSV content
     const csvContent = [
@@ -187,7 +285,8 @@ export function RegistrationReportsPage() {
       .map(([key, value]) => `${key}-${value}`)
       .join('_');
     
-    const filename = `registration_reports${filterSuffix ? '_' + filterSuffix : ''}_${new Date().toISOString().split('T')[0]}.csv`;
+    const campingSuffix = showCampingOptions ? '_with_registration_fields' : '';
+    const filename = `registration_reports${filterSuffix ? '_' + filterSuffix : ''}${campingSuffix}_${new Date().toISOString().split('T')[0]}.csv`;
     link.setAttribute('download', filename);
     
     link.style.visibility = 'hidden';
@@ -253,46 +352,78 @@ export function RegistrationReportsPage() {
                 <X size={20} />
               </button>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label htmlFor="year-filter" className="block text-sm font-medium text-gray-700 mb-1">
-                  Year
-                </label>
-                <select
-                  id="year-filter"
-                  value={filters.year || ''}
-                  onChange={(e) => handleFilterChange('year', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-amber-500 focus:border-amber-500"
-                >
-                  <option value="">All Years</option>
-                  {availableYears.map(year => (
-                    <option key={year} value={year}>{year}</option>
-                  ))}
-                </select>
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label htmlFor="year-filter" className="block text-sm font-medium text-gray-700 mb-1">
+                    Year
+                  </label>
+                  <select
+                    id="year-filter"
+                    value={filters.year || ''}
+                    onChange={(e) => handleFilterChange('year', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-amber-500 focus:border-amber-500"
+                  >
+                    <option value="">All Years</option>
+                    {availableYears.map(year => (
+                      <option key={year} value={year}>{year}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="status-filter" className="block text-sm font-medium text-gray-700 mb-1">
+                    Status
+                  </label>
+                  <select
+                    id="status-filter"
+                    value={filters.status || ''}
+                    onChange={(e) => handleFilterChange('status', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-amber-500 focus:border-amber-500"
+                  >
+                    <option value="">All Statuses</option>
+                    <option value="CONFIRMED">Confirmed</option>
+                    <option value="PENDING">Pending</option>
+                    <option value="CANCELLED">Cancelled</option>
+                  </select>
+                </div>
+                <div className="flex items-end">
+                  <button
+                    onClick={clearFilters}
+                    className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800"
+                  >
+                    Clear Filters
+                  </button>
+                </div>
               </div>
-              <div>
-                <label htmlFor="status-filter" className="block text-sm font-medium text-gray-700 mb-1">
-                  Status
-                </label>
-                <select
-                  id="status-filter"
-                  value={filters.status || ''}
-                  onChange={(e) => handleFilterChange('status', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-amber-500 focus:border-amber-500"
-                >
-                  <option value="">All Statuses</option>
-                  <option value="CONFIRMED">Confirmed</option>
-                  <option value="PENDING">Pending</option>
-                  <option value="CANCELLED">Cancelled</option>
-                </select>
-              </div>
-              <div className="flex items-end">
-                <button
-                  onClick={clearFilters}
-                  className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800"
-                >
-                  Clear Filters
-                </button>
+              
+              {/* Camping Options Toggle */}
+              <div className="pt-4 border-t border-gray-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label htmlFor="camping-options-toggle" className="block text-sm font-medium text-gray-700">
+                      Show Registration Fields
+                    </label>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Display camping option registrations and custom field values
+                    </p>
+                  </div>
+                  <div className="flex items-center">
+                    <button
+                      type="button"
+                      id="camping-options-toggle"
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 ${
+                        showCampingOptions ? 'bg-amber-600' : 'bg-gray-200'
+                      }`}
+                      onClick={() => setShowCampingOptions(!showCampingOptions)}
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                          showCampingOptions ? 'translate-x-6' : 'translate-x-1'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
