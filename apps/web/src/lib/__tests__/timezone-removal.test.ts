@@ -36,7 +36,7 @@ describe('CoreConfig Schema - Timezone Removal', () => {
   });
 
   it('should ignore timeZone field if provided and not include it in result', () => {
-    const dataWithTimeZone = {
+    const dataWithTimeZone: Record<string, unknown> = {
       id: '1',
       campName: 'Test Camp',
       registrationYear: 2024,
@@ -49,7 +49,7 @@ describe('CoreConfig Schema - Timezone Removal', () => {
       timeZone: 'America/Los_Angeles', // This should be ignored
       createdAt: '2024-01-01T00:00:00Z',
       updatedAt: '2024-01-01T00:00:00Z'
-    } as any; // Use 'as any' to allow timeZone property for testing
+    };
 
     // This should succeed but timeZone should not be in the result
     const result = CoreConfigSchema.parse(dataWithTimeZone);
