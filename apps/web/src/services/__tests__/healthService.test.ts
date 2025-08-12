@@ -170,9 +170,19 @@ describe('HealthService', () => {
     });
 
     it('should handle API timeout gracefully', async () => {
-      // Mock API timeout
+      // Mock API timeout - simulate a request that gets aborted
       vi.mocked(api.get).mockImplementation(
-        () => new Promise((resolve) => setTimeout(resolve, 6000))
+        (url, config) => new Promise((resolve, reject) => {
+          const timeout = setTimeout(() => resolve({ status: 200, data: { status: 'healthy' } }), 6000);
+          
+          // Handle abort signal if provided
+          if (config?.signal) {
+            config.signal.addEventListener('abort', () => {
+              clearTimeout(timeout);
+              reject(new Error('AbortError'));
+            });
+          }
+        })
       );
 
       const actualResult = await healthService.getHealthStatus();

@@ -53,12 +53,12 @@ class HealthService {
 
   private async checkApiConnectivity(): Promise<HealthCheckResult> {
     const startTime = Date.now();
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
 
     try {
-      await Promise.race([
-        api.get('/health'),
-        this.timeoutPromise(5000, 'API connectivity timeout'),
-      ]);
+      await api.get('/health', { signal: controller.signal });
+      clearTimeout(timeout);
 
       const responseTime = `${Date.now() - startTime}ms`;
       return {
@@ -66,6 +66,7 @@ class HealthService {
         responseTime,
       };
     } catch (error) {
+      clearTimeout(timeout);
       const responseTime = `${Date.now() - startTime}ms`;
       console.warn('API connectivity check failed:', error);
       return {
@@ -205,11 +206,6 @@ class HealthService {
     return `${browser} on ${os}`;
   }
 
-  private timeoutPromise<T>(ms: number, message: string): Promise<T> {
-    return new Promise((_, reject) => {
-      setTimeout(() => reject(new Error(message)), ms);
-    });
-  }
 
   private extractResult(settledResult: PromiseSettledResult<HealthCheckResult | ClientInfo>): HealthCheckResult | ClientInfo {
     if (settledResult.status === 'fulfilled') {

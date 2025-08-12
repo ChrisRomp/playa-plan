@@ -30,18 +30,6 @@ const HealthCheckPage: React.FC = () => {
           // This is done via document.title as a signal to headless browsers
           if (result.status === HealthStatus.UNHEALTHY) {
             document.title = `Health Check - ${result.status.toUpperCase()}`;
-            // Signal unhealthy status to monitoring systems
-            if ('serviceWorker' in navigator) {
-              // Use service worker messaging if available
-              navigator.serviceWorker.ready.then(registration => {
-                registration.active?.postMessage({
-                  type: 'HEALTH_STATUS',
-                  status: result.status
-                });
-              }).catch(() => {
-                // Service worker not available, that's fine
-              });
-            }
           } else {
             document.title = 'Health Check - OK';
           }
