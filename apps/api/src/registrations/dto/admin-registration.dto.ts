@@ -161,6 +161,15 @@ export class AdminRegistrationQueryDto {
   @IsInt({ message: 'Limit must be an integer' })
   @Min(1, { message: 'Limit must be 1 or greater' })
   limit?: number;
+
+  @ApiPropertyOptional({
+    description: 'Include camping option registrations and field values in the response',
+    example: false,
+    default: false,
+  })
+  @IsOptional()
+  @IsBoolean({ message: 'Include camping options must be a boolean' })
+  includeCampingOptions?: boolean = false;
 }
 
 /**

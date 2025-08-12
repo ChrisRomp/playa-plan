@@ -15,15 +15,15 @@ Structured implementation plan for adding camping registration custom field valu
 - [x] 1.1.3 Verify database constraints and foreign keys are properly set up
 
 ### 1.2 Service Layer Implementation
-- [ ] 1.2.1 Add method to `RegistrationAdminService` class
-  - [ ] 1.2.1.1 Create `getCampingOptionRegistrationsWithFields()` method
-  - [ ] 1.2.1.2 Implement query filters (year, userId, campingOptionId, includeInactive)
-  - [ ] 1.2.1.3 Add proper Prisma includes for nested data (user, campingOption, fieldValues, fields)
-  - [ ] 1.2.1.4 Implement error handling and logging
-- [ ] 1.2.2 Add method overload to existing `getRegistrations()` method
-  - [ ] 1.2.2.1 Add `includeCampingOptions?: boolean` parameter
-  - [ ] 1.2.2.2 Conditionally include camping option data in response
-  - [ ] 1.2.2.3 Maintain backward compatibility
+- [x] 1.2.1 Add method to `RegistrationAdminService` class
+  - [x] 1.2.1.1 Create `getCampingOptionRegistrationsWithFields()` method
+  - [x] 1.2.1.2 Implement query filters (year, userId, campingOptionId, includeInactive)
+  - [x] 1.2.1.3 Add proper Prisma includes for nested data (user, campingOption, fieldValues, fields)
+  - [x] 1.2.1.4 Implement error handling and logging
+- [x] 1.2.2 Add method overload to existing `getRegistrations()` method
+  - [x] 1.2.2.1 Add `includeCampingOptions?: boolean` parameter
+  - [x] 1.2.2.2 Conditionally include camping option data in response
+  - [x] 1.2.2.3 Maintain backward compatibility
 
 ### 1.3 Controller Layer Implementation
 - [ ] 1.3.1 Add new endpoint to `AdminRegistrationsController`
