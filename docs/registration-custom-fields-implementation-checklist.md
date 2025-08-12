@@ -8,11 +8,11 @@ Structured implementation plan for adding camping registration custom field valu
 ## 1. Backend API Implementation
 
 ### 1.1 Database Layer
-- [ ] 1.1.1 Review existing indexes on camping option tables
-- [ ] 1.1.2 Add performance indexes if needed:
-  - [ ] 1.1.2.1 `idx_camping_option_registrations_user_id` on `camping_option_registrations(user_id)`
-  - [ ] 1.1.2.2 `idx_camping_option_field_values_registration_id` on `camping_option_field_values(registration_id)`
-- [ ] 1.1.3 Verify database constraints and foreign keys are properly set up
+- [x] 1.1.1 Review existing indexes on camping option tables
+- [x] 1.1.2 Add performance indexes if needed:
+  - [x] 1.1.2.1 `idx_camping_option_registrations_user_id` on `camping_option_registrations(user_id)`
+  - [x] 1.1.2.2 `idx_camping_option_field_values_registration_id` on `camping_option_field_values(registration_id)`
+- [x] 1.1.3 Verify database constraints and foreign keys are properly set up
 
 ### 1.2 Service Layer Implementation
 - [ ] 1.2.1 Add method to `RegistrationAdminService` class
