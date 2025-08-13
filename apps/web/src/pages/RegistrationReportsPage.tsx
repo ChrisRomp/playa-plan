@@ -461,39 +461,39 @@ export function RegistrationReportsPage() {
                   </button>
                 </div>
               </div>
-              
-              {/* Camping Options Toggle */}
-              <div className="pt-4 border-t border-gray-200">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <label htmlFor="camping-options-toggle" className="block text-sm font-medium text-gray-700">
-                      Show Registration Fields
-                    </label>
-                    <p className="text-xs text-gray-500 mt-1">
-                      Display camping option registrations and custom field values
-                    </p>
-                  </div>
-                  <div className="flex items-center">
-                    <button
-                      type="button"
-                      id="camping-options-toggle"
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 ${
-                        showCampingOptions ? 'bg-amber-600' : 'bg-gray-200'
-                      }`}
-                      onClick={() => setShowCampingOptions(!showCampingOptions)}
-                    >
-                      <span
-                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                          showCampingOptions ? 'translate-x-6' : 'translate-x-1'
-                        }`}
-                      />
-                    </button>
-                  </div>
-                </div>
-              </div>
             </div>
           </div>
         )}
+
+        {/* Show Registration Fields Toggle */}
+        <div className="bg-gray-50 rounded-lg p-4 mb-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <label htmlFor="camping-options-toggle" className="block text-sm font-medium text-gray-700">
+                Show Registration Fields
+              </label>
+              <p className="text-xs text-gray-500 mt-1">
+                Display camping option registrations and custom field values
+              </p>
+            </div>
+            <div className="flex items-center">
+              <button
+                type="button"
+                id="camping-options-toggle"
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 ${
+                  showCampingOptions ? 'bg-amber-600' : 'bg-gray-200'
+                }`}
+                onClick={() => setShowCampingOptions(!showCampingOptions)}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    showCampingOptions ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+          </div>
+        </div>
 
         {/* Error Message */}
         {error && (
