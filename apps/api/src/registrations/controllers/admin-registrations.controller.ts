@@ -43,11 +43,11 @@ interface AuthenticatedRequest {
 @ApiBearerAuth()
 @Controller('admin/registrations')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(UserRole.ADMIN)
 export class AdminRegistrationsController {
   constructor(private readonly adminService: RegistrationAdminService) {}
 
   @Get('camping-options-with-fields')
+  @Roles(UserRole.ADMIN, UserRole.STAFF)
   @ApiOperation({
     summary: 'Get camping option registrations with field values',
     description: 'Retrieve all camping option registrations with their custom field values for admin reporting',
@@ -164,6 +164,7 @@ export class AdminRegistrationsController {
   }
 
   @Get()
+  @Roles(UserRole.ADMIN, UserRole.STAFF)
   @ApiOperation({
     summary: 'Get all registrations for admin management',
     description: 'Retrieve paginated list of registrations with filtering capabilities for admin management interface',
@@ -240,6 +241,7 @@ export class AdminRegistrationsController {
   }
 
   @Put(':id')
+  @Roles(UserRole.ADMIN)
   @ApiOperation({
     summary: 'Edit a registration',
     description: 'Update registration details including status, work shifts, and camping options with audit trail logging',
@@ -269,6 +271,7 @@ export class AdminRegistrationsController {
   }
 
   @Delete(':id')
+  @Roles(UserRole.ADMIN)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Cancel a registration',
@@ -298,6 +301,7 @@ export class AdminRegistrationsController {
   }
 
   @Get(':id/audit-trail')
+  @Roles(UserRole.ADMIN, UserRole.STAFF)
   @ApiOperation({
     summary: 'Get audit trail for a registration',
     description: 'Retrieve complete audit trail showing all administrative actions performed on this registration',
@@ -346,6 +350,7 @@ export class AdminRegistrationsController {
   }
 
   @Get(':id/camping-options')
+  @Roles(UserRole.ADMIN, UserRole.STAFF)
   @ApiOperation({
     summary: 'Get camping options for a registration user',
     description: 'Retrieve all camping options registered by the user of this registration',
