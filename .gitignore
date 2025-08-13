@@ -65,3 +65,5 @@ apps/*/package-lock.json
 libs/*/package-lock.json
 apps/api/.env.test
 .env.local
+
+tmp/*

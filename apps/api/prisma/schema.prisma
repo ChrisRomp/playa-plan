@@ -93,6 +93,7 @@ model CampingOptionFieldValue {
   field          CampingOptionField        @relation(fields: [fieldId], references: [id], onDelete: Cascade)
   registration   CampingOptionRegistration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
 
+  @@index([registrationId])
   @@map("camping_option_field_values")
 }
 
@@ -106,6 +107,7 @@ model CampingOptionRegistration {
   campingOption   CampingOption             @relation(fields: [campingOptionId], references: [id])
   user            User                      @relation(fields: [userId], references: [id])
 
+  @@index([userId])
   @@map("camping_option_registrations")
 }
 

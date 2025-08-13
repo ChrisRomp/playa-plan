@@ -112,6 +112,7 @@ describe('AdminRegistrationsController', () => {
       cancelRegistration: jest.fn(),
       getRegistrationAuditTrail: jest.fn(),
       getUserCampingOptions: jest.fn(),
+      getCampingOptionRegistrationsWithFields: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -177,6 +178,41 @@ describe('AdminRegistrationsController', () => {
       await controller.getRegistrations(query);
 
       expect(adminService.getRegistrations).toHaveBeenCalledWith({});
+    });
+
+    it('should handle includeCampingOptions parameter', async () => {
+      const query: AdminRegistrationQueryDto = {
+        page: 1,
+        limit: 10,
+        includeCampingOptions: true,
+      };
+
+      const mockResponseWithCampingOptions = {
+        ...mockRegistrationsResponse,
+        registrations: [
+          {
+            ...mockRegistration,
+            campingOptions: [
+              {
+                id: 'cor-123',
+                campingOption: { name: 'RV Camping' },
+                fieldValues: [{ field: { displayName: 'License Plate' }, value: 'ABC123' }],
+              },
+            ],
+          },
+        ],
+      };
+
+      adminService.getRegistrations.mockResolvedValue(mockResponseWithCampingOptions);
+
+      const result = await controller.getRegistrations(query);
+
+      expect(adminService.getRegistrations).toHaveBeenCalledWith({
+        page: 1,
+        limit: 10,
+        includeCampingOptions: true,
+      });
+      expect(result).toEqual(mockResponseWithCampingOptions);
     });
   });
 
@@ -375,6 +411,109 @@ describe('AdminRegistrationsController', () => {
     });
   });
 
+  describe('getCampingOptionRegistrationsWithFields', () => {
+    const mockCampingOptionRegistrations = [
+      {
+        id: 'cor-123',
+        userId: 'user-123',
+        campingOptionId: 'co-123',
+        createdAt: new Date('2024-01-01'),
+        updatedAt: new Date('2024-01-01'),
+        user: {
+          id: 'user-123',
+          email: 'test@example.com',
+          firstName: 'John',
+          lastName: 'Doe',
+          playaName: 'TestUser',
+        },
+        campingOption: {
+          id: 'co-123',
+          name: 'RV Camping',
+          description: 'RV camping with hookups',
+          enabled: true,
+          fields: [
+            {
+              id: 'field-123',
+              displayName: 'Vehicle License Plate',
+              dataType: 'STRING',
+              required: true,
+              order: 1,
+            },
+          ],
+        },
+        fieldValues: [
+          {
+            id: 'fv-123',
+            value: 'ABC123',
+            fieldId: 'field-123',
+            registrationId: 'cor-123',
+            field: {
+              id: 'field-123',
+              displayName: 'Vehicle License Plate',
+              dataType: 'STRING',
+              required: true,
+            },
+          },
+        ],
+      },
+    ];
+
+    it('should get camping option registrations with field values', async () => {
+      adminService.getCampingOptionRegistrationsWithFields.mockResolvedValue(
+        mockCampingOptionRegistrations as unknown as ReturnType<typeof adminService.getCampingOptionRegistrationsWithFields>
+      );
+
+      const result = await controller.getCampingOptionRegistrationsWithFields();
+
+      expect(adminService.getCampingOptionRegistrationsWithFields).toHaveBeenCalledWith({
+        year: undefined,
+        userId: undefined,
+        campingOptionId: undefined,
+        includeInactive: undefined,
+      });
+      expect(result).toEqual(mockCampingOptionRegistrations);
+    });
+
+    it('should handle query parameters for filtering', async () => {
+      adminService.getCampingOptionRegistrationsWithFields.mockResolvedValue(
+        mockCampingOptionRegistrations as unknown as ReturnType<typeof adminService.getCampingOptionRegistrationsWithFields>
+      );
+
+      const result = await controller.getCampingOptionRegistrationsWithFields(
+        2024,
+        'user-123',
+        'co-123',
+        true
+      );
+
+      expect(adminService.getCampingOptionRegistrationsWithFields).toHaveBeenCalledWith({
+        year: 2024,
+        userId: 'user-123',
+        campingOptionId: 'co-123',
+        includeInactive: true,
+      });
+      expect(result).toEqual(mockCampingOptionRegistrations);
+    });
+
+    it('should return empty array when no camping option registrations found', async () => {
+      adminService.getCampingOptionRegistrationsWithFields.mockResolvedValue([]);
+
+      const result = await controller.getCampingOptionRegistrationsWithFields();
+
+      expect(result).toEqual([]);
+    });
+
+    it('should handle service errors', async () => {
+      adminService.getCampingOptionRegistrationsWithFields.mockRejectedValue(
+        new Error('Database error')
+      );
+
+      await expect(
+        controller.getCampingOptionRegistrationsWithFields()
+      ).rejects.toThrow('Database error');
+    });
+  });
+
   describe('Authorization and Access Control', () => {
 
     // Task 5.4.5: Test unauthorized access returns proper HTTP status codes
@@ -389,26 +528,45 @@ describe('AdminRegistrationsController', () => {
 
     // Task 5.4.7: Test participant users receive 403 Forbidden for all admin registration endpoints
     it('should reject participant users with 403 Forbidden', async () => {
-      // This test verifies that the @Roles(UserRole.ADMIN) decorator is applied
+      // This test verifies that endpoints have proper role restrictions
       // In a real application, the RolesGuard would throw ForbiddenException for non-admin users
-      const roles = Reflect.getMetadata('roles', AdminRegistrationsController);
-      expect(roles).toContain(UserRole.ADMIN);
+      
+      // Check that camping options endpoint allows admin and staff but not participants
+      const campingOptionsRoles = Reflect.getMetadata('roles', AdminRegistrationsController.prototype.getCampingOptionRegistrationsWithFields);
+      expect(campingOptionsRoles).toContain(UserRole.ADMIN);
+      expect(campingOptionsRoles).toContain(UserRole.STAFF);
+      expect(campingOptionsRoles).not.toContain(UserRole.PARTICIPANT);
     });
 
     // Task 5.4.8: Test staff users receive 403 Forbidden for all admin registration endpoints
     it('should reject staff users with 403 Forbidden', async () => {
-      // This test verifies that only ADMIN role is allowed
-      // Staff users would be rejected by the RolesGuard
-      const roles = Reflect.getMetadata('roles', AdminRegistrationsController);
-      expect(roles).toEqual([UserRole.ADMIN]);
-      expect(roles).not.toContain(UserRole.STAFF);
-      expect(roles).not.toContain(UserRole.PARTICIPANT);
+      // This test verifies that admin-only endpoints are properly restricted
+      // Staff users would be rejected by the RolesGuard for admin-only endpoints
+      
+      // Check admin-only endpoints (edit and cancel operations)
+      const editRoles = Reflect.getMetadata('roles', AdminRegistrationsController.prototype.editRegistration);
+      const cancelRoles = Reflect.getMetadata('roles', AdminRegistrationsController.prototype.cancelRegistration);
+      
+      expect(editRoles).toEqual([UserRole.ADMIN]);
+      expect(editRoles).not.toContain(UserRole.STAFF);
+      expect(editRoles).not.toContain(UserRole.PARTICIPANT);
+      
+      expect(cancelRoles).toEqual([UserRole.ADMIN]);
+      expect(cancelRoles).not.toContain(UserRole.STAFF);
+      expect(cancelRoles).not.toContain(UserRole.PARTICIPANT);
     });
 
     it('should allow admin users to access all endpoints', async () => {
-      // This test verifies that admin users have access
-      const roles = Reflect.getMetadata('roles', AdminRegistrationsController);
-      expect(roles).toContain(UserRole.ADMIN);
+      // This test verifies that admin users have access to all endpoints
+      
+      // Check a few key endpoints to ensure admin access
+      const campingOptionsRoles = Reflect.getMetadata('roles', AdminRegistrationsController.prototype.getCampingOptionRegistrationsWithFields);
+      const editRoles = Reflect.getMetadata('roles', AdminRegistrationsController.prototype.editRegistration);
+      const cancelRoles = Reflect.getMetadata('roles', AdminRegistrationsController.prototype.cancelRegistration);
+      
+      expect(campingOptionsRoles).toContain(UserRole.ADMIN);
+      expect(editRoles).toContain(UserRole.ADMIN);
+      expect(cancelRoles).toContain(UserRole.ADMIN);
     });
   });
 

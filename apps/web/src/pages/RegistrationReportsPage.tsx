@@ -2,16 +2,9 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { ArrowLeft, Download, Filter, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { DataTable, DataTableColumn } from '../components/common/DataTable/DataTable';
-import { reports, Registration } from '../lib/api';
+import { reports, Registration, RegistrationReportFilters, CampingOptionRegistrationWithFields } from '../lib/api';
 import { PATHS } from '../routes';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
-
-interface RegistrationReportFilters {
-  year?: number;
-  userId?: string;
-  jobId?: string;
-  status?: string;
-}
 
 /**
  * Registration Reports page
@@ -23,13 +16,21 @@ export function RegistrationReportsPage() {
   const [error, setError] = useState<string | null>(null);
   const [filters, setFilters] = useState<RegistrationReportFilters>({});
   const [showFilters, setShowFilters] = useState(false);
+  const [showCampingOptions, setShowCampingOptions] = useState(() => {
+    // Restore from localStorage
+    return localStorage.getItem('registrationReports_showCampingOptions') === 'true';
+  });
+  const [campingOptionData, setCampingOptionData] = useState<CampingOptionRegistrationWithFields[]>([]);
+  const [campingOptionsLoading, setCampingOptionsLoading] = useState(false);
 
   // Fetch registrations data
   const fetchRegistrations = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await reports.getRegistrations();
+      const data = await reports.getRegistrations({ 
+        includeCampingOptions: showCampingOptions 
+      });
       setRegistrations(data);
     } catch (err) {
       setError('Failed to fetch registrations data');
@@ -37,11 +38,46 @@ export function RegistrationReportsPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [showCampingOptions]);
+
+  // Fetch camping option registrations with field values
+  const fetchCampingOptionData = useCallback(async () => {
+    if (!showCampingOptions) {
+      setCampingOptionData([]);
+      return;
+    }
+
+    setCampingOptionsLoading(true);
+    try {
+      // Convert RegistrationReportFilters to CampingOptionReportFilters
+      // by filtering out parameters not supported by the camping options endpoint
+      const campingFilters = {
+        year: filters.year,
+        userId: filters.userId,
+        // Note: jobId and includeCampingOptions are not supported by camping options endpoint
+      };
+      const data = await reports.getCampingOptionRegistrations(campingFilters);
+      setCampingOptionData(data);
+    } catch (err) {
+      console.error('Error fetching camping option data:', err);
+      // Don't set main error state for camping options - fail gracefully
+    } finally {
+      setCampingOptionsLoading(false);
+    }
+  }, [showCampingOptions, filters]);
 
   useEffect(() => {
     fetchRegistrations();
   }, [fetchRegistrations]);
+
+  useEffect(() => {
+    fetchCampingOptionData();
+  }, [fetchCampingOptionData]);
+
+  // Save toggle state to localStorage
+  useEffect(() => {
+    localStorage.setItem('registrationReports_showCampingOptions', showCampingOptions.toString());
+  }, [showCampingOptions]);
 
   // Apply client-side filtering
   const filteredRegistrations = useMemo(() => {
@@ -76,8 +112,81 @@ export function RegistrationReportsPage() {
     return years;
   }, [registrations]);
 
+  // Get unique field display names from camping option data
+  const uniqueFields = useMemo(() => {
+    if (!showCampingOptions || campingOptionData.length === 0) {
+      return [];
+    }
+
+    const fieldMap = new Map<string, { displayName: string; order: number }>();
+    
+    campingOptionData.forEach(registration => {
+      registration.fieldValues.forEach(fieldValue => {
+        const fieldId = fieldValue.field.id;
+        if (!fieldMap.has(fieldId)) {
+          // Try to obtain an explicit order from the field value first,
+          // then fall back to the campingOption.fields definition if available.
+          const orderFromField = (fieldValue.field as unknown as { order?: number }).order;
+          const orderFromOption = registration.campingOption?.fields?.find(f => f.id === fieldId)?.order;
+          const order = typeof orderFromField === 'number' ? orderFromField : (typeof orderFromOption === 'number' ? orderFromOption : 0);
+
+          fieldMap.set(fieldId, {
+            displayName: fieldValue.field.displayName,
+            order,
+          });
+        }
+      });
+    });
+
+    // Convert to array and sort by order
+    return Array.from(fieldMap.entries())
+      .map(([id, data]) => ({ id, ...data }))
+      .sort((a, b) => {
+        const orderA = Number(a.order);
+        const orderB = Number(b.order);
+        const safeA = isNaN(orderA) ? 0 : orderA;
+        const safeB = isNaN(orderB) ? 0 : orderB;
+        return safeA - safeB;
+      });
+  }, [showCampingOptions, campingOptionData]);
+
+  // Helper function to get field value for a specific user and field
+  const getFieldValue = useCallback((registration: Registration, fieldId: string) => {
+    if (!showCampingOptions || !registration.campingOptions || registration.campingOptions.length === 0) {
+      return '';
+    }
+
+    // Find matching detailed data for any of the user's camping options
+    for (const co of registration.campingOptions) {
+      const detailData = campingOptionData.find(detail => 
+        detail.userId === registration.userId && detail.campingOptionId === co.campingOptionId
+      );
+      
+      if (detailData) {
+        const fieldValue = detailData.fieldValues.find(fv => fv.field.id === fieldId);
+        if (fieldValue) {
+          return fieldValue.value;
+        }
+      }
+    }
+
+    return '';
+  }, [showCampingOptions, campingOptionData]);
+
+  // Helper function to format camping option name(s) for a user
+  const formatCampingOptionName = useCallback((registration: Registration) => {
+    if (!showCampingOptions || !registration.campingOptions || registration.campingOptions.length === 0) {
+      return 'No camping options';
+    }
+
+    return registration.campingOptions
+      .map(co => co.campingOption?.name || 'Unknown Option')
+      .join(', ');
+  }, [showCampingOptions]);
+
   // Define table columns
-  const columns: DataTableColumn<Registration>[] = [
+  const columns: DataTableColumn<Registration>[] = useMemo(() => {
+    const baseColumns: DataTableColumn<Registration>[] = [
     {
       id: 'user',
       header: 'User',
@@ -133,6 +242,48 @@ export function RegistrationReportsPage() {
     },
   ];
 
+    // Add camping options columns if enabled
+    if (showCampingOptions) {
+      const statusIndex = baseColumns.findIndex(col => col.id === 'status');
+      
+      // Add camping option name column
+      baseColumns.splice(statusIndex, 0, {
+        id: 'campingOptionName',
+        header: 'Camping Option',
+        accessor: (row) => (
+          <div className="max-w-xs">
+            <span className="text-sm">{formatCampingOptionName(row)}</span>
+            {campingOptionsLoading && (
+              <span className="ml-2 text-xs text-gray-500">(loading...)</span>
+            )}
+          </div>
+        ),
+        sortable: true,
+        hideOnMobile: true,
+      });
+
+      // Add dynamic columns for each unique field
+      uniqueFields.forEach((field, index) => {
+        baseColumns.splice(statusIndex + 1 + index, 0, {
+          id: `field_${field.id}`,
+          header: field.displayName,
+          accessor: (row) => {
+            const value = getFieldValue(row, field.id);
+            return (
+              <div className="max-w-xs">
+                <span className="text-sm">{value || '-'}</span>
+              </div>
+            );
+          },
+          sortable: true,
+          hideOnMobile: true,
+        });
+      });
+    }
+
+    return baseColumns;
+  }, [showCampingOptions, formatCampingOptionName, campingOptionsLoading, uniqueFields, getFieldValue]);
+
   const handleFilterChange = (key: keyof RegistrationReportFilters, value: string) => {
     setFilters(prev => ({
       ...prev,
@@ -142,11 +293,12 @@ export function RegistrationReportsPage() {
 
   const clearFilters = () => {
     setFilters({});
+    setShowCampingOptions(false);
   };
 
   const exportData = () => {
     // Convert registrations data to CSV format
-    const headers = [
+    const baseHeaders = [
       'User Name',
       'Email',
       'Shift',
@@ -155,14 +307,44 @@ export function RegistrationReportsPage() {
       'Registered Date'
     ];
 
-    const csvData = filteredRegistrations.map(registration => [
-      registration.user ? `${registration.user.firstName} ${registration.user.lastName}` : 'Unknown User',
-      registration.user?.email || '',
-      registration.jobs.map(rj => rj.job.name).join('; ') || '',
-      registration.status,
-      registration.year.toString(),
-      new Date(registration.createdAt).toLocaleDateString()
-    ]);
+    // Add camping options headers if enabled
+    let headers = baseHeaders;
+    if (showCampingOptions) {
+      const shiftIndex = baseHeaders.indexOf('Shift');
+      const campingHeaders = ['Camping Option', ...uniqueFields.map(field => field.displayName)];
+      headers = [
+        ...baseHeaders.slice(0, shiftIndex),
+        ...campingHeaders,
+        ...baseHeaders.slice(shiftIndex)
+      ];
+    }
+
+    const csvData = filteredRegistrations.map(registration => {
+      const baseData = [
+        registration.user ? `${registration.user.firstName} ${registration.user.lastName}` : 'Unknown User',
+        registration.user?.email || '',
+        registration.jobs.map(rj => rj.job.name).join('; ') || '',
+        registration.status,
+        registration.year.toString(),
+        new Date(registration.createdAt).toLocaleDateString()
+      ];
+
+      // Add camping options data if enabled
+      if (showCampingOptions) {
+        const shiftIndex = 2; // Position of Shift in baseData
+        const campingOptionName = formatCampingOptionName(registration);
+        const fieldValues = uniqueFields.map(field => getFieldValue(registration, field.id) || '');
+        
+        return [
+          ...baseData.slice(0, shiftIndex), // User Name, Email
+          campingOptionName, // Camping Option
+          ...fieldValues, // Dynamic field values
+          ...baseData.slice(shiftIndex) // Shift, Status, Year, Registered Date
+        ];
+      }
+
+      return baseData;
+    });
 
     // Create CSV content
     const csvContent = [
@@ -181,13 +363,8 @@ export function RegistrationReportsPage() {
     const url = URL.createObjectURL(blob);
     link.setAttribute('href', url);
     
-    // Generate filename with current date and applied filters
-    const filterSuffix = Object.entries(filters)
-      .filter(([, value]) => value !== undefined)
-      .map(([key, value]) => `${key}-${value}`)
-      .join('_');
-    
-    const filename = `registration_reports${filterSuffix ? '_' + filterSuffix : ''}_${new Date().toISOString().split('T')[0]}.csv`;
+    // Generate filename with current date
+    const filename = `registration_report_${new Date().toISOString().split('T')[0]}.csv`;
     link.setAttribute('download', filename);
     
     link.style.visibility = 'hidden';
@@ -253,50 +430,82 @@ export function RegistrationReportsPage() {
                 <X size={20} />
               </button>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label htmlFor="year-filter" className="block text-sm font-medium text-gray-700 mb-1">
-                  Year
-                </label>
-                <select
-                  id="year-filter"
-                  value={filters.year || ''}
-                  onChange={(e) => handleFilterChange('year', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-amber-500 focus:border-amber-500"
-                >
-                  <option value="">All Years</option>
-                  {availableYears.map(year => (
-                    <option key={year} value={year}>{year}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label htmlFor="status-filter" className="block text-sm font-medium text-gray-700 mb-1">
-                  Status
-                </label>
-                <select
-                  id="status-filter"
-                  value={filters.status || ''}
-                  onChange={(e) => handleFilterChange('status', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-amber-500 focus:border-amber-500"
-                >
-                  <option value="">All Statuses</option>
-                  <option value="CONFIRMED">Confirmed</option>
-                  <option value="PENDING">Pending</option>
-                  <option value="CANCELLED">Cancelled</option>
-                </select>
-              </div>
-              <div className="flex items-end">
-                <button
-                  onClick={clearFilters}
-                  className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800"
-                >
-                  Clear Filters
-                </button>
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label htmlFor="year-filter" className="block text-sm font-medium text-gray-700 mb-1">
+                    Year
+                  </label>
+                  <select
+                    id="year-filter"
+                    value={filters.year || ''}
+                    onChange={(e) => handleFilterChange('year', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-amber-500 focus:border-amber-500"
+                  >
+                    <option value="">All Years</option>
+                    {availableYears.map(year => (
+                      <option key={year} value={year}>{year}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="status-filter" className="block text-sm font-medium text-gray-700 mb-1">
+                    Status
+                  </label>
+                  <select
+                    id="status-filter"
+                    value={filters.status || ''}
+                    onChange={(e) => handleFilterChange('status', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-amber-500 focus:border-amber-500"
+                  >
+                    <option value="">All Statuses</option>
+                    <option value="CONFIRMED">Confirmed</option>
+                    <option value="PENDING">Pending</option>
+                    <option value="CANCELLED">Cancelled</option>
+                  </select>
+                </div>
+                <div className="flex items-end">
+                  <button
+                    onClick={clearFilters}
+                    className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800"
+                  >
+                    Clear Filters
+                  </button>
+                </div>
               </div>
             </div>
           </div>
         )}
+
+        {/* Show Registration Fields Toggle */}
+        <div className="bg-gray-50 rounded-lg p-4 mb-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <label htmlFor="camping-options-toggle" className="block text-sm font-medium text-gray-700">
+                Show Registration Fields
+              </label>
+              <p className="text-xs text-gray-500 mt-1">
+                Display camping option registrations and custom field values
+              </p>
+            </div>
+            <div className="flex items-center">
+              <button
+                type="button"
+                id="camping-options-toggle"
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 ${
+                  showCampingOptions ? 'bg-amber-600' : 'bg-gray-200'
+                }`}
+                onClick={() => setShowCampingOptions(!showCampingOptions)}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    showCampingOptions ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+          </div>
+        </div>
 
         {/* Error Message */}
         {error && (

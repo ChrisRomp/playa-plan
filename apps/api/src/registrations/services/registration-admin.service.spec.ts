@@ -99,7 +99,7 @@ describe('RegistrationAdminService', () => {
         create: jest.fn(),
       },
       $transaction: jest.fn(),
-    };
+    } as unknown as jest.Mocked<PrismaService>;
 
     const mockAdminAuditService = {
       createAuditRecord: jest.fn(),
@@ -919,6 +919,256 @@ describe('RegistrationAdminService', () => {
       expect(result.totalAmount).toBe(0);
       expect(result.paymentIds).toEqual([]);
       expect(result.message).toBe('No payments to refund');
+    });
+  });
+
+  describe('getCampingOptionRegistrationsWithFields', () => {
+    const mockCampingOptionRegistration = {
+      id: 'cor-123',
+      userId: 'user-123',
+      campingOptionId: 'co-123',
+      createdAt: new Date('2024-01-01'),
+      updatedAt: new Date('2024-01-01'),
+      user: {
+        id: 'user-123',
+        email: 'test@example.com',
+        firstName: 'John',
+        lastName: 'Doe',
+        playaName: 'TestUser',
+      },
+      campingOption: {
+        id: 'co-123',
+        name: 'RV Camping',
+        description: 'RV camping with hookups',
+        enabled: true,
+        fields: [
+          {
+            id: 'field-123',
+            displayName: 'Vehicle License Plate',
+            dataType: 'STRING',
+            required: true,
+            order: 1,
+          },
+        ],
+      },
+      fieldValues: [
+        {
+          id: 'fv-123',
+          value: 'ABC123',
+          fieldId: 'field-123',
+          registrationId: 'cor-123',
+          field: {
+            id: 'field-123',
+            displayName: 'Vehicle License Plate',
+            dataType: 'STRING',
+            required: true,
+          },
+        },
+      ],
+    };
+
+    it('should get all camping option registrations with fields', async () => {
+      (prismaService.campingOptionRegistration.findMany as jest.Mock).mockResolvedValue([mockCampingOptionRegistration]);
+
+      const result = await service.getCampingOptionRegistrationsWithFields();
+
+      expect(result).toEqual([mockCampingOptionRegistration]);
+      expect(prismaService.campingOptionRegistration.findMany).toHaveBeenCalledWith({
+        where: {
+          campingOption: {
+            enabled: true,
+          },
+        },
+        include: {
+          user: {
+            select: {
+              id: true,
+              email: true,
+              firstName: true,
+              lastName: true,
+              playaName: true,
+            },
+          },
+          campingOption: {
+            include: {
+              fields: {
+                orderBy: {
+                  order: 'asc',
+                },
+              },
+            },
+          },
+          fieldValues: {
+            include: {
+              field: {
+                select: {
+                  id: true,
+                  displayName: true,
+                  dataType: true,
+                  required: true,
+                },
+              },
+            },
+          },
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+      });
+    });
+
+    it('should filter by user ID', async () => {
+      (prismaService.campingOptionRegistration.findMany as jest.Mock).mockResolvedValue([mockCampingOptionRegistration]);
+
+      await service.getCampingOptionRegistrationsWithFields({ userId: 'user-123' });
+
+      expect(prismaService.campingOptionRegistration.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            userId: 'user-123',
+          }),
+        })
+      );
+    });
+
+    it('should filter by camping option ID', async () => {
+      (prismaService.campingOptionRegistration.findMany as jest.Mock).mockResolvedValue([mockCampingOptionRegistration]);
+
+      await service.getCampingOptionRegistrationsWithFields({ campingOptionId: 'co-123' });
+
+      expect(prismaService.campingOptionRegistration.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            campingOptionId: 'co-123',
+          }),
+        })
+      );
+    });
+
+    it('should include inactive camping options when requested', async () => {
+      (prismaService.campingOptionRegistration.findMany as jest.Mock).mockResolvedValue([mockCampingOptionRegistration]);
+
+      await service.getCampingOptionRegistrationsWithFields({ includeInactive: true });
+
+      expect(prismaService.campingOptionRegistration.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {},
+        })
+      );
+    });
+
+    it('should filter by year through user registrations', async () => {
+      (prismaService.campingOptionRegistration.findMany as jest.Mock).mockResolvedValue([mockCampingOptionRegistration]);
+
+      await service.getCampingOptionRegistrationsWithFields({ year: 2024 });
+
+      expect(prismaService.campingOptionRegistration.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            user: {
+              registrations: {
+                some: {
+                  year: 2024,
+                },
+              },
+            },
+          }),
+        })
+      );
+    });
+
+    it('should handle database errors', async () => {
+      const error = new Error('Database error');
+      (prismaService.campingOptionRegistration.findMany as jest.Mock).mockRejectedValue(error);
+
+      await expect(service.getCampingOptionRegistrationsWithFields()).rejects.toThrow('Database error');
+    });
+  });
+
+  describe('getRegistrations with camping options', () => {
+    const mockCampingOptionRegistration = {
+      id: 'cor-123',
+      userId: 'user-123',
+      campingOptionId: 'co-123',
+      createdAt: new Date('2024-01-01'),
+      updatedAt: new Date('2024-01-01'),
+      campingOption: {
+        id: 'co-123',
+        name: 'RV Camping',
+        enabled: true,
+        fields: [],
+      },
+      fieldValues: [],
+    };
+
+    it('should include camping options when requested', async () => {
+      (prismaService.registration.findMany as jest.Mock).mockResolvedValue([mockRegistration]);
+      (prismaService.registration.count as jest.Mock).mockResolvedValue(1);
+      (prismaService.campingOptionRegistration.findMany as jest.Mock).mockResolvedValue([mockCampingOptionRegistration]);
+
+      const query: AdminRegistrationQueryDto = { includeCampingOptions: true };
+      const result = await service.getRegistrations(query);
+
+      expect(result.registrations).toHaveLength(1);
+      expect(result.registrations[0]).toHaveProperty('campingOptions');
+      expect((result.registrations[0] as typeof mockRegistration & { campingOptions?: typeof mockCampingOptionRegistration[] }).campingOptions).toEqual([mockCampingOptionRegistration]);
+      
+      expect(prismaService.campingOptionRegistration.findMany).toHaveBeenCalledWith({
+        where: {
+          userId: { in: ['user-123'] },
+          campingOption: {
+            enabled: true,
+          },
+        },
+        include: {
+          campingOption: {
+            include: {
+              fields: {
+                orderBy: {
+                  order: 'asc',
+                },
+              },
+            },
+          },
+          fieldValues: {
+            include: {
+              field: {
+                select: {
+                  id: true,
+                  displayName: true,
+                  dataType: true,
+                  required: true,
+                },
+              },
+            },
+          },
+        },
+      });
+    });
+
+    it('should not include camping options when not requested', async () => {
+      (prismaService.registration.findMany as jest.Mock).mockResolvedValue([mockRegistration]);
+      (prismaService.registration.count as jest.Mock).mockResolvedValue(1);
+
+      const query: AdminRegistrationQueryDto = { includeCampingOptions: false };
+      const result = await service.getRegistrations(query);
+
+      expect(result.registrations).toHaveLength(1);
+      expect(result.registrations[0]).not.toHaveProperty('campingOptions');
+      expect(prismaService.campingOptionRegistration.findMany).not.toHaveBeenCalled();
+    });
+
+    it('should handle registrations with no camping options', async () => {
+      (prismaService.registration.findMany as jest.Mock).mockResolvedValue([mockRegistration]);
+      (prismaService.registration.count as jest.Mock).mockResolvedValue(1);
+      (prismaService.campingOptionRegistration.findMany as jest.Mock).mockResolvedValue([]);
+
+      const query: AdminRegistrationQueryDto = { includeCampingOptions: true };
+      const result = await service.getRegistrations(query);
+
+      expect(result.registrations).toHaveLength(1);
+      expect(result.registrations[0]).toHaveProperty('campingOptions');
+      expect((result.registrations[0] as typeof mockRegistration & { campingOptions?: typeof mockCampingOptionRegistration[] }).campingOptions).toEqual([]);
     });
   });
 }); 

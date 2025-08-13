@@ -126,8 +126,65 @@ export class RegistrationAdminService {
       this.prisma.registration.count({ where }),
     ]);
 
+    // If camping options are requested, fetch them separately and merge
+    let registrationsWithCampingOptions = registrations;
+    if (query.includeCampingOptions) {
+      // Get unique user IDs from registrations
+      const userIds = [...new Set(registrations.map(r => r.userId))];
+      
+      if (userIds.length > 0) {
+        // Fetch camping option registrations for these users
+        const campingOptionRegistrations = await this.prisma.campingOptionRegistration.findMany({
+          where: {
+            userId: { in: userIds },
+            campingOption: {
+              enabled: true, // Only include active camping options
+            },
+          },
+          include: {
+            campingOption: {
+              include: {
+                fields: {
+                  orderBy: {
+                    order: 'asc',
+                  },
+                },
+              },
+            },
+            fieldValues: {
+              include: {
+                field: {
+                  select: {
+                    id: true,
+                    displayName: true,
+                    dataType: true,
+                    required: true,
+                  },
+                },
+              },
+            },
+          },
+        });
+
+        // Group camping options by user ID for efficient lookup
+        const campingOptionsByUserId = campingOptionRegistrations.reduce((acc, cor) => {
+          if (!acc[cor.userId]) {
+            acc[cor.userId] = [];
+          }
+          acc[cor.userId].push(cor);
+          return acc;
+        }, {} as Record<string, typeof campingOptionRegistrations>);
+
+        // Add camping options to registrations
+        registrationsWithCampingOptions = registrations.map(registration => ({
+          ...registration,
+          campingOptions: campingOptionsByUserId[registration.userId] || [],
+        }));
+      }
+    }
+
     return {
-      registrations,
+      registrations: registrationsWithCampingOptions,
       total,
       page: 1,
       limit: 0, // 0 indicates unlimited
@@ -744,6 +801,99 @@ export class RegistrationAdminService {
       AdminAuditTargetType.REGISTRATION,
       registrationId,
     );
+  }
+
+  /**
+   * Get all camping option registrations with field values for admin reporting
+   * @param filters - Query parameters for filtering
+   * @returns Camping option registrations with field values
+   */
+  async getCampingOptionRegistrationsWithFields(filters?: {
+    year?: number;
+    userId?: string;
+    campingOptionId?: string;
+    includeInactive?: boolean;
+  }) {
+    try {
+      const where: Prisma.CampingOptionRegistrationWhereInput = {};
+
+      // Filter by user ID
+      if (filters?.userId) {
+        where.userId = filters.userId;
+      }
+
+      // Filter by camping option ID
+      if (filters?.campingOptionId) {
+        where.campingOptionId = filters.campingOptionId;
+      }
+
+      // Filter by camping option enabled status
+      if (!filters?.includeInactive) {
+        where.campingOption = {
+          enabled: true,
+        };
+      }
+
+      // For year filtering, we need to join through user registrations
+      // Since camping option registrations don't have a year field directly
+      if (filters?.year) {
+        where.user = {
+          registrations: {
+            some: {
+              year: filters.year,
+            },
+          },
+        };
+      }
+
+      const campingOptionRegistrations = await this.prisma.campingOptionRegistration.findMany({
+        where,
+        include: {
+          user: {
+            select: {
+              id: true,
+              email: true,
+              firstName: true,
+              lastName: true,
+              playaName: true,
+            },
+          },
+          campingOption: {
+            include: {
+              fields: {
+                orderBy: {
+                  order: 'asc',
+                },
+              },
+            },
+          },
+          fieldValues: {
+            include: {
+              field: {
+                select: {
+                  id: true,
+                  displayName: true,
+                  dataType: true,
+                  required: true,
+                },
+              },
+            },
+          },
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+      });
+
+      this.logger.log(  
+        `Retrieved ${campingOptionRegistrations.length} camping option registrations with fields. Filters: ${JSON.stringify(filters)}`
+      );
+      return campingOptionRegistrations;
+    } catch (error: unknown) {
+      const err = error as Error;
+      this.logger.error(`Failed to get camping option registrations with fields: ${err.message}`, err.stack);
+      throw error;
+    }
   }
 
   /**

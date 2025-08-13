@@ -450,6 +450,7 @@ export interface Registration {
     job: Job;
   }>;
   payments: Payment[];
+  campingOptions?: CampingOptionRegistration[];
 }
 
 // Camping Option Registration interface
@@ -460,6 +461,69 @@ export interface CampingOptionRegistration {
   createdAt: string;
   updatedAt: string;
   campingOption?: CampingOption;
+}
+
+// Camping Option Field Value interface for admin responses
+export interface CampingOptionFieldValue {
+  id: string;
+  value: string;
+  fieldId: string;
+  registrationId: string;
+  field: {
+    id: string;
+    displayName: string;
+    dataType: 'STRING' | 'MULTILINE_STRING' | 'INTEGER' | 'NUMBER' | 'BOOLEAN' | 'DATE';
+    required: boolean;
+  };
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Camping Option Registration with Field Values interface for admin responses
+export interface CampingOptionRegistrationWithFields {
+  id: string;
+  userId: string;
+  campingOptionId: string;
+  user: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    playaName: string | null;
+  };
+  campingOption: {
+    id: string;
+    name: string;
+    description: string | null;
+    enabled: boolean;
+    fields: Array<{
+      id: string;
+      displayName: string;
+      dataType: 'STRING' | 'MULTILINE_STRING' | 'INTEGER' | 'NUMBER' | 'BOOLEAN' | 'DATE';
+      required: boolean;
+      order: number;
+    }>;
+  };
+  fieldValues: CampingOptionFieldValue[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Registration Report Filters interface
+export interface RegistrationReportFilters {
+  userId?: string;
+  jobId?: string;
+  year?: number;
+  status?: Registration['status'];
+  includeCampingOptions?: boolean;
+}
+
+// Camping Option Report Filters interface
+export interface CampingOptionReportFilters {
+  year?: number;
+  userId?: string;
+  campingOptionId?: string;
+  includeInactive?: boolean;
 }
 
 // API Functions
@@ -1103,22 +1167,49 @@ export const reports = {
    * @param filters Optional filters for the report
    * @returns A promise that resolves to an array of all registrations
    */
-  getRegistrations: async (filters?: {
-    userId?: string;
-    jobId?: string;
-    year?: number;
-  }): Promise<Registration[]> => {
+  getRegistrations: async (filters?: RegistrationReportFilters): Promise<Registration[]> => {
     try {
       const params = new URLSearchParams();
       if (filters?.userId) params.append('userId', filters.userId);
       if (filters?.jobId) params.append('jobId', filters.jobId);
       if (filters?.year) params.append('year', filters.year.toString());
+      if (filters?.includeCampingOptions !== undefined) {
+        params.append('includeCampingOptions', String(filters.includeCampingOptions));
+      }
       
-      const url = `/registrations${params.toString() ? `?${params.toString()}` : ''}`;
-      const response = await api.get<Registration[]>(url);
-      return response.data;
+      const url = `/admin/registrations${params.toString() ? `?${params.toString()}` : ''}`;
+      const response = await api.get<{
+        registrations: Registration[];
+        total: number;
+        page: number;
+        limit: number;
+        totalPages: number;
+      }>(url);
+      return response.data.registrations;
     } catch (error) {
       console.error('Error fetching registrations report:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Get camping option registrations with field values for admin reports
+   * @param filters Optional filters for the report
+   * @returns A promise that resolves to an array of camping option registrations with field values
+   */
+  getCampingOptionRegistrations: async (filters?: CampingOptionReportFilters): Promise<CampingOptionRegistrationWithFields[]> => {
+    try {
+      const params = new URLSearchParams();
+      if (filters?.year) params.append('year', filters.year.toString());
+      if (filters?.userId) params.append('userId', filters.userId);
+      if (filters?.campingOptionId) params.append('campingOptionId', filters.campingOptionId);
+      if (filters?.includeInactive) params.append('includeInactive', 'true');
+      
+      const url = `/admin/registrations/camping-options-with-fields${params.toString() ? `?${params.toString()}` : ''}`;
+      const response = await api.get<CampingOptionRegistrationWithFields[]>(url);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching camping option registrations report:', error);
       throw error;
     }
   },

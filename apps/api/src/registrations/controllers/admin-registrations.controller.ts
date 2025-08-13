@@ -43,11 +43,128 @@ interface AuthenticatedRequest {
 @ApiBearerAuth()
 @Controller('admin/registrations')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(UserRole.ADMIN)
 export class AdminRegistrationsController {
   constructor(private readonly adminService: RegistrationAdminService) {}
 
+  @Get('camping-options-with-fields')
+  @Roles(UserRole.ADMIN, UserRole.STAFF)
+  @ApiOperation({
+    summary: 'Get camping option registrations with field values',
+    description: 'Retrieve all camping option registrations with their custom field values for admin reporting',
+  })
+  @ApiQuery({
+    name: 'year',
+    description: 'Filter by registration year',
+    required: false,
+    type: Number,
+  })
+  @ApiQuery({
+    name: 'userId',
+    description: 'Filter by user ID',
+    required: false,
+    type: String,
+  })
+  @ApiQuery({
+    name: 'campingOptionId',
+    description: 'Filter by camping option ID',
+    required: false,
+    type: String,
+  })
+  @ApiQuery({
+    name: 'includeInactive',
+    description: 'Include inactive camping options',
+    required: false,
+    type: Boolean,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Successfully retrieved camping option registrations with field values',
+    schema: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          id: { type: 'string' },
+          userId: { type: 'string' },
+          campingOptionId: { type: 'string' },
+          createdAt: { type: 'string', format: 'date-time' },
+          updatedAt: { type: 'string', format: 'date-time' },
+          user: {
+            type: 'object',
+            properties: {
+              id: { type: 'string' },
+              email: { type: 'string' },
+              firstName: { type: 'string' },
+              lastName: { type: 'string' },
+              playaName: { type: 'string' },
+            },
+          },
+          campingOption: {
+            type: 'object',
+            properties: {
+              id: { type: 'string' },
+              name: { type: 'string' },
+              description: { type: 'string' },
+              enabled: { type: 'boolean' },
+              fields: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    id: { type: 'string' },
+                    displayName: { type: 'string' },
+                    dataType: { type: 'string' },
+                    required: { type: 'boolean' },
+                    order: { type: 'number' },
+                  },
+                },
+              },
+            },
+          },
+          fieldValues: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                id: { type: 'string' },
+                value: { type: 'string' },
+                fieldId: { type: 'string' },
+                registrationId: { type: 'string' },
+                field: {
+                  type: 'object',
+                  properties: {
+                    id: { type: 'string' },
+                    displayName: { type: 'string' },
+                    dataType: { type: 'string' },
+                    required: { type: 'boolean' },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized - Invalid or missing JWT token' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Admin role required' })
+  async getCampingOptionRegistrationsWithFields(
+    @Query('year') year?: number,
+    @Query('userId') userId?: string,
+    @Query('campingOptionId') campingOptionId?: string,
+    @Query('includeInactive') includeInactive?: boolean,
+  ) {
+    const filters = {
+      year,
+      userId,
+      campingOptionId,
+      includeInactive,
+    };
+    return this.adminService.getCampingOptionRegistrationsWithFields(filters);
+  }
+
   @Get()
+  @Roles(UserRole.ADMIN, UserRole.STAFF)
   @ApiOperation({
     summary: 'Get all registrations for admin management',
     description: 'Retrieve paginated list of registrations with filtering capabilities for admin management interface',
@@ -94,6 +211,12 @@ export class AdminRegistrationsController {
     required: false,
     type: Number,
   })
+  @ApiQuery({
+    name: 'includeCampingOptions',
+    description: 'Include camping option registrations and field values in the response',
+    required: false,
+    type: Boolean,
+  })
   @ApiResponse({
     status: 200,
     description: 'Successfully retrieved registrations',
@@ -118,6 +241,7 @@ export class AdminRegistrationsController {
   }
 
   @Put(':id')
+  @Roles(UserRole.ADMIN)
   @ApiOperation({
     summary: 'Edit a registration',
     description: 'Update registration details including status, work shifts, and camping options with audit trail logging',
@@ -147,6 +271,7 @@ export class AdminRegistrationsController {
   }
 
   @Delete(':id')
+  @Roles(UserRole.ADMIN)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Cancel a registration',
@@ -176,6 +301,7 @@ export class AdminRegistrationsController {
   }
 
   @Get(':id/audit-trail')
+  @Roles(UserRole.ADMIN, UserRole.STAFF)
   @ApiOperation({
     summary: 'Get audit trail for a registration',
     description: 'Retrieve complete audit trail showing all administrative actions performed on this registration',
@@ -224,6 +350,7 @@ export class AdminRegistrationsController {
   }
 
   @Get(':id/camping-options')
+  @Roles(UserRole.ADMIN, UserRole.STAFF)
   @ApiOperation({
     summary: 'Get camping options for a registration user',
     description: 'Retrieve all camping options registered by the user of this registration',

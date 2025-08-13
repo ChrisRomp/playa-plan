@@ -8,6 +8,7 @@ import { reports, Registration } from '../../lib/api';
 vi.mock('../../lib/api', () => ({
   reports: {
     getRegistrations: vi.fn(),
+    getCampingOptionRegistrations: vi.fn(),
   },
 }));
 
@@ -198,7 +199,9 @@ describe('RegistrationReportsPage', () => {
   describe('Successful Data Fetching', () => {
     beforeEach(() => {
       const mockGetRegistrations = vi.mocked(reports.getRegistrations);
+      const mockGetCampingOptionRegistrations = vi.mocked(reports.getCampingOptionRegistrations);
       mockGetRegistrations.mockResolvedValue(mockRegistrations);
+      mockGetCampingOptionRegistrations.mockResolvedValue([]);
     });
 
     it('should render the page header correctly', async () => {
@@ -252,13 +255,13 @@ describe('RegistrationReportsPage', () => {
       expect(summarySection).toHaveTextContent('Cancelled:1');
     });
 
-    it('should call getRegistrations on mount without filters', async () => {
+    it('should call getRegistrations on mount with default parameters', async () => {
       const mockGetRegistrations = vi.mocked(reports.getRegistrations);
       
       renderComponent();
 
       await waitFor(() => {
-        expect(mockGetRegistrations).toHaveBeenCalledWith();
+        expect(mockGetRegistrations).toHaveBeenCalledWith({ includeCampingOptions: false });
       });
     });
   });
