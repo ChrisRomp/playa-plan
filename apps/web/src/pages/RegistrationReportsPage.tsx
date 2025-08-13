@@ -124,9 +124,15 @@ export function RegistrationReportsPage() {
       registration.fieldValues.forEach(fieldValue => {
         const fieldId = fieldValue.field.id;
         if (!fieldMap.has(fieldId)) {
+          // Try to obtain an explicit order from the field value first,
+          // then fall back to the campingOption.fields definition if available.
+          const orderFromField = (fieldValue.field as unknown as { order?: number }).order;
+          const orderFromOption = registration.campingOption?.fields?.find(f => f.id === fieldId)?.order;
+          const order = typeof orderFromField === 'number' ? orderFromField : (typeof orderFromOption === 'number' ? orderFromOption : 0);
+
           fieldMap.set(fieldId, {
             displayName: fieldValue.field.displayName,
-            order: fieldValue.field.order || 0
+            order,
           });
         }
       });
@@ -135,7 +141,13 @@ export function RegistrationReportsPage() {
     // Convert to array and sort by order
     return Array.from(fieldMap.entries())
       .map(([id, data]) => ({ id, ...data }))
-      .sort((a, b) => a.order - b.order);
+      .sort((a, b) => {
+        const orderA = Number(a.order);
+        const orderB = Number(b.order);
+        const safeA = isNaN(orderA) ? 0 : orderA;
+        const safeB = isNaN(orderB) ? 0 : orderB;
+        return safeA - safeB;
+      });
   }, [showCampingOptions, campingOptionData]);
 
   // Helper function to get field value for a specific user and field

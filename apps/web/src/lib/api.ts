@@ -514,6 +514,7 @@ export interface RegistrationReportFilters {
   userId?: string;
   jobId?: string;
   year?: number;
+  status?: Registration['status'];
   includeCampingOptions?: boolean;
 }
 
@@ -1172,7 +1173,9 @@ export const reports = {
       if (filters?.userId) params.append('userId', filters.userId);
       if (filters?.jobId) params.append('jobId', filters.jobId);
       if (filters?.year) params.append('year', filters.year.toString());
-      if (filters?.includeCampingOptions) params.append('includeCampingOptions', filters.includeCampingOptions.toString());
+      if (filters?.includeCampingOptions !== undefined) {
+        params.append('includeCampingOptions', String(filters.includeCampingOptions));
+      }
       
       const url = `/admin/registrations${params.toString() ? `?${params.toString()}` : ''}`;
       const response = await api.get<{
