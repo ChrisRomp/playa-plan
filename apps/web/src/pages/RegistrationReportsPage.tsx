@@ -159,7 +159,7 @@ export function RegistrationReportsPage() {
     }
 
     return '';
-  }, [showCampingOptions, campingOptionData, registrations]);
+  }, [showCampingOptions, campingOptionData]);
 
   // Helper function to format camping option name(s) for a user
   const formatCampingOptionName = useCallback((registration: Registration) => {
