@@ -112,30 +112,65 @@ export function RegistrationReportsPage() {
     return years;
   }, [registrations]);
 
-  // Helper function to format camping option data for a user
-  const formatCampingOptionData = useCallback((registration: Registration) => {
+  // Get unique field display names from camping option data
+  const uniqueFields = useMemo(() => {
+    if (!showCampingOptions || campingOptionData.length === 0) {
+      return [];
+    }
+
+    const fieldMap = new Map<string, { displayName: string; order: number }>();
+    
+    campingOptionData.forEach(registration => {
+      registration.fieldValues.forEach(fieldValue => {
+        const fieldId = fieldValue.field.id;
+        if (!fieldMap.has(fieldId)) {
+          fieldMap.set(fieldId, {
+            displayName: fieldValue.field.displayName,
+            order: fieldValue.field.order || 0
+          });
+        }
+      });
+    });
+
+    // Convert to array and sort by order
+    return Array.from(fieldMap.entries())
+      .map(([id, data]) => ({ id, ...data }))
+      .sort((a, b) => a.order - b.order);
+  }, [showCampingOptions, campingOptionData]);
+
+  // Helper function to get field value for a specific user and field
+  const getFieldValue = useCallback((registration: Registration, fieldId: string) => {
+    if (!showCampingOptions || !registration.campingOptions || registration.campingOptions.length === 0) {
+      return '';
+    }
+
+    // Find matching detailed data for any of the user's camping options
+    for (const co of registration.campingOptions) {
+      const detailData = campingOptionData.find(detail => 
+        detail.userId === registration.userId && detail.campingOptionId === co.campingOptionId
+      );
+      
+      if (detailData) {
+        const fieldValue = detailData.fieldValues.find(fv => fv.field.id === fieldId);
+        if (fieldValue) {
+          return fieldValue.value;
+        }
+      }
+    }
+
+    return '';
+  }, [showCampingOptions, campingOptionData, registrations]);
+
+  // Helper function to format camping option name(s) for a user
+  const formatCampingOptionName = useCallback((registration: Registration) => {
     if (!showCampingOptions || !registration.campingOptions || registration.campingOptions.length === 0) {
       return 'No camping options';
     }
 
-    return registration.campingOptions.map(co => {
-      // Find matching detailed data
-      const detailData = campingOptionData.find(detail => 
-        detail.userId === registration.userId && detail.campingOptionId === co.campingOptionId
-      );
-
-      let result = co.campingOption?.name || 'Unknown Option';
-      
-      if (detailData && detailData.fieldValues.length > 0) {
-        const fieldData = detailData.fieldValues
-          .map(fv => `${fv.field.displayName}: ${fv.value}`)
-          .join(', ');
-        result += ` (${fieldData})`;
-      }
-      
-      return result;
-    }).join('; ');
-  }, [showCampingOptions, campingOptionData]);
+    return registration.campingOptions
+      .map(co => co.campingOption?.name || 'Unknown Option')
+      .join(', ');
+  }, [showCampingOptions]);
 
   // Define table columns
   const columns: DataTableColumn<Registration>[] = useMemo(() => {
@@ -195,28 +230,47 @@ export function RegistrationReportsPage() {
     },
   ];
 
-    // Add camping options column if enabled
+    // Add camping options columns if enabled
     if (showCampingOptions) {
-      // Insert camping options column before status
       const statusIndex = baseColumns.findIndex(col => col.id === 'status');
+      
+      // Add camping option name column
       baseColumns.splice(statusIndex, 0, {
-        id: 'campingOptions',
-        header: 'Registration Fields',
+        id: 'campingOptionName',
+        header: 'Camping Option',
         accessor: (row) => (
           <div className="max-w-xs">
-            <span className="text-sm">{formatCampingOptionData(row)}</span>
+            <span className="text-sm">{formatCampingOptionName(row)}</span>
             {campingOptionsLoading && (
               <span className="ml-2 text-xs text-gray-500">(loading...)</span>
             )}
           </div>
         ),
-        sortable: false,
+        sortable: true,
         hideOnMobile: true,
+      });
+
+      // Add dynamic columns for each unique field
+      uniqueFields.forEach((field, index) => {
+        baseColumns.splice(statusIndex + 1 + index, 0, {
+          id: `field_${field.id}`,
+          header: field.displayName,
+          accessor: (row) => {
+            const value = getFieldValue(row, field.id);
+            return (
+              <div className="max-w-xs">
+                <span className="text-sm">{value || '-'}</span>
+              </div>
+            );
+          },
+          sortable: true,
+          hideOnMobile: true,
+        });
       });
     }
 
     return baseColumns;
-  }, [showCampingOptions, formatCampingOptionData, campingOptionsLoading]);
+  }, [showCampingOptions, formatCampingOptionName, campingOptionsLoading, uniqueFields, getFieldValue]);
 
   const handleFilterChange = (key: keyof RegistrationReportFilters, value: string) => {
     setFilters(prev => ({
@@ -241,10 +295,17 @@ export function RegistrationReportsPage() {
       'Registered Date'
     ];
 
-    // Add camping options header if enabled
-    const headers = showCampingOptions 
-      ? [...baseHeaders.slice(0, 3), 'Registration Fields', ...baseHeaders.slice(3)]
-      : baseHeaders;
+    // Add camping options headers if enabled
+    let headers = baseHeaders;
+    if (showCampingOptions) {
+      const shiftIndex = baseHeaders.indexOf('Shift');
+      const campingHeaders = ['Camping Option', ...uniqueFields.map(field => field.displayName)];
+      headers = [
+        ...baseHeaders.slice(0, shiftIndex),
+        ...campingHeaders,
+        ...baseHeaders.slice(shiftIndex)
+      ];
+    }
 
     const csvData = filteredRegistrations.map(registration => {
       const baseData = [
@@ -258,11 +319,15 @@ export function RegistrationReportsPage() {
 
       // Add camping options data if enabled
       if (showCampingOptions) {
-        const campingOptionText = formatCampingOptionData(registration);
+        const shiftIndex = 2; // Position of Shift in baseData
+        const campingOptionName = formatCampingOptionName(registration);
+        const fieldValues = uniqueFields.map(field => getFieldValue(registration, field.id) || '');
+        
         return [
-          ...baseData.slice(0, 2), // User Name, Email
-          campingOptionText, // Registration Fields
-          ...baseData.slice(2) // Shift, Status, Year, Registered Date
+          ...baseData.slice(0, shiftIndex), // User Name, Email
+          campingOptionName, // Camping Option
+          ...fieldValues, // Dynamic field values
+          ...baseData.slice(shiftIndex) // Shift, Status, Year, Registered Date
         ];
       }
 
