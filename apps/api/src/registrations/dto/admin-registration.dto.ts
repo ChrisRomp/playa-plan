@@ -10,7 +10,7 @@ import {
   Min,
   ValidateNested
 } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Type, Transform } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { RegistrationStatus, Registration, FieldType } from '@prisma/client';
 
@@ -169,6 +169,11 @@ export class AdminRegistrationQueryDto {
     default: false,
   })
   @IsOptional()
+  @Transform(({ value }) => {
+    if (value === 'true') return true;
+    if (value === 'false') return false;
+    return value;
+  })
   @IsBoolean({ message: 'Include camping options must be a boolean' })
   includeCampingOptions?: boolean = false;
 }
@@ -365,6 +370,11 @@ export class AdminCampingOptionQueryDto {
     default: false,
   })
   @IsOptional()
+  @Transform(({ value }) => {
+    if (value === 'true') return true;
+    if (value === 'false') return false;
+    return value;
+  })
   @IsBoolean({ message: 'Include inactive must be a boolean' })
   includeInactive?: boolean = false;
 } 

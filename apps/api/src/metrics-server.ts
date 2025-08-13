@@ -17,7 +17,11 @@ export async function createMetricsServer(): Promise<void> {
     // Listen on all interfaces within the container
     await app.listen(9464, '0.0.0.0');
     logger.log('🔧 Metrics server running on port 9464 (internal)');
-  } catch (error) {
+  } catch (error: unknown) {
+    if (error && typeof error === 'object' && 'code' in error && error.code === 'EADDRINUSE') {
+      logger.warn('⚠️ Metrics server port 9464 already in use, skipping metrics server');
+      return;
+    }
     logger.error('❌ Failed to start metrics server', error);
     throw error;
   }
