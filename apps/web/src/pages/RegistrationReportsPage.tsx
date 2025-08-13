@@ -351,14 +351,8 @@ export function RegistrationReportsPage() {
     const url = URL.createObjectURL(blob);
     link.setAttribute('href', url);
     
-    // Generate filename with current date and applied filters
-    const filterSuffix = Object.entries(filters)
-      .filter(([, value]) => value !== undefined)
-      .map(([key, value]) => `${key}-${value}`)
-      .join('_');
-    
-    const campingSuffix = showCampingOptions ? '_with_registration_fields' : '';
-    const filename = `registration_reports${filterSuffix ? '_' + filterSuffix : ''}${campingSuffix}_${new Date().toISOString().split('T')[0]}.csv`;
+    // Generate filename with current date
+    const filename = `registration_report_${new Date().toISOString().split('T')[0]}.csv`;
     link.setAttribute('download', filename);
     
     link.style.visibility = 'hidden';
