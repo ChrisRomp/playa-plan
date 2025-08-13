@@ -885,7 +885,9 @@ export class RegistrationAdminService {
         },
       });
 
-      this.logger.log(`Retrieved ${campingOptionRegistrations.length} camping option registrations with fields`);
+      this.logger.log(  
+        `Retrieved ${campingOptionRegistrations.length} camping option registrations with fields. Filters: ${JSON.stringify(filters)}`
+      );
       return campingOptionRegistrations;
     } catch (error: unknown) {
       const err = error as Error;
