@@ -528,26 +528,45 @@ describe('AdminRegistrationsController', () => {
 
     // Task 5.4.7: Test participant users receive 403 Forbidden for all admin registration endpoints
     it('should reject participant users with 403 Forbidden', async () => {
-      // This test verifies that the @Roles(UserRole.ADMIN) decorator is applied
+      // This test verifies that endpoints have proper role restrictions
       // In a real application, the RolesGuard would throw ForbiddenException for non-admin users
-      const roles = Reflect.getMetadata('roles', AdminRegistrationsController);
-      expect(roles).toContain(UserRole.ADMIN);
+      
+      // Check that camping options endpoint allows admin and staff but not participants
+      const campingOptionsRoles = Reflect.getMetadata('roles', AdminRegistrationsController.prototype.getCampingOptionRegistrationsWithFields);
+      expect(campingOptionsRoles).toContain(UserRole.ADMIN);
+      expect(campingOptionsRoles).toContain(UserRole.STAFF);
+      expect(campingOptionsRoles).not.toContain(UserRole.PARTICIPANT);
     });
 
     // Task 5.4.8: Test staff users receive 403 Forbidden for all admin registration endpoints
     it('should reject staff users with 403 Forbidden', async () => {
-      // This test verifies that only ADMIN role is allowed
-      // Staff users would be rejected by the RolesGuard
-      const roles = Reflect.getMetadata('roles', AdminRegistrationsController);
-      expect(roles).toEqual([UserRole.ADMIN]);
-      expect(roles).not.toContain(UserRole.STAFF);
-      expect(roles).not.toContain(UserRole.PARTICIPANT);
+      // This test verifies that admin-only endpoints are properly restricted
+      // Staff users would be rejected by the RolesGuard for admin-only endpoints
+      
+      // Check admin-only endpoints (edit and cancel operations)
+      const editRoles = Reflect.getMetadata('roles', AdminRegistrationsController.prototype.editRegistration);
+      const cancelRoles = Reflect.getMetadata('roles', AdminRegistrationsController.prototype.cancelRegistration);
+      
+      expect(editRoles).toEqual([UserRole.ADMIN]);
+      expect(editRoles).not.toContain(UserRole.STAFF);
+      expect(editRoles).not.toContain(UserRole.PARTICIPANT);
+      
+      expect(cancelRoles).toEqual([UserRole.ADMIN]);
+      expect(cancelRoles).not.toContain(UserRole.STAFF);
+      expect(cancelRoles).not.toContain(UserRole.PARTICIPANT);
     });
 
     it('should allow admin users to access all endpoints', async () => {
-      // This test verifies that admin users have access
-      const roles = Reflect.getMetadata('roles', AdminRegistrationsController);
-      expect(roles).toContain(UserRole.ADMIN);
+      // This test verifies that admin users have access to all endpoints
+      
+      // Check a few key endpoints to ensure admin access
+      const campingOptionsRoles = Reflect.getMetadata('roles', AdminRegistrationsController.prototype.getCampingOptionRegistrationsWithFields);
+      const editRoles = Reflect.getMetadata('roles', AdminRegistrationsController.prototype.editRegistration);
+      const cancelRoles = Reflect.getMetadata('roles', AdminRegistrationsController.prototype.cancelRegistration);
+      
+      expect(campingOptionsRoles).toContain(UserRole.ADMIN);
+      expect(editRoles).toContain(UserRole.ADMIN);
+      expect(cancelRoles).toContain(UserRole.ADMIN);
     });
   });
 

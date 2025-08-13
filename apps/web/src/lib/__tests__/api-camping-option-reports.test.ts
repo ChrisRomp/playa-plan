@@ -1,5 +1,32 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
+// Define types for better type safety
+interface CampingOptionRegistrationWithFields {
+  id: string;
+  userId: string;
+  campingOptionId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface Registration {
+  id: string;
+  userId: string;
+  year: number;
+  status: 'CONFIRMED';
+  createdAt: string;
+  updatedAt: string;
+  jobs: unknown[];
+  payments: unknown[];
+  campingOptions?: Array<{
+    id: string;
+    userId: string;
+    campingOptionId: string;
+    createdAt: string;
+    updatedAt: string;
+  }>;
+}
+
 describe('API Camping Option Reports', () => {
   let mockApi: {
     get: ReturnType<typeof vi.fn>;
@@ -79,7 +106,7 @@ describe('API Camping Option Reports', () => {
     it('should fetch camping option registrations with filters', async () => {
       const { reports } = await import('../api');
       
-      const mockData = [];
+      const mockData: CampingOptionRegistrationWithFields[] = [];
       mockApi.get.mockResolvedValue({ data: mockData });
 
       const filters = {
@@ -99,7 +126,7 @@ describe('API Camping Option Reports', () => {
     it('should handle partial filters correctly', async () => {
       const { reports } = await import('../api');
       
-      const mockData = [];
+      const mockData: CampingOptionRegistrationWithFields[] = [];
       mockApi.get.mockResolvedValue({ data: mockData });
 
       await reports.getCampingOptionRegistrations({ year: 2024 });
@@ -145,7 +172,16 @@ describe('API Camping Option Reports', () => {
         },
       ];
 
-      mockApi.get.mockResolvedValue({ data: mockData });
+      // Fix: Mock response should match the expected API structure
+      mockApi.get.mockResolvedValue({ 
+        data: {
+          registrations: mockData,
+          total: mockData.length,
+          page: 1,
+          limit: 10,
+          totalPages: 1
+        }
+      });
 
       const result = await reports.getRegistrations({ includeCampingOptions: true });
 
@@ -170,7 +206,16 @@ describe('API Camping Option Reports', () => {
         },
       ];
 
-      mockApi.get.mockResolvedValue({ data: mockData });
+      // Fix: Mock response should match the expected API structure
+      mockApi.get.mockResolvedValue({ 
+        data: {
+          registrations: mockData,
+          total: mockData.length,
+          page: 1,
+          limit: 10,
+          totalPages: 1
+        }
+      });
 
       const result = await reports.getRegistrations({ year: 2024 });
 
@@ -181,8 +226,16 @@ describe('API Camping Option Reports', () => {
     it('should handle mixed filters with camping options', async () => {
       const { reports } = await import('../api');
       
-      const mockData = [];
-      mockApi.get.mockResolvedValue({ data: mockData });
+      const mockData: Registration[] = [];
+      mockApi.get.mockResolvedValue({ 
+        data: {
+          registrations: mockData,
+          total: mockData.length,
+          page: 1,
+          limit: 10,
+          totalPages: 1
+        }
+      });
 
       await reports.getRegistrations({
         year: 2024,
