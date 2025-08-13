@@ -1172,11 +1172,17 @@ export const reports = {
       if (filters?.userId) params.append('userId', filters.userId);
       if (filters?.jobId) params.append('jobId', filters.jobId);
       if (filters?.year) params.append('year', filters.year.toString());
-      if (filters?.includeCampingOptions) params.append('includeCampingOptions', 'true');
+      if (filters?.includeCampingOptions) params.append('includeCampingOptions', filters.includeCampingOptions.toString());
       
       const url = `/admin/registrations${params.toString() ? `?${params.toString()}` : ''}`;
-      const response = await api.get<Registration[]>(url);
-      return response.data;
+      const response = await api.get<{
+        registrations: Registration[];
+        total: number;
+        page: number;
+        limit: number;
+        totalPages: number;
+      }>(url);
+      return response.data.registrations;
     } catch (error) {
       console.error('Error fetching registrations report:', error);
       throw error;

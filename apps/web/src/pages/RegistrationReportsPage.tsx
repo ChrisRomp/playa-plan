@@ -49,7 +49,14 @@ export function RegistrationReportsPage() {
 
     setCampingOptionsLoading(true);
     try {
-      const data = await reports.getCampingOptionRegistrations(filters);
+      // Convert RegistrationReportFilters to CampingOptionReportFilters
+      // by filtering out parameters not supported by the camping options endpoint
+      const campingFilters = {
+        year: filters.year,
+        userId: filters.userId,
+        // Note: jobId and includeCampingOptions are not supported by camping options endpoint
+      };
+      const data = await reports.getCampingOptionRegistrations(campingFilters);
       setCampingOptionData(data);
     } catch (err) {
       console.error('Error fetching camping option data:', err);
