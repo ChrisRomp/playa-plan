@@ -452,8 +452,11 @@ export function RegistrationReportsPage() {
     // Create CSV content using proper escaping
     const csvContent = generateCsv(headers, csvData);
 
+    // Add UTF-8 BOM for proper Excel encoding detection
+    const csvWithBom = '\uFEFF' + csvContent;
+
     // Create and download the file
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob([csvWithBom], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
     link.setAttribute('href', url);
