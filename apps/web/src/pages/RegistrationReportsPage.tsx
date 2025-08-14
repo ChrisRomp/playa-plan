@@ -220,6 +220,21 @@ export function RegistrationReportsPage() {
       .join(', ');
   }, [showCampingOptions]);
 
+  // Helper function to create user profile columns from field definitions
+  const createUserProfileColumns = (): DataTableColumn<Registration>[] => {
+    return USER_PROFILE_FIELDS.map(field => ({
+      id: field.key,
+      header: field.label,
+      accessor: (row) => (
+        <div className="max-w-xs">
+          <span className="text-sm">{(row.user as UserWithProfile)?.[field.key as keyof UserWithProfile] || '-'}</span>
+        </div>
+      ),
+      sortable: true,
+      hideOnMobile: true,
+    }));
+  };
+
   // Define table columns
   const columns: DataTableColumn<Registration>[] = useMemo(() => {
     const baseColumns: DataTableColumn<Registration>[] = [
@@ -281,88 +296,8 @@ export function RegistrationReportsPage() {
     // Add user profile columns if enabled
     if (showUserProfile) {
       const emailIndex = baseColumns.findIndex(col => col.id === 'email');
+      const userProfileColumns = createUserProfileColumns();
       
-      // Define user profile columns in order: Identity, Contact, Location
-      const userProfileColumns: DataTableColumn<Registration>[] = [
-        {
-          id: 'playaName',
-          header: 'Playa Name',
-          accessor: (row) => (
-            <div className="max-w-xs">
-              <span className="text-sm">{(row.user as UserWithProfile)?.playaName || '-'}</span>
-            </div>
-          ),
-          sortable: true,
-          hideOnMobile: true,
-        },
-        {
-          id: 'role',
-          header: 'Role',
-          accessor: (row) => (
-            <div className="max-w-xs">
-              <span className="text-sm">{(row.user as UserWithProfile)?.role || '-'}</span>
-            </div>
-          ),
-          sortable: true,
-          hideOnMobile: true,
-        },
-        {
-          id: 'phone',
-          header: 'Phone',
-          accessor: (row) => (
-            <div className="max-w-xs">
-              <span className="text-sm">{(row.user as UserWithProfile)?.phone || '-'}</span>
-            </div>
-          ),
-          sortable: true,
-          hideOnMobile: true,
-        },
-        {
-          id: 'emergencyContact',
-          header: 'Emergency Contact',
-          accessor: (row) => (
-            <div className="max-w-xs">
-              <span className="text-sm">{(row.user as UserWithProfile)?.emergencyContact || '-'}</span>
-            </div>
-          ),
-          sortable: true,
-          hideOnMobile: true,
-        },
-        {
-          id: 'city',
-          header: 'City',
-          accessor: (row) => (
-            <div className="max-w-xs">
-              <span className="text-sm">{(row.user as UserWithProfile)?.city || '-'}</span>
-            </div>
-          ),
-          sortable: true,
-          hideOnMobile: true,
-        },
-        {
-          id: 'stateProvince',
-          header: 'State/Province',
-          accessor: (row) => (
-            <div className="max-w-xs">
-              <span className="text-sm">{(row.user as UserWithProfile)?.stateProvince || '-'}</span>
-            </div>
-          ),
-          sortable: true,
-          hideOnMobile: true,
-        },
-        {
-          id: 'country',
-          header: 'Country',
-          accessor: (row) => (
-            <div className="max-w-xs">
-              <span className="text-sm">{(row.user as UserWithProfile)?.country || '-'}</span>
-            </div>
-          ),
-          sortable: true,
-          hideOnMobile: true,
-        },
-      ];
-
       // Insert user profile columns after email
       userProfileColumns.forEach((column, index) => {
         baseColumns.splice(emailIndex + 1 + index, 0, column);
@@ -420,8 +355,6 @@ export function RegistrationReportsPage() {
 
   const clearFilters = () => {
     setFilters({});
-    setShowCampingOptions(false);
-    setShowUserProfile(false);
   };
 
   const exportData = () => {
@@ -486,14 +419,8 @@ export function RegistrationReportsPage() {
 
       // Add camping options data if enabled
       if (showCampingOptions) {
-        const shiftIndex = data.findIndex((_, index) => {
-          // Find shift by looking for the jobs data (3rd element in original baseData)
-          if (showUserProfile) {
-            return index === 1 + USER_PROFILE_FIELDS.length + 1; // Email + user profile fields + 1 = Shift position
-          } else {
-            return index === 2; // Original position of Shift in baseData
-          }
-        });
+        // Calculate shift position: Email index (1) + user profile fields count + 1
+        const shiftIndex = showUserProfile ? 1 + USER_PROFILE_FIELDS.length + 1 : 2;
         const campingOptionName = formatCampingOptionName(registration);
         const fieldValues = uniqueFields.map(field => getFieldValue(registration, field.id) || '');
         
