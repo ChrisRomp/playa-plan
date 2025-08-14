@@ -22,6 +22,17 @@ interface UserWithProfile {
   emergencyContact?: string;
 }
 
+// User profile field definitions for consistent ordering
+const USER_PROFILE_FIELDS = [
+  { key: 'playaName', label: 'Playa Name' },
+  { key: 'role', label: 'Role' },
+  { key: 'phone', label: 'Phone' },
+  { key: 'emergencyContact', label: 'Emergency Contact' },
+  { key: 'city', label: 'City' },
+  { key: 'stateProvince', label: 'State/Province' },
+  { key: 'country', label: 'Country' },
+] as const;
+
 /**
  * Registration Reports page
  * Displays all registrations in a filterable, sortable table for staff/admin
@@ -428,15 +439,7 @@ export function RegistrationReportsPage() {
     let headers = baseHeaders;
     if (showUserProfile) {
       const emailIndex = baseHeaders.indexOf('Email');
-      const userProfileHeaders = [
-        'Playa Name',
-        'Role', 
-        'Phone',
-        'Emergency Contact',
-        'City',
-        'State/Province',
-        'Country'
-      ];
+      const userProfileHeaders = USER_PROFILE_FIELDS.map(field => field.label);
       headers = [
         ...baseHeaders.slice(0, emailIndex + 1), // User Name, Email
         ...userProfileHeaders, // User profile fields
@@ -470,15 +473,9 @@ export function RegistrationReportsPage() {
       // Add user profile data if enabled
       if (showUserProfile) {
         const emailIndex = 1; // Position of Email in baseData
-        const userProfileData = [
-          (registration.user as UserWithProfile)?.playaName || '',
-          (registration.user as UserWithProfile)?.role || '',
-          (registration.user as UserWithProfile)?.phone || '',
-          (registration.user as UserWithProfile)?.emergencyContact || '',
-          (registration.user as UserWithProfile)?.city || '',
-          (registration.user as UserWithProfile)?.stateProvince || '',
-          (registration.user as UserWithProfile)?.country || ''
-        ];
+        const userProfileData = USER_PROFILE_FIELDS.map(field =>
+          (registration.user as UserWithProfile)?.[field.key as keyof UserWithProfile] || ''
+        );
         
         data = [
           ...data.slice(0, emailIndex + 1), // User Name, Email
@@ -492,7 +489,7 @@ export function RegistrationReportsPage() {
         const shiftIndex = data.findIndex((_, index) => {
           // Find shift by looking for the jobs data (3rd element in original baseData)
           if (showUserProfile) {
-            return index === 1 + 7 + 1; // Email + 7 user profile fields + 1 = Shift position
+            return index === 1 + USER_PROFILE_FIELDS.length + 1; // Email + user profile fields + 1 = Shift position
           } else {
             return index === 2; // Original position of Shift in baseData
           }
