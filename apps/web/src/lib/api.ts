@@ -516,6 +516,7 @@ export interface RegistrationReportFilters {
   year?: number;
   status?: Registration['status'];
   includeCampingOptions?: boolean;
+  includeUserProfile?: boolean;
 }
 
 // Camping Option Report Filters interface
@@ -1175,6 +1176,9 @@ export const reports = {
       if (filters?.year) params.append('year', filters.year.toString());
       if (filters?.includeCampingOptions !== undefined) {
         params.append('includeCampingOptions', String(filters.includeCampingOptions));
+      }
+      if (filters?.includeUserProfile !== undefined) {
+        params.append('includeUserProfile', String(filters.includeUserProfile));
       }
       
       const url = `/admin/registrations${params.toString() ? `?${params.toString()}` : ''}`;

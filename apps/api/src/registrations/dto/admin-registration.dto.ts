@@ -176,6 +176,20 @@ export class AdminRegistrationQueryDto {
   })
   @IsBoolean({ message: 'Include camping options must be a boolean' })
   includeCampingOptions?: boolean = false;
+
+  @ApiPropertyOptional({
+    description: 'Include additional user profile fields in the response (playa name, role, phone, location, emergency contact)',
+    example: false,
+    default: false,
+  })
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (value === 'true') return true;
+    if (value === 'false') return false;
+    return value;
+  })
+  @IsBoolean({ message: 'Include user profile must be a boolean' })
+  includeUserProfile?: boolean = false;
 }
 
 /**
