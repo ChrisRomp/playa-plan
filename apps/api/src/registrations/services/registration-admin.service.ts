@@ -92,20 +92,35 @@ export class RegistrationAdminService {
       }
     }
 
+    // Configure user fields to select based on includeUserProfile parameter
+    const baseUserFields = {
+      id: true,
+      email: true,
+      firstName: true,
+      lastName: true,
+      playaName: true,
+      role: true,
+    };
+
+    const userProfileFields = {
+      phone: true,
+      city: true,
+      stateProvince: true,
+      country: true,
+      emergencyContact: true,
+    };
+
+    const userSelectFields = query.includeUserProfile 
+      ? { ...baseUserFields, ...userProfileFields }
+      : baseUserFields;
+
     // Get total count and all registrations in parallel for better performance
     const [registrations, total] = await Promise.all([
       this.prisma.registration.findMany({
         where,
         include: {
           user: {
-            select: {
-              id: true,
-              email: true,
-              firstName: true,
-              lastName: true,
-              playaName: true,
-              role: true,
-            },
+            select: userSelectFields,
           },
           jobs: {
             include: {

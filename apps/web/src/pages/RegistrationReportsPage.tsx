@@ -7,6 +7,32 @@ import { PATHS } from '../routes';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import { generateCsv } from '../utils/csv';
 
+// Extended user type for registration reports that includes profile fields
+interface UserWithProfile {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  playaName?: string;
+  role?: string;
+  phone?: string;
+  city?: string;
+  stateProvince?: string;
+  country?: string;
+  emergencyContact?: string;
+}
+
+// User profile field definitions for consistent ordering
+const USER_PROFILE_FIELDS = [
+  { key: 'playaName', label: 'Playa Name' },
+  { key: 'role', label: 'Role' },
+  { key: 'phone', label: 'Phone' },
+  { key: 'emergencyContact', label: 'Emergency Contact' },
+  { key: 'city', label: 'City' },
+  { key: 'stateProvince', label: 'State/Province' },
+  { key: 'country', label: 'Country' },
+] as const;
+
 /**
  * Registration Reports page
  * Displays all registrations in a filterable, sortable table for staff/admin
@@ -21,6 +47,10 @@ export function RegistrationReportsPage() {
     // Restore from localStorage
     return localStorage.getItem('registrationReports_showCampingOptions') === 'true';
   });
+  const [showUserProfile, setShowUserProfile] = useState(() => {
+    // Restore from localStorage
+    return localStorage.getItem('registrationReports_showUserProfile') === 'true';
+  });
   const [campingOptionData, setCampingOptionData] = useState<CampingOptionRegistrationWithFields[]>([]);
   const [campingOptionsLoading, setCampingOptionsLoading] = useState(false);
 
@@ -30,7 +60,8 @@ export function RegistrationReportsPage() {
     setError(null);
     try {
       const data = await reports.getRegistrations({ 
-        includeCampingOptions: showCampingOptions 
+        includeCampingOptions: showCampingOptions,
+        includeUserProfile: showUserProfile
       });
       setRegistrations(data);
     } catch (err) {
@@ -39,7 +70,7 @@ export function RegistrationReportsPage() {
     } finally {
       setLoading(false);
     }
-  }, [showCampingOptions]);
+  }, [showCampingOptions, showUserProfile]);
 
   // Fetch camping option registrations with field values
   const fetchCampingOptionData = useCallback(async () => {
@@ -79,6 +110,10 @@ export function RegistrationReportsPage() {
   useEffect(() => {
     localStorage.setItem('registrationReports_showCampingOptions', showCampingOptions.toString());
   }, [showCampingOptions]);
+
+  useEffect(() => {
+    localStorage.setItem('registrationReports_showUserProfile', showUserProfile.toString());
+  }, [showUserProfile]);
 
   // Apply client-side filtering
   const filteredRegistrations = useMemo(() => {
@@ -185,6 +220,24 @@ export function RegistrationReportsPage() {
       .join(', ');
   }, [showCampingOptions]);
 
+  // Helper function to create user profile columns from field definitions
+  const createUserProfileColumns = (): DataTableColumn<Registration>[] => {
+    return USER_PROFILE_FIELDS.map(field => ({
+      id: field.key,
+      header: field.label,
+      accessor: (row) => {
+        const user = row.user as UserWithProfile | undefined;
+        return (
+          <div className="max-w-xs">
+            <span className="text-sm">{user?.[field.key as keyof UserWithProfile] || '-'}</span>
+          </div>
+        );
+      },
+      sortable: true,
+      hideOnMobile: true,
+    }));
+  };
+
   // Define table columns
   const columns: DataTableColumn<Registration>[] = useMemo(() => {
     const baseColumns: DataTableColumn<Registration>[] = [
@@ -243,6 +296,21 @@ export function RegistrationReportsPage() {
     },
   ];
 
+    // Add user profile columns if enabled
+    if (showUserProfile) {
+      const emailIndex = baseColumns.findIndex(col => col.id === 'email');
+      if (emailIndex === -1) {
+        console.warn('Email column not found in base columns, user profile columns will be appended at the end');
+      }
+      const userProfileColumns = createUserProfileColumns();
+      
+      // Insert user profile columns after email (or at end if email not found)
+      const insertIndex = emailIndex === -1 ? baseColumns.length : emailIndex + 1;
+      userProfileColumns.forEach((column, index) => {
+        baseColumns.splice(insertIndex + index, 0, column);
+      });
+    }
+
     // Add camping options columns if enabled
     if (showCampingOptions) {
       const statusIndex = baseColumns.findIndex(col => col.id === 'status');
@@ -283,7 +351,7 @@ export function RegistrationReportsPage() {
     }
 
     return baseColumns;
-  }, [showCampingOptions, formatCampingOptionName, campingOptionsLoading, uniqueFields, getFieldValue]);
+  }, [showCampingOptions, showUserProfile, formatCampingOptionName, campingOptionsLoading, uniqueFields, getFieldValue]);
 
   const handleFilterChange = (key: keyof RegistrationReportFilters, value: string) => {
     setFilters(prev => ({
@@ -294,7 +362,6 @@ export function RegistrationReportsPage() {
 
   const clearFilters = () => {
     setFilters({});
-    setShowCampingOptions(false);
   };
 
   const exportData = () => {
@@ -308,15 +375,26 @@ export function RegistrationReportsPage() {
       'Registered Date'
     ];
 
-    // Add camping options headers if enabled
+    // Add user profile headers if enabled
     let headers = baseHeaders;
+    if (showUserProfile) {
+      const emailIndex = baseHeaders.indexOf('Email');
+      const userProfileHeaders = USER_PROFILE_FIELDS.map(field => field.label);
+      headers = [
+        ...baseHeaders.slice(0, emailIndex + 1), // User Name, Email
+        ...userProfileHeaders, // User profile fields
+        ...baseHeaders.slice(emailIndex + 1) // Shift, Status, Year, Registered Date
+      ];
+    }
+
+    // Add camping options headers if enabled
     if (showCampingOptions) {
-      const shiftIndex = baseHeaders.indexOf('Shift');
+      const shiftIndex = headers.indexOf('Shift');
       const campingHeaders = ['Camping Option', ...uniqueFields.map(field => field.displayName)];
       headers = [
-        ...baseHeaders.slice(0, shiftIndex),
+        ...headers.slice(0, shiftIndex),
         ...campingHeaders,
-        ...baseHeaders.slice(shiftIndex)
+        ...headers.slice(shiftIndex)
       ];
     }
 
@@ -330,21 +408,45 @@ export function RegistrationReportsPage() {
         new Date(registration.createdAt).toLocaleDateString()
       ];
 
-      // Add camping options data if enabled
-      if (showCampingOptions) {
-        const shiftIndex = 2; // Position of Shift in baseData
-        const campingOptionName = formatCampingOptionName(registration);
-        const fieldValues = uniqueFields.map(field => getFieldValue(registration, field.id) || '');
+      let data = [...baseData];
+
+      // Add user profile data if enabled
+      if (showUserProfile) {
+        const emailIndex = headers.indexOf('Email');
+        if (emailIndex === -1) {
+          console.warn('Email header not found in CSV headers, user profile data will be appended at the end');
+        }
+        const userProfileData = USER_PROFILE_FIELDS.map(field =>
+          (registration.user as UserWithProfile)?.[field.key as keyof UserWithProfile] || ''
+        );
         
-        return [
-          ...baseData.slice(0, shiftIndex), // User Name, Email
-          campingOptionName, // Camping Option
-          ...fieldValues, // Dynamic field values
-          ...baseData.slice(shiftIndex) // Shift, Status, Year, Registered Date
+        const insertIndex = emailIndex === -1 ? data.length : emailIndex + 1;
+        data = [
+          ...data.slice(0, insertIndex), // Up to and including Email
+          ...userProfileData, // User profile fields
+          ...data.slice(insertIndex) // Remaining fields
         ];
       }
 
-      return baseData;
+      // Add camping options data if enabled
+      if (showCampingOptions) {
+        // Calculate shift position based on current data structure
+        const EMAIL_INDEX = 1; // Position of Email in original baseData structure
+        const afterUserProfileIndex = EMAIL_INDEX + 1 + USER_PROFILE_FIELDS.length;
+        const shiftIndex = showUserProfile ? afterUserProfileIndex : 2;
+        
+        const campingOptionName = formatCampingOptionName(registration);
+        const fieldValues = uniqueFields.map(field => getFieldValue(registration, field.id) || '');
+        
+        data = [
+          ...data.slice(0, shiftIndex), // Everything before Shift
+          campingOptionName, // Camping Option
+          ...fieldValues, // Dynamic field values
+          ...data.slice(shiftIndex) // Shift, Status, Year, Registered Date
+        ];
+      }
+
+      return data;
     });
 
     // Create CSV content using proper escaping
@@ -470,8 +572,37 @@ export function RegistrationReportsPage() {
           </div>
         )}
 
-        {/* Show Registration Fields Toggle */}
-        <div className="bg-gray-50 rounded-lg p-4 mb-6">
+        {/* Display Options Toggles */}
+        <div className="bg-gray-50 rounded-lg p-4 mb-6 space-y-4">
+          {/* Show User Profile Fields Toggle */}
+          <div className="flex items-center justify-between">
+            <div>
+              <label htmlFor="user-profile-toggle" className="block text-sm font-medium text-gray-700">
+                Show User Profile Fields
+              </label>
+              <p className="text-xs text-gray-500 mt-1">
+                Display additional user profile information (playa name, role, contact, location)
+              </p>
+            </div>
+            <div className="flex items-center">
+              <button
+                type="button"
+                id="user-profile-toggle"
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 ${
+                  showUserProfile ? 'bg-amber-600' : 'bg-gray-200'
+                }`}
+                onClick={() => setShowUserProfile(!showUserProfile)}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    showUserProfile ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+          </div>
+
+          {/* Show Registration Fields Toggle */}
           <div className="flex items-center justify-between">
             <div>
               <label htmlFor="camping-options-toggle" className="block text-sm font-medium text-gray-700">
