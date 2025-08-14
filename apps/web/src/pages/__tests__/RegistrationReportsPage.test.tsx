@@ -261,7 +261,10 @@ describe('RegistrationReportsPage', () => {
       renderComponent();
 
       await waitFor(() => {
-        expect(mockGetRegistrations).toHaveBeenCalledWith({ includeCampingOptions: false });
+        expect(mockGetRegistrations).toHaveBeenCalledWith({ 
+          includeCampingOptions: false,
+          includeUserProfile: false
+        });
       });
     });
   });
