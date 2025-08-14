@@ -5,6 +5,7 @@ import { DataTable, DataTableColumn } from '../components/common/DataTable/DataT
 import { reports, Registration, RegistrationReportFilters, CampingOptionRegistrationWithFields } from '../lib/api';
 import { PATHS } from '../routes';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
+import { generateCsv } from '../utils/csv';
 
 /**
  * Registration Reports page
@@ -346,16 +347,8 @@ export function RegistrationReportsPage() {
       return baseData;
     });
 
-    // Create CSV content
-    const csvContent = [
-      headers.join(','),
-      ...csvData.map(row => row.map(field => 
-        // Escape fields that contain commas or quotes
-        typeof field === 'string' && (field.includes(',') || field.includes('"')) 
-          ? `"${field.replace(/"/g, '""')}"` 
-          : field
-      ).join(','))
-    ].join('\n');
+    // Create CSV content using proper escaping
+    const csvContent = generateCsv(headers, csvData);
 
     // Create and download the file
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
