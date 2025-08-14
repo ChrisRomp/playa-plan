@@ -47,6 +47,17 @@ describe('Proper CSV utility functions', () => {
       expect(csv).toBe('Name,Email\nJohn Doe,john@example.com\nJane Smith,jane@example.com');
     });
 
+    it('should handle null and undefined values in rows', () => {
+      const headers = ['Name', 'Email', 'Phone'];
+      const rows = [
+        ['John Doe', null, '555-1234'],
+        ['Jane Smith', 'jane@example.com', undefined],
+      ];
+
+      const csv = generateCsv(headers, rows);
+      expect(csv).toBe('Name,Email,Phone\nJohn Doe,,555-1234\nJane Smith,jane@example.com,');
+    });
+
     it('should properly escape fields with newlines', () => {
       const headers = ['Name', 'Description'];
       const rows = [

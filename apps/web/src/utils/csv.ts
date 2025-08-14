@@ -35,7 +35,7 @@ export function escapeCsvField(
  */
 export function generateCsv(
   headers: string[],
-  rows: (string | number)[][],
+  rows: (string | number | null | undefined)[][],
   options: GenerateCsvOptions = {}
 ): string {
   const { alwaysQuote = false, lineTerminator = '\n' } = options;
@@ -51,7 +51,7 @@ export function generateCsv(
  */
 export function generateCsvAllQuoted(
   headers: string[],
-  rows: (string | number)[][],
+  rows: (string | number | null | undefined)[][],
   lineTerminator = '\n'
 ): string {
   return generateCsv(headers, rows, { alwaysQuote: true, lineTerminator });
