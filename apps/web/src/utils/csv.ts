@@ -9,7 +9,7 @@ export interface GenerateCsvOptions {
   readonly lineTerminator?: string; // default \n
 }
 
-export function escapeCsvField(value: string | number, alwaysQuote = false): string {
+export function escapeCsvField(value: string | number | null | undefined, alwaysQuote = false): string {
   const str = String(value ?? '');
   const needsQuoting = alwaysQuote || /[",\n\r]/.test(str);
   if (!needsQuoting) return str;
