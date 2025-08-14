@@ -225,11 +225,14 @@ export function RegistrationReportsPage() {
     return USER_PROFILE_FIELDS.map(field => ({
       id: field.key,
       header: field.label,
-      accessor: (row) => (
-        <div className="max-w-xs">
-          <span className="text-sm">{(row.user as UserWithProfile)?.[field.key as keyof UserWithProfile] || '-'}</span>
-        </div>
-      ),
+      accessor: (row) => {
+        const user = row.user as UserWithProfile | undefined;
+        return (
+          <div className="max-w-xs">
+            <span className="text-sm">{user?.[field.key as keyof UserWithProfile] || '-'}</span>
+          </div>
+        );
+      },
       sortable: true,
       hideOnMobile: true,
     }));
@@ -296,11 +299,15 @@ export function RegistrationReportsPage() {
     // Add user profile columns if enabled
     if (showUserProfile) {
       const emailIndex = baseColumns.findIndex(col => col.id === 'email');
+      if (emailIndex === -1) {
+        console.warn('Email column not found in base columns, user profile columns will be appended at the end');
+      }
       const userProfileColumns = createUserProfileColumns();
       
-      // Insert user profile columns after email
+      // Insert user profile columns after email (or at end if email not found)
+      const insertIndex = emailIndex === -1 ? baseColumns.length : emailIndex + 1;
       userProfileColumns.forEach((column, index) => {
-        baseColumns.splice(emailIndex + 1 + index, 0, column);
+        baseColumns.splice(insertIndex + index, 0, column);
       });
     }
 
@@ -405,22 +412,29 @@ export function RegistrationReportsPage() {
 
       // Add user profile data if enabled
       if (showUserProfile) {
-        const emailIndex = 1; // Position of Email in baseData
+        const emailIndex = headers.indexOf('Email');
+        if (emailIndex === -1) {
+          console.warn('Email header not found in CSV headers, user profile data will be appended at the end');
+        }
         const userProfileData = USER_PROFILE_FIELDS.map(field =>
           (registration.user as UserWithProfile)?.[field.key as keyof UserWithProfile] || ''
         );
         
+        const insertIndex = emailIndex === -1 ? data.length : emailIndex + 1;
         data = [
-          ...data.slice(0, emailIndex + 1), // User Name, Email
+          ...data.slice(0, insertIndex), // Up to and including Email
           ...userProfileData, // User profile fields
-          ...data.slice(emailIndex + 1) // Shift, Status, Year, Registered Date
+          ...data.slice(insertIndex) // Remaining fields
         ];
       }
 
       // Add camping options data if enabled
       if (showCampingOptions) {
-        // Calculate shift position: Email index (1) + user profile fields count + 1
-        const shiftIndex = showUserProfile ? 1 + USER_PROFILE_FIELDS.length + 1 : 2;
+        // Calculate shift position based on current data structure
+        const EMAIL_INDEX = 1; // Position of Email in original baseData structure
+        const afterUserProfileIndex = EMAIL_INDEX + 1 + USER_PROFILE_FIELDS.length;
+        const shiftIndex = showUserProfile ? afterUserProfileIndex : 2;
+        
         const campingOptionName = formatCampingOptionName(registration);
         const fieldValues = uniqueFields.map(field => getFieldValue(registration, field.id) || '');
         
