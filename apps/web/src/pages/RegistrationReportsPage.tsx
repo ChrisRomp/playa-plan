@@ -5,6 +5,7 @@ import { DataTable, DataTableColumn } from '../components/common/DataTable/DataT
 import { reports, Registration, RegistrationReportFilters, CampingOptionRegistrationWithFields } from '../lib/api';
 import { PATHS } from '../routes';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
+import { generateCsv } from '../utils/csv';
 
 /**
  * Registration Reports page
@@ -297,7 +298,6 @@ export function RegistrationReportsPage() {
   };
 
   const exportData = () => {
-    // Convert registrations data to CSV format
     const baseHeaders = [
       'User Name',
       'Email',
@@ -307,7 +307,6 @@ export function RegistrationReportsPage() {
       'Registered Date'
     ];
 
-    // Add camping options headers if enabled
     let headers = baseHeaders;
     if (showCampingOptions) {
       const shiftIndex = baseHeaders.indexOf('Shift');
@@ -319,8 +318,8 @@ export function RegistrationReportsPage() {
       ];
     }
 
-    const csvData = filteredRegistrations.map(registration => {
-      const baseData = [
+    const rows = filteredRegistrations.map(registration => {
+      const baseRow = [
         registration.user ? `${registration.user.firstName} ${registration.user.lastName}` : 'Unknown User',
         registration.user?.email || '',
         registration.jobs.map(rj => rj.job.name).join('; ') || '',
@@ -329,44 +328,27 @@ export function RegistrationReportsPage() {
         new Date(registration.createdAt).toLocaleDateString()
       ];
 
-      // Add camping options data if enabled
       if (showCampingOptions) {
-        const shiftIndex = 2; // Position of Shift in baseData
+        const shiftIndex = 2;
         const campingOptionName = formatCampingOptionName(registration);
         const fieldValues = uniqueFields.map(field => getFieldValue(registration, field.id) || '');
-        
         return [
-          ...baseData.slice(0, shiftIndex), // User Name, Email
-          campingOptionName, // Camping Option
-          ...fieldValues, // Dynamic field values
-          ...baseData.slice(shiftIndex) // Shift, Status, Year, Registered Date
+          ...baseRow.slice(0, shiftIndex),
+          campingOptionName,
+            ...fieldValues,
+          ...baseRow.slice(shiftIndex)
         ];
       }
-
-      return baseData;
+      return baseRow;
     });
 
-    // Create CSV content
-    const csvContent = [
-      headers.join(','),
-      ...csvData.map(row => row.map(field => 
-        // Escape fields that contain commas or quotes
-        typeof field === 'string' && (field.includes(',') || field.includes('"')) 
-          ? `"${field.replace(/"/g, '""')}"` 
-          : field
-      ).join(','))
-    ].join('\n');
-
-    // Create and download the file
+    const csvContent = generateCsv(headers, rows);
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
     link.setAttribute('href', url);
-    
-    // Generate filename with current date
     const filename = `registration_report_${new Date().toISOString().split('T')[0]}.csv`;
     link.setAttribute('download', filename);
-    
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();
