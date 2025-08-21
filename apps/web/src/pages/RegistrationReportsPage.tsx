@@ -5,7 +5,7 @@ import { DataTable, DataTableColumn } from '../components/common/DataTable/DataT
 import { reports, Registration, RegistrationReportFilters, CampingOptionRegistrationWithFields } from '../lib/api';
 import { PATHS } from '../routes';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
-import { generateCsv } from '../utils/csv';
+import { downloadCsv } from '../utils/csv';
 
 // Extended user type for registration reports that includes profile fields
 interface UserWithProfile {
@@ -449,27 +449,10 @@ export function RegistrationReportsPage() {
       return data;
     });
 
-    // Create CSV content using proper escaping
-    const csvContent = generateCsv(headers, csvData);
-
-    // Add UTF-8 BOM for proper Excel encoding detection
-    const csvWithBom = '\uFEFF' + csvContent;
-
-    // Create and download the file
-    const blob = new Blob([csvWithBom], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    
     // Generate filename with current date
     const filename = `registration_report_${new Date().toISOString().split('T')[0]}.csv`;
-    link.setAttribute('download', filename);
     
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    downloadCsv(headers, csvData, { filename });
   };
 
   if (loading) {

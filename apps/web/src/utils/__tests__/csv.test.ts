@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { escapeCsvField, generateCsv, generateCsvAllQuoted } from '../csv';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { escapeCsvField, generateCsv, generateCsvAllQuoted, downloadCsv } from '../csv';
 
 describe('Proper CSV utility functions', () => {
   describe('escapeCsvField', () => {
@@ -106,6 +106,130 @@ describe('Proper CSV utility functions', () => {
 
       const csv = generateCsvAllQuoted(headers, rows);
       expect(csv).toBe('"Name","Email"\n"John","john@example.com"');
+    });
+  });
+
+  describe('downloadCsv', () => {
+    // Mock DOM elements and methods
+    let mockLink: HTMLAnchorElement;
+    let mockCreateElement: ReturnType<typeof vi.fn>;
+    let mockCreateObjectURL: ReturnType<typeof vi.fn>;
+    let mockRevokeObjectURL: ReturnType<typeof vi.fn>;
+    let mockClick: ReturnType<typeof vi.fn>;
+    let mockAppendChild: ReturnType<typeof vi.fn>;
+    let mockRemoveChild: ReturnType<typeof vi.fn>;
+
+    beforeEach(() => {
+      // Mock document.createElement
+      mockClick = vi.fn();
+      mockLink = {
+        setAttribute: vi.fn(),
+        click: mockClick,
+        style: {}
+      } as unknown as HTMLAnchorElement;
+      
+      mockCreateElement = vi.fn(() => mockLink);
+      mockAppendChild = vi.fn();
+      mockRemoveChild = vi.fn();
+      
+      // Mock global objects
+      Object.defineProperty(global, 'document', {
+        writable: true,
+        value: {
+          createElement: mockCreateElement,
+          body: {
+            appendChild: mockAppendChild,
+            removeChild: mockRemoveChild
+          }
+        }
+      });
+
+      mockCreateObjectURL = vi.fn(() => 'blob:mock-url');
+      mockRevokeObjectURL = vi.fn();
+      
+      Object.defineProperty(global, 'URL', {
+        writable: true,
+        value: {
+          createObjectURL: mockCreateObjectURL,
+          revokeObjectURL: mockRevokeObjectURL
+        }
+      });
+
+      // Mock Blob
+      Object.defineProperty(global, 'Blob', {
+        writable: true,
+        value: vi.fn((content: BlobPart[], options?: BlobPropertyBag) => ({
+          content,
+          type: options?.type || '',
+          size: content.length
+        }))
+      });
+    });
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it('should create CSV with BOM by default and trigger download', () => {
+      const headers = ['Name', 'Email'];
+      const rows = [['John Doe', 'john@example.com']];
+
+      downloadCsv(headers, rows, { filename: 'test.csv' });
+
+      // Verify Blob was created with BOM
+      expect(global.Blob).toHaveBeenCalledWith(
+        ['\uFEFFName,Email\nJohn Doe,john@example.com'],
+        { type: 'text/csv;charset=utf-8;' }
+      );
+
+      // Verify download process
+      expect(mockCreateElement).toHaveBeenCalledWith('a');
+      expect(mockLink.setAttribute).toHaveBeenCalledWith('href', 'blob:mock-url');
+      expect(mockLink.setAttribute).toHaveBeenCalledWith('download', 'test.csv');
+      expect(mockAppendChild).toHaveBeenCalledWith(mockLink);
+      expect(mockClick).toHaveBeenCalled();
+      expect(mockRemoveChild).toHaveBeenCalledWith(mockLink);
+      expect(mockRevokeObjectURL).toHaveBeenCalledWith('blob:mock-url');
+    });
+
+    it('should allow disabling BOM', () => {
+      const headers = ['Name'];
+      const rows = [['John']];
+
+      downloadCsv(headers, rows, { includeBom: false });
+
+      expect(global.Blob).toHaveBeenCalledWith(
+        ['Name\nJohn'],
+        { type: 'text/csv;charset=utf-8;' }
+      );
+    });
+
+    it('should use default filename when not provided', () => {
+      const headers = ['Name'];
+      const rows = [['John']];
+
+      downloadCsv(headers, rows);
+
+      expect(mockLink.setAttribute).toHaveBeenCalledWith(
+        'download',
+        expect.stringMatching(/^export_\d{4}-\d{2}-\d{2}\.csv$/)
+      );
+    });
+
+    it('should handle complex data with proper escaping and BOM', () => {
+      const headers = ['Name', 'Description'];
+      const rows = [
+        ['John "Johnny" Doe', 'Has license A-123, very experienced\nCoach rating: excellent'],
+        ['Jane Smith', 'Normal entry']
+      ];
+
+      downloadCsv(headers, rows);
+
+      const expectedCsv = '\uFEFFName,Description\n"John ""Johnny"" Doe","Has license A-123, very experienced\nCoach rating: excellent"\nJane Smith,Normal entry';
+      expect(global.Blob).toHaveBeenCalledWith(
+        [expectedCsv],
+        { type: 'text/csv;charset=utf-8;' }
+      );
     });
   });
 });
