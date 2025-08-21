@@ -59,7 +59,8 @@ export function generateCsvAllQuoted(
 
 export interface DownloadCsvOptions extends GenerateCsvOptions {
   readonly filename?: string;
-  readonly includeBom?: boolean; // default true
+  /** Whether to include UTF-8 BOM for proper Unicode support in Excel. Defaults to true. */
+  readonly includeBom?: boolean;
 }
 
 /**
@@ -67,6 +68,8 @@ export interface DownloadCsvOptions extends GenerateCsvOptions {
  * @param headers - Array of column headers
  * @param rows - Array of row data
  * @param options - Download and CSV generation options
+ * @param options.filename - Custom filename for the download (defaults to dated export)
+ * @param options.includeBom - Whether to include UTF-8 BOM for Excel compatibility (defaults to true)
  */
 export function downloadCsv(
   headers: string[],

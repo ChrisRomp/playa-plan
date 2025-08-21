@@ -163,7 +163,7 @@ export function WorkScheduleReportPage() {
     // CSV headers
     const headers = ['Day', 'Shift', 'Shift Time', 'Job', 'Registrations', 'User'];
     
-    const csvRows: (string | number)[][] = [];
+    const csvRows: (string | number | null | undefined)[][] = [];
     
     // Process each shift and its jobs
     Object.entries(filteredShiftsByDay).forEach(([day, shifts]) => {
