@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { reports } from '../lib/api';
 import { PATHS } from '../routes';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
+import { downloadCsv } from '../utils/csv';
 
 // Day of week values from backend for sorting
 // (removed enum definition to simplify type handling)
@@ -155,14 +156,14 @@ export function WorkScheduleReportPage() {
     return user.playaName ? `${fullName} (${user.playaName})` : fullName;
   };
 
-  // Export data to CSV
+  // Export data to CSV using shared utility function
   const exportData = () => {
     if (!workScheduleData) return;
     
     // CSV headers
     const headers = ['Day', 'Shift', 'Shift Time', 'Job', 'Registrations', 'User'];
     
-    const csvRows: string[][] = [];
+    const csvRows: (string | number)[][] = [];
     
     // Process each shift and its jobs
     Object.entries(filteredShiftsByDay).forEach(([day, shifts]) => {
@@ -207,32 +208,11 @@ export function WorkScheduleReportPage() {
       });
     });
     
-    // Create CSV content
-    const csvContent = [
-      headers.join(','),
-      ...csvRows.map(row => row.map(field => 
-        // Escape fields that contain commas or quotes
-        typeof field === 'string' && (field.includes(',') || field.includes('"')) 
-          ? `"${field.replace(/"/g, '""')}"` 
-          : field
-      ).join(','))
-    ].join('\n');
-    
-    // Create and download the file
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    
     // Generate filename with current date
     const filename = `work_schedule_report_${dayFilter !== 'all' ? dayFilter + '_' : ''}${new Date().toISOString().split('T')[0]}.csv`;
-    link.setAttribute('download', filename);
     
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    // Use shared CSV download function with BOM for Unicode support
+    downloadCsv(headers, csvRows, { filename });
   };
 
   // Count total shifts, jobs, and registrations
