@@ -6,6 +6,7 @@ import { reports } from '../lib/api';
 import { Payment } from '../types';
 import { PATHS } from '../routes';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
+import { downloadCsv } from '../utils/csv';
 
 interface PaymentReportFilters {
   year?: number;
@@ -214,23 +215,6 @@ export function PaymentReportsPage() {
       ];
     });
 
-    // Create CSV content
-    const csvContent = [
-      headers.join(','),
-      ...csvData.map(row => row.map(field => 
-        // Escape fields that contain commas or quotes
-        typeof field === 'string' && (field.includes(',') || field.includes('"')) 
-          ? `"${field.replace(/"/g, '""')}"` 
-          : field
-      ).join(','))
-    ].join('\\n');
-
-    // Create and download the file
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    
     // Generate filename with current date and applied filters
     const filterSuffix = Object.entries(filters)
       .filter(([, value]) => value !== undefined)
@@ -238,13 +222,8 @@ export function PaymentReportsPage() {
       .join('_');
     
     const filename = `payment_reports${filterSuffix ? '_' + filterSuffix : ''}_${new Date().toISOString().split('T')[0]}.csv`;
-    link.setAttribute('download', filename);
     
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    downloadCsv(headers, csvData, { filename });
   };
 
   if (loading) {
