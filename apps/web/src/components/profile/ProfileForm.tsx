@@ -66,14 +66,14 @@ const ProfileForm: React.FC = () => {
     
     try {
       await updateProfile({
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        phone: formData.phone,
-        city: formData.city,
-        stateProvince: formData.stateProvince,
-        country: formData.country,
-        playaName: formData.playaName,
-        emergencyContact: formData.emergencyContact,
+        firstName: formData.firstName.trim(),
+        lastName: formData.lastName.trim(),
+        phone: formData.phone.trim(),
+        city: formData.city.trim(),
+        stateProvince: formData.stateProvince.trim(),
+        country: formData.country.trim(),
+        playaName: formData.playaName.trim(),
+        emergencyContact: formData.emergencyContact.trim(),
       });
       
       // Redirect to dashboard after successful save

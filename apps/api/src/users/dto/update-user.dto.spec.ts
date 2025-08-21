@@ -251,4 +251,32 @@ describe('UpdateUserDto', () => {
     expect(errors[0].constraints).toHaveProperty('minLength');
     expect(errors[0].constraints?.minLength).toContain('at least 8 characters');
   });
+
+  it('should trim whitespace from string fields', async () => {
+    // Arrange
+    const dto = plainToInstance(UpdateUserDto, {
+      firstName: '  John  ',
+      lastName: '  Doe  ',
+      playaName: '  Dusty  ',
+      phone: '  +1-555-123-4567  ',
+      city: '  San Francisco  ',
+      stateProvince: '  CA  ',
+      country: '  United States  ',
+      emergencyContact: '  Jane Doe, +1-555-987-6543, sister  ',
+    });
+
+    // Act
+    const errors = await validate(dto);
+
+    // Assert
+    expect(errors.length).toBe(0);
+    expect(dto.firstName).toBe('John');
+    expect(dto.lastName).toBe('Doe');
+    expect(dto.playaName).toBe('Dusty');
+    expect(dto.phone).toBe('+1-555-123-4567');
+    expect(dto.city).toBe('San Francisco');
+    expect(dto.stateProvince).toBe('CA');
+    expect(dto.country).toBe('United States');
+    expect(dto.emergencyContact).toBe('Jane Doe, +1-555-987-6543, sister');
+  });
 });
