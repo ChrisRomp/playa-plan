@@ -1,4 +1,5 @@
 import { IsEmail, IsEnum, IsOptional, IsString, MinLength, IsBoolean, MaxLength } from 'class-validator';
+import { Transform } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { UserRole } from '@prisma/client';
 
@@ -32,6 +33,7 @@ export class UpdateUserDto {
   })
   @IsString()
   @MaxLength(50, { message: 'First name must be at most 50 characters long' })
+  @Transform(({ value }) => typeof value === 'string' ? value.trim() : value)
   @IsOptional()
   readonly firstName?: string;
 
@@ -42,6 +44,7 @@ export class UpdateUserDto {
   })
   @IsString()
   @MaxLength(50, { message: 'Last name must be at most 50 characters long' })
+  @Transform(({ value }) => typeof value === 'string' ? value.trim() : value)
   @IsOptional()
   readonly lastName?: string;
 
@@ -52,6 +55,7 @@ export class UpdateUserDto {
   })
   @IsString()
   @MaxLength(50, { message: 'Playa name must be at most 50 characters long' })
+  @Transform(({ value }) => typeof value === 'string' ? value.trim() : value)
   @IsOptional()
   readonly playaName?: string;
 
@@ -62,6 +66,7 @@ export class UpdateUserDto {
   })
   @IsString()
   @MaxLength(50, { message: 'Phone number must be at most 50 characters long' })
+  @Transform(({ value }) => typeof value === 'string' ? value.trim() : value)
   @IsOptional()
   readonly phone?: string;
 
@@ -72,6 +77,7 @@ export class UpdateUserDto {
   })
   @IsString()
   @MaxLength(50, { message: 'City must be at most 50 characters long' })
+  @Transform(({ value }) => typeof value === 'string' ? value.trim() : value)
   @IsOptional()
   readonly city?: string;
 
@@ -82,6 +88,7 @@ export class UpdateUserDto {
   })
   @IsString()
   @MaxLength(50, { message: 'State/province must be at most 50 characters long' })
+  @Transform(({ value }) => typeof value === 'string' ? value.trim() : value)
   @IsOptional()
   readonly stateProvince?: string;
 
@@ -92,6 +99,7 @@ export class UpdateUserDto {
   })
   @IsString()
   @MaxLength(50, { message: 'Country must be at most 50 characters long' })
+  @Transform(({ value }) => typeof value === 'string' ? value.trim() : value)
   @IsOptional()
   readonly country?: string;
 
@@ -102,6 +110,7 @@ export class UpdateUserDto {
   })
   @IsString()
   @MaxLength(1024, { message: 'Emergency contact must be at most 1024 characters long' })
+  @Transform(({ value }) => typeof value === 'string' ? value.trim() : value)
   @IsOptional()
   readonly emergencyContact?: string;
 

@@ -1,4 +1,5 @@
 import { IsEmail, IsEnum, IsNotEmpty, IsOptional, IsString, IsBoolean } from 'class-validator';
+import { Transform } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { UserRole } from '@prisma/client';
 
@@ -21,6 +22,7 @@ export class CreateUserDto {
   })
   @IsString()
   @IsNotEmpty({ message: 'First name is required' })
+  @Transform(({ value }) => typeof value === 'string' ? value.trim() : value)
   firstName!: string;
 
   @ApiProperty({
@@ -29,6 +31,7 @@ export class CreateUserDto {
   })
   @IsString()
   @IsNotEmpty({ message: 'Last name is required' })
+  @Transform(({ value }) => typeof value === 'string' ? value.trim() : value)
   lastName!: string;
 
   @ApiPropertyOptional({
@@ -36,6 +39,7 @@ export class CreateUserDto {
     example: 'Dusty',
   })
   @IsString()
+  @Transform(({ value }) => typeof value === 'string' ? value.trim() : value)
   @IsOptional()
   playaName?: string;
 
@@ -44,6 +48,7 @@ export class CreateUserDto {
     example: '+1-555-123-4567',
   })
   @IsString()
+  @Transform(({ value }) => typeof value === 'string' ? value.trim() : value)
   @IsOptional()
   phone?: string;
 
@@ -52,6 +57,7 @@ export class CreateUserDto {
     example: 'San Francisco',
   })
   @IsString()
+  @Transform(({ value }) => typeof value === 'string' ? value.trim() : value)
   @IsOptional()
   city?: string;
 
@@ -60,6 +66,7 @@ export class CreateUserDto {
     example: 'California',
   })
   @IsString()
+  @Transform(({ value }) => typeof value === 'string' ? value.trim() : value)
   @IsOptional()
   stateProvince?: string;
 
@@ -68,6 +75,7 @@ export class CreateUserDto {
     example: 'United States',
   })
   @IsString()
+  @Transform(({ value }) => typeof value === 'string' ? value.trim() : value)
   @IsOptional()
   country?: string;
 
@@ -76,6 +84,7 @@ export class CreateUserDto {
     example: 'Jane Doe, +1-555-987-6543, relationship: sister',
   })
   @IsString()
+  @Transform(({ value }) => typeof value === 'string' ? value.trim() : value)
   @IsOptional()
   emergencyContact?: string;
 
