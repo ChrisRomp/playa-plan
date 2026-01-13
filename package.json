@@ -45,7 +45,7 @@
         "docker:run:web:prod": "docker run -p 5173:5173 -e VITE_API_URL=${VITE_API_URL:-http://localhost:3000} playaplan-web:prod"
     },
     "devDependencies": {
-        "@playwright/test": "^1.52.0",
+        "@playwright/test": "^1.57.0",
         "@typescript-eslint/eslint-plugin": "^8.33.1",
         "@typescript-eslint/parser": "^8.33.1",
         "@vitest/coverage-v8": "^3.2.2",
