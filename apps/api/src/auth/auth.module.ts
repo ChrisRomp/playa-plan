@@ -27,6 +27,8 @@ import type { StringValue } from 'ms';
       useFactory: async (configService: ConfigService) => ({
         secret: configService.get<string>('jwt.secret'),
         signOptions: {
+          // StringValue is a branded type from 'ms' package. The config value should be
+          // a valid time string (e.g., '24h', '7d', '30m'). Default is '24h'.
           expiresIn: configService.get<string>('jwt.expirationTime', '24h') as StringValue,
         },
       }),
