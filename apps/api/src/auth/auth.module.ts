@@ -10,6 +10,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { PrismaModule } from '../common/prisma/prisma.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import type { StringValue } from 'ms';
 
 /**
  * Authentication module providing JWT and local authentication
@@ -26,7 +27,9 @@ import { NotificationsModule } from '../notifications/notifications.module';
       useFactory: async (configService: ConfigService) => ({
         secret: configService.get<string>('jwt.secret'),
         signOptions: {
-          expiresIn: configService.get<string>('jwt.expirationTime', '24h'),
+          // StringValue is a branded type from 'ms' package. The config value should be
+          // a valid time string (e.g., '24h', '7d', '30m'). Default is '24h'.
+          expiresIn: configService.get<string>('jwt.expirationTime', '24h') as StringValue,
         },
       }),
     }),
