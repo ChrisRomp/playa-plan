@@ -56,3 +56,44 @@ export function generateCsvAllQuoted(
 ): string {
   return generateCsv(headers, rows, { alwaysQuote: true, lineTerminator });
 }
+
+export interface DownloadCsvOptions extends GenerateCsvOptions {
+  readonly filename?: string;
+  /** Whether to include UTF-8 BOM for proper Unicode support in Excel. Defaults to true. */
+  readonly includeBom?: boolean;
+}
+
+/**
+ * Generates CSV content and triggers download with proper BOM for Unicode support
+ * @param headers - Array of column headers
+ * @param rows - Array of row data
+ * @param options - Download and CSV generation options
+ * @param options.filename - Custom filename for the download (defaults to dated export)
+ * @param options.includeBom - Whether to include UTF-8 BOM for Excel compatibility (defaults to true)
+ */
+export function downloadCsv(
+  headers: string[],
+  rows: (string | number | null | undefined)[][],
+  options: DownloadCsvOptions = {}
+): void {
+  const { filename = `export_${new Date().toISOString().split('T')[0]}.csv`, includeBom = true, ...csvOptions } = options;
+
+  // Generate CSV content using proper escaping
+  const csvContent = generateCsv(headers, rows, csvOptions);
+
+  // Add UTF-8 BOM for proper Excel encoding detection of Unicode characters
+  const csvWithBom = includeBom ? '\uFEFF' + csvContent : csvContent;
+
+  // Create and download the file
+  const blob = new Blob([csvWithBom], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  const url = URL.createObjectURL(blob);
+  link.setAttribute('href', url);
+  link.setAttribute('download', filename);
+
+  link.style.visibility = 'hidden';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
