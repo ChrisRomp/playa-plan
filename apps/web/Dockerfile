@@ -1,20 +1,10 @@
 # Multi-stage Dockerfile for web application
 FROM node:22.12.0-alpine3.20 AS base
 
-# Add build arguments for dynamic versioning
+# Build arguments for dynamic versioning (used in runtime stage labels)
 ARG IMAGE_VERSION=dev
 ARG BUILD_DATE
 ARG GIT_COMMIT
-
-# Add OCI labels with dynamic values
-LABEL org.opencontainers.image.title="PlayaPlan Web"
-LABEL org.opencontainers.image.description="React frontend for PlayaPlan camp registration system"
-LABEL org.opencontainers.image.source="https://github.com/ChrisRomp/playa-plan"
-LABEL org.opencontainers.image.authors="Chris Romp"
-LABEL org.opencontainers.image.licenses="MIT"
-LABEL org.opencontainers.image.version="${IMAGE_VERSION}"
-LABEL org.opencontainers.image.created="${BUILD_DATE}"
-LABEL org.opencontainers.image.revision="${GIT_COMMIT}"
 
 WORKDIR /app
 
@@ -38,6 +28,21 @@ RUN npm run build
 
 # Runtime stage - serves built files using nginx
 FROM nginx:alpine AS runtime
+
+# Redeclare build args for labels (FROM resets ARG scope)
+ARG IMAGE_VERSION=dev
+ARG BUILD_DATE
+ARG GIT_COMMIT
+
+# OCI labels for GHCR metadata
+LABEL org.opencontainers.image.title="PlayaPlan Web"
+LABEL org.opencontainers.image.description="React frontend for PlayaPlan camp registration system"
+LABEL org.opencontainers.image.source="https://github.com/ChrisRomp/playa-plan"
+LABEL org.opencontainers.image.authors="Chris Romp"
+LABEL org.opencontainers.image.licenses="MIT"
+LABEL org.opencontainers.image.version="${IMAGE_VERSION}"
+LABEL org.opencontainers.image.created="${BUILD_DATE}"
+LABEL org.opencontainers.image.revision="${GIT_COMMIT}"
 
 # Create a separate nginx configuration file
 COPY --from=build /app/apps/web/dist /usr/share/nginx/html
