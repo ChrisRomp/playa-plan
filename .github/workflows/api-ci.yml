@@ -90,6 +90,10 @@ jobs:
     name: Build API Image (${{ matrix.arch }})
     needs: build-and-test
     timeout-minutes: 20
+    # Skip for fork PRs — self-hosted runner should not run untrusted code
+    if: >-
+      github.event_name == 'push' ||
+      github.event.pull_request.head.repo.full_name == github.repository
     strategy:
       fail-fast: false
       matrix:
