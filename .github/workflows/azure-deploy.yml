@@ -35,6 +35,7 @@ env:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     # Determine environment based on workflow dispatch input or default to 'test' for branch pushes
     environment: ${{ github.event.inputs.environment || 'test' }}
     steps:
@@ -110,6 +111,7 @@ jobs:
   deploy:
     needs: build-and-push
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     environment: ${{ github.event.inputs.environment || 'test' }}
     steps:
       - name: Checkout repository

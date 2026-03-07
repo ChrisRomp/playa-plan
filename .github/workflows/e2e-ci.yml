@@ -29,6 +29,7 @@ jobs:
   e2e-tests:
     name: End-to-End Tests
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     
     services:
       postgres:
