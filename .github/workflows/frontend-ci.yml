@@ -74,7 +74,7 @@ jobs:
     runs-on: ${{ fromJSON(matrix.runner) }}
     steps:
     - name: Set registry image name
-      run: echo "REGISTRY_IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}/web" >> $GITHUB_ENV
+      run: echo "REGISTRY_IMAGE=ghcr.io/$(echo "$GITHUB_REPOSITORY" | tr '[:upper:]' '[:lower:]')/web" >> $GITHUB_ENV
 
     - uses: actions/checkout@v4
     
@@ -146,7 +146,7 @@ jobs:
     timeout-minutes: 10
     steps:
     - name: Set registry image name
-      run: echo "REGISTRY_IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}/web" >> $GITHUB_ENV
+      run: echo "REGISTRY_IMAGE=ghcr.io/$(echo "$GITHUB_REPOSITORY" | tr '[:upper:]' '[:lower:]')/web" >> $GITHUB_ENV
 
     - name: Download digests
       uses: actions/download-artifact@v4
