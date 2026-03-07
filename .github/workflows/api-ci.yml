@@ -103,10 +103,10 @@ jobs:
           - arch: arm64
             runner: '["self-hosted", "macOS", "ARM64"]'
     runs-on: ${{ fromJSON(matrix.runner) }}
-    env:
-      REGISTRY_IMAGE: ghcr.io/${{ github.repository }}/api
-    
     steps:
+    - name: Set registry image name
+      run: echo "REGISTRY_IMAGE=ghcr.io/$(echo "$GITHUB_REPOSITORY" | tr '[:upper:]' '[:lower:]')/api" >> $GITHUB_ENV
+
     - uses: actions/checkout@v4
     
     - name: Set up Docker Buildx
@@ -175,10 +175,10 @@ jobs:
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    env:
-      REGISTRY_IMAGE: ghcr.io/${{ github.repository }}/api
-    
     steps:
+    - name: Set registry image name
+      run: echo "REGISTRY_IMAGE=ghcr.io/$(echo "$GITHUB_REPOSITORY" | tr '[:upper:]' '[:lower:]')/api" >> $GITHUB_ENV
+
     - name: Download digests
       uses: actions/download-artifact@v4
       with:
