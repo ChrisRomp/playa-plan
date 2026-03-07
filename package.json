@@ -66,7 +66,6 @@
     "overrides": {
         "@angular-devkit/core": {
             "ajv": "8.18.0"
-        },
-        "serialize-javascript": ">=7.0.4"
+        }
     }
 }
