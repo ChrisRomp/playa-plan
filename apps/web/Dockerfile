@@ -26,25 +26,10 @@ WORKDIR /app/apps/web
 FROM base AS build
 RUN npm run build
 
-# Runtime stage - serves built files using nginx
-FROM nginx:alpine AS runtime
+# Production stage - serves built files using nginx
+FROM nginx:alpine AS production
 
-# Redeclare build args for labels (FROM resets ARG scope)
-ARG IMAGE_VERSION=dev
-ARG BUILD_DATE
-ARG GIT_COMMIT
-
-# OCI labels for GHCR metadata
-LABEL org.opencontainers.image.title="PlayaPlan Web"
-LABEL org.opencontainers.image.description="React frontend for PlayaPlan camp registration system"
-LABEL org.opencontainers.image.source="https://github.com/ChrisRomp/playa-plan"
-LABEL org.opencontainers.image.authors="Chris Romp"
-LABEL org.opencontainers.image.licenses="MIT"
-LABEL org.opencontainers.image.version="${IMAGE_VERSION}"
-LABEL org.opencontainers.image.created="${BUILD_DATE}"
-LABEL org.opencontainers.image.revision="${GIT_COMMIT}"
-
-# Create a separate nginx configuration file
+# Copy built assets
 COPY --from=build /app/apps/web/dist /usr/share/nginx/html
 
 # Copy runtime config template
@@ -101,6 +86,21 @@ RUN echo '#!/bin/sh' > /usr/local/bin/entrypoint.sh && \
     echo 'echo "Starting nginx server..."' >> /usr/local/bin/entrypoint.sh && \
     echo 'nginx -g "daemon off;"' >> /usr/local/bin/entrypoint.sh && \
     chmod +x /usr/local/bin/entrypoint.sh
+
+# Redeclare build args for labels (FROM resets ARG scope)
+ARG IMAGE_VERSION=dev
+ARG BUILD_DATE
+ARG GIT_COMMIT
+
+# OCI labels for GHCR metadata (placed last to avoid cache busting from BUILD_DATE)
+LABEL org.opencontainers.image.title="PlayaPlan Web"
+LABEL org.opencontainers.image.description="React frontend for PlayaPlan camp registration system"
+LABEL org.opencontainers.image.source="https://github.com/ChrisRomp/playa-plan"
+LABEL org.opencontainers.image.authors="Chris Romp"
+LABEL org.opencontainers.image.licenses="MIT"
+LABEL org.opencontainers.image.version="${IMAGE_VERSION}"
+LABEL org.opencontainers.image.created="${BUILD_DATE}"
+LABEL org.opencontainers.image.revision="${GIT_COMMIT}"
 
 EXPOSE 5173 9464
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
