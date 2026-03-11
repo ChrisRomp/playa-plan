@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { JobsService } from './jobs.service';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { NotFoundException } from '@nestjs/common';
+import { UserRole } from '@prisma/client';
 import { CreateJobDto } from './dto/create-job.dto';
 import { UpdateJobDto } from './dto/update-job.dto';
 
@@ -209,6 +210,99 @@ describe('JobsService', () => {
           },
         },
       });
+    });
+
+    it('should filter out staffOnly jobs when userRole is PARTICIPANT', async () => {
+      const mockJobs = [
+        {
+          id: 'staff-job',
+          name: 'Staff Job',
+          location: 'Loc',
+          categoryId: 'cat-1',
+          shiftId: 'shift-1',
+          staffOnly: true,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          category: { id: 'cat-1', name: 'Cat', staffOnly: true, alwaysRequired: false },
+          shift: { id: 'shift-1', name: 'Shift', startTime: '09:00', endTime: '17:00', dayOfWeek: 'MONDAY' },
+          registrations: [],
+        },
+        {
+          id: 'normal-job',
+          name: 'Normal Job',
+          location: 'Loc',
+          categoryId: 'cat-2',
+          shiftId: 'shift-2',
+          staffOnly: false,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          category: { id: 'cat-2', name: 'Cat2', staffOnly: false, alwaysRequired: true },
+          shift: { id: 'shift-2', name: 'Shift2', startTime: '09:00', endTime: '17:00', dayOfWeek: 'TUESDAY' },
+          registrations: [],
+        },
+      ];
+
+      mockPrismaService.job.findMany.mockResolvedValue(mockJobs);
+
+      const result = await service.findAll(UserRole.PARTICIPANT);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].staffOnly).toBe(false);
+    });
+
+    it('should return all jobs including staffOnly when userRole is STAFF', async () => {
+      const mockJobs = [
+        {
+          id: 'staff-job',
+          name: 'Staff Job',
+          location: 'Loc',
+          staffOnly: true,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          category: { id: 'cat-1', name: 'Cat', staffOnly: true, alwaysRequired: false },
+          shift: { id: 'shift-1', name: 'Shift', startTime: '09:00', endTime: '17:00', dayOfWeek: 'MONDAY' },
+          registrations: [],
+        },
+        {
+          id: 'normal-job',
+          name: 'Normal Job',
+          location: 'Loc',
+          staffOnly: false,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          category: { id: 'cat-2', name: 'Cat2', staffOnly: false, alwaysRequired: true },
+          shift: { id: 'shift-2', name: 'Shift2', startTime: '09:00', endTime: '17:00', dayOfWeek: 'TUESDAY' },
+          registrations: [],
+        },
+      ];
+
+      mockPrismaService.job.findMany.mockResolvedValue(mockJobs);
+
+      const result = await service.findAll(UserRole.STAFF);
+
+      expect(result).toHaveLength(2);
+    });
+
+    it('should return all jobs when no userRole is provided', async () => {
+      const mockJobs = [
+        {
+          id: 'staff-job',
+          name: 'Staff Job',
+          location: 'Loc',
+          staffOnly: true,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          category: { id: 'cat-1', name: 'Cat', staffOnly: true, alwaysRequired: false },
+          shift: { id: 'shift-1', name: 'Shift', startTime: '09:00', endTime: '17:00', dayOfWeek: 'MONDAY' },
+          registrations: [],
+        },
+      ];
+
+      mockPrismaService.job.findMany.mockResolvedValue(mockJobs);
+
+      const result = await service.findAll();
+
+      expect(result).toHaveLength(1);
     });
   });
 

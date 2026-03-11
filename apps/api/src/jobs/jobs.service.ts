@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { CreateJobDto } from './dto/create-job.dto';
 import { UpdateJobDto } from './dto/update-job.dto';
-import { Job, Prisma } from '@prisma/client';
+import { Job, Prisma, UserRole } from '@prisma/client';
 
 /**
  * Type definition for job with included relations
@@ -71,7 +71,12 @@ export class JobsService {
     return this.addDerivedPropertiesWithRegistrations(job);
   }
 
-  async findAll() {
+  /**
+   * Get all jobs, optionally filtered by user role.
+   * Participants will not see staff-only jobs.
+   * @param userRole - Optional role to filter results
+   */
+  async findAll(userRole?: UserRole) {
     const jobs = await this.prisma.job.findMany({
       include: {
         category: true,
@@ -84,8 +89,11 @@ export class JobsService {
       },
     });
 
-    // Add derived properties from categories and calculate current registrations
-    return jobs.map(job => this.addDerivedPropertiesWithRegistrations(job));
+    const jobsWithProperties = jobs.map(job => this.addDerivedPropertiesWithRegistrations(job));
+    if (userRole === UserRole.PARTICIPANT) {
+      return jobsWithProperties.filter(job => !job.staffOnly);
+    }
+    return jobsWithProperties;
   }
 
   async findOne(id: string) {

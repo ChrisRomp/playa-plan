@@ -40,8 +40,8 @@ export class JobsController {
   @Get()
   @ApiOperation({ summary: 'Get all jobs' })
   @ApiOkResponse({ description: 'Returns all jobs.' })
-  findAll() {
-    return this.jobsService.findAll();
+  findAll(@Req() req: RequestWithUser) {
+    return this.jobsService.findAll(req.user.role);
   }
 
   @Get(':id')
