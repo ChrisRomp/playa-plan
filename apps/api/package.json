@@ -73,7 +73,7 @@
     "sanitize-html": "^2.17.3",
     "stripe": "^14.25.0",
     "uid": "^2.0.2",
-    "uuid": "^9.0.1"
+    "uuid": "^14.0.0"
   },
   "devDependencies": {
     "@babel/core": "^7.27.4",
