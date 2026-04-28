@@ -39,6 +39,11 @@ const validationSchema = Joi.object({
   
   // JWT configuration
   JWT_EXPIRATION_TIME: Joi.string().default('24h'),
+
+  // WebAuthn (passkey) configuration — all optional; derived from FRONTEND_URL when unset
+  WEBAUTHN_RP_NAME: Joi.string().default('PlayaPlan'),
+  WEBAUTHN_RP_ID: Joi.string().hostname(),
+  WEBAUTHN_ORIGIN: Joi.string().uri(),
   
   // Email configuration
   EMAIL_PROVIDER: Joi.string().valid('sendgrid', 'smtp').default('sendgrid'),

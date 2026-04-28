@@ -46,6 +46,36 @@ export default () => ({
     expirationTime: process.env.JWT_EXPIRATION_TIME || '24h',
   },
 
+  // WebAuthn (passkey) configuration
+  // Defaults derived from FRONTEND_URL so a single env var change moves
+  // passkey scope with the deployment. RP ID is the effective domain
+  // (hostname only — no scheme/port). Origin is the full origin string.
+  // RP ID must equal or be a registrable parent of the origin hostname;
+  // boot-time validation in WebAuthnConfigValidator enforces this.
+  webauthn: (() => {
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const frontendHost = (() => {
+      try {
+        return new URL(frontendUrl).hostname;
+      } catch {
+        return 'localhost';
+      }
+    })();
+    const origin = (() => {
+      try {
+        const u = new URL(process.env.WEBAUTHN_ORIGIN || frontendUrl);
+        return `${u.protocol}//${u.host}`;
+      } catch {
+        return frontendUrl;
+      }
+    })();
+    return {
+      rpName: process.env.WEBAUTHN_RP_NAME || 'PlayaPlan',
+      rpId: process.env.WEBAUTHN_RP_ID || frontendHost,
+      origin,
+    };
+  })(),
+
   // Payment providers are configured in the CoreConfig database table
   // and managed through the admin interface, not through environment variables
 

@@ -5,11 +5,17 @@ import { GlobalValidationPipe } from './common/pipes/validation.pipe';
 import helmet from 'helmet';
 import { ConfigService } from '@nestjs/config';
 import { createMetricsServer } from './metrics-server';
+import { validateWebAuthnConfig, WebAuthnConfig } from './config/webauthn-config.validator';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const configService = app.get(ConfigService);
-  
+
+  // Validate WebAuthn (passkey) config early so misconfigured RP ID / origin
+  // pairs fail boot with a clear error rather than producing silent browser
+  // rejections at registration/authentication time.
+  validateWebAuthnConfig(configService.get<WebAuthnConfig>('webauthn')!);
+
   // Start the internal metrics server (port 9464)
   await createMetricsServer();
   
