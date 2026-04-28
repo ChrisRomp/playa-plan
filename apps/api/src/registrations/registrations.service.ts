@@ -167,6 +167,7 @@ export class RegistrationsService {
     // Block participants from adding staff-only jobs
     const registrationOwner = await this.prisma.user.findUnique({
       where: { id: registration.userId },
+      select: { id: true, role: true },
     });
     if (!registrationOwner) {
       throw new NotFoundException(`User for registration ${registration.id} not found`);
@@ -1002,7 +1003,7 @@ export class RegistrationsService {
         id: { in: jobIds },
         category: { staffOnly: true },
       },
-      select: { id: true, name: true },
+      select: { id: true },
     });
     if (staffOnlyJobs.length > 0) {
       throw new ForbiddenException('Participants cannot register for staff-only jobs');
