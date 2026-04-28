@@ -303,6 +303,7 @@ describe('RegistrationsService', () => {
       year: 2024,
       status: RegistrationStatus.PENDING,
       jobs: [],
+      user: { id: 'user-id', role: UserRole.PARTICIPANT },
     };
 
     const mockJobWithRegistrations = {
@@ -313,10 +314,6 @@ describe('RegistrationsService', () => {
     };
 
     it('should throw ForbiddenException when adding staffOnly job for participant', async () => {
-      const mockParticipant = {
-        id: 'user-id',
-        role: UserRole.PARTICIPANT,
-      };
       const staffOnlyJob = {
         id: 'staff-job-id',
         staffOnly: true,
@@ -325,7 +322,6 @@ describe('RegistrationsService', () => {
       };
       mockPrismaService.registration.findUnique.mockResolvedValue(mockRegistrationWithJobs);
       mockPrismaService.job.findUnique.mockResolvedValue(staffOnlyJob);
-      mockPrismaService.user.findUnique.mockResolvedValue(mockParticipant);
       mockPrismaService.job.findMany.mockResolvedValue([staffOnlyJob]);
 
       await expect(
@@ -334,15 +330,18 @@ describe('RegistrationsService', () => {
     });
 
     it('should throw NotFoundException when registration owner is not found', async () => {
+      const registrationWithNoUser = {
+        ...mockRegistrationWithJobs,
+        user: null,
+      };
       const staffOnlyJob = {
         id: 'staff-job-id',
         staffOnly: true,
         maxRegistrations: 10,
         registrations: [],
       };
-      mockPrismaService.registration.findUnique.mockResolvedValue(mockRegistrationWithJobs);
+      mockPrismaService.registration.findUnique.mockResolvedValue(registrationWithNoUser);
       mockPrismaService.job.findUnique.mockResolvedValue(staffOnlyJob);
-      mockPrismaService.user.findUnique.mockResolvedValue(null);
 
       await expect(
         service.addJobToRegistration('registration-id', { jobId: 'staff-job-id' })
@@ -354,16 +353,19 @@ describe('RegistrationsService', () => {
         id: 'user-id',
         role: UserRole.STAFF,
       };
+      const staffRegistration = {
+        ...mockRegistrationWithJobs,
+        user: mockStaff,
+      };
       mockPrismaService.registration.findUnique
-        .mockResolvedValueOnce(mockRegistrationWithJobs)
+        .mockResolvedValueOnce(staffRegistration)
         .mockResolvedValueOnce({
-          ...mockRegistrationWithJobs,
+          ...staffRegistration,
           jobs: [{ job: mockJobWithRegistrations }],
-          user: mockStaff,
           payments: [],
         });
       mockPrismaService.job.findUnique.mockResolvedValue(mockJobWithRegistrations);
-      mockPrismaService.user.findUnique.mockResolvedValue(mockStaff);
+      mockPrismaService.job.findMany.mockResolvedValue([]);
       mockPrismaService.registrationJob.create.mockResolvedValue({});
 
       const result = await service.addJobToRegistration('registration-id', { jobId: 'job-id-1' });

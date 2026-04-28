@@ -141,6 +141,9 @@ export class RegistrationsService {
             job: true,
           },
         },
+        user: {
+          select: { id: true, role: true },
+        },
       },
     });
 
@@ -165,14 +168,10 @@ export class RegistrationsService {
     }
 
     // Block participants from adding staff-only jobs
-    const registrationOwner = await this.prisma.user.findUnique({
-      where: { id: registration.userId },
-      select: { id: true, role: true },
-    });
-    if (!registrationOwner) {
+    if (!registration.user) {
       throw new NotFoundException(`User for registration ${registration.id} not found`);
     }
-    await this.validateNoStaffOnlyJobsForParticipant(registrationOwner.role, [addJobDto.jobId]);
+    await this.validateNoStaffOnlyJobsForParticipant(registration.user.role, [addJobDto.jobId]);
 
     // Check if job is already in this registration
     const existingJobRegistration = registration.jobs.find(
