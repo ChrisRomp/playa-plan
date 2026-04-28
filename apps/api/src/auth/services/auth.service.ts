@@ -4,9 +4,8 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { RegisterDto } from '../dto/register.dto';
 import { User, UserRole } from '@prisma/client';
-import { randomUUID } from 'crypto';
+import { randomUUID, randomInt } from 'crypto';
 import { NotificationsService } from '../../notifications/services/notifications.service';
-import { randomInt } from 'crypto';
 import { normalizeEmail } from '../../common/utils/email.utils';
 
 /**
