@@ -76,6 +76,11 @@ export interface TemplateData {
       includeSmtpDetails?: boolean;
     };
   };
+  passkeyDetails?: {
+    nickname: string | null;
+    timestamp: Date;
+    firstName?: string | null;
+  };
   adminInfo?: {
     name: string;
     email: string;
@@ -456,6 +461,16 @@ export class NotificationsService {
           throw new Error('Test email details are required for test email template');
         }
         return this.getTestEmailTemplate(data.testEmailDetails, data.campName || '');
+      case NotificationType.PASSKEY_ADDED:
+        if (!data.passkeyDetails) {
+          throw new Error('Passkey details are required for passkey added template');
+        }
+        return this.getPasskeyChangeTemplate('added', data.passkeyDetails, data.campName || '');
+      case NotificationType.PASSKEY_REMOVED:
+        if (!data.passkeyDetails) {
+          throw new Error('Passkey details are required for passkey removed template');
+        }
+        return this.getPasskeyChangeTemplate('removed', data.passkeyDetails, data.campName || '');
       default:
         throw new Error(`Unknown notification type: ${type}`);
     }
@@ -1103,5 +1118,49 @@ This is an automated test email from ${campName}. If you received this unexpecte
 
       return { subject, html: text, text };
     }
+  }
+
+  /**
+   * Build the security-notification email sent when a passkey is added or
+   * removed from a user's account. Intentionally contains no revocation
+   * link — the user is directed to log in and manage passkeys themselves.
+   */
+  private getPasskeyChangeTemplate(
+    action: 'added' | 'removed',
+    details: { nickname: string | null; timestamp: Date; firstName?: string | null },
+    campName: string,
+  ): NotificationTemplate {
+    const nickname = details.nickname?.trim() || 'Unnamed passkey';
+    const safeNickname = this.escapeHtml(nickname);
+    const greeting = details.firstName ? `Hi ${this.escapeHtml(details.firstName)},` : 'Hi,';
+    const formatted = details.timestamp.toLocaleString();
+    const subject = `A passkey was ${action} on your ${campName || 'PlayaPlan'} account`;
+    const html = `
+      <p>${greeting}</p>
+      <p>A passkey called <strong>${safeNickname}</strong> was <strong>${action}</strong>
+      on your account on ${formatted}.</p>
+      <p>If this wasn't you, please log in to your account and remove
+      any passkeys you don't recognize from your security settings.</p>
+      <p>This is an automated security notification from ${campName || 'PlayaPlan'}.</p>
+    `;
+    const text = [
+      greeting,
+      '',
+      `A passkey called "${nickname}" was ${action} on your account on ${formatted}.`,
+      '',
+      "If this wasn't you, please log in to your account and remove any passkeys you don't recognize from your security settings.",
+      '',
+      `This is an automated security notification from ${campName || 'PlayaPlan'}.`,
+    ].join('\n');
+    return { subject, text, html };
+  }
+
+  private escapeHtml(input: string): string {
+    return input
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#x27;');
   }
 } 
