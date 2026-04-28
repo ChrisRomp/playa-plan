@@ -4,7 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { RegisterDto } from '../dto/register.dto';
 import { User, UserRole } from '@prisma/client';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 import { NotificationsService } from '../../notifications/services/notifications.service';
 import { randomInt } from 'crypto';
 import { normalizeEmail } from '../../common/utils/email.utils';
@@ -58,7 +58,7 @@ export class AuthService {
       }
 
       // Generate email verification token
-      const verificationToken = uuidv4();
+      const verificationToken = randomUUID();
 
       // Create new user (always as PARTICIPANT initially - admin promotion happens on first authentication)
       const newUser = await this.prisma.user.create({

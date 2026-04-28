@@ -25,7 +25,7 @@ import {
   AdminRegistrationResponseDto,
   AdminRegistrationQueryDto
 } from '../dto/admin-registration.dto';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 
 export interface RefundInfo {
   hasPayments: boolean;
@@ -219,7 +219,7 @@ export class RegistrationAdminService {
     editData: AdminEditRegistrationDto,
     adminUserId: string,
   ): Promise<AdminRegistrationResponseDto> {
-    const transactionId = uuidv4();
+    const transactionId = randomUUID();
     this.logger.log(`Admin ${adminUserId} editing registration ${registrationId}`);
 
     try {
@@ -530,7 +530,7 @@ export class RegistrationAdminService {
     cancelData: AdminCancelRegistrationDto,
     adminUserId: string,
   ): Promise<AdminRegistrationResponseDto> {
-    const transactionId = uuidv4();
+    const transactionId = randomUUID();
     this.logger.log(`Admin ${adminUserId} cancelling registration ${registrationId}`);
 
     try {

@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { AdminAuditService, CreateAuditRecordDto } from '../../admin-audit/services/admin-audit.service';
 import { AdminAuditActionType, AdminAuditTargetType } from '@prisma/client';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 
 export interface CleanupResult {
   workShiftsRemoved: number;
@@ -36,7 +36,7 @@ export class RegistrationCleanupService {
     reason: string,
     transactionId?: string,
   ): Promise<CleanupResult> {
-    const txId = transactionId || uuidv4();
+    const txId = transactionId || randomUUID();
     this.logger.log(`Starting cleanup for registration ${registrationId} by admin ${adminUserId}`);
 
     try {
@@ -177,7 +177,7 @@ export class RegistrationCleanupService {
     reason: string,
     transactionId?: string,
   ): Promise<number> {
-    const txId = transactionId || uuidv4();
+    const txId = transactionId || randomUUID();
 
     try {
       return await this.prisma.$transaction(async (prisma) => {
@@ -239,7 +239,7 @@ export class RegistrationCleanupService {
     reason: string,
     transactionId?: string,
   ): Promise<number> {
-    const txId = transactionId || uuidv4();
+    const txId = transactionId || randomUUID();
 
     try {
       return await this.prisma.$transaction(async (prisma) => {

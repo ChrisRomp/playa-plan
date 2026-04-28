@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { AdminAudit, AdminAuditActionType, AdminAuditTargetType, Prisma } from '@prisma/client';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 
 export interface CreateAuditRecordDto {
   adminUserId: string;
@@ -88,7 +88,7 @@ export class AdminAuditService {
     records: CreateAuditRecordDto[],
     transactionId?: string,
   ): Promise<AdminAudit[]> {
-    const txId = transactionId || uuidv4();
+    const txId = transactionId || randomUUID();
     
     try {
       return await this.prisma.$transaction(
