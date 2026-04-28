@@ -1,6 +1,7 @@
 {
   "name": "@playa-plan/types",
   "version": "0.1.0",
+  "license": "MIT",
   "description": "Shared types for PlayaPlan",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
