@@ -5,7 +5,7 @@ import { AppModule } from '../src/app.module';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../src/common/prisma/prisma.service';
 import { UserRole } from '@prisma/client';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 
 describe('CoreConfigController (e2e)', () => {
   let app: INestApplication;
@@ -37,7 +37,7 @@ describe('CoreConfigController (e2e)', () => {
       where: { email: 'admin-test@example.playaplan.app' },
       update: { role: UserRole.ADMIN },
       create: {
-        id: uuidv4(),
+        id: randomUUID(),
         email: 'admin-test@example.playaplan.app',
         firstName: 'Admin',
         lastName: 'User',
@@ -51,7 +51,7 @@ describe('CoreConfigController (e2e)', () => {
       where: { email: 'user-test@example.playaplan.app' },
       update: { role: UserRole.PARTICIPANT },
       create: {
-        id: uuidv4(),
+        id: randomUUID(),
         email: 'user-test@example.playaplan.app',
         firstName: 'Regular',
         lastName: 'User',

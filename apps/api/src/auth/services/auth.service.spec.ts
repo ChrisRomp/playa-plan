@@ -6,11 +6,14 @@ import { PrismaService } from '../../common/prisma/prisma.service';
 import { RegisterDto } from '../dto/register.dto';
 import { User, UserRole } from '@prisma/client';
 import { NotificationsService } from '../../notifications/services/notifications.service';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 import { BadRequestException, ConflictException } from '@nestjs/common';
 
-// Mock external dependencies
-jest.mock('uuid');
+// Mock crypto.randomUUID
+jest.mock('crypto', () => ({
+  ...jest.requireActual('crypto'),
+  randomUUID: jest.fn(),
+}));
 
 describe('AuthService', () => {
   let service: AuthService;
@@ -103,8 +106,8 @@ describe('AuthService', () => {
     jwtService = module.get<JwtService>(JwtService);
     notificationsService = module.get<NotificationsService>(NotificationsService);
     
-    // Setup uuid mock to return predictable values
-    (uuidv4 as jest.Mock).mockReturnValue('mocked-uuid-token');
+    // Setup randomUUID mock to return predictable values
+    (randomUUID as jest.Mock).mockReturnValue('mocked-uuid-token');
   });
 
   it('should be defined', () => {

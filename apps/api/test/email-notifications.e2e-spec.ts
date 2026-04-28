@@ -5,7 +5,7 @@ import { AppModule } from '../src/app.module';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../src/common/prisma/prisma.service';
 import { UserRole, NotificationType, EmailAuditStatus } from '@prisma/client';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 import { NotificationsService } from '../src/notifications/services/notifications.service';
 import { EmailService } from '../src/notifications/services/email.service';
 import * as nodemailer from 'nodemailer';
@@ -71,7 +71,7 @@ describe('Email Notifications (e2e)', () => {
     // Create test admin user
     const adminUser = await prismaService.user.create({
       data: {
-        id: uuidv4(),
+        id: randomUUID(),
         email: 'admin-test@example.playaplan.app',
         firstName: 'Admin',
         lastName: 'User',
@@ -83,7 +83,7 @@ describe('Email Notifications (e2e)', () => {
     // Create test regular user
     const testUser = await prismaService.user.create({
       data: {
-        id: uuidv4(),
+        id: randomUUID(),
         email: 'test-user@example.playaplan.app',
         firstName: 'Test',
         lastName: 'User',
@@ -106,7 +106,7 @@ describe('Email Notifications (e2e)', () => {
     // Create test core configuration with email enabled
     const config = await prismaService.coreConfig.create({
       data: {
-        id: uuidv4(),
+        id: randomUUID(),
         campName: 'Test Camp',
         registrationYear: 2024,
         emailEnabled: true,
@@ -421,7 +421,7 @@ describe('Email Notifications (e2e)', () => {
       for (const audit of testAudits) {
         await prismaService.emailAudit.create({
           data: {
-            id: uuidv4(),
+            id: randomUUID(),
             ...audit,
             createdAt: new Date(),
           },
@@ -458,7 +458,7 @@ describe('Email Notifications (e2e)', () => {
       // Create audit records with different dates
       await prismaService.emailAudit.create({
         data: {
-          id: uuidv4(),
+          id: randomUUID(),
           recipientEmail: 'old@example.com',
           subject: 'Old Email',
           notificationType: NotificationType.EMAIL_VERIFICATION,
@@ -471,7 +471,7 @@ describe('Email Notifications (e2e)', () => {
 
       await prismaService.emailAudit.create({
         data: {
-          id: uuidv4(),
+          id: randomUUID(),
           recipientEmail: 'recent@example.com',
           subject: 'Recent Email',
           notificationType: NotificationType.EMAIL_VERIFICATION,
