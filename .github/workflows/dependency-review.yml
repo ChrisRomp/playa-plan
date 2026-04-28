@@ -36,5 +36,5 @@ jobs:
         with:
           comment-summary-in-pr: always
         #   fail-on-severity: moderate
-          deny-licenses: GPL-1.0-or-later, LGPL-2.0-or-later
+          allow-licenses: MIT, ISC, Apache-2.0, BSD-2-Clause, BSD-3-Clause, BlueOak-1.0.0, MIT-0, Unlicense, 0BSD, CC0-1.0, CC-BY-4.0, Python-2.0
         #   retry-on-snapshot-warnings: true
