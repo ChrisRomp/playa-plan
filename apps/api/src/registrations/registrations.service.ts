@@ -1,8 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException, ConflictException, Logger } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException, ConflictException, Logger } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { NotificationsService } from '../notifications/services/notifications.service';
 import { CreateRegistrationDto, AddJobToRegistrationDto, CreateCampRegistrationDto, UpdateRegistrationDto } from './dto';
-import { Registration, RegistrationStatus } from '@prisma/client';
+import { Registration, RegistrationStatus, UserRole } from '@prisma/client';
 import { DayOfWeek } from '../common/enums/day-of-week.enum';
 
 interface JobRegistrationWithJobs extends Registration {
@@ -46,6 +46,9 @@ export class RegistrationsService {
     if (!user) {
       throw new NotFoundException(`User with ID ${createRegistrationDto.userId} not found`);
     }
+
+    // Block participants from registering for staff-only jobs
+    await this.validateNoStaffOnlyJobsForParticipant(user.role, createRegistrationDto.jobIds);
 
     // Check if user already has an active registration for this year
     const existingActiveRegistration = await this.prisma.registration.findFirst({
@@ -138,6 +141,9 @@ export class RegistrationsService {
             job: true,
           },
         },
+        user: {
+          select: { id: true, role: true },
+        },
       },
     });
 
@@ -160,6 +166,12 @@ export class RegistrationsService {
     if (!job) {
       throw new NotFoundException(`Job with ID ${addJobDto.jobId} not found`);
     }
+
+    // Block participants from adding staff-only jobs
+    if (!registration.user) {
+      throw new NotFoundException(`User for registration ${registration.id} not found`);
+    }
+    await this.validateNoStaffOnlyJobsForParticipant(registration.user.role, [addJobDto.jobId]);
 
     // Check if job is already in this registration
     const existingJobRegistration = registration.jobs.find(
@@ -969,5 +981,31 @@ export class RegistrationsService {
       jobRegistrations,
       hasRegistration: campingOptionRegistrations.length > 0 || activeJobRegistrations.length > 0,
     };
+  }
+
+  /**
+   * Validate that a participant is not attempting to register for staff-only jobs.
+   * The effective staffOnly status is derived from the job's category (see
+   * JobsService.addDerivedPropertiesWithRegistrations), so validation checks
+   * category.staffOnly to stay consistent with what the API exposes.
+   * Staff and admin users are allowed to register for any job.
+   * @param userRole - The role of the user
+   * @param jobIds - The job IDs to validate
+   * @throws ForbiddenException if a participant attempts to register for staff-only jobs
+   */
+  private async validateNoStaffOnlyJobsForParticipant(userRole: UserRole, jobIds: string[]): Promise<void> {
+    if (userRole !== UserRole.PARTICIPANT || jobIds.length === 0) {
+      return;
+    }
+    const staffOnlyJobs = await this.prisma.job.findMany({
+      where: {
+        id: { in: jobIds },
+        category: { staffOnly: true },
+      },
+      select: { id: true },
+    });
+    if (staffOnlyJobs.length > 0) {
+      throw new ForbiddenException('Participants cannot register for staff-only jobs');
+    }
   }
 }

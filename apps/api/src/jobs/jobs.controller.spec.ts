@@ -4,6 +4,7 @@ import { JobsService } from './jobs.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { RegistrationsService } from '../registrations/registrations.service';
+import { UserRole } from '@prisma/client';
 
 describe('JobsController', () => {
   let controller: JobsController;
@@ -174,10 +175,11 @@ describe('JobsController', () => {
 
       mockJobsService.findAll.mockResolvedValue(expectedJobs);
 
-      const result = await controller.findAll();
+      const mockReq = { user: { id: 'user-id', role: UserRole.ADMIN } } as unknown as Parameters<typeof controller.findAll>[0];
+      const result = await controller.findAll(mockReq);
 
       expect(result).toEqual(expectedJobs);
-      expect(mockJobsService.findAll).toHaveBeenCalled();
+      expect(mockJobsService.findAll).toHaveBeenCalledWith(UserRole.ADMIN);
     });
   });
 

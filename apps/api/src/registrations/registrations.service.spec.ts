@@ -2,8 +2,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { RegistrationsService } from './registrations.service';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { NotificationsService } from '../notifications/services/notifications.service';
-import { NotFoundException, ConflictException } from '@nestjs/common';
-import { RegistrationStatus } from '@prisma/client';
+import { NotFoundException, ConflictException, ForbiddenException } from '@nestjs/common';
+import { RegistrationStatus, UserRole } from '@prisma/client';
 import { CreateRegistrationDto } from './dto';
 
 describe('RegistrationsService', () => {
@@ -27,6 +27,7 @@ describe('RegistrationsService', () => {
     },
     job: {
       findUnique: jest.fn(),
+      findMany: jest.fn(),
     },
     user: {
       findUnique: jest.fn(),
@@ -192,6 +193,183 @@ describe('RegistrationsService', () => {
       const result = await service.create(createDto);
       
       expect(result.status).toBe(RegistrationStatus.WAITLISTED);
+    });
+
+    it('should throw ForbiddenException when participant registers for staffOnly job', async () => {
+      const mockParticipant = {
+        id: 'user-id',
+        email: 'test@example.playaplan.app',
+        role: UserRole.PARTICIPANT,
+      };
+      const staffOnlyJob = {
+        id: 'job-id-1',
+        staffOnly: true,
+        maxRegistrations: 10,
+        registrations: [],
+      };
+      mockPrismaService.user.findUnique.mockResolvedValue(mockParticipant);
+      mockPrismaService.registration.findFirst.mockResolvedValue(null);
+      mockPrismaService.job.findUnique.mockResolvedValue(staffOnlyJob);
+      mockPrismaService.job.findMany.mockResolvedValue([staffOnlyJob]);
+
+      const inputDto: CreateRegistrationDto = {
+        userId: 'user-id',
+        year: 2024,
+        jobIds: ['job-id-1'],
+      };
+      await expect(service.create(inputDto)).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should allow staff to register for staffOnly job', async () => {
+      const mockStaff = {
+        id: 'user-id',
+        email: 'staff@example.playaplan.app',
+        role: UserRole.STAFF,
+      };
+      mockPrismaService.user.findUnique.mockResolvedValue(mockStaff);
+      mockPrismaService.registration.findFirst.mockResolvedValue(null);
+      mockPrismaService.job.findUnique.mockResolvedValue(mockJobs[0]);
+      mockPrismaService.job.findMany.mockResolvedValue([]);
+      mockPrismaService.registration.create.mockResolvedValue(mockRegistration);
+
+      const result = await service.create(createDto);
+      expect(result).toEqual(mockRegistration);
+    });
+
+    it('should allow admin to register for staffOnly job', async () => {
+      const mockAdmin = {
+        id: 'user-id',
+        email: 'admin@example.playaplan.app',
+        role: UserRole.ADMIN,
+      };
+      mockPrismaService.user.findUnique.mockResolvedValue(mockAdmin);
+      mockPrismaService.registration.findFirst.mockResolvedValue(null);
+      mockPrismaService.job.findUnique.mockResolvedValue(mockJobs[0]);
+      mockPrismaService.job.findMany.mockResolvedValue([]);
+      mockPrismaService.registration.create.mockResolvedValue(mockRegistration);
+
+      const result = await service.create(createDto);
+      expect(result).toEqual(mockRegistration);
+    });
+
+    it('should throw ForbiddenException when participant registers with mix of normal and staffOnly jobs', async () => {
+      const mockParticipant = {
+        id: 'user-id',
+        email: 'test@example.playaplan.app',
+        role: UserRole.PARTICIPANT,
+      };
+      const staffOnlyJob = {
+        id: 'job-id-2',
+        staffOnly: true,
+        maxRegistrations: 10,
+        registrations: [],
+      };
+      mockPrismaService.user.findUnique.mockResolvedValue(mockParticipant);
+      mockPrismaService.registration.findFirst.mockResolvedValue(null);
+      mockPrismaService.job.findMany.mockResolvedValue([staffOnlyJob]);
+
+      await expect(service.create(createDto)).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should throw ForbiddenException when participant registers for job with staffOnly category', async () => {
+      const mockParticipant = {
+        id: 'user-id',
+        email: 'test@example.playaplan.app',
+        role: UserRole.PARTICIPANT,
+      };
+      const jobWithStaffOnlyCategory = {
+        id: 'job-id-1',
+        staffOnly: false,
+        maxRegistrations: 10,
+        registrations: [],
+      };
+      mockPrismaService.user.findUnique.mockResolvedValue(mockParticipant);
+      mockPrismaService.registration.findFirst.mockResolvedValue(null);
+      mockPrismaService.job.findMany.mockResolvedValue([jobWithStaffOnlyCategory]);
+
+      const inputDto: CreateRegistrationDto = {
+        userId: 'user-id',
+        year: 2024,
+        jobIds: ['job-id-1'],
+      };
+      await expect(service.create(inputDto)).rejects.toThrow(ForbiddenException);
+    });
+  });
+
+  describe('addJobToRegistration', () => {
+    const mockRegistrationWithJobs = {
+      id: 'registration-id',
+      userId: 'user-id',
+      year: 2024,
+      status: RegistrationStatus.PENDING,
+      jobs: [],
+      user: { id: 'user-id', role: UserRole.PARTICIPANT },
+    };
+
+    const mockJobWithRegistrations = {
+      id: 'job-id-1',
+      staffOnly: false,
+      maxRegistrations: 10,
+      registrations: [],
+    };
+
+    it('should throw ForbiddenException when adding staffOnly job for participant', async () => {
+      const staffOnlyJob = {
+        id: 'staff-job-id',
+        staffOnly: true,
+        maxRegistrations: 10,
+        registrations: [],
+      };
+      mockPrismaService.registration.findUnique.mockResolvedValue(mockRegistrationWithJobs);
+      mockPrismaService.job.findUnique.mockResolvedValue(staffOnlyJob);
+      mockPrismaService.job.findMany.mockResolvedValue([staffOnlyJob]);
+
+      await expect(
+        service.addJobToRegistration('registration-id', { jobId: 'staff-job-id' })
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should throw NotFoundException when registration owner is not found', async () => {
+      const registrationWithNoUser = {
+        ...mockRegistrationWithJobs,
+        user: null,
+      };
+      const staffOnlyJob = {
+        id: 'staff-job-id',
+        staffOnly: true,
+        maxRegistrations: 10,
+        registrations: [],
+      };
+      mockPrismaService.registration.findUnique.mockResolvedValue(registrationWithNoUser);
+      mockPrismaService.job.findUnique.mockResolvedValue(staffOnlyJob);
+
+      await expect(
+        service.addJobToRegistration('registration-id', { jobId: 'staff-job-id' })
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should allow adding staffOnly job for staff user', async () => {
+      const mockStaff = {
+        id: 'user-id',
+        role: UserRole.STAFF,
+      };
+      const staffRegistration = {
+        ...mockRegistrationWithJobs,
+        user: mockStaff,
+      };
+      mockPrismaService.registration.findUnique
+        .mockResolvedValueOnce(staffRegistration)
+        .mockResolvedValueOnce({
+          ...staffRegistration,
+          jobs: [{ job: mockJobWithRegistrations }],
+          payments: [],
+        });
+      mockPrismaService.job.findUnique.mockResolvedValue(mockJobWithRegistrations);
+      mockPrismaService.job.findMany.mockResolvedValue([]);
+      mockPrismaService.registrationJob.create.mockResolvedValue({});
+
+      const result = await service.addJobToRegistration('registration-id', { jobId: 'job-id-1' });
+      expect(result).toBeDefined();
     });
   });
 
