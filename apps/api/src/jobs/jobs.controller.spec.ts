@@ -175,7 +175,7 @@ describe('JobsController', () => {
 
       mockJobsService.findAll.mockResolvedValue(expectedJobs);
 
-      const mockReq = { user: { id: 'user-id', role: UserRole.ADMIN } } as unknown as Request & { user: { id: string; role: UserRole } };
+      const mockReq = { user: { id: 'user-id', role: UserRole.ADMIN } } as unknown as Parameters<typeof controller.findAll>[0];
       const result = await controller.findAll(mockReq);
 
       expect(result).toEqual(expectedJobs);
