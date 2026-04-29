@@ -10,6 +10,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { PrismaModule } from '../common/prisma/prisma.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { PasskeysModule } from '../passkeys/passkeys.module';
 import type { StringValue } from 'ms';
 
 /**
@@ -21,6 +22,7 @@ import type { StringValue } from 'ms';
     PassportModule,
     ConfigModule,
     NotificationsModule,
+    PasskeysModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

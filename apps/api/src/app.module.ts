@@ -9,6 +9,7 @@ import { RegistrationsModule } from './registrations/registrations.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { CampingOptionsModule } from './camping-options/camping-options.module';
 import { JobsModule } from './jobs/jobs.module';
+import { PasskeysModule } from './passkeys/passkeys.module';
 import { CoreConfigModule } from './core-config/core-config.module';
 import { HealthModule } from './health/health.module';
 import { APP_FILTER } from '@nestjs/core';
@@ -57,6 +58,7 @@ import validationSchema from './config/validation.schema';
     NotificationsModule,
     CampingOptionsModule,
     JobsModule,
+    PasskeysModule,
     CoreConfigModule,
     HealthModule,
     // Other feature modules will be added here as they are implemented
