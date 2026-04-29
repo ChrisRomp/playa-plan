@@ -2,7 +2,6 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import {
   BadRequestException,
-  ForbiddenException,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -48,6 +47,7 @@ describe('PasskeysService', () => {
     passkey: {
       findMany: jest.Mock;
       findUnique: jest.Mock;
+      findFirst: jest.Mock;
       count: jest.Mock;
       create: jest.Mock;
       update: jest.Mock;
@@ -55,7 +55,6 @@ describe('PasskeysService', () => {
     };
     webAuthnChallenge: {
       create: jest.Mock;
-      findUnique: jest.Mock;
       delete: jest.Mock;
       deleteMany: jest.Mock;
     };
@@ -106,6 +105,7 @@ describe('PasskeysService', () => {
       passkey: {
         findMany: jest.fn(),
         findUnique: jest.fn(),
+        findFirst: jest.fn(),
         count: jest.fn(),
         create: jest.fn(),
         update: jest.fn(),
@@ -113,7 +113,6 @@ describe('PasskeysService', () => {
       },
       webAuthnChallenge: {
         create: jest.fn(),
-        findUnique: jest.fn(),
         delete: jest.fn(),
         deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
       },
@@ -216,7 +215,12 @@ describe('PasskeysService', () => {
     const challenge = 'chal-reg';
     const response = {
       id: 'cred-new',
-      response: { clientDataJSON: buildClientDataJSON(challenge) },
+      rawId: 'cred-new',
+      type: 'public-key',
+      response: {
+        clientDataJSON: buildClientDataJSON(challenge),
+        attestationObject: 'attestation-bytes',
+      },
     } as never;
 
     const persistedPasskey = {
@@ -229,14 +233,13 @@ describe('PasskeysService', () => {
 
     beforeEach(() => {
       prisma.passkey.count.mockResolvedValue(0);
-      prisma.webAuthnChallenge.findUnique.mockResolvedValue({
+      prisma.webAuthnChallenge.delete.mockResolvedValue({
         id: 'wc-1',
         challenge,
         userId: user.id,
         type: WebAuthnChallengeType.REGISTRATION,
         expiresAt: new Date(Date.now() + 60_000),
       });
-      prisma.webAuthnChallenge.delete.mockResolvedValue({});
       prisma.passkey.create.mockResolvedValue(persistedPasskey);
       mockedVerifyRegistrationResponse.mockResolvedValue({
         verified: true,
@@ -271,14 +274,22 @@ describe('PasskeysService', () => {
       expect(result).toBe(persistedPasskey);
     });
 
-    it('consumes the challenge before persisting', async () => {
+    it('atomically consumes the challenge by delete-on-read', async () => {
       await service.verifyRegistration(user, response);
-      expect(prisma.webAuthnChallenge.delete).toHaveBeenCalledWith({ where: { id: 'wc-1' } });
+      expect(prisma.webAuthnChallenge.delete).toHaveBeenCalledWith({
+        where: { challenge },
+      });
+    });
+
+    it('rejects when challenge is unknown / already used (P2025)', async () => {
+      prisma.webAuthnChallenge.delete.mockRejectedValueOnce(new Error('Record not found'));
+      await expect(service.verifyRegistration(user, response)).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
     });
 
     it('dispatches PASSKEY_ADDED notification', async () => {
       await service.verifyRegistration(user, response, 'My iPhone');
-      // Notification is fire-and-forget; flush microtasks to give it a chance to run.
       await new Promise((resolve) => setImmediate(resolve));
       expect(notifications.sendNotification).toHaveBeenCalledWith(
         user.email,
@@ -297,7 +308,7 @@ describe('PasskeysService', () => {
     });
 
     it('rejects expired challenges', async () => {
-      prisma.webAuthnChallenge.findUnique.mockResolvedValue({
+      prisma.webAuthnChallenge.delete.mockResolvedValueOnce({
         id: 'wc-1',
         challenge,
         userId: user.id,
@@ -310,7 +321,7 @@ describe('PasskeysService', () => {
     });
 
     it('rejects challenge belonging to another user', async () => {
-      prisma.webAuthnChallenge.findUnique.mockResolvedValue({
+      prisma.webAuthnChallenge.delete.mockResolvedValueOnce({
         id: 'wc-1',
         challenge,
         userId: 'someone-else',
@@ -325,6 +336,22 @@ describe('PasskeysService', () => {
     it('rejects when verification fails', async () => {
       mockedVerifyRegistrationResponse.mockResolvedValueOnce({ verified: false } as never);
       await expect(service.verifyRegistration(user, response)).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+    });
+
+    it('normalizes verifier exceptions to BadRequestException', async () => {
+      mockedVerifyRegistrationResponse.mockRejectedValueOnce(
+        new Error('Unexpected origin foo.com'),
+      );
+      await expect(service.verifyRegistration(user, response)).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+    });
+
+    it('rejects malformed registration shape', async () => {
+      const badResponse = { id: 'x', type: 'public-key', response: {} } as never;
+      await expect(service.verifyRegistration(user, badResponse)).rejects.toBeInstanceOf(
         BadRequestException,
       );
     });
@@ -359,17 +386,22 @@ describe('PasskeysService', () => {
 
   describe('verifyAuthentication', () => {
     const challenge = 'chal-auth';
+    const encodeHandle = (s: string) => Buffer.from(s, 'utf8').toString('base64url');
     const buildResponse = (overrides: Partial<{ userHandle: string }> = {}) =>
       ({
         id: 'cred-stored',
+        rawId: 'cred-stored',
+        type: 'public-key',
         response: {
           clientDataJSON: buildClientDataJSON(challenge),
-          userHandle: overrides.userHandle ?? user.id,
+          authenticatorData: 'auth-data',
+          signature: 'sig',
+          userHandle: encodeHandle(overrides.userHandle ?? user.id),
         },
       } as never);
 
     const seedChallenge = () => {
-      prisma.webAuthnChallenge.findUnique.mockResolvedValue({
+      prisma.webAuthnChallenge.delete.mockResolvedValue({
         id: 'wc-2',
         challenge,
         userId: null,
@@ -451,6 +483,38 @@ describe('PasskeysService', () => {
       });
     });
 
+    it('accepts nonzero → 0 but does not downgrade stored counter', async () => {
+      seedChallenge();
+      seedPasskey(5);
+      mockVerify(0);
+
+      await service.verifyAuthentication(buildResponse());
+      // We accept the response, but persist the higher stored counter
+      // so we never lose clone-detection history.
+      expect(prisma.passkey.update).toHaveBeenCalledWith({
+        where: { id: 'pk-1' },
+        data: expect.objectContaining({ counter: BigInt(5) }),
+      });
+    });
+
+    it('normalizes verifier exceptions to UnauthorizedException', async () => {
+      seedChallenge();
+      seedPasskey(5);
+      mockedVerifyAuthenticationResponse.mockRejectedValueOnce(
+        new Error('Unexpected RP ID hash'),
+      );
+      await expect(service.verifyAuthentication(buildResponse())).rejects.toBeInstanceOf(
+        UnauthorizedException,
+      );
+    });
+
+    it('rejects malformed authentication response with Unauthorized', async () => {
+      const bad = { id: 'x', response: {} } as never;
+      await expect(service.verifyAuthentication(bad)).rejects.toBeInstanceOf(
+        UnauthorizedException,
+      );
+    });
+
     it('rejects userHandle mismatch', async () => {
       seedChallenge();
       seedPasskey(5);
@@ -499,7 +563,7 @@ describe('PasskeysService', () => {
 
   describe('deleteForUser', () => {
     it('deletes the passkey and notifies the user', async () => {
-      prisma.passkey.findUnique.mockResolvedValue({
+      prisma.passkey.findFirst.mockResolvedValue({
         id: 'pk-1',
         userId: user.id,
         nickname: 'Phone',
@@ -519,21 +583,19 @@ describe('PasskeysService', () => {
     });
 
     it('throws NotFound when passkey does not exist', async () => {
-      prisma.passkey.findUnique.mockResolvedValue(null);
+      prisma.passkey.findFirst.mockResolvedValue(null);
       await expect(service.deleteForUser(user.id, 'pk-x', user)).rejects.toBeInstanceOf(
         NotFoundException,
       );
     });
 
-    it('throws Forbidden when passkey belongs to another user', async () => {
-      prisma.passkey.findUnique.mockResolvedValue({
-        id: 'pk-1',
-        userId: 'someone-else',
-        nickname: null,
-        createdAt: new Date(),
-      });
+    it('throws NotFound (not Forbidden) when passkey belongs to another user', async () => {
+      // findFirst({ id, userId }) returns null when not owned, so we cannot
+      // distinguish "missing" from "wrong owner" — and that is intentional
+      // (avoids leaking existence of other users' passkey IDs).
+      prisma.passkey.findFirst.mockResolvedValue(null);
       await expect(service.deleteForUser(user.id, 'pk-1', user)).rejects.toBeInstanceOf(
-        ForbiddenException,
+        NotFoundException,
       );
       expect(prisma.passkey.delete).not.toHaveBeenCalled();
     });
@@ -541,7 +603,7 @@ describe('PasskeysService', () => {
 
   describe('updateNickname', () => {
     it('updates the nickname when caller owns the passkey', async () => {
-      prisma.passkey.findUnique.mockResolvedValue({
+      prisma.passkey.findFirst.mockResolvedValue({
         id: 'pk-1',
         userId: user.id,
         nickname: 'Old',
@@ -562,19 +624,15 @@ describe('PasskeysService', () => {
       ).rejects.toBeInstanceOf(BadRequestException);
     });
 
-    it('throws Forbidden when caller does not own the passkey', async () => {
-      prisma.passkey.findUnique.mockResolvedValue({
-        id: 'pk-1',
-        userId: 'someone-else',
-        nickname: null,
-      });
+    it('throws NotFound when caller does not own the passkey', async () => {
+      prisma.passkey.findFirst.mockResolvedValue(null);
       await expect(service.updateNickname(user.id, 'pk-1', 'New')).rejects.toBeInstanceOf(
-        ForbiddenException,
+        NotFoundException,
       );
     });
 
     it('throws NotFound when passkey does not exist', async () => {
-      prisma.passkey.findUnique.mockResolvedValue(null);
+      prisma.passkey.findFirst.mockResolvedValue(null);
       await expect(service.updateNickname(user.id, 'pk-x', 'New')).rejects.toBeInstanceOf(
         NotFoundException,
       );

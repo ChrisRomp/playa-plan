@@ -1,6 +1,5 @@
 import {
   BadRequestException,
-  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
@@ -127,21 +126,26 @@ export class PasskeysService {
   ): Promise<Passkey> {
     await this.assertCapacity(user.id);
     const trimmedNickname = this.normalizeNickname(nickname);
+    this.assertRegistrationShape(response);
     const challengeRow = await this.consumeChallenge(
-      response.response.clientDataJSON
-        ? this.extractChallenge(response.response.clientDataJSON)
-        : null,
+      this.extractChallenge(response.response.clientDataJSON),
       WebAuthnChallengeType.REGISTRATION,
       user.id,
     );
     const cfg = this.config();
-    const verification = await verifyRegistrationResponse({
-      response,
-      expectedChallenge: challengeRow.challenge,
-      expectedOrigin: cfg.origin,
-      expectedRPID: cfg.rpId,
-      requireUserVerification: true,
-    });
+    let verification;
+    try {
+      verification = await verifyRegistrationResponse({
+        response,
+        expectedChallenge: challengeRow.challenge,
+        expectedOrigin: cfg.origin,
+        expectedRPID: cfg.rpId,
+        requireUserVerification: true,
+      });
+    } catch (err) {
+      this.logger.warn(`Passkey registration verify error: ${this.errorMessage(err)}`);
+      throw new BadRequestException('Passkey registration failed verification');
+    }
     if (!verification.verified || !verification.registrationInfo) {
       throw new BadRequestException('Passkey registration failed verification');
     }
@@ -207,13 +211,19 @@ export class PasskeysService {
       return await this.doVerifyAuthentication(response);
     } catch (err) {
       await this.padTiming(startedAt);
-      throw err;
+      if (err instanceof UnauthorizedException) throw err;
+      // Normalize any verifier/parsing/internal error to a generic
+      // UnauthorizedException so we don't leak protocol details
+      // (origin/RP ID/counter/library messages) to anonymous callers.
+      this.logger.warn(`Passkey verify error normalized to 401: ${this.errorMessage(err)}`);
+      throw new UnauthorizedException('Passkey verification failed');
     }
   }
 
   private async doVerifyAuthentication(
     response: AuthenticationResponseJSON,
   ): Promise<VerifiedPasskeyAuthentication> {
+    this.assertAuthenticationShape(response);
     const challengeStr = this.extractChallenge(response.response.clientDataJSON);
     const challengeRow = await this.consumeChallenge(
       challengeStr,
@@ -228,13 +238,19 @@ export class PasskeysService {
       this.logger.warn(`Passkey verify: unknown credentialId ${response.id}`);
       throw new UnauthorizedException('Passkey verification failed');
     }
-    if (response.response.userHandle && response.response.userHandle !== passkey.webAuthnUserID) {
-      this.logger.warn(
-        `Passkey verify: userHandle mismatch for credential ${response.id}`,
-      );
-      throw new UnauthorizedException('Passkey verification failed');
+    if (response.response.userHandle) {
+      const decodedUserHandle = this.decodeUserHandle(response.response.userHandle);
+      if (decodedUserHandle !== passkey.webAuthnUserID) {
+        this.logger.warn(
+          `Passkey verify: userHandle mismatch for credential ${response.id}`,
+        );
+        throw new UnauthorizedException('Passkey verification failed');
+      }
     }
     const cfg = this.config();
+    // Pass counter: 0 to neutralize the library's built-in counter check so
+    // we can apply our own policy that tolerates Apple/synced authenticators
+    // returning 0 even after a nonzero stored counter.
     const verification = await verifyAuthenticationResponse({
       response,
       expectedChallenge: challengeRow.challenge,
@@ -244,7 +260,7 @@ export class PasskeysService {
       credential: {
         id: passkey.credentialId,
         publicKey: new Uint8Array(passkey.publicKey),
-        counter: Number(passkey.counter),
+        counter: 0,
         transports: passkey.transports as never,
       },
     });
@@ -259,10 +275,14 @@ export class PasskeysService {
       );
       throw new UnauthorizedException('Passkey verification failed');
     }
+    // Never downgrade a nonzero stored counter to zero — preserves clone
+    // detection history if the authenticator alternates between counter
+    // and no-counter responses.
+    const counterToPersist = newCounter > 0 ? newCounter : storedCounter;
     await this.prisma.passkey.update({
       where: { id: passkey.id },
       data: {
-        counter: BigInt(newCounter),
+        counter: BigInt(counterToPersist),
         lastUsedAt: new Date(),
         backedUp: verification.authenticationInfo.credentialBackedUp,
         deviceType: verification.authenticationInfo.credentialDeviceType,
@@ -288,14 +308,11 @@ export class PasskeysService {
     passkeyId: string,
     actor: Pick<User, 'id' | 'email' | 'firstName' | 'lastName'>,
   ): Promise<void> {
-    const passkey = await this.prisma.passkey.findUnique({
-      where: { id: passkeyId },
+    const passkey = await this.prisma.passkey.findFirst({
+      where: { id: passkeyId, userId },
     });
     if (!passkey) {
       throw new NotFoundException('Passkey not found');
-    }
-    if (passkey.userId !== userId) {
-      throw new ForbiddenException('Cannot delete another user\'s passkey');
     }
     await this.prisma.passkey.delete({ where: { id: passkeyId } });
     this.dispatchNotification(actor, 'PASSKEY_REMOVED', passkey).catch((err) =>
@@ -311,14 +328,11 @@ export class PasskeysService {
     nickname: string,
   ): Promise<Passkey> {
     const trimmed = this.normalizeNickname(nickname);
-    const passkey = await this.prisma.passkey.findUnique({
-      where: { id: passkeyId },
+    const passkey = await this.prisma.passkey.findFirst({
+      where: { id: passkeyId, userId },
     });
     if (!passkey) {
       throw new NotFoundException('Passkey not found');
-    }
-    if (passkey.userId !== userId) {
-      throw new ForbiddenException('Cannot modify another user\'s passkey');
     }
     return this.prisma.passkey.update({
       where: { id: passkeyId },
@@ -381,17 +395,22 @@ export class PasskeysService {
     if (!challenge) {
       throw new BadRequestException('Missing challenge in client data');
     }
-    const row = await this.prisma.webAuthnChallenge.findUnique({
-      where: { challenge },
-    });
-    if (!row) {
+    let row;
+    try {
+      // Atomic single-use: delete by unique field. If two requests race,
+      // exactly one succeeds; the other gets P2025 and we surface a clean
+      // BadRequestException instead of a 500.
+      row = await this.prisma.webAuthnChallenge.delete({
+        where: { challenge },
+      });
+    } catch {
       throw new BadRequestException('Unknown or already-used challenge');
     }
-    await this.prisma.webAuthnChallenge.delete({ where: { id: row.id } });
+    // Best-effort lazy cleanup — fire and forget.
     this.prisma.webAuthnChallenge
       .deleteMany({ where: { expiresAt: { lt: new Date() } } })
       .catch(() => {
-        // Best-effort cleanup; ignore errors.
+        /* ignore */
       });
     if (row.expiresAt.getTime() < Date.now()) {
       throw new BadRequestException('Challenge has expired');
@@ -426,6 +445,58 @@ export class PasskeysService {
     if (remaining > 0) {
       await new Promise<void>((resolve) => setTimeout(resolve, remaining));
     }
+  }
+
+  /**
+   * Validates the minimum WebAuthn assertion shape before any verifier work.
+   * Throws UnauthorizedException so the public verify path doesn't leak
+   * structural details for malformed inputs.
+   */
+  private assertAuthenticationShape(response: AuthenticationResponseJSON): void {
+    if (!response || typeof response !== 'object') {
+      throw new UnauthorizedException('Passkey verification failed');
+    }
+    const r = response.response as unknown as Record<string, unknown> | undefined;
+    if (
+      typeof response.id !== 'string' ||
+      typeof response.rawId !== 'string' ||
+      typeof response.type !== 'string' ||
+      !r ||
+      typeof r.clientDataJSON !== 'string' ||
+      typeof r.authenticatorData !== 'string' ||
+      typeof r.signature !== 'string'
+    ) {
+      throw new UnauthorizedException('Passkey verification failed');
+    }
+  }
+
+  /**
+   * Validates the minimum registration response shape before verifier work.
+   */
+  private assertRegistrationShape(response: RegistrationResponseJSON): void {
+    if (!response || typeof response !== 'object') {
+      throw new BadRequestException('Malformed registration response');
+    }
+    const r = response.response as unknown as Record<string, unknown> | undefined;
+    if (
+      typeof response.id !== 'string' ||
+      typeof response.rawId !== 'string' ||
+      typeof response.type !== 'string' ||
+      !r ||
+      typeof r.clientDataJSON !== 'string' ||
+      typeof r.attestationObject !== 'string'
+    ) {
+      throw new BadRequestException('Malformed registration response');
+    }
+  }
+
+  /**
+   * The browser sends `userHandle` as base64url-encoded bytes of whatever
+   * we passed as `userID` to generateRegistrationOptions (UTF-8 of user.id).
+   * Decode back to UTF-8 so we can compare to the stored webAuthnUserID.
+   */
+  private decodeUserHandle(userHandleBase64Url: string): string {
+    return Buffer.from(userHandleBase64Url, 'base64url').toString('utf8');
   }
 
   private async dispatchNotification(
