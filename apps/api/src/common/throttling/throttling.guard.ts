@@ -109,8 +109,15 @@ export class ThrottlingGuard extends ThrottlerGuard {
    * @returns Whether the request is for an authentication endpoint
    */
   private isAuthenticationRequest(request: Request): boolean {
-    return (request.path.includes('/auth/login') || 
-            request.path.includes('/auth/register')) && 
-            request.method === 'POST';
+    if (request.method !== 'POST') return false;
+    const p = request.path;
+    return (
+      p.includes('/auth/login') ||
+      p.includes('/auth/register') ||
+      p.includes('/auth/request-login-code') ||
+      p.includes('/auth/login-with-code') ||
+      p.includes('/auth/passkey/options') ||
+      p.includes('/auth/passkey/verify')
+    );
   }
 }

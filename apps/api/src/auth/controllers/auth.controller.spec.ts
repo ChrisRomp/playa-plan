@@ -237,7 +237,7 @@ describe('AuthController', () => {
       // Assert
       expect(result).toEqual(mockAuthResponse);
       expect(mockAuthService.validateLoginCode).toHaveBeenCalledWith('test@example.playaplan.app', '123456');
-      expect(mockAuthService.login).toHaveBeenCalledWith(mockUser);
+      expect(mockAuthService.login).toHaveBeenCalledWith(mockUser, ['email-code']);
     });
 
     it('should throw UnauthorizedException for invalid login code', async () => {
@@ -277,7 +277,7 @@ describe('AuthController', () => {
       const result = await controller.passkeyVerify({ response: { id: 'cred-x' } as never });
 
       expect(mockPasskeysService.verifyAuthentication).toHaveBeenCalledWith({ id: 'cred-x' });
-      expect(mockAuthService.login).toHaveBeenCalledWith(mockUser);
+      expect(mockAuthService.login).toHaveBeenCalledWith(mockUser, ['passkey']);
       expect(result.accessToken).toBe(mockAuthResponse.accessToken);
       expect(result.userId).toBe(mockAuthResponse.userId);
     });

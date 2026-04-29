@@ -94,26 +94,34 @@ export class AuthService {
   }
 
   /**
-   * Logs in a user and generates a JWT token
+   * Logs in a user and generates a JWT token.
+   *
    * @param user Authenticated user object
+   * @param amr Optional RFC 8176 Authentication Methods References values
+   *            (e.g. ['email-code'] or ['passkey']). Recorded in the JWT
+   *            for future audit/step-up use; not enforced by any consumer
+   *            today.
    * @returns Object containing user information and access token
    */
-  async login(user: Omit<User, 'password'>): Promise<{ 
-    accessToken: string; 
+  async login(
+    user: Omit<User, 'password'>,
+    amr?: readonly string[],
+  ): Promise<{
+    accessToken: string;
     userId: string;
     email: string;
     firstName: string;
     lastName: string;
     role: string;
   }> {
-    // Create JWT payload
-    const payload = { 
-      email: user.email, 
+    const payload: Record<string, unknown> = {
+      email: user.email,
       sub: user.id,
       role: user.role,
     };
-
-    // Generate JWT token
+    if (amr && amr.length > 0) {
+      payload.amr = [...amr];
+    }
     const accessToken = this.jwtService.sign(payload);
 
     return {

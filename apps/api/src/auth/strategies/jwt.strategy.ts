@@ -11,6 +11,8 @@ import { User } from '@prisma/client';
 interface JwtPayload {
   sub: string; // User ID
   email: string;
+  /** RFC 8176 Authentication Methods References. Optional. */
+  amr?: string[];
 }
 
 /**
