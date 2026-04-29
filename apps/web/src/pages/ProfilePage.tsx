@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import ProfileForm from '../components/profile/ProfileForm';
+import PasskeysSection from '../components/profile/PasskeysSection';
 import { useProfile } from '../hooks/useProfile';
 
 /**
@@ -27,7 +28,7 @@ const ProfilePage: React.FC = () => {
   return (
     <div className="max-w-3xl mx-auto">
       <h1 className="text-2xl font-bold mb-6">Your Profile</h1>
-      
+
       <div className="bg-white shadow-md rounded-lg p-6">
         {isLoading ? (
           <div className="py-8 text-center">Loading your profile information...</div>
@@ -35,6 +36,8 @@ const ProfilePage: React.FC = () => {
           <ProfileForm />
         )}
       </div>
+
+      {!isLoading && <PasskeysSection />}
     </div>
   );
 };

@@ -289,6 +289,7 @@ export class PasskeysService {
       },
     });
     const { password: _password, ...userWithoutPassword } = passkey.user;
+    void _password;
     return { user: userWithoutPassword, passkeyId: passkey.id };
   }
 

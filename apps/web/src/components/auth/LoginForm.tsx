@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../store/authUtils';
+import { isPasskeySupported } from '../../lib/api/passkeys';
 
 const LoginForm: React.FC = () => {
   // Form state
@@ -17,8 +18,31 @@ const LoginForm: React.FC = () => {
   const [localLoading, setLocalLoading] = useState(false);
   
   // Get authentication context values
-  const { requestVerificationCode, verifyCode, error: authError, isAuthenticated } = useAuth();
+  const { requestVerificationCode, verifyCode, loginWithPasskey, error: authError, isAuthenticated } = useAuth();
   const [error, setError] = useState('');
+  const passkeySupported = isPasskeySupported();
+
+  /**
+   * Trigger the discoverable-credentials WebAuthn flow. Errors from
+   * the user cancelling the OS picker are intentionally swallowed so
+   * we don't show a confusing "passkey sign-in failed" message.
+   */
+  const handlePasskeyLogin = async () => {
+    setError('');
+    setLocalLoading(true);
+    try {
+      await loginWithPasskey();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : '';
+      // NotAllowedError fires when the user dismisses the picker.
+      if (!msg.toLowerCase().includes('not allowed') &&
+          !msg.toLowerCase().includes('cancel')) {
+        setError(msg || 'Passkey sign-in failed');
+      }
+    } finally {
+      setLocalLoading(false);
+    }
+  };
   
   // Initialize email from localStorage if available (for page refreshes)
   useEffect(() => {
@@ -244,6 +268,27 @@ const LoginForm: React.FC = () => {
           Enter your email to sign in or create an account
         </p>
       </div>
+
+      {!codeSent && passkeySupported && (
+        <div className="mt-6">
+          <div className="relative my-4">
+            <div className="absolute inset-0 flex items-center" aria-hidden="true">
+              <div className="w-full border-t border-gray-300" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-white px-2 text-gray-500">or</span>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={handlePasskeyLogin}
+            disabled={localLoading}
+            className="w-full bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium py-2 px-4 rounded-md border border-gray-300 transition-colors disabled:opacity-50"
+          >
+            Sign in with a passkey
+          </button>
+        </div>
+      )}
     </div>
   );
 };
