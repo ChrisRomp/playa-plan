@@ -19,23 +19,16 @@ export const PasskeySchema = z.object({
 export type Passkey = z.infer<typeof PasskeySchema>;
 
 /**
- * Detect whether the current browser supports the WebAuthn platform
- * authenticator features we rely on. Used to gate UI rendering so
- * users on unsupported browsers never see broken passkey controls.
+ * Detect whether the current browser supports the modal WebAuthn flows we use.
+ *
+ * We deliberately do NOT require `isConditionalMediationAvailable` because we
+ * use `startAuthentication()` / `startRegistration()` (modal pickers), not
+ * conditional UI / browser autofill. Gating on conditional mediation hides
+ * the feature on browsers where it would otherwise work fine.
  */
 export const isPasskeySupported = (): boolean => {
   if (typeof window === 'undefined') return false;
-  if (!window.PublicKeyCredential) return false;
-  if (typeof window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable !== 'function') {
-    return false;
-  }
-  if (typeof window.PublicKeyCredential.isConditionalMediationAvailable !== 'function') {
-    // Conditional mediation isn't strictly required, but we depend on
-    // discoverable credentials, which all modern WebAuthn-capable browsers
-    // expose alongside this method.
-    return false;
-  }
-  return true;
+  return typeof window.PublicKeyCredential === 'function';
 };
 
 export const passkeysApi = {

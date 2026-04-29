@@ -23,9 +23,9 @@ const LoginForm: React.FC = () => {
   const passkeySupported = isPasskeySupported();
 
   /**
-   * Trigger the discoverable-credentials WebAuthn flow. Errors from
-   * the user cancelling the OS picker are intentionally swallowed so
-   * we don't show a confusing "passkey sign-in failed" message.
+   * Trigger the discoverable-credentials WebAuthn flow. AuthContext
+   * already swallows user cancellations, so any error reaching here
+   * is a genuine failure worth showing.
    */
   const handlePasskeyLogin = async () => {
     setError('');
@@ -33,12 +33,8 @@ const LoginForm: React.FC = () => {
     try {
       await loginWithPasskey();
     } catch (err) {
-      const msg = err instanceof Error ? err.message : '';
-      // NotAllowedError fires when the user dismisses the picker.
-      if (!msg.toLowerCase().includes('not allowed') &&
-          !msg.toLowerCase().includes('cancel')) {
-        setError(msg || 'Passkey sign-in failed');
-      }
+      const msg = err instanceof Error ? err.message : 'Passkey sign-in failed';
+      setError(msg);
     } finally {
       setLocalLoading(false);
     }

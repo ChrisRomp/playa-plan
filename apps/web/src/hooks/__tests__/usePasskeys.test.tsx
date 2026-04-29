@@ -1,7 +1,7 @@
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 
-import { usePasskeys, usePasskeyLogin } from '../usePasskeys';
+import { usePasskeys } from '../usePasskeys';
 import { passkeysApi, isPasskeySupported } from '../../lib/api/passkeys';
 import * as webauthn from '@simplewebauthn/browser';
 
@@ -26,7 +26,6 @@ vi.mock('@simplewebauthn/browser', () => ({
 const mockApi = vi.mocked(passkeysApi);
 const mockIsSupported = vi.mocked(isPasskeySupported);
 const mockStartReg = vi.mocked(webauthn.startRegistration);
-const mockStartAuth = vi.mocked(webauthn.startAuthentication);
 
 const samplePasskey = {
   id: 'pk-1',
@@ -59,7 +58,7 @@ describe('usePasskeys', () => {
     expect(result.current.supported).toBe(false);
   });
 
-  it('register() runs the WebAuthn ceremony and prepends the new passkey', async () => {
+  it('register() runs the WebAuthn ceremony with v13 optionsJSON wrapper', async () => {
     mockApi.list.mockResolvedValue([]);
     mockApi.registrationOptions.mockResolvedValue({ challenge: 'c' });
     mockStartReg.mockResolvedValue({ id: 'cred-x' } as never);
@@ -74,7 +73,7 @@ describe('usePasskeys', () => {
     });
 
     expect(returned).toEqual(samplePasskey);
-    expect(mockStartReg).toHaveBeenCalledWith({ challenge: 'c' });
+    expect(mockStartReg).toHaveBeenCalledWith({ optionsJSON: { challenge: 'c' } });
     expect(mockApi.registrationVerify).toHaveBeenCalledWith({ id: 'cred-x' }, 'My Phone');
     expect(result.current.passkeys[0]).toEqual(samplePasskey);
   });
@@ -116,45 +115,5 @@ describe('usePasskeys', () => {
       await result.current.remove('pk-1');
     });
     expect(result.current.passkeys).toHaveLength(0);
-  });
-});
-
-describe('usePasskeyLogin', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockIsSupported.mockReturnValue(true);
-  });
-
-  it('runs the WebAuthn auth ceremony and forwards to the API client', async () => {
-    mockApi.authenticationOptions.mockResolvedValue({ challenge: 'c' });
-    mockStartAuth.mockResolvedValue({ id: 'cred' } as never);
-    mockApi.authenticationVerify.mockResolvedValue({
-      accessToken: 't',
-      userId: 'u',
-      email: 'e',
-      firstName: 'F',
-      lastName: 'L',
-      role: 'PARTICIPANT',
-    });
-
-    const { result } = renderHook(() => usePasskeyLogin());
-    let returned;
-    await act(async () => {
-      returned = await result.current.login();
-    });
-    expect(mockStartAuth).toHaveBeenCalledWith({ challenge: 'c' });
-    expect(mockApi.authenticationVerify).toHaveBeenCalledWith({ id: 'cred' });
-    expect(returned).toMatchObject({ userId: 'u' });
-  });
-
-  it('refuses to run when WebAuthn is unsupported', async () => {
-    mockIsSupported.mockReturnValue(false);
-    const { result } = renderHook(() => usePasskeyLogin());
-    let returned;
-    await act(async () => {
-      returned = await result.current.login();
-    });
-    expect(returned).toBeNull();
-    expect(result.current.error).toMatch(/does not support/i);
   });
 });

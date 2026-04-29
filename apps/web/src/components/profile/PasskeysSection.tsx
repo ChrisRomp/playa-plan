@@ -40,9 +40,9 @@ const PasskeysSection: React.FC = () => {
     if (!renamingId) return;
     if (renameValue.length > NICKNAME_MAX_LENGTH) return;
     setBusy(true);
-    await rename(renamingId, renameValue.trim());
+    const updated = await rename(renamingId, renameValue.trim());
     setBusy(false);
-    setRenamingId(null);
+    if (updated) setRenamingId(null);
   };
 
   const confirmRemove = async (p: Passkey) => {

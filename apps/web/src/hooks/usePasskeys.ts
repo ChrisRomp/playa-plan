@@ -1,8 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import {
-  startAuthentication,
-  startRegistration,
-} from '@simplewebauthn/browser';
+import { startRegistration } from '@simplewebauthn/browser';
 import {
   passkeysApi,
   isPasskeySupported,
@@ -47,10 +44,10 @@ export const usePasskeys = () => {
       }
       setError(null);
       try {
-        const options = (await passkeysApi.registrationOptions()) as Parameters<
+        const optionsJSON = (await passkeysApi.registrationOptions()) as Parameters<
           typeof startRegistration
-        >[0];
-        const credential = await startRegistration(options);
+        >[0]['optionsJSON'];
+        const credential = await startRegistration({ optionsJSON });
         const created = await passkeysApi.registrationVerify(credential, nickname);
         setPasskeys((prev) => [created, ...prev]);
         return created;
@@ -99,37 +96,7 @@ export const usePasskeys = () => {
   };
 };
 
-/**
- * Hook for the discoverable / "Sign in with a passkey" login flow.
- * Performs the WebAuthn ceremony, hands the assertion to the API,
- * and returns the AuthResponse on success.
- */
-export const usePasskeyLogin = () => {
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const supported = isPasskeySupported();
-
-  const login = useCallback(async () => {
-    if (!supported) {
-      setError('This browser does not support passkeys.');
-      return null;
-    }
-    setError(null);
-    setIsLoading(true);
-    try {
-      const options = (await passkeysApi.authenticationOptions()) as Parameters<
-        typeof startAuthentication
-      >[0];
-      const assertion = await startAuthentication(options);
-      return await passkeysApi.authenticationVerify(assertion);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Passkey sign-in failed';
-      setError(msg);
-      return null;
-    } finally {
-      setIsLoading(false);
-    }
-  }, [supported]);
-
-  return { login, isLoading, error, supported };
-};
+// The discoverable passkey login ceremony lives on AuthContext.loginWithPasskey()
+// because completing a login also has to update cookie state, isAuthenticated,
+// and the user record. A hook that returns just the AuthResponse would be a
+// footgun (token persisted, app state still unauthenticated).

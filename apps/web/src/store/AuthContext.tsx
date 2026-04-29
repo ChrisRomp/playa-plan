@@ -7,6 +7,17 @@ import cookieService from '../lib/cookieService';
 import { AuthContext, mapApiRoleToClientRole } from './authUtils';
 import { connectionManager, ConnectionStatus } from '../lib/connectionManager';
 
+/**
+ * Detects WebAuthn cancellations / aborts that should NOT surface as errors.
+ * Covers DOMException("NotAllowedError") (most browsers when user dismisses
+ * the picker) and SimpleWebAuthn's WebAuthnError with ERROR_CEREMONY_ABORTED.
+ */
+const isPasskeyCancellation = (err: unknown): boolean => {
+  if (!err || typeof err !== 'object') return false;
+  const e = err as { name?: string; code?: string };
+  return e.name === 'NotAllowedError' || e.code === 'ERROR_CEREMONY_ABORTED';
+};
+
 
 
 /**
@@ -141,54 +152,57 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   /**
    * Common post-authentication setup shared by the email-code and
    * passkey login paths. Sets the auth cookie, fetches the profile,
-   * and updates context state.
+   * and updates context state. Runs the async work first so that on
+   * profile-fetch failure the partial auth artifacts can be rolled
+   * back before flipping isAuthenticated/user state.
    */
   const completeLogin = async (authResponse: AuthResponse): Promise<void> => {
-    await cookieService.setAuthenticatedState();
-    setIsAuthenticated(true);
-    const userProfile = await auth.getProfile();
-    setUser({
-      id: authResponse.userId,
-      email: authResponse.email,
-      name: `${authResponse.firstName} ${authResponse.lastName}`,
-      role: mapApiRoleToClientRole(authResponse.role),
-      isAuthenticated: true,
-      isEarlyRegistrationEnabled: userProfile.allowEarlyRegistration || false,
-      hasRegisteredForCurrentYear: false,
-    });
-    localStorage.removeItem('pendingLoginEmail');
+    try {
+      await cookieService.setAuthenticatedState();
+      const userProfile = await auth.getProfile();
+      setUser({
+        id: authResponse.userId,
+        email: authResponse.email,
+        name: `${authResponse.firstName} ${authResponse.lastName}`,
+        role: mapApiRoleToClientRole(authResponse.role),
+        isAuthenticated: true,
+        isEarlyRegistrationEnabled: userProfile.allowEarlyRegistration || false,
+        hasRegisteredForCurrentYear: false,
+      });
+      setIsAuthenticated(true);
+      localStorage.removeItem('pendingLoginEmail');
+    } catch (err) {
+      // Roll back any persisted token / cookie so the user isn't left
+      // half-authenticated after a successful API auth call.
+      clearJwtToken();
+      await cookieService.clearAuthTokens();
+      setIsAuthenticated(false);
+      setUser(null);
+      throw err;
+    }
   };
 
   /**
    * Verify the provided code for the given email and login/register the user
    */
   const verifyCode = async (email: string, code: string) => {
-    // Reset error state and set loading
     setError(null);
     setIsLoading(true);
-
     try {
-      // Verify code with the API. The JWT token is stored in
-      // localStorage by auth.verifyCode via setJwtToken.
       const authResponse = await auth.verifyCode(email, code);
       await completeLogin(authResponse);
     } catch (err) {
-      // Extract error message from the Error object or use a default message
       const errorMessage = err instanceof Error
         ? err.message
         : 'Invalid verification code. Please try again.';
-
       setError(errorMessage);
       console.error('Verification failed:', err);
-
-      // Clear authentication state on verification failure
+      // Defensive: also clear auth state in case the failure happened
+      // before completeLogin ran (e.g., the verify call itself rejected).
       setIsAuthenticated(false);
       setUser(null);
-
-      // Rethrow the error so it can be caught by the component
       throw err;
     } finally {
-      // Always ensure loading state is reset
       setIsLoading(false);
     }
   };
@@ -197,6 +211,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
    * Sign in with a previously-registered passkey (discoverable / usernameless flow).
    * Performs the WebAuthn ceremony, hands the assertion to the API,
    * and finishes the login on success exactly like verifyCode.
+   *
+   * User cancellations (closing the OS passkey picker) are silently
+   * ignored — they are an expected user action, not an error.
    */
   const loginWithPasskey = async (): Promise<void> => {
     if (!isPasskeySupported()) {
@@ -207,13 +224,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setError(null);
     setIsLoading(true);
     try {
-      const options = (await passkeysApi.authenticationOptions()) as Parameters<
+      const optionsJSON = (await passkeysApi.authenticationOptions()) as Parameters<
         typeof startAuthentication
-      >[0];
-      const assertion = await startAuthentication(options);
+      >[0]['optionsJSON'];
+      const assertion = await startAuthentication({ optionsJSON });
       const authResponse = await passkeysApi.authenticationVerify(assertion);
       await completeLogin(authResponse);
     } catch (err) {
+      if (isPasskeyCancellation(err)) {
+        // Don't surface cancellations to the UI.
+        return;
+      }
       const message = err instanceof Error ? err.message : 'Passkey sign-in failed';
       setError(message);
       setIsAuthenticated(false);
