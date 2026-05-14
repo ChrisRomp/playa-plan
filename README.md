@@ -82,7 +82,7 @@ Defaults:
 
 - API: <http://localhost:3000>
 - Web: <http://localhost:5173>
-- Dev login code: `123456` (any login code emailed in dev is logged to the API console)
+- Dev mode login code: `123456` (any login code emailed in dev is logged to the API console)
 
 ## Common scripts
 
