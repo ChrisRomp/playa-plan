@@ -58,8 +58,6 @@ Optional, depending on what you want to exercise:
 - **Docker** / **Docker Compose** — for containerized runs and the E2E test stack
 - **Stripe** and/or **PayPal** account — for live payment flows (test mode is fine)
 - **SMTP / SendGrid / Mailgun** credentials — for live transactional email
-  (in development, login codes are logged to the console and the dev code is
-  always `123456`)
 
 ## Getting started
 
