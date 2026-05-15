@@ -146,6 +146,29 @@ describe('PasskeyController', () => {
     });
   });
 
+  describe('email verification gate', () => {
+    const unverifiedReq = {
+      user: { ...mockUser, isEmailVerified: false },
+    } as unknown as Parameters<PasskeyController['list']>[0];
+
+    it('rejects registrationOptions when email is not verified', async () => {
+      await expect(controller.registrationOptions(unverifiedReq)).rejects.toMatchObject({
+        status: 403,
+      });
+      expect(passkeysService.createRegistrationOptions).not.toHaveBeenCalled();
+    });
+
+    it('rejects verifyRegistration when email is not verified', async () => {
+      await expect(
+        controller.verifyRegistration(unverifiedReq, {
+          response: {} as never,
+          nickname: 'iPhone',
+        }),
+      ).rejects.toMatchObject({ status: 403 });
+      expect(passkeysService.verifyRegistration).not.toHaveBeenCalled();
+    });
+  });
+
   describe('remove', () => {
     it('passes ownership context and the actor to the service', async () => {
       passkeysService.deleteForUser.mockResolvedValue(undefined);

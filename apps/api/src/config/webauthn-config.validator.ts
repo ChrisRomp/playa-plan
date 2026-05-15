@@ -42,11 +42,24 @@ export function validateWebAuthnConfig(config: WebAuthnConfig): void {
     throw new WebAuthnConfigError('WEBAUTHN_RP_ID must be a non-empty hostname');
   }
   let originHost: string;
+  let originProtocol: string;
   try {
-    originHost = new URL(config.origin).hostname;
+    const parsed = new URL(config.origin);
+    originHost = parsed.hostname;
+    originProtocol = parsed.protocol;
   } catch {
     throw new WebAuthnConfigError(
       `WEBAUTHN_ORIGIN is not a valid URL: ${config.origin}`,
+    );
+  }
+  // Browsers only honor WebAuthn ceremonies in a secure context: HTTPS, or
+  // localhost/127.0.0.1 over plain HTTP. Reject any non-HTTPS production
+  // origin at boot so a misconfigured deploy fails fast instead of silently
+  // breaking passkey login in the browser.
+  const isLoopbackHost = originHost === 'localhost' || originHost === '127.0.0.1';
+  if (originProtocol !== 'https:' && !isLoopbackHost) {
+    throw new WebAuthnConfigError(
+      `WEBAUTHN_ORIGIN must use https outside localhost (got "${config.origin}")`,
     );
   }
   if (config.rpId === 'localhost') {

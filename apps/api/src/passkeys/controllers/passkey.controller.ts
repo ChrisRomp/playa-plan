@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   HttpCode,
   HttpStatus,
@@ -34,11 +35,27 @@ interface RequestWithUser extends ExpressRequest {
 export class PasskeyController {
   constructor(private readonly passkeysService: PasskeysService) {}
 
+  /**
+   * Enrollment is gated on a verified email address. Without this gate, the
+   * legacy `/auth/register` flow (which issues a JWT before the email is
+   * verified) would let anyone bind a passkey to an unverified account
+   * tied to someone else's email — a pre-hijacking risk if the real email
+   * owner later logs in via email code.
+   */
+  private assertVerified(user: Pick<User, 'isEmailVerified'>): void {
+    if (!user.isEmailVerified) {
+      throw new ForbiddenException(
+        'Verify your email before adding a passkey',
+      );
+    }
+  }
+
   @Post('registration/options')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Generate WebAuthn registration options for the current user' })
   @ApiResponse({ status: HttpStatus.OK, description: 'Registration options issued' })
   async registrationOptions(@Request() req: RequestWithUser) {
+    this.assertVerified(req.user);
     return this.passkeysService.createRegistrationOptions(req.user);
   }
 
@@ -50,6 +67,7 @@ export class PasskeyController {
     @Request() req: RequestWithUser,
     @Body() body: VerifyRegistrationDto,
   ): Promise<PasskeyResponseDto> {
+    this.assertVerified(req.user);
     const passkey = await this.passkeysService.verifyRegistration(
       req.user,
       body.response,

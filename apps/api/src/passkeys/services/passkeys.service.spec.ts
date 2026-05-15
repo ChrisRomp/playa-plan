@@ -51,6 +51,7 @@ describe('PasskeysService', () => {
       count: jest.Mock;
       create: jest.Mock;
       update: jest.Mock;
+      updateMany: jest.Mock;
       delete: jest.Mock;
     };
     webAuthnChallenge: {
@@ -58,6 +59,7 @@ describe('PasskeysService', () => {
       delete: jest.Mock;
       deleteMany: jest.Mock;
     };
+    $transaction: jest.Mock;
   };
   let notifications: { sendNotification: jest.Mock };
 
@@ -109,6 +111,7 @@ describe('PasskeysService', () => {
         count: jest.fn(),
         create: jest.fn(),
         update: jest.fn(),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
         delete: jest.fn(),
       },
       webAuthnChallenge: {
@@ -116,6 +119,10 @@ describe('PasskeysService', () => {
         delete: jest.fn(),
         deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
       },
+      // Run the transaction callback synchronously against the same prisma
+      // mock (treat `tx` as the surrounding service). Real serializability
+      // is exercised in API e2e tests, not unit tests.
+      $transaction: jest.fn((fn) => fn(prisma)),
     };
     notifications = { sendNotification: jest.fn().mockResolvedValue(true) };
     const config = {
@@ -442,10 +449,12 @@ describe('PasskeysService', () => {
 
       const result = await service.verifyAuthentication(buildResponse());
       expect(result.user.id).toBe(user.id);
+      // newCounter === 0 → metadata-only update, no counter change
       expect(prisma.passkey.update).toHaveBeenCalledWith({
         where: { id: 'pk-1' },
-        data: expect.objectContaining({ counter: BigInt(0) }),
+        data: expect.not.objectContaining({ counter: expect.anything() }),
       });
+      expect(prisma.passkey.updateMany).not.toHaveBeenCalled();
     });
 
     it('accepts when counter increments (5 → 6)', async () => {
@@ -454,8 +463,8 @@ describe('PasskeysService', () => {
       mockVerify(6);
 
       await service.verifyAuthentication(buildResponse());
-      expect(prisma.passkey.update).toHaveBeenCalledWith({
-        where: { id: 'pk-1' },
+      expect(prisma.passkey.updateMany).toHaveBeenCalledWith({
+        where: { id: 'pk-1', counter: { lt: BigInt(6) } },
         data: expect.objectContaining({ counter: BigInt(6) }),
       });
     });
@@ -469,6 +478,7 @@ describe('PasskeysService', () => {
         UnauthorizedException,
       );
       expect(prisma.passkey.update).not.toHaveBeenCalled();
+      expect(prisma.passkey.updateMany).not.toHaveBeenCalled();
     });
 
     it('accepts 0 → nonzero', async () => {
@@ -477,8 +487,8 @@ describe('PasskeysService', () => {
       mockVerify(7);
 
       await service.verifyAuthentication(buildResponse());
-      expect(prisma.passkey.update).toHaveBeenCalledWith({
-        where: { id: 'pk-1' },
+      expect(prisma.passkey.updateMany).toHaveBeenCalledWith({
+        where: { id: 'pk-1', counter: { lt: BigInt(7) } },
         data: expect.objectContaining({ counter: BigInt(7) }),
       });
     });
@@ -489,12 +499,70 @@ describe('PasskeysService', () => {
       mockVerify(0);
 
       await service.verifyAuthentication(buildResponse());
-      // We accept the response, but persist the higher stored counter
-      // so we never lose clone-detection history.
+      // newCounter === 0 → metadata-only update, never touch counter column,
+      // so no clone-detection history is lost.
       expect(prisma.passkey.update).toHaveBeenCalledWith({
         where: { id: 'pk-1' },
-        data: expect.objectContaining({ counter: BigInt(5) }),
+        data: expect.not.objectContaining({ counter: expect.anything() }),
       });
+      expect(prisma.passkey.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('handles concurrent counter race without downgrading stored value', async () => {
+      seedChallenge();
+      const seededPasskey = {
+        id: 'pk-1',
+        userId: user.id,
+        credentialId: 'cred-stored',
+        publicKey: Buffer.from([9, 9]),
+        counter: BigInt(5),
+        webAuthnUserID: user.id,
+        transports: ['internal'],
+        nickname: 'Phone',
+        user: fullUser,
+      };
+      // First findUnique: lookup by credentialId. Second findUnique: race
+      // re-read of the counter column after the conditional update no-ops.
+      prisma.passkey.findUnique
+        .mockResolvedValueOnce(seededPasskey)
+        .mockResolvedValueOnce({ counter: BigInt(7) });
+      mockVerify(6);
+      // Simulate another worker advancing the counter past ours: the
+      // conditional updateMany affects 0 rows.
+      prisma.passkey.updateMany.mockResolvedValueOnce({ count: 0 });
+
+      await service.verifyAuthentication(buildResponse());
+      // We accept the assertion (not a clone) but only update metadata.
+      expect(prisma.passkey.update).toHaveBeenCalledWith({
+        where: { id: 'pk-1' },
+        data: expect.not.objectContaining({ counter: expect.anything() }),
+      });
+    });
+
+    it('rejects when concurrent re-read confirms counter regression', async () => {
+      seedChallenge();
+      const seededPasskey = {
+        id: 'pk-1',
+        userId: user.id,
+        credentialId: 'cred-stored',
+        publicKey: Buffer.from([9, 9]),
+        counter: BigInt(5),
+        webAuthnUserID: user.id,
+        transports: ['internal'],
+        nickname: 'Phone',
+        user: fullUser,
+      };
+      prisma.passkey.findUnique
+        .mockResolvedValueOnce(seededPasskey)
+        // Stored counter is still below our new counter, but updateMany
+        // somehow failed — treat as a clone signal.
+        .mockResolvedValueOnce({ counter: BigInt(4) });
+      mockVerify(6);
+      prisma.passkey.updateMany.mockResolvedValueOnce({ count: 0 });
+
+      await expect(service.verifyAuthentication(buildResponse())).rejects.toBeInstanceOf(
+        UnauthorizedException,
+      );
     });
 
     it('normalizes verifier exceptions to UnauthorizedException', async () => {

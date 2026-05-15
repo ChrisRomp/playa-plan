@@ -17,9 +17,11 @@ import {
 import {
   Passkey,
   NotificationType,
+  Prisma,
   User,
   WebAuthnChallengeType,
 } from '@prisma/client';
+import { createHash } from 'crypto';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { NotificationsService } from '../../notifications/services/notifications.service';
 import { WebAuthnConfig } from '../../config/webauthn-config.validator';
@@ -118,13 +120,15 @@ export class PasskeysService {
   /**
    * Verifies the browser-returned attestation, persists the new passkey,
    * deletes the consumed challenge, and dispatches a notification email.
+   * The capacity check + create are wrapped in a transaction so two
+   * concurrent registration completions cannot both pass `assertCapacity`
+   * and exceed `MAX_PASSKEYS_PER_USER`.
    */
   async verifyRegistration(
     user: Pick<User, 'id' | 'email' | 'firstName' | 'lastName'>,
     response: RegistrationResponseJSON,
     nickname?: string,
   ): Promise<Passkey> {
-    await this.assertCapacity(user.id);
     const trimmedNickname = this.normalizeNickname(nickname);
     this.assertRegistrationShape(response);
     const challengeRow = await this.consumeChallenge(
@@ -150,19 +154,27 @@ export class PasskeysService {
       throw new BadRequestException('Passkey registration failed verification');
     }
     const info = verification.registrationInfo;
-    const created = await this.prisma.passkey.create({
-      data: {
-        userId: user.id,
-        credentialId: info.credential.id,
-        publicKey: Buffer.from(info.credential.publicKey),
-        webAuthnUserID: user.id,
-        counter: BigInt(info.credential.counter),
-        transports: info.credential.transports ?? [],
-        deviceType: info.credentialDeviceType,
-        backedUp: info.credentialBackedUp,
-        nickname: trimmedNickname,
-      },
-    });
+    const created = await this.prisma.$transaction(async (tx) => {
+      const count = await tx.passkey.count({ where: { userId: user.id } });
+      if (count >= MAX_PASSKEYS_PER_USER) {
+        throw new BadRequestException(
+          `Cannot add more than ${MAX_PASSKEYS_PER_USER} passkeys per user`,
+        );
+      }
+      return tx.passkey.create({
+        data: {
+          userId: user.id,
+          credentialId: info.credential.id,
+          publicKey: Buffer.from(info.credential.publicKey),
+          webAuthnUserID: user.id,
+          counter: BigInt(info.credential.counter),
+          transports: info.credential.transports ?? [],
+          deviceType: info.credentialDeviceType,
+          backedUp: info.credentialBackedUp,
+          nickname: trimmedNickname,
+        },
+      });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
     this.dispatchNotification(user, 'PASSKEY_ADDED', created).catch((err) =>
       this.logger.error(
         `Failed to send PASSKEY_ADDED notification for user ${user.id}: ${this.errorMessage(err)}`,
@@ -179,6 +191,10 @@ export class PasskeysService {
    * Builds authentication options for a usernameless ("Sign in with a passkey")
    * flow. allowCredentials is empty so the browser can present any
    * discoverable credential the user has for this RP.
+   *
+   * Opportunistically purges expired challenge rows so abandoned login
+   * ceremonies don't accumulate. The cleanup is fire-and-forget so a
+   * cleanup error never blocks a legitimate login attempt.
    */
   async createAuthenticationOptions() {
     const cfg = this.config();
@@ -195,6 +211,7 @@ export class PasskeysService {
         expiresAt: new Date(Date.now() + CHALLENGE_TTL_MS),
       },
     });
+    this.purgeExpiredChallenges();
     return options;
   }
 
@@ -235,14 +252,16 @@ export class PasskeysService {
       include: { user: true },
     });
     if (!passkey) {
-      this.logger.warn(`Passkey verify: unknown credentialId ${response.id}`);
+      this.logger.warn(
+        `Passkey verify: unknown credential (hash=${this.hashCredentialId(response.id)})`,
+      );
       throw new UnauthorizedException('Passkey verification failed');
     }
     if (response.response.userHandle) {
       const decodedUserHandle = this.decodeUserHandle(response.response.userHandle);
       if (decodedUserHandle !== passkey.webAuthnUserID) {
         this.logger.warn(
-          `Passkey verify: userHandle mismatch for credential ${response.id}`,
+          `Passkey verify: userHandle mismatch for credential hash ${this.hashCredentialId(response.id)}`,
         );
         throw new UnauthorizedException('Passkey verification failed');
       }
@@ -275,19 +294,63 @@ export class PasskeysService {
       );
       throw new UnauthorizedException('Passkey verification failed');
     }
-    // Never downgrade a nonzero stored counter to zero — preserves clone
-    // detection history if the authenticator alternates between counter
-    // and no-counter responses.
-    const counterToPersist = newCounter > 0 ? newCounter : storedCounter;
-    await this.prisma.passkey.update({
-      where: { id: passkey.id },
-      data: {
-        counter: BigInt(counterToPersist),
-        lastUsedAt: new Date(),
-        backedUp: verification.authenticationInfo.credentialBackedUp,
-        deviceType: verification.authenticationInfo.credentialDeviceType,
-      },
-    });
+    // Persist the counter monotonically. For nonzero new counters we use a
+    // conditional updateMany so two concurrent verifications can't downgrade
+    // the stored counter (e.g. A reads 5, sees 7, B reads 5, sees 6 — without
+    // the WHERE guard the last writer wins and persists 6). For zero new
+    // counter (Apple-style synced authenticators) we never touch the counter
+    // column, so concurrency is harmless.
+    if (newCounter > 0) {
+      const updated = await this.prisma.passkey.updateMany({
+        where: {
+          id: passkey.id,
+          counter: { lt: BigInt(newCounter) },
+        },
+        data: {
+          counter: BigInt(newCounter),
+          lastUsedAt: new Date(),
+          backedUp: verification.authenticationInfo.credentialBackedUp,
+          deviceType: verification.authenticationInfo.credentialDeviceType,
+        },
+      });
+      if (updated.count === 0) {
+        // Another concurrent verification advanced the counter past ours
+        // (or beyond). Re-read and treat regression as a possible clone.
+        const fresh = await this.prisma.passkey.findUnique({
+          where: { id: passkey.id },
+          select: { counter: true },
+        });
+        const freshCounter = fresh ? Number(fresh.counter) : 0;
+        if (freshCounter >= newCounter) {
+          this.logger.warn(
+            `Passkey ${passkey.id} counter raced (stored=${freshCounter}, new=${newCounter}); accepting without overwrite.`,
+          );
+          await this.prisma.passkey.update({
+            where: { id: passkey.id },
+            data: {
+              lastUsedAt: new Date(),
+              backedUp: verification.authenticationInfo.credentialBackedUp,
+              deviceType: verification.authenticationInfo.credentialDeviceType,
+            },
+          });
+        } else {
+          this.logger.error(
+            `Passkey ${passkey.id} counter race resulted in regression (stored=${freshCounter}, new=${newCounter}). Possible cloned authenticator.`,
+          );
+          throw new UnauthorizedException('Passkey verification failed');
+        }
+      }
+    } else {
+      // newCounter === 0: leave the stored counter alone, just update metadata.
+      await this.prisma.passkey.update({
+        where: { id: passkey.id },
+        data: {
+          lastUsedAt: new Date(),
+          backedUp: verification.authenticationInfo.credentialBackedUp,
+          deviceType: verification.authenticationInfo.credentialDeviceType,
+        },
+      });
+    }
     const { password: _password, ...userWithoutPassword } = passkey.user;
     void _password;
     return { user: userWithoutPassword, passkeyId: passkey.id };
@@ -408,11 +471,7 @@ export class PasskeysService {
       throw new BadRequestException('Unknown or already-used challenge');
     }
     // Best-effort lazy cleanup — fire and forget.
-    this.prisma.webAuthnChallenge
-      .deleteMany({ where: { expiresAt: { lt: new Date() } } })
-      .catch(() => {
-        /* ignore */
-      });
+    this.purgeExpiredChallenges();
     if (row.expiresAt.getTime() < Date.now()) {
       throw new BadRequestException('Challenge has expired');
     }
@@ -520,5 +579,26 @@ export class PasskeysService {
   private errorMessage(err: unknown): string {
     if (err instanceof Error) return err.message;
     return String(err);
+  }
+
+  /**
+   * Truncated SHA-256 of a credential ID for use in log messages. Avoids
+   * spilling full credential identifiers into application logs while keeping
+   * enough entropy for forensic correlation across requests.
+   */
+  private hashCredentialId(credentialId: string): string {
+    return createHash('sha256').update(credentialId).digest('hex').slice(0, 12);
+  }
+
+  /**
+   * Fire-and-forget cleanup of expired challenge rows. Errors are swallowed
+   * so cleanup can never block a legitimate ceremony.
+   */
+  private purgeExpiredChallenges(): void {
+    this.prisma.webAuthnChallenge
+      .deleteMany({ where: { expiresAt: { lt: new Date() } } })
+      .catch(() => {
+        /* ignore */
+      });
   }
 }

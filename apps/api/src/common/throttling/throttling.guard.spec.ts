@@ -5,18 +5,14 @@ import { ThrottlingGuard } from './throttling.guard';
 import { ConfigModule } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
 
-// Test-only subclass that exposes protected methods for testing
+// Test-only subclass that exposes protected v6 hooks for testing
 class TestableThrottlingGuard extends ThrottlingGuard {
-  public getTrackingKeyTest(context: ExecutionContext): string {
-    return this.getTrackingKey(context);
+  public getTrackerTest(req: Record<string, unknown>): Promise<string> {
+    return this.getTracker(req);
   }
-  
-  public async shouldThrottleTest(context: ExecutionContext): Promise<boolean> {
-    return this.shouldThrottle(context);
-  }
-  
-  public getThrottlerNameTest(context: ExecutionContext): string {
-    return this.getThrottlerName(context);
+
+  public shouldSkipTest(context: ExecutionContext): Promise<boolean> {
+    return this.shouldSkip(context);
   }
 }
 
@@ -26,64 +22,52 @@ describe('ThrottlingGuard', () => {
   let mockStorageService: any;
   let mockOptions: ThrottlerModuleOptions;
   let mockReflector: Reflector;
-  
-  const mockExecutionContext = (): ExecutionContext => {
+
+  const mockExecutionContext = (overrides: Record<string, unknown> = {}): ExecutionContext => {
     const mockRequest = {
       ip: '127.0.0.1',
       method: 'POST',
       path: '/api/users',
-      user: { id: 'test-user-id' }
+      user: { id: 'test-user-id' },
+      ...overrides,
     };
-    
+
     const mockHttpArgumentsHost = {
       getRequest: jest.fn().mockReturnValue(mockRequest),
       getResponse: jest.fn().mockReturnValue({}),
     };
-    
+
     const mockContext = {
       switchToHttp: jest.fn().mockReturnValue(mockHttpArgumentsHost),
       getHandler: jest.fn(),
       getClass: jest.fn(),
     } as unknown as ExecutionContext;
-    
+
     return mockContext;
   };
-  
+
   beforeEach(async () => {
-    // Mock throttler options
     mockOptions = {
       throttlers: [
-        {
-          name: 'default',
-          ttl: 60000,
-          limit: 300,
-        },
-        {
-          name: 'auth',
-          ttl: 60000,
-          limit: 30,
-        },
+        { name: 'default', ttl: 60000, limit: 300 },
+        { name: 'auth', ttl: 60000, limit: 30 },
       ],
     };
-    
-    // Mock storage service that tracks rate limiting
+
     mockStorageService = {
       increment: jest.fn().mockResolvedValue({ totalHits: 1 }),
       getRecord: jest.fn().mockResolvedValue({ totalHits: 1 }),
     };
-    
-    // Mock reflector
+
     mockReflector = {
       getAllAndOverride: jest.fn().mockReturnValue(null),
       getAllAndMerge: jest.fn().mockReturnValue([]),
       get: jest.fn().mockReturnValue(null),
     } as unknown as Reflector;
-    
+
     const module: TestingModule = await Test.createTestingModule({
       imports: [
-        ConfigModule.forRoot({
-          isGlobal: true,
-        }),
+        ConfigModule.forRoot({ isGlobal: true }),
         ThrottlerModule.forRoot(mockOptions),
       ],
       providers: [
@@ -92,99 +76,75 @@ describe('ThrottlingGuard', () => {
           useFactory: () => new TestableThrottlingGuard(
             mockOptions,
             mockStorageService,
-            mockReflector, 
+            mockReflector,
           ),
         },
       ],
     }).compile();
-    
+
     guard = module.get<TestableThrottlingGuard>(TestableThrottlingGuard);
   });
-  
+
   it('should be defined', () => {
     expect(guard).toBeDefined();
   });
-  
-  it('should use user ID as tracking key when available', async () => {
-    // Arrange
-    const context = mockExecutionContext();
-    
-    // Act
-    const trackingKey = guard.getTrackingKeyTest(context);
-    
-    // Assert
-    expect(trackingKey).toBe('user_test-user-id');
+
+  it('should track authenticated requests by user ID', async () => {
+    const req = { ip: '127.0.0.1', user: { id: 'test-user-id' } };
+    await expect(guard.getTrackerTest(req)).resolves.toBe('user_test-user-id');
   });
-  
-  it('should use IP as tracking key when user is not authenticated', async () => {
-    // Arrange
-    const context = mockExecutionContext();
-    const request = context.switchToHttp().getRequest();
-    request.user = undefined;
-    
-    // Act
-    const trackingKey = guard.getTrackingKeyTest(context);
-    
-    // Assert
-    expect(trackingKey).toBe('127.0.0.1');
+
+  it('should track anonymous requests by IP', async () => {
+    const req = { ip: '127.0.0.1' };
+    await expect(guard.getTrackerTest(req)).resolves.toBe('127.0.0.1');
   });
-  
+
+  it('should fall back to "unknown" when neither user nor IP is available', async () => {
+    await expect(guard.getTrackerTest({})).resolves.toBe('unknown');
+  });
+
   it('should skip throttling for health check endpoints', async () => {
-    // Arrange
-    const context = mockExecutionContext();
-    const request = context.switchToHttp().getRequest();
-    request.path = '/api/health';
-    
-    // Act
-    const shouldThrottle = await guard.shouldThrottleTest(context);
-    
-    // Assert
-    expect(shouldThrottle).toBe(false);
+    const context = mockExecutionContext({ path: '/api/health' });
+    await expect(guard.shouldSkipTest(context)).resolves.toBe(true);
   });
-  
-  it('should apply auth throttler for authentication endpoints', async () => {
-    // Arrange
+
+  it('should not skip throttling for regular endpoints', async () => {
     const context = mockExecutionContext();
-    const request = context.switchToHttp().getRequest();
-    request.path = '/auth/login';
-    request.method = 'POST';
-    
-    // Act
-    const throttlerName = guard.getThrottlerNameTest(context);
-    
-    // Assert
-    expect(throttlerName).toBe('auth');
+    await expect(guard.shouldSkipTest(context)).resolves.toBe(false);
   });
-  
-  it('should apply default throttler for regular endpoints', async () => {
-    // Arrange
-    const context = mockExecutionContext();
-    
-    // Act
-    const throttlerName = guard.getThrottlerNameTest(context);
-    
-    // Assert
-    expect(throttlerName).toBe('default');
-  });
-  
-  it('should skip throttling for GET requests when configured', async () => {
-    // Arrange
-    const ignoreGetRequests = true;
+
+  it('should skip GET requests when ignoreGetRequests is enabled', async () => {
     const customGuard = new TestableThrottlingGuard(
       mockOptions,
       mockStorageService,
       mockReflector,
-      ignoreGetRequests
+      true,
     );
-    
-    const context = mockExecutionContext();
-    const request = context.switchToHttp().getRequest();
-    request.method = 'GET';
-    
-    // Act
-    const shouldThrottle = await customGuard.shouldThrottleTest(context);
-    
-    // Assert
-    expect(shouldThrottle).toBe(false);
+    const context = mockExecutionContext({ method: 'GET' });
+    await expect(customGuard.shouldSkipTest(context)).resolves.toBe(true);
+  });
+
+  describe('isAuthenticationRequest', () => {
+    const buildReq = (method: string, path: string) =>
+      ({ method, path } as unknown as Parameters<typeof ThrottlingGuard.isAuthenticationRequest>[0]);
+
+    it.each([
+      ['POST', '/auth/login'],
+      ['POST', '/auth/register'],
+      ['POST', '/auth/request-login-code'],
+      ['POST', '/auth/login-with-code'],
+      ['POST', '/auth/passkey/options'],
+      ['POST', '/auth/passkey/verify'],
+    ])('classifies %s %s as an auth request', (method, path) => {
+      expect(ThrottlingGuard.isAuthenticationRequest(buildReq(method, path))).toBe(true);
+    });
+
+    it('classifies non-auth POST as not an auth request', () => {
+      expect(ThrottlingGuard.isAuthenticationRequest(buildReq('POST', '/users'))).toBe(false);
+    });
+
+    it('classifies GET on an auth path as not an auth request', () => {
+      expect(ThrottlingGuard.isAuthenticationRequest(buildReq('GET', '/auth/login'))).toBe(false);
+    });
   });
 });

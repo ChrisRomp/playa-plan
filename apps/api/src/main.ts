@@ -1,5 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from './app.module';
 import { GlobalValidationPipe } from './common/pipes/validation.pipe';
 import helmet from 'helmet';
@@ -8,8 +9,15 @@ import { createMetricsServer } from './metrics-server';
 import { validateWebAuthnConfig, WebAuthnConfig } from './config/webauthn-config.validator';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
   const configService = app.get(ConfigService);
+
+  // Trust the first reverse proxy in front of the API so that `req.ip` and
+  // helmet's secure-context detection use the X-Forwarded-* values rather
+  // than the proxy's loopback address. Without this, throttling buckets all
+  // real clients behind a single proxy IP and CSP / cookie security
+  // heuristics may misbehave under HTTPS termination at the proxy.
+  app.set('trust proxy', 1);
 
   // Validate WebAuthn (passkey) config early so misconfigured RP ID / origin
   // pairs fail boot with a clear error rather than producing silent browser
