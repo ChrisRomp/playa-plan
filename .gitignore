@@ -56,6 +56,7 @@ turbo/
 # E2E testing artifacts
 playwright-report/
 test-results/
+tests/.auth/
 *.pid
 web.log
 api.log

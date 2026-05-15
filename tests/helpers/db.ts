@@ -1,0 +1,88 @@
+/**
+ * Thin Prisma client for tests. Use sparingly — prefer the API client.
+ *
+ * Safety rails: write operations exposed here only delete rows whose email/userId
+ * matches the current run's TEST_EMAIL_PREFIX. This keeps a misconfigured local run
+ * from nuking data in a shared dev DB.
+ */
+import { PrismaClient } from '@prisma/client';
+import { DATABASE_URL } from './env';
+import { TEST_EMAIL_PREFIX } from './runId';
+
+let cached: PrismaClient | null = null;
+
+export function getPrisma(): PrismaClient {
+  if (!cached) {
+    cached = new PrismaClient({ datasources: { db: { url: DATABASE_URL } } });
+  }
+  return cached;
+}
+
+export async function disconnectPrisma(): Promise<void> {
+  if (cached) {
+    await cached.$disconnect();
+    cached = null;
+  }
+}
+
+/**
+ * Best-effort cleanup of any rows tagged with the current run's prefix.
+ * Logs and continues on errors; never throws.
+ */
+export async function cleanupRunData(): Promise<void> {
+  const prisma = getPrisma();
+  const prefix = `${TEST_EMAIL_PREFIX}-`;
+
+  try {
+    const users = await prisma.user.findMany({
+      where: { email: { startsWith: prefix } },
+      select: { id: true, email: true },
+    });
+    if (users.length === 0) return;
+
+    const userIds = users.map((u) => u.id);
+
+    // Delete in FK-safe order. Each step is wrapped so a single failure doesn't
+    // abort the rest of the cleanup.
+    const steps: Array<[string, () => Promise<unknown>]> = [
+      ['email_audit', () => prisma.emailAudit.deleteMany({ where: { userId: { in: userIds } } })],
+      ['notifications', () => prisma.notification.deleteMany({ where: { recipient: { startsWith: prefix } } })],
+      ['admin_audit', () => prisma.adminAudit.deleteMany({ where: { adminUserId: { in: userIds } } })],
+      ['payments', () => prisma.payment.deleteMany({ where: { userId: { in: userIds } } })],
+      ['registration_jobs', () =>
+        prisma.registrationJob.deleteMany({
+          where: { registration: { userId: { in: userIds } } },
+        }),
+      ],
+      ['camping_option_field_values', () =>
+        prisma.campingOptionFieldValue.deleteMany({
+          where: { registration: { userId: { in: userIds } } },
+        }),
+      ],
+      ['camping_option_registrations', () =>
+        prisma.campingOptionRegistration.deleteMany({ where: { userId: { in: userIds } } }),
+      ],
+      ['registrations', () => prisma.registration.deleteMany({ where: { userId: { in: userIds } } })],
+      ['passkeys', () => prisma.passkey.deleteMany({ where: { userId: { in: userIds } } })],
+      ['webauthn_challenges', () => prisma.webAuthnChallenge.deleteMany({ where: { userId: { in: userIds } } })],
+      ['users', () => prisma.user.deleteMany({ where: { id: { in: userIds } } })],
+    ];
+
+    for (const [label, fn] of steps) {
+      try {
+        const result = (await fn()) as { count?: number } | unknown;
+        const count = (result as { count?: number })?.count ?? 0;
+        if (count > 0) {
+           
+          console.log(`[e2e-cleanup] ${label}: deleted ${count} rows`);
+        }
+      } catch (err) {
+         
+        console.warn(`[e2e-cleanup] ${label}: ${(err as Error).message}`);
+      }
+    }
+  } catch (err) {
+     
+    console.warn(`[e2e-cleanup] aborted: ${(err as Error).message}`);
+  }
+}

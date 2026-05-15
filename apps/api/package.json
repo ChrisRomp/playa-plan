@@ -33,6 +33,8 @@
     "seed:test": "dotenv -e .env.test -- ts-node ./prisma/seeds/seed.ts",
     "seed:test:force": "dotenv -e .env.test -- FORCE_RESEED=true ts-node ./prisma/seeds/seed.ts",
     "seed:local": "ts-node ./prisma/seeds/seed.local.ts",
+    "seed:e2e": "ts-node ./prisma/seeds/seed.e2e.ts",
+    "seed:e2e:full": "FORCE_RESEED=true ts-node ./prisma/seeds/seed.ts && ts-node ./prisma/seeds/seed.e2e.ts && (test -f ./prisma/seeds/seed.local.ts && ts-node ./prisma/seeds/seed.local.ts || echo 'no seed.local.ts present')",
     "db:setup": "npm run prisma:generate && npm run prisma:migrate:dev && npm run seed:dev",
     "db:setup:test": "npm run prisma:generate && npm run prisma:migrate:test && npm run seed:test"
   },
