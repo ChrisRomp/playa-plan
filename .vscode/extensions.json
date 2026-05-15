@@ -1,6 +1,5 @@
 {
     "recommendations": [
-        "GitHub.copilot",
         "rvest.vs-code-prettier-eslint",
         "dbaeumer.vscode-eslint"
     ]
