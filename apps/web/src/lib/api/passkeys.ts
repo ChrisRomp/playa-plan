@@ -8,7 +8,7 @@ import { api, setJwtToken, AuthResponseSchema, type AuthResponse } from '../api'
  */
 export const PasskeySchema = z.object({
   id: z.string(),
-  nickname: z.string().nullable(),
+  nickname: z.string(),
   transports: z.array(z.string()).default([]),
   backedUp: z.boolean(),
   deviceType: z.string().nullable(),
@@ -45,7 +45,7 @@ export const passkeysApi = {
   },
 
   /** Submit the browser-supplied attestation back for verification. */
-  registrationVerify: async (response: unknown, nickname?: string): Promise<Passkey> => {
+  registrationVerify: async (response: unknown, nickname: string): Promise<Passkey> => {
     const res = await api.post('/passkeys/registration/verify', { response, nickname });
     return PasskeySchema.parse(res.data);
   },

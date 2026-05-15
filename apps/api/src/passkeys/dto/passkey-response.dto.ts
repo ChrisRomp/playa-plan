@@ -10,8 +10,8 @@ export class PasskeyResponseDto {
   @ApiProperty({ description: 'Passkey database ID' })
   id!: string;
 
-  @ApiProperty({ description: 'User-supplied label', nullable: true })
-  nickname!: string | null;
+  @ApiProperty({ description: 'User-supplied label' })
+  nickname!: string;
 
   @ApiProperty({ description: 'Authenticator transports (e.g., internal, hybrid, usb)' })
   transports!: string[];

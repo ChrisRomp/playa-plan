@@ -283,7 +283,7 @@ describe('PasskeysService', () => {
     });
 
     it('atomically consumes the challenge by delete-on-read', async () => {
-      await service.verifyRegistration(user, response);
+      await service.verifyRegistration(user, response, 'My iPhone');
       expect(prisma.webAuthnChallenge.delete).toHaveBeenCalledWith({
         where: { challenge },
       });
@@ -296,7 +296,7 @@ describe('PasskeysService', () => {
           clientVersion: 'test',
         }),
       );
-      await expect(service.verifyRegistration(user, response)).rejects.toBeInstanceOf(
+      await expect(service.verifyRegistration(user, response, 'My iPhone')).rejects.toBeInstanceOf(
         BadRequestException,
       );
     });
@@ -307,7 +307,7 @@ describe('PasskeysService', () => {
         clientVersion: 'test',
       });
       prisma.webAuthnChallenge.delete.mockRejectedValueOnce(dbErr);
-      await expect(service.verifyRegistration(user, response)).rejects.toBe(dbErr);
+      await expect(service.verifyRegistration(user, response, 'My iPhone')).rejects.toBe(dbErr);
     });
 
     it('dispatches PASSKEY_ADDED notification', async () => {
@@ -323,9 +323,23 @@ describe('PasskeysService', () => {
       );
     });
 
-    it('rejects nicknames longer than 20 chars', async () => {
+    it('rejects missing nicknames', async () => {
       await expect(
-        service.verifyRegistration(user, response, 'a'.repeat(21)),
+        service.verifyRegistration(user, response, undefined as unknown as string),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(prisma.webAuthnChallenge.delete).not.toHaveBeenCalled();
+    });
+
+    it('rejects blank nicknames', async () => {
+      await expect(
+        service.verifyRegistration(user, response, '   '),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(prisma.webAuthnChallenge.delete).not.toHaveBeenCalled();
+    });
+
+    it('rejects nicknames longer than 40 chars', async () => {
+      await expect(
+        service.verifyRegistration(user, response, 'a'.repeat(41)),
       ).rejects.toBeInstanceOf(BadRequestException);
     });
 
@@ -337,7 +351,7 @@ describe('PasskeysService', () => {
         type: WebAuthnChallengeType.REGISTRATION,
         expiresAt: new Date(Date.now() - 10),
       });
-      await expect(service.verifyRegistration(user, response)).rejects.toBeInstanceOf(
+      await expect(service.verifyRegistration(user, response, 'My iPhone')).rejects.toBeInstanceOf(
         BadRequestException,
       );
     });
@@ -350,14 +364,14 @@ describe('PasskeysService', () => {
         type: WebAuthnChallengeType.REGISTRATION,
         expiresAt: new Date(Date.now() + 60_000),
       });
-      await expect(service.verifyRegistration(user, response)).rejects.toBeInstanceOf(
+      await expect(service.verifyRegistration(user, response, 'My iPhone')).rejects.toBeInstanceOf(
         BadRequestException,
       );
     });
 
     it('rejects when verification fails', async () => {
       mockedVerifyRegistrationResponse.mockResolvedValueOnce({ verified: false } as never);
-      await expect(service.verifyRegistration(user, response)).rejects.toBeInstanceOf(
+      await expect(service.verifyRegistration(user, response, 'My iPhone')).rejects.toBeInstanceOf(
         BadRequestException,
       );
     });
@@ -366,14 +380,14 @@ describe('PasskeysService', () => {
       mockedVerifyRegistrationResponse.mockRejectedValueOnce(
         new Error('Unexpected origin foo.com'),
       );
-      await expect(service.verifyRegistration(user, response)).rejects.toBeInstanceOf(
+      await expect(service.verifyRegistration(user, response, 'My iPhone')).rejects.toBeInstanceOf(
         BadRequestException,
       );
     });
 
     it('rejects malformed registration shape', async () => {
       const badResponse = { id: 'x', type: 'public-key', response: {} } as never;
-      await expect(service.verifyRegistration(user, badResponse)).rejects.toBeInstanceOf(
+      await expect(service.verifyRegistration(user, badResponse, 'My iPhone')).rejects.toBeInstanceOf(
         BadRequestException,
       );
     });
@@ -388,7 +402,7 @@ describe('PasskeysService', () => {
           attestationObject: 'attestation-bytes',
         },
       } as never;
-      await expect(service.verifyRegistration(user, badResponse)).rejects.toBeInstanceOf(
+      await expect(service.verifyRegistration(user, badResponse, 'My iPhone')).rejects.toBeInstanceOf(
         BadRequestException,
       );
     });
@@ -400,7 +414,7 @@ describe('PasskeysService', () => {
           clientVersion: 'test',
         }),
       );
-      await expect(service.verifyRegistration(user, response)).rejects.toBeInstanceOf(
+      await expect(service.verifyRegistration(user, response, 'My iPhone')).rejects.toBeInstanceOf(
         BadRequestException,
       );
     });
@@ -738,9 +752,16 @@ describe('PasskeysService', () => {
       expect(out.nickname).toBe('New');
     });
 
-    it('rejects nicknames over 20 chars', async () => {
+    it('rejects blank nicknames', async () => {
       await expect(
-        service.updateNickname(user.id, 'pk-1', 'x'.repeat(21)),
+        service.updateNickname(user.id, 'pk-1', '   '),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(prisma.passkey.findFirst).not.toHaveBeenCalled();
+    });
+
+    it('rejects nicknames over 40 chars', async () => {
+      await expect(
+        service.updateNickname(user.id, 'pk-1', 'x'.repeat(41)),
       ).rejects.toBeInstanceOf(BadRequestException);
     });
 

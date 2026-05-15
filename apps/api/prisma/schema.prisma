@@ -406,7 +406,7 @@ model Passkey {
   transports     String[]  @default([])
   deviceType     String?
   backedUp       Boolean   @default(false)
-  nickname       String?
+  nickname       String
   lastUsedAt     DateTime?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
