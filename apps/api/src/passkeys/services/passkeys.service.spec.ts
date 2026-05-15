@@ -5,7 +5,7 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
-import { NotificationType, UserRole, WebAuthnChallengeType } from '@prisma/client';
+import { NotificationType, Prisma, UserRole, WebAuthnChallengeType } from '@prisma/client';
 import { PasskeysService, MAX_PASSKEYS_PER_USER } from './passkeys.service';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { NotificationsService } from '../../notifications/services/notifications.service';
@@ -240,6 +240,7 @@ describe('PasskeysService', () => {
 
     beforeEach(() => {
       prisma.passkey.count.mockResolvedValue(0);
+      prisma.passkey.findMany.mockResolvedValue([]);
       prisma.webAuthnChallenge.delete.mockResolvedValue({
         id: 'wc-1',
         challenge,
@@ -361,6 +362,43 @@ describe('PasskeysService', () => {
       await expect(service.verifyRegistration(user, badResponse)).rejects.toBeInstanceOf(
         BadRequestException,
       );
+    });
+
+    it('rejects malformed clientDataJSON without leaking SyntaxError', async () => {
+      const badResponse = {
+        id: 'cred-new',
+        rawId: 'cred-new',
+        type: 'public-key',
+        response: {
+          clientDataJSON: Buffer.from('not-json').toString('base64url'),
+          attestationObject: 'attestation-bytes',
+        },
+      } as never;
+      await expect(service.verifyRegistration(user, badResponse)).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+    });
+
+    it('translates duplicate credentialId (P2002) to BadRequestException', async () => {
+      prisma.passkey.create.mockRejectedValueOnce(
+        new Prisma.PrismaClientKnownRequestError('Unique constraint', {
+          code: 'P2002',
+          clientVersion: 'test',
+        }),
+      );
+      await expect(service.verifyRegistration(user, response)).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+    });
+
+    it('reuses existing webAuthnUserID when persisting an additional passkey', async () => {
+      prisma.passkey.findMany.mockResolvedValueOnce([
+        { webAuthnUserID: 'legacy-handle' },
+      ] as never);
+      await service.verifyRegistration(user, response, 'My iPhone');
+      expect(prisma.passkey.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ webAuthnUserID: 'legacy-handle' }),
+      });
     });
   });
 

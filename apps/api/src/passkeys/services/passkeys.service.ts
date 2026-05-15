@@ -154,27 +154,45 @@ export class PasskeysService {
       throw new BadRequestException('Passkey registration failed verification');
     }
     const info = verification.registrationInfo;
-    const created = await this.prisma.$transaction(async (tx) => {
-      const count = await tx.passkey.count({ where: { userId: user.id } });
-      if (count >= MAX_PASSKEYS_PER_USER) {
-        throw new BadRequestException(
-          `Cannot add more than ${MAX_PASSKEYS_PER_USER} passkeys per user`,
-        );
+    let created: Passkey;
+    try {
+      created = await this.prisma.$transaction(async (tx) => {
+        const existingForUser = await tx.passkey.findMany({
+          where: { userId: user.id },
+          select: { webAuthnUserID: true },
+        });
+        if (existingForUser.length >= MAX_PASSKEYS_PER_USER) {
+          throw new BadRequestException(
+            `Cannot add more than ${MAX_PASSKEYS_PER_USER} passkeys per user`,
+          );
+        }
+        // Match the webAuthnUserID we sent the browser during option generation,
+        // not user.id. This ensures `userHandle === passkey.webAuthnUserID` checks
+        // remain consistent if any future migration alters stored handles.
+        const webAuthnUserID = existingForUser[0]?.webAuthnUserID ?? user.id;
+        return tx.passkey.create({
+          data: {
+            userId: user.id,
+            credentialId: info.credential.id,
+            publicKey: Buffer.from(info.credential.publicKey),
+            webAuthnUserID,
+            counter: BigInt(info.credential.counter),
+            transports: info.credential.transports ?? [],
+            deviceType: info.credentialDeviceType,
+            backedUp: info.credentialBackedUp,
+            nickname: trimmedNickname,
+          },
+        });
+      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+    } catch (err) {
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2002'
+      ) {
+        throw new BadRequestException('Passkey already registered');
       }
-      return tx.passkey.create({
-        data: {
-          userId: user.id,
-          credentialId: info.credential.id,
-          publicKey: Buffer.from(info.credential.publicKey),
-          webAuthnUserID: user.id,
-          counter: BigInt(info.credential.counter),
-          transports: info.credential.transports ?? [],
-          deviceType: info.credentialDeviceType,
-          backedUp: info.credentialBackedUp,
-          nickname: trimmedNickname,
-        },
-      });
-    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+      throw err;
+    }
     this.dispatchNotification(user, 'PASSKEY_ADDED', created).catch((err) =>
       this.logger.error(
         `Failed to send PASSKEY_ADDED notification for user ${user.id}: ${this.errorMessage(err)}`,
@@ -491,8 +509,13 @@ export class PasskeysService {
    * be looked up.
    */
   private extractChallenge(clientDataJSONBase64Url: string): string {
-    const json = Buffer.from(clientDataJSONBase64Url, 'base64url').toString('utf8');
-    const parsed = JSON.parse(json) as { challenge?: string };
+    let parsed: { challenge?: string };
+    try {
+      const json = Buffer.from(clientDataJSONBase64Url, 'base64url').toString('utf8');
+      parsed = JSON.parse(json) as { challenge?: string };
+    } catch {
+      throw new BadRequestException('Malformed clientDataJSON');
+    }
     if (!parsed.challenge || typeof parsed.challenge !== 'string') {
       throw new BadRequestException('clientDataJSON missing challenge');
     }

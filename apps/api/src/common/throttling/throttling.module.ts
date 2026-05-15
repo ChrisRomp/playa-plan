@@ -3,6 +3,7 @@ import {
   ThrottlerModule,
   ThrottlerModuleOptions,
   ThrottlerStorage,
+  getOptionsToken,
 } from '@nestjs/throttler';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { Request } from 'express';
@@ -102,29 +103,18 @@ export class ThrottlingModule {
       providers: [
         {
           provide: APP_GUARD,
-          inject: [Reflector, ThrottlerStorage],
+          inject: [getOptionsToken(), Reflector, ThrottlerStorage],
           useFactory: (
+            throttlerOptions: ThrottlerModuleOptions,
             reflector: Reflector,
             storageService: ThrottlerStorage
           ) => {
-            const defaultOptions: ThrottlerModuleOptions = {
-              throttlers: [
-                {
-                  name: 'default',
-                  ttl: 60000,
-                  limit: 300,
-                  skipIf: skipIfAuth,
-                },
-                {
-                  name: 'auth',
-                  ttl: 60000,
-                  limit: 30,
-                  skipIf: skipIfNotAuth,
-                },
-              ],
-            };
+            // IMPORTANT: pass the SAME options object that ThrottlerModule.forRootAsync
+            // produced. @nestjs/throttler v6 reads ttl/limit/skipIf from the constructor
+            // arg (this.options); a separate options object would silently bypass the
+            // env-driven THROTTLE_TTL / THROTTLE_LIMIT configuration.
             return new ThrottlingGuard(
-              defaultOptions,
+              throttlerOptions,
               storageService,
               reflector,
               ignoreGetRequests
