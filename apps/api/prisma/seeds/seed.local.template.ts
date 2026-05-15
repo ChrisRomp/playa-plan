@@ -42,11 +42,8 @@ async function seedLocalConfig() {
           stripePublicKey: 'pk_test_REPLACE_ME',
           stripeApiKey: 'sk_test_REPLACE_ME',
 
-          // ---- PayPal sandbox (optional) ----
+          // ---- PayPal: not exercised by E2E; leave disabled. ----
           paypalEnabled: false,
-          paypalClientId: '',
-          paypalClientSecret: '',
-          paypalMode: 'SANDBOX',
 
           // ---- Email: keep OFF for E2E so tests don't trigger SMTP ----
           emailEnabled: false,

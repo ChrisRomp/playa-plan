@@ -105,10 +105,33 @@ Rotate the Stripe test key by updating the secret; nothing else changes.
 
 `.gitignore` excludes `seed.local.ts`, so the secret never lands in the repo.
 
+## `playwright-cli` vs `npx playwright test`
+
+These are two different things — both are part of our workflow.
+
+| Tool                                    | Purpose                                                 | When to use                                         |
+| --------------------------------------- | ------------------------------------------------------- | --------------------------------------------------- |
+| `npx playwright test` (or `npm run test:e2e*`) | **Runs** the test suite via the `@playwright/test` runner. | Always. Local runs, CI runs, debugging individual specs (`--debug=cli`). |
+| `playwright-cli`                        | Interactive browser automation: drive a page, take snapshots, generate locators, attach to a paused test. | Authoring new specs (skill-driven), debugging a failing test by attaching to its session, exploring the app to find the right selectors. |
+
+The Microsoft skill (`.agents/skills/playwright-cli/SKILL.md`) is the canonical reference and is
+worth reading in full. Quick orientation:
+
+- `playwright-cli open http://localhost:5173` — start a headed browser session.
+- `playwright-cli snapshot` — get an accessibility tree with refs (e.g. `e15`) you can target.
+- `playwright-cli click e15` / `playwright-cli fill e3 "value"` — interact using refs.
+- `playwright-cli attach tw-abcdef` — attach to a Playwright test paused via `--debug=cli`.
+
+Our wrapper script `npm run test:e2e:author` runs the preflight check, then opens a headed
+session at the local web URL — handy as a starting point for skill-driven authoring.
+
+CI runs `npx playwright test` (with optional `--grep` from the workflow input). It does **not**
+need `playwright-cli` installed; the CLI is purely an authoring/debugging convenience.
+
 ## Stripe test cards
 
-We use real Stripe test mode (no charges occur). Common cards (full list:
-<https://docs.stripe.com/testing>):
+We use real Stripe test mode (no charges occur). PayPal is intentionally not exercised by E2E.
+Common cards (full list: <https://docs.stripe.com/testing>):
 
 | Purpose                                | Number               |
 | -------------------------------------- | -------------------- |
