@@ -39,6 +39,8 @@ model User {
   registrations              Registration[]
   emailAudit                 EmailAudit[]
   adminAuditRecords          AdminAudit[]                @relation("AdminAuditRecords")
+  passkeys                   Passkey[]
+  webAuthnChallenges         WebAuthnChallenge[]
 
   @@map("users")
 }
@@ -46,19 +48,19 @@ model User {
 // Camp model has been removed
 
 model CampingOption {
-  id                 String                           @id @default(uuid())
+  id                 String                      @id @default(uuid())
   name               String
   description        String?
-  enabled            Boolean                          @default(true)
-  workShiftsRequired Int                              @default(0)
+  enabled            Boolean                     @default(true)
+  workShiftsRequired Int                         @default(0)
   participantDues    Float
   staffDues          Float
-  maxSignups         Int                              @default(0)
+  maxSignups         Int                         @default(0)
   fields             CampingOptionField[]
   registrations      CampingOptionRegistration[]
   jobCategories      CampingOptionJobCategory[]
-  createdAt          DateTime                         @default(now())
-  updatedAt          DateTime                         @updatedAt
+  createdAt          DateTime                    @default(now())
+  updatedAt          DateTime                    @updatedAt
 
   @@map("camping_options")
 }
@@ -157,15 +159,15 @@ model Job {
 }
 
 model Shift {
-  id               String         @id @default(uuid())
-  name             String
-  description      String?
-  startTime        String         // HH:MM format (24-hour time)
-  endTime          String         // HH:MM format (24-hour time)
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
-  dayOfWeek        DayOfWeek
-  jobs             Job[]
+  id          String    @id @default(uuid())
+  name        String
+  description String?
+  startTime   String // HH:MM format (24-hour time)
+  endTime     String // HH:MM format (24-hour time)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  dayOfWeek   DayOfWeek
+  jobs        Job[]
 
   @@map("shifts")
 }
@@ -226,7 +228,7 @@ model Notification {
 }
 
 model EmailAudit {
-  id               String         @id @default(uuid())
+  id               String           @id @default(uuid())
   recipientEmail   String
   ccEmails         String?
   bccEmails        String?
@@ -236,14 +238,14 @@ model EmailAudit {
   errorMessage     String?
   sentAt           DateTime?
   userId           String?
-  createdAt        DateTime       @default(now())
-  user             User?          @relation(fields: [userId], references: [id])
+  createdAt        DateTime         @default(now())
+  user             User?            @relation(fields: [userId], references: [id])
 
   @@map("email_audit")
 }
 
 model AdminAudit {
-  id               String                  @id @default(uuid())
+  id               String               @id @default(uuid())
   adminUserId      String
   actionType       AdminAuditActionType
   targetRecordType AdminAuditTargetType
@@ -252,8 +254,8 @@ model AdminAudit {
   newValues        Json?
   reason           String?
   transactionId    String?
-  createdAt        DateTime                @default(now())
-  adminUser        User                    @relation("AdminAuditRecords", fields: [adminUserId], references: [id])
+  createdAt        DateTime             @default(now())
+  adminUser        User                 @relation("AdminAuditRecords", fields: [adminUserId], references: [id])
 
   @@map("admin_audit")
 }
@@ -352,6 +354,8 @@ enum NotificationType {
   PAYMENT_CONFIRMATION
   SHIFT_REMINDER
   EMAIL_TEST
+  PASSKEY_ADDED
+  PASSKEY_REMOVED
 }
 
 enum NotificationStatus {
@@ -389,4 +393,42 @@ enum AdminAuditTargetType {
   PAYMENT
   WORK_SHIFT
   CAMPING_OPTION
+}
+
+model Passkey {
+  id             String    @id @default(uuid())
+  userId         String
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  credentialId   String    @unique
+  publicKey      Bytes
+  webAuthnUserID String
+  counter        BigInt    @default(0)
+  transports     String[]  @default([])
+  deviceType     String?
+  backedUp       Boolean   @default(false)
+  nickname       String?
+  lastUsedAt     DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([userId])
+  @@map("passkeys")
+}
+
+model WebAuthnChallenge {
+  id        String                @id @default(uuid())
+  challenge String                @unique
+  userId    String?
+  user      User?                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      WebAuthnChallengeType
+  expiresAt DateTime
+  createdAt DateTime              @default(now())
+
+  @@index([expiresAt])
+  @@map("webauthn_challenges")
+}
+
+enum WebAuthnChallengeType {
+  REGISTRATION
+  AUTHENTICATION
 }

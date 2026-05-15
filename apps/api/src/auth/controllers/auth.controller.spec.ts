@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AuthController } from './auth.controller';
 import { AuthService } from '../services/auth.service';
+import { PasskeysService } from '../../passkeys/services/passkeys.service';
 import { RegisterDto } from '../dto/register.dto';
 import { User, UserRole } from '@prisma/client';
 import { UnauthorizedException, BadRequestException, ConflictException } from '@nestjs/common';
@@ -76,6 +77,12 @@ describe('AuthController', () => {
     validateLoginCode: jest.fn(),
   };
 
+  // Mock passkeys service (used by passkey login endpoints)
+  const mockPasskeysService = {
+    createAuthenticationOptions: jest.fn(),
+    verifyAuthentication: jest.fn(),
+  };
+
   beforeEach(async () => {
     jest.clearAllMocks();
     
@@ -85,6 +92,10 @@ describe('AuthController', () => {
         {
           provide: AuthService,
           useValue: mockAuthService,
+        },
+        {
+          provide: PasskeysService,
+          useValue: mockPasskeysService,
         },
       ],
     })
@@ -226,7 +237,7 @@ describe('AuthController', () => {
       // Assert
       expect(result).toEqual(mockAuthResponse);
       expect(mockAuthService.validateLoginCode).toHaveBeenCalledWith('test@example.playaplan.app', '123456');
-      expect(mockAuthService.login).toHaveBeenCalledWith(mockUser);
+      expect(mockAuthService.login).toHaveBeenCalledWith(mockUser, ['otp']);
     });
 
     it('should throw UnauthorizedException for invalid login code', async () => {
@@ -240,6 +251,45 @@ describe('AuthController', () => {
       // Act & Assert
       await expect(controller.loginWithCode(emailCodeLoginDto)).rejects.toThrow(UnauthorizedException);
       await expect(controller.loginWithCode(emailCodeLoginDto)).rejects.toThrow('Invalid or expired verification code');
+    });
+  });
+
+  describe('passkeyAuthenticationOptions', () => {
+    it('returns options issued by PasskeysService', async () => {
+      const opts = { challenge: 'chal-123', rpId: 'example.test' };
+      mockPasskeysService.createAuthenticationOptions.mockResolvedValue(opts);
+
+      const result = await controller.passkeyAuthenticationOptions();
+
+      expect(result).toBe(opts);
+      expect(mockPasskeysService.createAuthenticationOptions).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('passkeyVerify', () => {
+    it('verifies the assertion and returns an AuthResponseDto', async () => {
+      mockPasskeysService.verifyAuthentication.mockResolvedValue({
+        user: mockUser,
+        passkeyId: 'pk-1',
+      });
+      mockAuthService.login.mockResolvedValue(mockAuthResponse);
+
+      const result = await controller.passkeyVerify({ response: { id: 'cred-x' } as never });
+
+      expect(mockPasskeysService.verifyAuthentication).toHaveBeenCalledWith({ id: 'cred-x' });
+      expect(mockAuthService.login).toHaveBeenCalledWith(mockUser, ['hwk', 'mfa']);
+      expect(result.accessToken).toBe(mockAuthResponse.accessToken);
+      expect(result.userId).toBe(mockAuthResponse.userId);
+    });
+
+    it('propagates UnauthorizedException from PasskeysService.verifyAuthentication', async () => {
+      mockPasskeysService.verifyAuthentication.mockRejectedValue(
+        new UnauthorizedException('Passkey verification failed'),
+      );
+      await expect(
+        controller.passkeyVerify({ response: { id: 'cred-bad' } as never }),
+      ).rejects.toThrow(UnauthorizedException);
+      expect(mockAuthService.login).not.toHaveBeenCalled();
     });
   });
 

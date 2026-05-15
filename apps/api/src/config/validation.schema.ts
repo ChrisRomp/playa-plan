@@ -39,6 +39,17 @@ const validationSchema = Joi.object({
   
   // JWT configuration
   JWT_EXPIRATION_TIME: Joi.string().default('24h'),
+
+  // Reverse proxy / forwarded header trust. See main.ts parseTrustProxy.
+  // Accepts: unset/empty/false/0 (no trust), true (trust all), or a
+  // positive integer (number of trusted hops). Defaults to no trust so
+  // direct exposure is safe by default.
+  TRUST_PROXY: Joi.string(),
+
+  // WebAuthn (passkey) configuration — all optional; derived from FRONTEND_URL when unset
+  WEBAUTHN_RP_NAME: Joi.string().default('PlayaPlan'),
+  WEBAUTHN_RP_ID: Joi.string().hostname(),
+  WEBAUTHN_ORIGIN: Joi.string().uri(),
   
   // Email configuration
   EMAIL_PROVIDER: Joi.string().valid('sendgrid', 'smtp').default('sendgrid'),

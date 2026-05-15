@@ -169,10 +169,15 @@ api.interceptors.response.use(
   async error => {
     const originalRequest = error.config;
     
-    // Skip token refresh for login-related endpoints where 401 is expected
-    const isLoginEndpoint = originalRequest.url?.includes('/auth/login-with-code') || 
+    // Skip token refresh for login-related endpoints where 401 is expected.
+    // Passkey login endpoints are included so a 401 from a consumed challenge
+    // or failed assertion never triggers a refresh-and-retry loop that would
+    // re-submit against a now-invalid challenge.
+    const isLoginEndpoint = originalRequest.url?.includes('/auth/login-with-code') ||
                            originalRequest.url?.includes('/auth/request-login-code') ||
-                           originalRequest.url?.includes('/auth/register');
+                           originalRequest.url?.includes('/auth/register') ||
+                           originalRequest.url?.includes('/auth/passkey/options') ||
+                           originalRequest.url?.includes('/auth/passkey/verify');
     
     // If error response is 401 and we haven't already tried to refresh
     // and this is not a login endpoint

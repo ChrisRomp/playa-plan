@@ -8,6 +8,7 @@ export interface AuthContextType {
   user: User | null;
   requestVerificationCode: (email: string) => Promise<boolean>;
   verifyCode: (email: string, code: string) => Promise<void>;
+  loginWithPasskey: () => Promise<void>;
   logout: () => Promise<void>;
   isLoading: boolean;
   error: string | null;
@@ -28,6 +29,7 @@ export const AuthContext = createContext<AuthContextType>({
   error: null,
   requestVerificationCode: async () => false,
   verifyCode: async () => {},
+  loginWithPasskey: async () => {},
   logout: async () => {},
   // Connection state defaults
   isConnecting: true,

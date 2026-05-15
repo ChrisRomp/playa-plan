@@ -158,6 +158,15 @@ module apiContainerApp 'modules/container-app.bicep' = {
         name: 'NODE_ENV'
         value: 'production'
       }
+      {
+        // Azure Container Apps puts a reverse-proxy ingress in front of
+        // the API. Trust one hop so `req.ip` / IP-based throttling use
+        // the real client IP from X-Forwarded-For instead of the
+        // ingress's loopback address. Do not raise without adding more
+        // trusted hops in front of the app.
+        name: 'TRUST_PROXY'
+        value: '1'
+      }
     ]
   }
 }

@@ -1,5 +1,6 @@
 import { Controller, Post, Body, UseGuards, Get, Request, Query, HttpStatus, HttpCode, UnauthorizedException, BadRequestException } from '@nestjs/common';
 import { AuthService } from '../services/auth.service';
+import { PasskeysService } from '../../passkeys/services/passkeys.service';
 import { RegisterDto } from '../dto/register.dto';
 import { LoginDto } from '../dto/login.dto';
 import { AuthResponseDto } from '../dto/auth-response.dto';
@@ -11,6 +12,7 @@ import { Request as ExpressRequest } from 'express';
 import { User } from '@prisma/client';
 import { RequestLoginCodeDto } from '../dto/request-login-code.dto';
 import { EmailCodeLoginDto } from '../dto/email-code-login.dto';
+import { VerifyAuthenticationDto } from '../../passkeys/dto/verify-passkey.dto';
 
 // Define the user type for request objects
 interface RequestWithUser extends ExpressRequest {
@@ -23,7 +25,10 @@ interface RequestWithUser extends ExpressRequest {
 @ApiTags('Authentication')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly passkeysService: PasskeysService,
+  ) {}
 
   /**
    * Register a new user
@@ -132,7 +137,46 @@ export class AuthController {
       throw new UnauthorizedException('Invalid or expired verification code');
     }
     
-    return this.authService.login(user);
+    return this.authService.login(user, ['otp']);
+  }
+
+  /**
+   * Issue WebAuthn authentication options for the discoverable
+   * ("Sign in with a passkey") flow. Public — no email is required
+   * because the credential the browser returns identifies the user.
+   */
+  @Public()
+  @Post('passkey/options')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Get authentication options for passkey login' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Authentication options issued' })
+  async passkeyAuthenticationOptions() {
+    return this.passkeysService.createAuthenticationOptions();
+  }
+
+  /**
+   * Verify a browser-supplied passkey assertion. On success, issues
+   * a JWT identical in shape to the email-code login response.
+   * Generic error message on failure to avoid credential enumeration.
+   */
+  @Public()
+  @Post('passkey/verify')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Verify passkey authentication and issue a JWT' })
+  @ApiBody({ type: VerifyAuthenticationDto })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'User successfully logged in',
+    type: AuthResponseDto,
+  })
+  @ApiResponse({
+    status: HttpStatus.UNAUTHORIZED,
+    description: 'Passkey verification failed',
+  })
+  async passkeyVerify(@Body() body: VerifyAuthenticationDto): Promise<AuthResponseDto> {
+    const { user } = await this.passkeysService.verifyAuthentication(body.response);
+    const tokenResponse = await this.authService.login(user, ['hwk', 'mfa']);
+    return new AuthResponseDto(tokenResponse);
   }
 
   /**
