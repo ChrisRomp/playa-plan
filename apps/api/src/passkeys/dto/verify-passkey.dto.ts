@@ -1,4 +1,4 @@
-import { IsObject, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsObject, IsString, Matches, MaxLength } from 'class-validator';
 import type {
   RegistrationResponseJSON,
   AuthenticationResponseJSON,
@@ -15,10 +15,10 @@ export class VerifyRegistrationDto {
   @IsObject()
   response!: RegistrationResponseJSON;
 
-  @IsOptional()
   @IsString()
-  @MaxLength(20, { message: 'Nickname must be 20 characters or fewer' })
-  nickname?: string;
+  @Matches(/\S/, { message: 'Nickname is required' })
+  @MaxLength(40, { message: 'Nickname must be 40 characters or fewer' })
+  nickname!: string;
 }
 
 /**

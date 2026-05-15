@@ -86,7 +86,7 @@ describe('usePasskeys', () => {
 
     let returned;
     await act(async () => {
-      returned = await result.current.register();
+      returned = await result.current.register('My Phone');
     });
 
     expect(returned).toBeNull();

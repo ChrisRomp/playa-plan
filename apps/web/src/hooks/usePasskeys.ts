@@ -37,7 +37,7 @@ export const usePasskeys = () => {
   }, [load]);
 
   const register = useCallback(
-    async (nickname?: string): Promise<Passkey | null> => {
+    async (nickname: string): Promise<Passkey | null> => {
       if (!supported) {
         setError('This browser does not support passkeys.');
         return null;

@@ -36,7 +36,7 @@ export const MAX_PASSKEYS_PER_USER = 5;
 /**
  * Maximum length of a user-supplied passkey nickname (plaintext).
  */
-export const MAX_NICKNAME_LENGTH = 20;
+export const MAX_NICKNAME_LENGTH = 40;
 
 /**
  * How long an issued challenge remains valid. Five minutes is plenty for
@@ -128,9 +128,9 @@ export class PasskeysService {
   async verifyRegistration(
     user: Pick<User, 'id' | 'email' | 'firstName' | 'lastName'>,
     response: RegistrationResponseJSON,
-    nickname?: string,
+    nickname: string,
   ): Promise<Passkey> {
-    const trimmedNickname = this.normalizeNickname(nickname);
+    const trimmedNickname = this.normalizeRequiredNickname(nickname);
     this.assertRegistrationShape(response);
     const challengeRow = await this.consumeChallenge(
       this.extractChallenge(response.response.clientDataJSON),
@@ -410,7 +410,7 @@ export class PasskeysService {
     passkeyId: string,
     nickname: string,
   ): Promise<Passkey> {
-    const trimmed = this.normalizeNickname(nickname);
+    const trimmed = this.normalizeRequiredNickname(nickname);
     const passkey = await this.prisma.passkey.findFirst({
       where: { id: passkeyId, userId },
     });
@@ -444,10 +444,14 @@ export class PasskeysService {
     }
   }
 
-  private normalizeNickname(nickname: string | undefined | null): string | null {
-    if (nickname === undefined || nickname === null) return null;
+  private normalizeRequiredNickname(nickname: string | undefined | null): string {
+    if (nickname === undefined || nickname === null) {
+      throw new BadRequestException('Nickname is required');
+    }
     const trimmed = nickname.trim();
-    if (trimmed.length === 0) return null;
+    if (trimmed.length === 0) {
+      throw new BadRequestException('Nickname is required');
+    }
     if (trimmed.length > MAX_NICKNAME_LENGTH) {
       throw new BadRequestException(
         `Nickname must be ${MAX_NICKNAME_LENGTH} characters or fewer`,

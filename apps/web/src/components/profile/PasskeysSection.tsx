@@ -2,10 +2,45 @@ import { useState } from 'react';
 import { usePasskeys } from '../../hooks/usePasskeys';
 import type { Passkey } from '../../lib/api/passkeys';
 
-const NICKNAME_MAX_LENGTH = 20;
+const NICKNAME_MAX_LENGTH = 40;
 
 const formatDate = (d: Date | null): string =>
   d ? d.toLocaleDateString() : 'never';
+
+interface NavigatorWithUserAgentData extends Navigator {
+  readonly userAgentData?: {
+    readonly platform?: string;
+  };
+}
+
+const browserName = (userAgent: string): string => {
+  if (/Edg\//.test(userAgent)) return 'Edge';
+  if (/Firefox\//.test(userAgent)) return 'Firefox';
+  if (/Chrome\//.test(userAgent) || /CriOS\//.test(userAgent)) return 'Chrome';
+  if (/Safari\//.test(userAgent)) return 'Safari';
+  return 'Browser';
+};
+
+const platformName = (nav: NavigatorWithUserAgentData): string => {
+  const platform = nav.userAgentData?.platform || nav.platform || '';
+  const userAgent = nav.userAgent || '';
+  const source = `${platform} ${userAgent}`;
+
+  if (/iPhone|iPad|iPod/i.test(source)) return 'iOS';
+  if (/Mac/i.test(source)) return 'macOS';
+  if (/Win/i.test(source)) return 'Windows';
+  if (/Android/i.test(source)) return 'Android';
+  if (/Linux/i.test(source)) return 'Linux';
+  return 'this device';
+};
+
+const defaultPasskeyName = (): string => {
+  if (typeof navigator === 'undefined') {
+    return `Browser on this device - ${new Date().toLocaleDateString()}`;
+  }
+  const nav = navigator as NavigatorWithUserAgentData;
+  return `${browserName(nav.userAgent)} on ${platformName(nav)} - ${new Date().toLocaleDateString()}`;
+};
 
 /**
  * "Sign-in passkeys" section for the user profile page. Lists all
@@ -16,37 +51,49 @@ const PasskeysSection: React.FC = () => {
   const { passkeys, isLoading, error, supported, register, rename, remove } =
     usePasskeys();
 
-  const [newNickname, setNewNickname] = useState('');
+  const [newNickname, setNewNickname] = useState(defaultPasskeyName);
   const [busy, setBusy] = useState(false);
+  const [showAddForm, setShowAddForm] = useState(false);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
 
   if (!supported) return null;
 
+  const newNicknameTrimmed = newNickname.trim();
+  const renameValueTrimmed = renameValue.trim();
+  const isNewNicknameInvalid =
+    newNicknameTrimmed.length === 0 || newNicknameTrimmed.length > NICKNAME_MAX_LENGTH;
+  const isRenameValueInvalid =
+    renameValueTrimmed.length === 0 || renameValueTrimmed.length > NICKNAME_MAX_LENGTH;
+  const shouldShowAddForm = showAddForm || (!isLoading && passkeys.length === 0);
+
   const handleAdd = async () => {
-    if (newNickname.length > NICKNAME_MAX_LENGTH) return;
+    if (isNewNicknameInvalid) return;
     setBusy(true);
-    const created = await register(newNickname.trim() || undefined);
+    const created = await register(newNicknameTrimmed);
     setBusy(false);
-    if (created) setNewNickname('');
+    if (created) {
+      setNewNickname(defaultPasskeyName());
+      setShowAddForm(false);
+    }
   };
 
   const startRename = (p: Passkey) => {
     setRenamingId(p.id);
-    setRenameValue(p.nickname ?? '');
+    setRenameValue(p.nickname);
   };
 
   const submitRename = async () => {
     if (!renamingId) return;
-    if (renameValue.length > NICKNAME_MAX_LENGTH) return;
+    if (isRenameValueInvalid) return;
     setBusy(true);
-    const updated = await rename(renamingId, renameValue.trim());
+    const updated = await rename(renamingId, renameValueTrimmed);
     setBusy(false);
     if (updated) setRenamingId(null);
   };
 
   const confirmRemove = async (p: Passkey) => {
-    const label = p.nickname || 'this passkey';
+    const label = p.nickname;
     if (!window.confirm(`Remove ${label}? You will no longer be able to sign in with it.`)) {
       return;
     }
@@ -74,30 +121,46 @@ const PasskeysSection: React.FC = () => {
         </div>
       )}
 
-      <div className="mb-6 flex flex-col sm:flex-row gap-2 sm:items-end">
-        <label className="flex-1">
-          <span className="block text-sm font-medium text-gray-700 mb-1">
-            Nickname (optional, up to {NICKNAME_MAX_LENGTH} chars)
-          </span>
-          <input
-            type="text"
-            value={newNickname}
-            onChange={(e) => setNewNickname(e.target.value)}
-            maxLength={NICKNAME_MAX_LENGTH}
-            placeholder="e.g. My laptop"
-            className="w-full border rounded px-3 py-2"
-            disabled={busy}
-          />
-        </label>
+      {!shouldShowAddForm && (
         <button
           type="button"
-          onClick={handleAdd}
-          disabled={busy || newNickname.length > NICKNAME_MAX_LENGTH}
-          className="bg-blue-600 text-white rounded px-4 py-2 disabled:opacity-50"
+          onClick={() => setShowAddForm(true)}
+          disabled={busy}
+          className="mb-6 bg-blue-600 text-white rounded px-4 py-2 disabled:opacity-50"
         >
-          {busy ? 'Working…' : 'Add passkey'}
+          Add passkey
         </button>
-      </div>
+      )}
+
+      {shouldShowAddForm && (
+        <div className="mb-6 flex flex-col sm:flex-row gap-2 sm:items-end">
+          <label className="flex-1">
+            <span className="block text-sm font-medium text-gray-700 mb-1">
+              Passkey Name (required, up to {NICKNAME_MAX_LENGTH} chars)
+            </span>
+            <input
+              type="text"
+              value={newNickname}
+              onChange={(e) => setNewNickname(e.target.value)}
+              onFocus={(e) => e.target.select()}
+              maxLength={NICKNAME_MAX_LENGTH}
+              placeholder="e.g. Safari on macOS - 5/15/2026"
+              className="w-full border rounded px-3 py-2"
+              disabled={busy}
+              required
+              aria-invalid={isNewNicknameInvalid}
+            />
+          </label>
+          <button
+            type="button"
+            onClick={handleAdd}
+            disabled={busy || isNewNicknameInvalid}
+            className="bg-blue-600 text-white rounded px-4 py-2 disabled:opacity-50"
+          >
+            {busy ? 'Working…' : 'Create passkey'}
+          </button>
+        </div>
+      )}
 
       {isLoading ? (
         <div>Loading…</div>
@@ -117,11 +180,13 @@ const PasskeysSection: React.FC = () => {
                       maxLength={NICKNAME_MAX_LENGTH}
                       className="flex-1 border rounded px-2 py-1"
                       autoFocus
+                      required
+                      aria-invalid={isRenameValueInvalid}
                     />
                     <button
                       type="button"
                       onClick={submitRename}
-                      disabled={busy || renameValue.length > NICKNAME_MAX_LENGTH}
+                      disabled={busy || isRenameValueInvalid}
                       className="text-blue-600 hover:underline"
                     >
                       Save
@@ -136,12 +201,9 @@ const PasskeysSection: React.FC = () => {
                   </div>
                 ) : (
                   <>
-                    <div className="font-medium truncate">
-                      {p.nickname || <em className="text-gray-500">Unnamed passkey</em>}
-                    </div>
+                    <div className="font-medium truncate">{p.nickname}</div>
                     <div className="text-xs text-gray-500">
                       Added {formatDate(p.createdAt)} · Last used {formatDate(p.lastUsedAt)}
-                      {p.backedUp && ' · Synced'}
                     </div>
                   </>
                 )}
