@@ -20,7 +20,7 @@ CREATE TABLE "passkeys" (
     "publicKey" BYTEA NOT NULL,
     "webAuthnUserID" TEXT NOT NULL,
     "counter" BIGINT NOT NULL DEFAULT 0,
-    "transports" TEXT[],
+    "transports" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
     "deviceType" TEXT,
     "backedUp" BOOLEAN NOT NULL DEFAULT false,
     "nickname" TEXT,

@@ -290,10 +290,24 @@ describe('PasskeysService', () => {
     });
 
     it('rejects when challenge is unknown / already used (P2025)', async () => {
-      prisma.webAuthnChallenge.delete.mockRejectedValueOnce(new Error('Record not found'));
+      prisma.webAuthnChallenge.delete.mockRejectedValueOnce(
+        new Prisma.PrismaClientKnownRequestError('Record not found', {
+          code: 'P2025',
+          clientVersion: 'test',
+        }),
+      );
       await expect(service.verifyRegistration(user, response)).rejects.toBeInstanceOf(
         BadRequestException,
       );
+    });
+
+    it('rethrows non-P2025 prisma errors so infra failures surface as 5xx', async () => {
+      const dbErr = new Prisma.PrismaClientKnownRequestError('connection lost', {
+        code: 'P1001',
+        clientVersion: 'test',
+      });
+      prisma.webAuthnChallenge.delete.mockRejectedValueOnce(dbErr);
+      await expect(service.verifyRegistration(user, response)).rejects.toBe(dbErr);
     });
 
     it('dispatches PASSKEY_ADDED notification', async () => {

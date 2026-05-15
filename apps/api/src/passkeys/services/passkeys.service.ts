@@ -486,8 +486,18 @@ export class PasskeysService {
       row = await this.prisma.webAuthnChallenge.delete({
         where: { challenge },
       });
-    } catch {
-      throw new BadRequestException('Unknown or already-used challenge');
+    } catch (err) {
+      // Only translate Prisma's "record not found" into a 400. Any other
+      // error (DB connectivity loss, permission failure, etc.) should
+      // surface as a 5xx so production incidents are diagnosable rather
+      // than masquerading as a client error.
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2025'
+      ) {
+        throw new BadRequestException('Unknown or already-used challenge');
+      }
+      throw err;
     }
     // Best-effort lazy cleanup — fire and forget.
     this.purgeExpiredChallenges();

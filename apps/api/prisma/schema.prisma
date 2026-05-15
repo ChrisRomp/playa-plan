@@ -403,7 +403,7 @@ model Passkey {
   publicKey      Bytes
   webAuthnUserID String
   counter        BigInt    @default(0)
-  transports     String[]
+  transports     String[]  @default([])
   deviceType     String?
   backedUp       Boolean   @default(false)
   nickname       String?
