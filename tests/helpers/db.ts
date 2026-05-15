@@ -27,14 +27,21 @@ export async function disconnectPrisma(): Promise<void> {
 
 /**
  * Best-effort cleanup of any rows tagged with the current run's prefix, plus any
- * registrations/payments owned by the canonical e2e- personas (so a previous run's
+ * registrations/payments owned by the canonical seeded personas (so a previous run's
  * leftover registration doesn't make a "fresh" registration test fail).
+ *
+ * Critically, this only touches the *explicit* canonical persona emails — not the
+ * whole `@test.playaplan.local` domain — so it's safe to run while another
+ * concurrent CI run on the same shared DB is also creating per-run users.
  *
  * Logs and continues on errors; never throws.
  */
+import { PERSONAS } from './personas';
+
 export async function cleanupRunData(): Promise<void> {
   const prisma = getPrisma();
   const prefix = `${TEST_EMAIL_PREFIX}-`;
+  const personaEmails = Object.values(PERSONAS).map((p) => p.email);
 
   try {
     // Per-run users we will delete entirely.
@@ -44,9 +51,10 @@ export async function cleanupRunData(): Promise<void> {
     });
 
     // Canonical personas — we keep the user rows but blow away their
-    // registration/payment data so each run starts clean.
+    // registration/payment data so each run starts clean. Only known persona
+    // emails, never a domain wildcard.
     const personaUsers = await prisma.user.findMany({
-      where: { email: { endsWith: '@test.playaplan.local' } },
+      where: { email: { in: personaEmails } },
       select: { id: true },
     });
 

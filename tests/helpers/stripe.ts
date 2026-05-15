@@ -16,61 +16,79 @@ export const STRIPE_TEST_CARDS = {
 
 export type StripeTestCard = keyof typeof STRIPE_TEST_CARDS;
 
-interface CheckoutOpts {
-  /** Card key from STRIPE_TEST_CARDS; defaults to 'success'. */
+interface FillOpts {
   card?: StripeTestCard;
-  /** Email to use for the receipt; defaults to a generic test address. */
   email?: string;
-  /** MM / YY (with the spaces); defaults to 12 / 34. */
   exp?: string;
-  /** 3-digit CVC; defaults to 123. */
   cvc?: string;
-  /** Cardholder name; defaults to 'Test User'. */
   name?: string;
-  /** US ZIP; defaults to 94110. The country defaults to US. */
   zip?: string;
+}
+
+/**
+ * Fill the Stripe Checkout form fields without clicking Pay. Useful for failure
+ * specs that want to assert form-level validation, decline messages, etc.
+ */
+export async function fillStripeCheckoutForm(page: Page, opts: FillOpts = {}): Promise<void> {
+  const card = STRIPE_TEST_CARDS[opts.card ?? 'success'];
+  await expect(page).toHaveURL(/checkout\.stripe\.com/, { timeout: 15_000 });
+
+  await page.getByRole('textbox', { name: 'Email' }).fill(opts.email ?? 'stripe-receipt@test.playaplan.local');
+  await page.getByRole('textbox', { name: 'Card number' }).fill(card);
+  await page.getByRole('textbox', { name: 'Expiration' }).fill(opts.exp ?? '12 / 34');
+  await page.getByRole('textbox', { name: 'CVC' }).fill(opts.cvc ?? '123');
+  await page.getByRole('textbox', { name: 'Cardholder name' }).fill(opts.name ?? 'Test User');
+
+  // Country defaults to US in test mode; ZIP appears for US/CA.
+  const zipBox = page.getByRole('textbox', { name: 'ZIP' });
+  if (await zipBox.isVisible().catch(() => false)) {
+    await zipBox.fill(opts.zip ?? '94110');
+  }
+}
+
+/** Click the Pay button. Does not wait for the redirect. */
+export async function submitStripePayment(page: Page): Promise<void> {
+  await page.getByRole('button', { name: 'Pay' }).click();
+}
+
+/**
+ * Wait for the page to leave checkout.stripe.com (back to the app at
+ * /#/payment/success or /#/payment/cancel).
+ */
+export async function waitForAppReturn(page: Page, timeoutMs = 30_000): Promise<void> {
+  await page.waitForURL((url) => !url.toString().includes('checkout.stripe.com'), {
+    timeout: timeoutMs,
+  });
+}
+
+/**
+ * Assert that Stripe Checkout is showing a card decline message in the form.
+ * Stripe surfaces the failure inline rather than redirecting on declined cards.
+ */
+export async function expectStripeDecline(page: Page): Promise<void> {
+  // Stripe's inline error region uses role=alert. Common phrasings: "Your card
+  // was declined.", "Your card has insufficient funds.", "Your card number is
+  // incorrect.". Match loosely.
+  const alert = page
+    .locator('[role="alert"]')
+    .or(page.getByText(/declined|insufficient funds|incorrect|did not go through/i));
+  await expect(alert.first()).toBeVisible({ timeout: 15_000 });
+  // We should still be on Stripe; the form did not submit successfully.
+  await expect(page).toHaveURL(/checkout\.stripe\.com/);
+}
+
+interface CheckoutOpts extends FillOpts {
   /** Maximum time to wait for the post-payment redirect away from Stripe. */
   redirectTimeoutMs?: number;
 }
 
 /**
- * Drive Stripe's hosted Checkout page (NOT embedded Elements). Assumes the user has
- * just been redirected to https://checkout.stripe.com/c/pay/cs_test_... by clicking
- * "Complete Registration" on the Payment step.
- *
- * Returns once the page has been redirected back to the app (e.g. /#/payment/success
- * or /#/payment/cancel). The caller is responsible for asserting on that destination.
+ * High-level convenience wrapper for the happy path: fill, submit, wait for the
+ * redirect away from Stripe. Failure/3DS specs should compose the granular
+ * helpers above instead.
  */
 export async function payViaStripeCheckout(page: Page, opts: CheckoutOpts = {}): Promise<void> {
-  const card = STRIPE_TEST_CARDS[opts.card ?? 'success'];
-  const email = opts.email ?? 'stripe-receipt@test.playaplan.local';
-  const exp = opts.exp ?? '12 / 34';
-  const cvc = opts.cvc ?? '123';
-  const name = opts.name ?? 'Test User';
-  const zip = opts.zip ?? '94110';
-  const timeout = opts.redirectTimeoutMs ?? 30_000;
-
-  // Confirm we landed on Stripe before driving the form.
-  await expect(page).toHaveURL(/checkout\.stripe\.com/, { timeout: 15_000 });
-
-  await page.getByRole('textbox', { name: 'Email' }).fill(email);
-  await page.getByRole('textbox', { name: 'Card number' }).fill(card);
-  await page.getByRole('textbox', { name: 'Expiration' }).fill(exp);
-  await page.getByRole('textbox', { name: 'CVC' }).fill(cvc);
-  await page.getByRole('textbox', { name: 'Cardholder name' }).fill(name);
-
-  // Country defaults to US in test mode; ZIP appears for US/CA.
-  const zipBox = page.getByRole('textbox', { name: 'ZIP' });
-  if (await zipBox.isVisible().catch(() => false)) {
-    await zipBox.fill(zip);
-  }
-
-  await page.getByRole('button', { name: 'Pay' }).click();
-
-  // Stripe will either redirect to /#/payment/success, /#/payment/cancel, or stay
-  // on its own page if 3DS / failure. The caller asserts the destination; we just
-  // wait for the URL to leave Stripe.
-  await page.waitForURL((url) => !url.toString().includes('checkout.stripe.com'), {
-    timeout,
-  });
+  await fillStripeCheckoutForm(page, opts);
+  await submitStripePayment(page);
+  await waitForAppReturn(page, opts.redirectTimeoutMs);
 }

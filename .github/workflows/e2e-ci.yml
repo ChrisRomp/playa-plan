@@ -11,11 +11,6 @@ on:
         description: 'Playwright --grep filter (e.g. "@smoke|@auth"). Empty = run all.'
         required: false
         default: ''
-      reuse_db:
-        description: 'Skip prisma reset/seed (only useful if you preprovisioned the DB).'
-        required: false
-        type: boolean
-        default: false
   # NOTE: PR/push triggers intentionally disabled until E2E timings are stable.
   # When re-enabled, consider gating per-tag via path filters
   # (dorny/paths-filter or scripts/select-e2e-tags.sh) so admin-only changes only run @admin.
@@ -82,7 +77,6 @@ jobs:
         echo "NODE_ENV=development" >> .env
 
     - name: Write seed.local.ts from secret
-      if: ${{ !inputs.reuse_db }}
       env:
         E2E_SEED_LOCAL: ${{ secrets.E2E_SEED_LOCAL }}
       run: |
@@ -94,7 +88,6 @@ jobs:
         fi
 
     - name: Setup database (migrate + base seed + e2e personas + local creds)
-      if: ${{ !inputs.reuse_db }}
       run: |
         cd apps/api
         npx --yes prisma generate
@@ -159,18 +152,19 @@ jobs:
         echo "Web server is ready!"
 
     - name: Run Playwright tests
-      run: |
-        if [ -n "${{ inputs.tags }}" ]; then
-          echo "Running with --grep '${{ inputs.tags }}'"
-          npx --yes playwright test --grep "${{ inputs.tags }}"
-        else
-          npx --yes playwright test
-        fi
       env:
         CI: true
         DATABASE_URL: postgresql://postgres:postgres@localhost:5432/playaplan_test
         JWT_SECRET: test-secret-key-for-ci
         NODE_ENV: development
+        E2E_TAGS: ${{ inputs.tags }}
+      run: |
+        if [ -n "$E2E_TAGS" ]; then
+          echo "Running with --grep \"$E2E_TAGS\""
+          npx --yes playwright test --grep "$E2E_TAGS"
+        else
+          npx --yes playwright test
+        fi
 
     - name: Upload Playwright Report
       uses: actions/upload-artifact@v4
