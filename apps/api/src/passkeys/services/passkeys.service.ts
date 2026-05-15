@@ -14,6 +14,7 @@ import {
   type AuthenticationResponseJSON,
   type RegistrationResponseJSON,
 } from '@simplewebauthn/server';
+import type { AuthenticatorTransportFuture } from '@simplewebauthn/server';
 import {
   Passkey,
   NotificationType,
@@ -98,7 +99,7 @@ export class PasskeysService {
       attestationType: 'none',
       excludeCredentials: existing.map((c) => ({
         id: c.credentialId,
-        transports: c.transports as never,
+        transports: c.transports as AuthenticatorTransportFuture[],
       })),
       authenticatorSelection: {
         residentKey: 'required',
