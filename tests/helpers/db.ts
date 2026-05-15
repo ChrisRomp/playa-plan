@@ -26,7 +26,10 @@ export async function disconnectPrisma(): Promise<void> {
 }
 
 /**
- * Best-effort cleanup of any rows tagged with the current run's prefix.
+ * Best-effort cleanup of any rows tagged with the current run's prefix, plus any
+ * registrations/payments owned by the canonical e2e- personas (so a previous run's
+ * leftover registration doesn't make a "fresh" registration test fail).
+ *
  * Logs and continues on errors; never throws.
  */
 export async function cleanupRunData(): Promise<void> {
@@ -34,38 +37,49 @@ export async function cleanupRunData(): Promise<void> {
   const prefix = `${TEST_EMAIL_PREFIX}-`;
 
   try {
-    const users = await prisma.user.findMany({
+    // Per-run users we will delete entirely.
+    const runUsers = await prisma.user.findMany({
       where: { email: { startsWith: prefix } },
-      select: { id: true, email: true },
+      select: { id: true },
     });
-    if (users.length === 0) return;
 
-    const userIds = users.map((u) => u.id);
+    // Canonical personas — we keep the user rows but blow away their
+    // registration/payment data so each run starts clean.
+    const personaUsers = await prisma.user.findMany({
+      where: { email: { endsWith: '@test.playaplan.local' } },
+      select: { id: true },
+    });
+
+    const runUserIds = runUsers.map((u) => u.id);
+    const personaUserIds = personaUsers.map((u) => u.id);
+    const allUserIds = Array.from(new Set([...runUserIds, ...personaUserIds]));
+    if (allUserIds.length === 0) return;
 
     // Delete in FK-safe order. Each step is wrapped so a single failure doesn't
     // abort the rest of the cleanup.
     const steps: Array<[string, () => Promise<unknown>]> = [
-      ['email_audit', () => prisma.emailAudit.deleteMany({ where: { userId: { in: userIds } } })],
+      ['email_audit', () => prisma.emailAudit.deleteMany({ where: { userId: { in: allUserIds } } })],
       ['notifications', () => prisma.notification.deleteMany({ where: { recipient: { startsWith: prefix } } })],
-      ['admin_audit', () => prisma.adminAudit.deleteMany({ where: { adminUserId: { in: userIds } } })],
-      ['payments', () => prisma.payment.deleteMany({ where: { userId: { in: userIds } } })],
+      ['admin_audit', () => prisma.adminAudit.deleteMany({ where: { adminUserId: { in: allUserIds } } })],
+      ['payments', () => prisma.payment.deleteMany({ where: { userId: { in: allUserIds } } })],
       ['registration_jobs', () =>
         prisma.registrationJob.deleteMany({
-          where: { registration: { userId: { in: userIds } } },
+          where: { registration: { userId: { in: allUserIds } } },
         }),
       ],
       ['camping_option_field_values', () =>
         prisma.campingOptionFieldValue.deleteMany({
-          where: { registration: { userId: { in: userIds } } },
+          where: { registration: { userId: { in: allUserIds } } },
         }),
       ],
       ['camping_option_registrations', () =>
-        prisma.campingOptionRegistration.deleteMany({ where: { userId: { in: userIds } } }),
+        prisma.campingOptionRegistration.deleteMany({ where: { userId: { in: allUserIds } } }),
       ],
-      ['registrations', () => prisma.registration.deleteMany({ where: { userId: { in: userIds } } })],
-      ['passkeys', () => prisma.passkey.deleteMany({ where: { userId: { in: userIds } } })],
-      ['webauthn_challenges', () => prisma.webAuthnChallenge.deleteMany({ where: { userId: { in: userIds } } })],
-      ['users', () => prisma.user.deleteMany({ where: { id: { in: userIds } } })],
+      ['registrations', () => prisma.registration.deleteMany({ where: { userId: { in: allUserIds } } })],
+      // Only delete users + passkeys + challenges for run-prefixed users.
+      ['passkeys', () => prisma.passkey.deleteMany({ where: { userId: { in: runUserIds } } })],
+      ['webauthn_challenges', () => prisma.webAuthnChallenge.deleteMany({ where: { userId: { in: runUserIds } } })],
+      ['users', () => prisma.user.deleteMany({ where: { id: { in: runUserIds } } })],
     ];
 
     for (const [label, fn] of steps) {
@@ -73,16 +87,13 @@ export async function cleanupRunData(): Promise<void> {
         const result = (await fn()) as { count?: number } | unknown;
         const count = (result as { count?: number })?.count ?? 0;
         if (count > 0) {
-           
           console.log(`[e2e-cleanup] ${label}: deleted ${count} rows`);
         }
       } catch (err) {
-         
         console.warn(`[e2e-cleanup] ${label}: ${(err as Error).message}`);
       }
     }
   } catch (err) {
-     
     console.warn(`[e2e-cleanup] aborted: ${(err as Error).message}`);
   }
 }

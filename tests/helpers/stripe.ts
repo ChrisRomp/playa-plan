@@ -1,4 +1,4 @@
-import { Page, FrameLocator } from '@playwright/test';
+import { Page, expect } from '@playwright/test';
 
 /**
  * Stripe test cards (https://docs.stripe.com/testing).
@@ -16,59 +16,61 @@ export const STRIPE_TEST_CARDS = {
 
 export type StripeTestCard = keyof typeof STRIPE_TEST_CARDS;
 
-interface FillCardOpts {
-  /** Card number; defaults to the success card. */
+interface CheckoutOpts {
+  /** Card key from STRIPE_TEST_CARDS; defaults to 'success'. */
   card?: StripeTestCard;
-  /** MM/YY expiry; defaults to a far-future date. */
+  /** Email to use for the receipt; defaults to a generic test address. */
+  email?: string;
+  /** MM / YY (with the spaces); defaults to 12 / 34. */
   exp?: string;
-  /** 3- or 4-digit CVC; defaults to 123. */
+  /** 3-digit CVC; defaults to 123. */
   cvc?: string;
-  /** ZIP/postal — Stripe Elements requires it for US. */
+  /** Cardholder name; defaults to 'Test User'. */
+  name?: string;
+  /** US ZIP; defaults to 94110. The country defaults to US. */
   zip?: string;
+  /** Maximum time to wait for the post-payment redirect away from Stripe. */
+  redirectTimeoutMs?: number;
 }
 
 /**
- * Locate the Stripe Card Element iframe inside the payment area and fill it.
- * Stripe renders each field in its own iframe; this helper walks them.
+ * Drive Stripe's hosted Checkout page (NOT embedded Elements). Assumes the user has
+ * just been redirected to https://checkout.stripe.com/c/pay/cs_test_... by clicking
+ * "Complete Registration" on the Payment step.
  *
- * NOTE: requires `data-testid="payment-iframe-wrapper"` on the wrapper around
- * the Stripe Elements mount node (added in the data-testid pass).
+ * Returns once the page has been redirected back to the app (e.g. /#/payment/success
+ * or /#/payment/cancel). The caller is responsible for asserting on that destination.
  */
-export async function fillStripeCard(page: Page, opts: FillCardOpts = {}): Promise<void> {
+export async function payViaStripeCheckout(page: Page, opts: CheckoutOpts = {}): Promise<void> {
   const card = STRIPE_TEST_CARDS[opts.card ?? 'success'];
-  const exp = opts.exp ?? '12/34';
+  const email = opts.email ?? 'stripe-receipt@test.playaplan.local';
+  const exp = opts.exp ?? '12 / 34';
   const cvc = opts.cvc ?? '123';
+  const name = opts.name ?? 'Test User';
   const zip = opts.zip ?? '94110';
+  const timeout = opts.redirectTimeoutMs ?? 30_000;
 
-  const wrapper = page.locator('[data-testid="payment-iframe-wrapper"]');
-  await wrapper.waitFor({ state: 'visible', timeout: 15_000 });
+  // Confirm we landed on Stripe before driving the form.
+  await expect(page).toHaveURL(/checkout\.stripe\.com/, { timeout: 15_000 });
 
-  // Stripe iframes have name attributes containing the field. Match loosely.
-  const numberFrame: FrameLocator = page.frameLocator('iframe[name*="card"][title*="card number" i], iframe[title*="card number" i]').first();
-  const expFrame: FrameLocator = page.frameLocator('iframe[title*="expiration" i]').first();
-  const cvcFrame: FrameLocator = page.frameLocator('iframe[title*="cvc" i], iframe[title*="security code" i]').first();
-  const zipFrame: FrameLocator = page.frameLocator('iframe[title*="zip" i], iframe[title*="postal" i]').first();
+  await page.getByRole('textbox', { name: 'Email' }).fill(email);
+  await page.getByRole('textbox', { name: 'Card number' }).fill(card);
+  await page.getByRole('textbox', { name: 'Expiration' }).fill(exp);
+  await page.getByRole('textbox', { name: 'CVC' }).fill(cvc);
+  await page.getByRole('textbox', { name: 'Cardholder name' }).fill(name);
 
-  await numberFrame.locator('input[name="cardnumber"], input[autocomplete="cc-number"]').fill(card);
-  await expFrame.locator('input[name="exp-date"], input[autocomplete="cc-exp"]').fill(exp);
-  await cvcFrame.locator('input[name="cvc"], input[autocomplete="cc-csc"]').fill(cvc);
-
-  // ZIP iframe is optional depending on Stripe Elements config.
-  if (await zipFrame.locator('input').count().catch(() => 0)) {
-    await zipFrame.locator('input').first().fill(zip);
+  // Country defaults to US in test mode; ZIP appears for US/CA.
+  const zipBox = page.getByRole('textbox', { name: 'ZIP' });
+  if (await zipBox.isVisible().catch(() => false)) {
+    await zipBox.fill(zip);
   }
-}
 
-/**
- * Handle Stripe's 3DS challenge popup. Calls completeOrFail with 'complete' to
- * authenticate, 'fail' to fail the challenge.
- */
-export async function handle3dsChallenge(
-  page: Page,
-  action: 'complete' | 'fail' = 'complete',
-): Promise<void> {
-  const challengeFrame = page.frameLocator('iframe[name*="3ds" i], iframe[name*="stripe-challenge" i]').first();
-  const inner = challengeFrame.frameLocator('iframe').first();
-  const buttonText = action === 'complete' ? /complete authentication/i : /fail authentication/i;
-  await inner.getByRole('button', { name: buttonText }).click({ timeout: 20_000 });
+  await page.getByRole('button', { name: 'Pay' }).click();
+
+  // Stripe will either redirect to /#/payment/success, /#/payment/cancel, or stay
+  // on its own page if 3DS / failure. The caller asserts the destination; we just
+  // wait for the URL to leave Stripe.
+  await page.waitForURL((url) => !url.toString().includes('checkout.stripe.com'), {
+    timeout,
+  });
 }

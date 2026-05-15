@@ -67,4 +67,6 @@ libs/*/package-lock.json
 apps/api/.env.test
 .env.local
 
-tmp/*.playwright-cli/
+tmp/*
+
+.playwright-cli/
