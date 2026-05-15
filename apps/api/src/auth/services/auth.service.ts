@@ -98,9 +98,10 @@ export class AuthService {
    *
    * @param user Authenticated user object
    * @param amr Optional RFC 8176 Authentication Methods References values
-   *            (e.g. ['email-code'] or ['passkey']). Recorded in the JWT
-   *            for future audit/step-up use; not enforced by any consumer
-   *            today.
+   *            (e.g. ['otp'] for an emailed one-time code, or
+   *            ['hwk', 'mfa'] for a passkey assertion that satisfies
+   *            user verification). Recorded in the JWT for future
+   *            audit/step-up use; not enforced by any consumer today.
    * @returns Object containing user information and access token
    */
   async login(

@@ -137,7 +137,7 @@ export class AuthController {
       throw new UnauthorizedException('Invalid or expired verification code');
     }
     
-    return this.authService.login(user, ['email-code']);
+    return this.authService.login(user, ['otp']);
   }
 
   /**
@@ -175,7 +175,7 @@ export class AuthController {
   })
   async passkeyVerify(@Body() body: VerifyAuthenticationDto): Promise<AuthResponseDto> {
     const { user } = await this.passkeysService.verifyAuthentication(body.response);
-    const tokenResponse = await this.authService.login(user, ['passkey']);
+    const tokenResponse = await this.authService.login(user, ['hwk', 'mfa']);
     return new AuthResponseDto(tokenResponse);
   }
 

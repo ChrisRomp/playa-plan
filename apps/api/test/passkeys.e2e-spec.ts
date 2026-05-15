@@ -255,7 +255,7 @@ describe('Passkeys (e2e)', () => {
       expect(res.body.allowCredentials.length).toBe(0);
     });
 
-    it('verifies an assertion and issues a JWT including amr=["passkey"]', async () => {
+    it('verifies an assertion and issues a JWT including amr=["hwk","mfa"]', async () => {
       const optionsRes = await request(app.getHttpServer())
         .post('/auth/passkey/options')
         .expect(200);
@@ -299,7 +299,7 @@ describe('Passkeys (e2e)', () => {
       expect(verifyRes.body).toHaveProperty('userId', userId);
 
       const decoded = jwtService.decode(verifyRes.body.accessToken) as Record<string, unknown>;
-      expect(decoded.amr).toEqual(['passkey']);
+      expect(decoded.amr).toEqual(['hwk', 'mfa']);
       expect(decoded.sub).toBe(userId);
     });
 

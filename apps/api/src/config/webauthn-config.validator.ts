@@ -70,6 +70,17 @@ export function validateWebAuthnConfig(config: WebAuthnConfig): void {
     }
     return;
   }
+  // Loopback exception: browsers honor 127.0.0.1 as a secure-context relying
+  // party for local development, even though it is technically an IP address.
+  // Allow it only when the origin hostname is also 127.0.0.1.
+  if (config.rpId === '127.0.0.1') {
+    if (originHost !== '127.0.0.1') {
+      throw new WebAuthnConfigError(
+        `WEBAUTHN_RP_ID is "127.0.0.1" but WEBAUTHN_ORIGIN hostname is "${originHost}"`,
+      );
+    }
+    return;
+  }
   if (isIpAddress(config.rpId)) {
     throw new WebAuthnConfigError(
       `WEBAUTHN_RP_ID "${config.rpId}" is an IP address; WebAuthn requires a domain name`,

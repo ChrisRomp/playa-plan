@@ -95,6 +95,26 @@ describe('validateWebAuthnConfig', () => {
     ).toThrow(WebAuthnConfigError);
   });
 
+  it('should accept 127.0.0.1 rpId with 127.0.0.1 origin (loopback)', () => {
+    expect(() =>
+      validateWebAuthnConfig({
+        rpName: 'PlayaPlan',
+        rpId: '127.0.0.1',
+        origin: 'http://127.0.0.1:5173',
+      }),
+    ).not.toThrow();
+  });
+
+  it('should reject 127.0.0.1 rpId with non-loopback origin', () => {
+    expect(() =>
+      validateWebAuthnConfig({
+        rpName: 'PlayaPlan',
+        rpId: '127.0.0.1',
+        origin: 'https://test.playaplan.app',
+      }),
+    ).toThrow(WebAuthnConfigError);
+  });
+
   it('should reject empty rpName', () => {
     expect(() =>
       validateWebAuthnConfig({ ...baseConfig, rpName: '' }),
