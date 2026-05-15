@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { WEB_BASE_URL } from '../helpers/env';
+import { webUrl } from '../helpers/env';
 
 /**
  * RBAC matrix: for each protected route, assert each role gets the expected outcome.
@@ -7,15 +7,12 @@ import { WEB_BASE_URL } from '../helpers/env';
  * "Allowed" = page renders normally (URL stays put, expected heading shows).
  * "Denied" = either redirected to /login, /dashboard, or shown an access-denied state.
  * "Anon"   = unauthenticated user is redirected to /login.
- *
- * Storage states come from auth.setup.ts (admin/staff/participant). Anonymous tests
- * use an empty storage state.
  */
 
 type Outcome = 'allowed' | 'denied';
 
 interface RouteCase {
-  /** URL path to navigate to */
+  /** Hash-route path to navigate to (without the leading `#`) */
   path: string;
   /** Heading text expected when allowed (case-insensitive) */
   heading: RegExp;
@@ -29,12 +26,12 @@ interface RouteCase {
 const ROUTES: RouteCase[] = [
   {
     path: '/dashboard',
-    heading: /dashboard|welcome/i,
+    heading: /welcome|dashboard/i,
     matrix: { admin: 'allowed', staff: 'allowed', participant: 'allowed' },
   },
   {
     path: '/profile',
-    heading: /your profile|profile/i,
+    heading: /your profile/i,
     matrix: { admin: 'allowed', staff: 'allowed', participant: 'allowed' },
   },
   {
@@ -54,7 +51,7 @@ const ROUTES: RouteCase[] = [
   },
   {
     path: '/admin/configuration',
-    heading: /configuration|settings/i,
+    heading: /config/i,
     matrix: { admin: 'allowed', staff: 'denied', participant: 'denied' },
   },
   {
@@ -65,20 +62,23 @@ const ROUTES: RouteCase[] = [
 ];
 
 async function expectAllowed(page: import('@playwright/test').Page, route: RouteCase): Promise<void> {
-  await page.goto(`${WEB_BASE_URL}${route.path}`);
-  await expect(page).toHaveURL(new RegExp(route.path.replace(/\//g, '\\/')), { timeout: 10_000 });
+  await page.goto(webUrl(route.path));
+  await expect(page).toHaveURL(new RegExp(`#${route.path.replace(/\//g, '\\/')}`), {
+    timeout: 10_000,
+  });
   await expect(page.getByRole('heading').filter({ hasText: route.heading }).first()).toBeVisible({
     timeout: 10_000,
   });
 }
 
 async function expectDenied(page: import('@playwright/test').Page, route: RouteCase): Promise<void> {
-  await page.goto(`${WEB_BASE_URL}${route.path}`);
+  await page.goto(webUrl(route.path));
   // App may redirect to /dashboard or /login or render an access-denied state. Any of those is acceptable.
   await page.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => undefined);
   const url = page.url();
-  const stayedOnRoute = url.includes(route.path);
-  if (!stayedOnRoute) return; // redirected — denied as expected
+  // We're "denied" if we're no longer on the requested hash route.
+  const stillOnRoute = url.includes(`#${route.path}`);
+  if (!stillOnRoute) return;
   // If we stayed, there must be an access-denied indicator.
   const accessDenied = page.getByText(/access denied|not authorized|forbidden/i).first();
   await expect(accessDenied).toBeVisible({ timeout: 5_000 });
@@ -108,8 +108,8 @@ test.describe('RBAC: anonymous', { tag: ['@rbac'] }, () => {
 
   for (const route of ROUTES) {
     test(`unauthenticated visit to ${route.path} redirects to login`, async ({ page }) => {
-      await page.goto(`${WEB_BASE_URL}${route.path}`);
-      await expect(page).toHaveURL(/\/login/, { timeout: 10_000 });
+      await page.goto(webUrl(route.path));
+      await expect(page).toHaveURL(/#\/login/, { timeout: 10_000 });
     });
   }
 });

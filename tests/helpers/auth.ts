@@ -1,5 +1,5 @@
 import { Page, expect } from '@playwright/test';
-import { WEB_BASE_URL, DEV_LOGIN_CODE } from './env';
+import { webUrl, DEV_LOGIN_CODE } from './env';
 
 /**
  * Drive the LoginForm UI to sign a user in. Used by the storage-state setup project
@@ -8,7 +8,7 @@ import { WEB_BASE_URL, DEV_LOGIN_CODE } from './env';
  */
 export async function loginViaUi(page: Page, email: string): Promise<void> {
   // localStorage may carry a stale pendingLoginEmail from a previous run — clear it.
-  await page.goto(`${WEB_BASE_URL}/login`);
+  await page.goto(webUrl('/login'));
   await page.evaluate(() => {
     try {
       window.localStorage.removeItem('pendingLoginEmail');
@@ -16,18 +16,19 @@ export async function loginViaUi(page: Page, email: string): Promise<void> {
       /* ignore */
     }
   });
-  await page.goto(`${WEB_BASE_URL}/login`);
+  await page.goto(webUrl('/login'));
 
-  await page.locator('input[type="email"]').fill(email);
-  await page.locator('button[type="submit"]:has-text("Send Verification Code")').click();
+  await page.getByLabel('Email').fill(email);
+  await page.getByRole('button', { name: /send verification code/i }).click();
 
-  const codeInput = page.locator('input#verificationCode');
+  const codeInput = page.getByLabel(/verification code/i);
   await expect(codeInput).toBeVisible({ timeout: 10_000 });
 
   await codeInput.fill(DEV_LOGIN_CODE);
-  await page.locator('button[type="submit"]').last().click();
+  await page.getByRole('button', { name: /^log in$/i }).click();
 
-  await expect(page).toHaveURL(/\/dashboard/, { timeout: 15_000 });
+  // HashRouter — dashboard URL is .../#/dashboard.
+  await expect(page).toHaveURL(/#\/dashboard/, { timeout: 15_000 });
 }
 
 export async function logoutViaUi(page: Page): Promise<void> {

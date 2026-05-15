@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { WEB_BASE_URL } from '../helpers/env';
+import { webUrl } from '../helpers/env';
 
 /**
  * Read-only checks for the admin config page. Mutations are intentionally avoided —
@@ -11,7 +11,7 @@ test.describe('Admin: configuration (read-only)', { tag: ['@admin', '@admin-conf
   test.use({ storageState: 'tests/.auth/admin.json' });
 
   test('configuration page loads and shows core fields', async ({ page }) => {
-    await page.goto(`${WEB_BASE_URL}/admin/configuration`);
+    await page.goto(webUrl('/admin/configuration'));
     await expect(page.getByRole('heading').filter({ hasText: /config/i }).first()).toBeVisible({
       timeout: 10_000,
     });

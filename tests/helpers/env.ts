@@ -4,6 +4,16 @@
 
 export const API_BASE_URL = process.env.E2E_API_URL ?? 'http://localhost:3000';
 export const WEB_BASE_URL = process.env.E2E_WEB_URL ?? 'http://localhost:5173';
+
+/**
+ * The web app uses a HashRouter, so all client-side routes live under `/#/...`.
+ * Use this helper to construct full URLs for `page.goto()` and assertions.
+ */
+export function webUrl(path = '/'): string {
+  const normalized = path.startsWith('/') ? path : `/${path}`;
+  return `${WEB_BASE_URL}/#${normalized}`;
+}
+
 export const DATABASE_URL =
   process.env.E2E_DATABASE_URL ??
   process.env.DATABASE_URL ??
