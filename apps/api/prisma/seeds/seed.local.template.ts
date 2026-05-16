@@ -10,6 +10,17 @@
  * 
  * Usage:
  *   npm run seed:local
+ *
+ * For E2E testing:
+ *   - Use Stripe test keys (pk_test_..., sk_test_...). Test cards are documented at
+ *     https://docs.stripe.com/testing — common ones used by the suite:
+ *       4242 4242 4242 4242  → success
+ *       4000 0000 0000 0002  → generic decline
+ *       4000 0000 0000 9995  → insufficient funds
+ *       4000 0025 0000 3155  → 3DS challenge then success
+ *   - Set `emailEnabled: false` so tests don't send mail; the dev login code is
+ *     always 123456.
+ *   - Optionally use PayPal sandbox creds.
  */
 
 import { PrismaClient } from '@prisma/client';
@@ -20,63 +31,38 @@ async function seedLocalConfig() {
   console.log('Starting local configuration seed...');
 
   try {
-    // Example: Update core configuration with local/test values
+    // Update core configuration with local/test values
     const coreConfig = await prisma.coreConfig.findFirst();
     if (coreConfig) {
       await prisma.coreConfig.update({
         where: { id: coreConfig.id },
         data: {
-          // Example local configuration - customize these values
-          stripePublicKey: 'pk_test_your_local_stripe_key_here',
-          stripeApiKey: 'sk_test_your_local_stripe_secret_key_here',
-          smtpHost: 'smtp.sendgrid.net',
-          smtpPort: 587,
-          smtpUser: 'apikey',
-          smtpPassword: 'SG.your_local_sendgrid_key_here',
-          senderEmail: 'test@example.com',
-          senderName: 'Playa Plan Dev',
-          emailEnabled: true,
+          // ---- Stripe (TEST mode keys only — they start with pk_test_ / sk_test_) ----
           stripeEnabled: true,
-          // Add other configuration you need for local development
+          stripePublicKey: 'pk_test_REPLACE_ME',
+          stripeApiKey: 'sk_test_REPLACE_ME',
+
+          // ---- PayPal: not exercised by E2E; leave disabled. ----
+          paypalEnabled: false,
+
+          // ---- Email: keep OFF for E2E so tests don't trigger SMTP ----
+          emailEnabled: false,
+          smtpHost: 'localhost',
+          smtpPort: 587,
+          smtpSecure: false,
+          smtpUser: '',
+          smtpPassword: '',
+          senderEmail: 'noreply@example.playaplan.local',
+          senderName: 'Playa Plan E2E',
+
+          // ---- Other dev defaults ----
+          allowDeferredDuesPayment: true,
         },
       });
       console.log('✅ Updated core configuration with local values');
+    } else {
+      console.warn('⚠️  No coreConfig row found — run `npm run seed:dev` first.');
     }
-
-    // Create test users with known credentials (useful for development)
-    // const testUsers = [
-    //   {
-    //     email: 'admin@test.local',
-    //     firstName: 'Test',
-    //     lastName: 'Admin',
-    //     phone: '555-0101',
-    //     password: '$2b$10$K7L/VNE7YrG9R8k2/UWz4uGYN8pFkZGpZ1X2wjCrK9cPFY4Z5TYqW', // bcrypt hash of "password123"
-    //     isAdmin: true,
-    //     emailVerified: true,
-    //   },
-    //   {
-    //     email: 'user@test.local',
-    //     firstName: 'Test',
-    //     lastName: 'User',
-    //     phone: '555-0102',
-    //     password: '$2b$10$K7L/VNE7YrG9R8k2/UWz4uGYN8pFkZGpZ1X2wjCrK9cPFY4Z5TYqW', // bcrypt hash of "password123"
-    //     isAdmin: false,
-    //     emailVerified: true,
-    //   },
-    // ];
-
-    // for (const userData of testUsers) {
-    //   const existingUser = await prisma.user.findUnique({
-    //     where: { email: userData.email },
-    //   });
-
-    //   if (!existingUser) {
-    //     await prisma.user.create({ data: userData });
-    //     console.log(`✅ Created test user: ${userData.email} (password: password123)`);
-    //   } else {
-    //     console.log(`ℹ️  Test user already exists: ${userData.email}`);
-    //   }
-    // }
 
     console.log('✅ Local configuration seed completed successfully!');
   } catch (error) {

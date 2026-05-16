@@ -6,6 +6,14 @@ permissions:
 
 on:
   workflow_dispatch:
+    inputs:
+      tags:
+        description: 'Playwright --grep filter (e.g. "@smoke|@auth"). Empty = run all.'
+        required: false
+        default: ''
+  # NOTE: PR/push triggers intentionally disabled until E2E timings are stable.
+  # When re-enabled, consider gating per-tag via path filters
+  # (dorny/paths-filter or scripts/select-e2e-tags.sh) so admin-only changes only run @admin.
   # push:
   #   branches: [ main ]
   #   paths:
@@ -29,8 +37,8 @@ jobs:
   e2e-tests:
     name: End-to-End Tests
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-    
+    timeout-minutes: 30
+
     services:
       postgres:
         image: postgres:15
@@ -48,36 +56,50 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-    
+
     - name: Use Node.js 22.x
       uses: actions/setup-node@v4
       with:
         node-version: 22.x
         cache: 'npm'
-    
+
     - name: Install dependencies
       run: npm ci
-    
+
     - name: Install Playwright Browsers
       run: npx --yes playwright install --with-deps
-    
+
     - name: Setup test environment
       run: |
         cp .env.sample .env
-        # Add test-specific environment variables
         echo "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/playaplan_test" >> .env
         echo "JWT_SECRET=test-secret-key-for-ci" >> .env
         echo "NODE_ENV=development" >> .env
-    
-    - name: Setup database
+
+    - name: Write seed.local.ts from secret
+      env:
+        E2E_SEED_LOCAL: ${{ secrets.E2E_SEED_LOCAL }}
+      run: |
+        if [ -z "$E2E_SEED_LOCAL" ]; then
+          echo "::warning::E2E_SEED_LOCAL secret is not set; Stripe-dependent tests will fail. Add it under repo Settings → Secrets → Actions."
+        else
+          printf '%s' "$E2E_SEED_LOCAL" > apps/api/prisma/seeds/seed.local.ts
+          echo "Wrote apps/api/prisma/seeds/seed.local.ts ($(wc -c < apps/api/prisma/seeds/seed.local.ts) bytes)"
+        fi
+
+    - name: Setup database (migrate + base seed + e2e personas + local creds)
       run: |
         cd apps/api
         npx --yes prisma generate
         npx --yes prisma migrate deploy
-        npx --yes prisma db seed
+        npm run seed:dev:force
+        npm run seed:e2e
+        if [ -f prisma/seeds/seed.local.ts ]; then
+          npm run seed:local
+        fi
       env:
         DATABASE_URL: postgresql://postgres:postgres@localhost:5432/playaplan_test
-    
+
     - name: Start API server in background
       run: |
         cd apps/api
@@ -90,11 +112,11 @@ jobs:
         JWT_SECRET: test-secret-key-for-ci
         NODE_ENV: development
         PORT: 3000
-    
+
     - name: Wait for API server to be ready
       run: |
         echo "Waiting for API server to start..."
-        timeout 60 bash -c 'until curl -f http://localhost:3000/health 2>/dev/null; do 
+        timeout 60 bash -c 'until curl -f http://localhost:3000/health 2>/dev/null; do
           echo "API not ready yet, waiting..."
           if [ -f apps/api/api.log ]; then
             echo "Last 10 lines of API log:"
@@ -103,7 +125,7 @@ jobs:
           sleep 2
         done'
         echo "API server is ready!"
-    
+
     - name: Start Web server in background
       run: |
         cd apps/web
@@ -115,11 +137,11 @@ jobs:
         VITE_API_URL: http://localhost:3000
         NODE_ENV: development
         PORT: 5173
-    
+
     - name: Wait for Web server to be ready
       run: |
         echo "Waiting for Web server to start..."
-        timeout 60 bash -c 'until curl -f http://localhost:5173 2>/dev/null; do 
+        timeout 60 bash -c 'until curl -f http://localhost:5173 2>/dev/null; do
           echo "Web server not ready yet, waiting..."
           if [ -f apps/web/web.log ]; then
             echo "Last 10 lines of Web log:"
@@ -128,15 +150,22 @@ jobs:
           sleep 2
         done'
         echo "Web server is ready!"
-    
+
     - name: Run Playwright tests
-      run: npx --yes playwright test
       env:
         CI: true
         DATABASE_URL: postgresql://postgres:postgres@localhost:5432/playaplan_test
         JWT_SECRET: test-secret-key-for-ci
         NODE_ENV: development
-    
+        E2E_TAGS: ${{ inputs.tags }}
+      run: |
+        if [ -n "$E2E_TAGS" ]; then
+          echo "Running with --grep \"$E2E_TAGS\""
+          npx --yes playwright test --grep "$E2E_TAGS"
+        else
+          npx --yes playwright test
+        fi
+
     - name: Upload Playwright Report
       uses: actions/upload-artifact@v4
       if: always()
@@ -144,7 +173,7 @@ jobs:
         name: playwright-report
         path: playwright-report/
         retention-days: 10
-    
+
     - name: Upload Test Results
       uses: actions/upload-artifact@v4
       if: always()
@@ -152,7 +181,7 @@ jobs:
         name: test-results
         path: test-results/
         retention-days: 10
-    
+
     - name: Show server logs on failure
       if: failure()
       run: |
@@ -169,7 +198,7 @@ jobs:
         else
           echo "No Web log file found"
         fi
-    
+
     - name: Cleanup servers
       if: always()
       run: |
@@ -183,4 +212,4 @@ jobs:
           echo "Stopping Web server with PID $(cat apps/web/web.pid)"
           kill $(cat apps/web/web.pid) || echo "Web server already stopped"
           rm apps/web/web.pid
-        fi 
+        fi
