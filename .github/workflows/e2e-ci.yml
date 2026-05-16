@@ -81,11 +81,11 @@ jobs:
         E2E_SEED_LOCAL: ${{ secrets.E2E_SEED_LOCAL }}
       run: |
         if [ -z "$E2E_SEED_LOCAL" ]; then
-          echo "::warning::E2E_SEED_LOCAL secret is not set; Stripe-dependent tests will fail. Add it under repo Settings → Secrets → Actions."
-        else
-          printf '%s' "$E2E_SEED_LOCAL" > apps/api/prisma/seeds/seed.local.ts
-          echo "Wrote apps/api/prisma/seeds/seed.local.ts ($(wc -c < apps/api/prisma/seeds/seed.local.ts) bytes)"
+          echo "::error::E2E_SEED_LOCAL secret is not set. Stripe-dependent tests would fail with confusing timeouts on the disabled 'Complete Registration' button. Add the secret under repo Settings → Secrets and variables → Actions (use the apps/api/prisma/seeds/seed.local.template.ts as a starting point, with Stripe TEST keys: pk_test_* / sk_test_*)."
+          exit 1
         fi
+        printf '%s' "$E2E_SEED_LOCAL" > apps/api/prisma/seeds/seed.local.ts
+        echo "Wrote apps/api/prisma/seeds/seed.local.ts ($(wc -c < apps/api/prisma/seeds/seed.local.ts) bytes)"
 
     - name: Setup database (migrate + base seed + e2e personas + local creds)
       run: |
@@ -165,6 +165,10 @@ jobs:
         else
           npx --yes playwright test
         fi
+
+    - name: Publish Playwright summary to job summary
+      if: always()
+      run: node scripts/playwright-summary.mjs playwright-report/results.json
 
     - name: Upload Playwright Report
       uses: actions/upload-artifact@v4

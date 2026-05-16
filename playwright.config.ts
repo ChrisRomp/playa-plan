@@ -17,7 +17,13 @@ export default defineConfig({
   /* Tests are namespaced per-run, so two workers are safe in CI. */
   workers: process.env.CI ? 2 : undefined,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
-  reporter: process.env.CI ? [['html'], ['github']] : 'html',
+  reporter: process.env.CI
+    ? [
+        ['html'],
+        ['github'],
+        ['json', { outputFile: 'playwright-report/results.json' }],
+      ]
+    : 'html',
   /* Tag-driven filter: `E2E_TAGS=@auth npm run test:e2e` */
   grep: TAGS ? new RegExp(TAGS) : undefined,
   /* Global timeout for each test */
