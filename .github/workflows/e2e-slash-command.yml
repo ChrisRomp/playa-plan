@@ -89,11 +89,15 @@ jobs:
       - name: Dispatch e2e-ci.yml
         if: steps.parse.outputs.matched == 'true'
         uses: actions/github-script@v7
+        env:
+          PR_HEAD_REF: ${{ steps.parse.outputs.ref }}
+          PR_HEAD_SHA: ${{ steps.parse.outputs.sha }}
+          PR_TAGS: ${{ steps.parse.outputs.tags }}
         with:
           script: |
-            const ref = '${{ steps.parse.outputs.ref }}';
-            const sha = '${{ steps.parse.outputs.sha }}';
-            const tags = '${{ steps.parse.outputs.tags }}';
+            const ref = process.env.PR_HEAD_REF;
+            const sha = process.env.PR_HEAD_SHA;
+            const tags = process.env.PR_TAGS;
             core.info(`Dispatching e2e-ci.yml on ref=${ref} sha=${sha} tags="${tags}"`);
             await github.rest.actions.createWorkflowDispatch({
               owner: context.repo.owner,
