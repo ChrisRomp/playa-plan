@@ -77,12 +77,23 @@ async function upsertPersona(spec: PersonaSpec): Promise<void> {
 }
 
 async function main(): Promise<void> {
-   
   console.log('Seeding E2E personas...');
   for (const persona of PERSONAS) {
     await upsertPersona(persona);
   }
-   
+
+  // Enable allowDeferredDuesPayment at the config level so tests covering the
+  // deferred path can opt users in via the user-level flag. Without this, the
+  // deferred path is unreachable regardless of user settings.
+  const config = await prisma.coreConfig.findFirst();
+  if (config && !config.allowDeferredDuesPayment) {
+    await prisma.coreConfig.update({
+      where: { id: config.id },
+      data: { allowDeferredDuesPayment: true },
+    });
+    console.log('✅ Enabled allowDeferredDuesPayment on coreConfig');
+  }
+
   console.log('E2E personas seed complete.');
 }
 

@@ -1,24 +1,61 @@
 /**
- * SCAFFOLD — author against a running stack.
+ * Coverage:
+ *  - End-to-end deferred-dues path: a participant with allowDeferredDuesPayment
+ *    set both at config and user level should see "Pay Dues Later" instead of
+ *    Stripe Checkout, complete registration without paying, and land on the
+ *    dashboard with a CONFIRMED registration and no completed payment.
  *
- * Coverage to add:
- *  - Log in as e2e-participant-deferred (allowDeferredDuesPayment=true).
- *  - Step through registration; assert the payment step is skipped or shows a
- *    "deferred" notice.
- *  - After submit, registration is CONFIRMED with no Payment row (or a PENDING
- *    Payment row — confirm app behavior during authoring).
- *  - If a "pay now later" affordance exists on the dashboard, exercise it with
- *    the Stripe success card.
+ * KNOWN APP BUG (skipped, not deleted): apps/web/src/store/AuthContext.tsx
+ * builds the in-app `user` object as `{id, name, email, role,
+ * isAuthenticated}` and drops `allowDeferredDuesPayment` (and the other
+ * per-user flags) when it stores the auth response. The registration page's
+ * deferred-path check is `config?.allowDeferredDuesPayment &&
+ * user?.allowDeferredDuesPayment`, so the user-side condition is *always*
+ * false and the deferred path is unreachable through the real UI even when
+ * the database says the user is allowed.
  *
- * Tags: @registration, @deferred.
+ * Until the app exposes the per-user flag on the client `user` object, this
+ * spec is a `test.fixme` documenting the bug — kept in source so it lights
+ * up green automatically the moment the bug is fixed.
  */
-import { test } from '@playwright/test';
+import { test, expect } from '../helpers/fixtures';
+import { walkRegistrationToPayment } from '../helpers/registration';
+import { getPrisma } from '../helpers/db';
 
-test.describe('Registration: deferred dues', { tag: ['@registration', '@deferred'] }, () => {
-  test.skip(true, 'TODO: author against running stack');
-  test.use({ storageState: 'tests/.auth/participantDeferred.json' });
+test.describe(
+  'Registration: deferred dues',
+  { tag: ['@registration', '@deferred'] },
+  () => {
+    test.use({ storageState: { cookies: [], origins: [] } });
 
-  test('placeholder', () => {
-    // intentionally empty
-  });
-});
+    test.fixme(
+      'deferred-payment participant completes registration without paying',
+      async ({ page, freshDeferredParticipant }) => {
+        test.setTimeout(60_000);
+        await walkRegistrationToPayment(page);
+
+        await expect(
+          page.getByText(/payment has been deferred|complete payment later/i),
+        ).toBeVisible();
+        const payLater = page.getByRole('button', { name: /pay dues later/i });
+        await expect(payLater).toBeVisible();
+        await payLater.click();
+
+        await expect(page).toHaveURL(/#\/dashboard/, { timeout: 15_000 });
+
+        const prisma = getPrisma();
+        const reg = await prisma.registration.findFirst({
+          where: { userId: freshDeferredParticipant.id },
+          include: { payments: true, jobs: true },
+          orderBy: { createdAt: 'desc' },
+        });
+        expect(reg).not.toBeNull();
+        expect(reg!.status).toBe('CONFIRMED');
+        expect(reg!.year).toBe(new Date().getFullYear());
+        expect(reg!.jobs.length).toBeGreaterThanOrEqual(2);
+        const completed = reg!.payments.filter((p) => p.status === 'COMPLETED');
+        expect(completed).toHaveLength(0);
+      },
+    );
+  },
+);

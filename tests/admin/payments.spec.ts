@@ -1,21 +1,28 @@
 /**
- * SCAFFOLD — author against a running stack.
+ * Coverage:
+ *  - Payment Reports page loads with the expected heading, filter toggle, and
+ *    export button.
  *
- * Coverage to add:
- *  - Payments report renders with seeded payments.
- *  - Filter by status/provider/date range.
- *  - Manual payment recorded by admin → shows on the user's registration.
- *  - Refund initiated → status flips to REFUNDED, audit record created.
- *
- * Tags: @admin, @admin-payments, @payment.
+ * Manual payment recording, refunds, and provider/status filters live in their
+ * own admin-flow components and are large enough to deserve dedicated specs —
+ * out of scope here for now.
  */
-import { test } from '@playwright/test';
+import { test, expect } from '../helpers/fixtures';
+import { webUrl } from '../helpers/env';
 
-test.describe('Admin: payments', { tag: ['@admin', '@admin-payments'] }, () => {
-  test.skip(true, 'TODO: author against running stack');
-  test.use({ storageState: 'tests/.auth/admin.json' });
+test.describe(
+  'Admin: payments report',
+  { tag: ['@admin', '@admin-payments', '@payment'] },
+  () => {
+    test.use({ storageState: 'tests/.auth/admin.json' });
 
-  test('placeholder', () => {
-    // intentionally empty
-  });
-});
+    test('payment reports page loads with controls', async ({ page }) => {
+      await page.goto(webUrl('/reports/payments'));
+      await expect(page.getByRole('heading', { name: 'Payment Reports' })).toBeVisible({
+        timeout: 10_000,
+      });
+      await expect(page.getByRole('button', { name: 'Toggle filters' })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Export payments data' })).toBeVisible();
+    });
+  },
+);

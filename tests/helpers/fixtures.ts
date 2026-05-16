@@ -27,6 +27,12 @@ interface FreshFixtures {
   freshParticipant: FreshUser;
   /** Same as freshParticipant but with role=ADMIN. */
   freshAdmin: FreshAdmin;
+  /**
+   * Same as freshParticipant but with allowDeferredDuesPayment=true so the
+   * registration flow exposes the "Pay Dues Later" path. The config-level
+   * allowDeferredDuesPayment is enabled by seed.e2e.ts.
+   */
+  freshDeferredParticipant: FreshUser;
 }
 
 interface CreateOpts {
@@ -36,13 +42,15 @@ interface CreateOpts {
   retry: number;
   firstName?: string;
   lastName?: string;
+  flags?: {
+    allowDeferredDuesPayment?: boolean;
+    allowEarlyRegistration?: boolean;
+    allowNoJob?: boolean;
+  };
 }
 
 async function createAndLogin(page: import('@playwright/test').Page, opts: CreateOpts): Promise<BaseUser> {
   const prisma = getPrisma();
-  // Hash the verbose test identity into a short, stable suffix. 8 hex chars
-  // gives ~4 billion buckets — more than enough across a single run, far less
-  // than the 254-char (or 64-char local-part) email limit.
   const id = createHash('sha1')
     .update(`${opts.scope}|w${opts.workerIndex}|r${opts.retry}`)
     .digest('hex')
@@ -50,22 +58,29 @@ async function createAndLogin(page: import('@playwright/test').Page, opts: Creat
   const roleTag = opts.role === 'PARTICIPANT' ? 'p' : opts.role === 'ADMIN' ? 'a' : 's';
   const email = `${TEST_EMAIL_PREFIX}-${roleTag}${id}@test.playaplan.local`;
 
+  const baseData = {
+    firstName: opts.firstName ?? 'Fresh',
+    lastName: opts.lastName ?? `W${opts.workerIndex}`,
+    role: opts.role,
+    isEmailVerified: true,
+    phone: '555-0100',
+    emergencyContact: 'E2E Auto, 555-0199, friend',
+    allowDeferredDuesPayment: opts.flags?.allowDeferredDuesPayment ?? false,
+    allowEarlyRegistration: opts.flags?.allowEarlyRegistration ?? false,
+    allowNoJob: opts.flags?.allowNoJob ?? false,
+  };
+
   const user = await prisma.user.upsert({
     where: { email },
-    create: {
-      email,
-      firstName: opts.firstName ?? 'Fresh',
-      lastName: opts.lastName ?? `W${opts.workerIndex}`,
-      role: opts.role,
-      isEmailVerified: true,
-      phone: '555-0100',
-      emergencyContact: 'E2E Auto, 555-0199, friend',
-    },
-    // Reset role/flags on retry so a stale user from a previous attempt can't
-    // poison the test (e.g. an admin retry shouldn't get a stuck PARTICIPANT row).
+    create: { email, ...baseData },
+    // Reset role + flags on retry so a stale row from a previous attempt can't
+    // poison the test.
     update: {
       role: opts.role,
       isEmailVerified: true,
+      allowDeferredDuesPayment: baseData.allowDeferredDuesPayment,
+      allowEarlyRegistration: baseData.allowEarlyRegistration,
+      allowNoJob: baseData.allowNoJob,
     },
   });
 
@@ -95,6 +110,16 @@ export const test = base.extend<FreshFixtures>({
       scope: `${testInfo.file}:${testInfo.title}`,
       workerIndex: testInfo.workerIndex,
       retry: testInfo.retry,
+    });
+    await use(user);
+  },
+  freshDeferredParticipant: async ({ page }, use, testInfo) => {
+    const user = await createAndLogin(page, {
+      role: 'PARTICIPANT',
+      scope: `${testInfo.file}:${testInfo.title}`,
+      workerIndex: testInfo.workerIndex,
+      retry: testInfo.retry,
+      flags: { allowDeferredDuesPayment: true },
     });
     await use(user);
   },

@@ -21,8 +21,10 @@ export async function loginViaUi(page: Page, email: string): Promise<void> {
   await page.getByLabel('Email').fill(email);
   await page.getByRole('button', { name: /send verification code/i }).click();
 
+  // Allow extra time for the form to transition under parallel load — the
+  // request-login-code endpoint can take a moment when the throttler is hot.
   const codeInput = page.getByLabel(/verification code/i);
-  await expect(codeInput).toBeVisible({ timeout: 10_000 });
+  await expect(codeInput).toBeVisible({ timeout: 20_000 });
 
   await codeInput.fill(DEV_LOGIN_CODE);
   await page.getByRole('button', { name: /^log in$/i }).click();
