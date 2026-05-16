@@ -23,13 +23,59 @@ jobs:
     # trusted authors. Random read-only users must not be able to burn CI.
     if: >-
       github.event.issue.pull_request &&
-      startsWith(github.event.comment.body, '/run-e2e') &&
       (github.event.comment.author_association == 'OWNER' ||
        github.event.comment.author_association == 'MEMBER' ||
        github.event.comment.author_association == 'COLLABORATOR')
     runs-on: ubuntu-latest
     steps:
+      - name: Parse command and validate PR
+        id: parse
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // Parse ONLY the first line of the comment. Require `/run-e2e` at
+            // the very start, followed by end-of-line or whitespace. This
+            // rejects things like "/run-e2evil" or "please /run-e2e" while
+            // still allowing trailing tag args.
+            const body = context.payload.comment.body || '';
+            const firstLine = body.split(/\r?\n/, 1)[0].trim();
+            const match = firstLine.match(/^\/run-e2e(?:\s+(.*))?$/);
+            if (!match) {
+              core.info(`Comment did not match /run-e2e on first line: ${JSON.stringify(firstLine)}`);
+              core.setOutput('matched', 'false');
+              return;
+            }
+            const tags = (match[1] || '').trim();
+
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+            });
+
+            // Reject fork PRs. workflow_dispatch can't target a ref that
+            // doesn't live in the base repo, and we don't want to run
+            // privileged secrets-bearing CI against fork-owned code anyway.
+            const baseRepo = `${context.repo.owner}/${context.repo.repo}`.toLowerCase();
+            const headRepo = (pr.head.repo?.full_name || '').toLowerCase();
+            if (headRepo !== baseRepo) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: `❌ \`/run-e2e\` is only supported for PRs from branches in this repo (got head repo \`${pr.head.repo?.full_name || 'unknown'}\`). For fork PRs, push the branch to this repo or run the workflow manually via Actions → "E2E Tests".`,
+              });
+              core.setOutput('matched', 'false');
+              return;
+            }
+
+            core.setOutput('matched', 'true');
+            core.setOutput('ref', pr.head.ref);
+            core.setOutput('sha', pr.head.sha);
+            core.setOutput('tags', tags);
+
       - name: React to triggering comment
+        if: steps.parse.outputs.matched == 'true'
         uses: actions/github-script@v7
         with:
           script: |
@@ -40,38 +86,23 @@ jobs:
               content: 'eyes',
             });
 
-      - name: Fetch PR head info and dispatch workflow
+      - name: Dispatch e2e-ci.yml
+        if: steps.parse.outputs.matched == 'true'
         uses: actions/github-script@v7
         with:
           script: |
-            const { data: pr } = await github.rest.pulls.get({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: context.issue.number,
-            });
-
-            // Anything on the comment line after `/run-e2e` becomes the --grep filter.
-            const body = (context.payload.comment.body || '').trim();
-            const match = body.match(/^\/run-e2e\s*(.*)$/);
-            const tags = (match && match[1] ? match[1] : '').trim();
-
-            core.info(`Dispatching e2e-ci.yml on ref=${pr.head.ref} sha=${pr.head.sha} tags="${tags}"`);
-
+            const ref = '${{ steps.parse.outputs.ref }}';
+            const sha = '${{ steps.parse.outputs.sha }}';
+            const tags = '${{ steps.parse.outputs.tags }}';
+            core.info(`Dispatching e2e-ci.yml on ref=${ref} sha=${sha} tags="${tags}"`);
             await github.rest.actions.createWorkflowDispatch({
               owner: context.repo.owner,
               repo: context.repo.repo,
               workflow_id: 'e2e-ci.yml',
-              ref: pr.head.ref,
+              ref,
               inputs: {
                 tags,
                 pr_number: String(context.issue.number),
-                head_sha: pr.head.sha,
+                head_sha: sha,
               },
-            });
-
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-              body: `E2E workflow dispatched against \`${pr.head.ref}\`${tags ? ` with grep \`${tags}\`` : ''}. The "E2E Tests" check will appear on this PR shortly. [View Actions](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/workflows/e2e-ci.yml).`,
             });

@@ -2,7 +2,6 @@ name: E2E Tests
 
 permissions:
   contents: read
-  actions: write
   checks: write
   pull-requests: write
 
@@ -48,6 +47,12 @@ jobs:
     name: End-to-End Tests
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # Cancel any older run for the same PR (or for the same triggering ref on
+    # manual dispatch) so the sticky comment + check always reflect the
+    # latest invocation, not whichever happens to finish last.
+    concurrency:
+      group: e2e-ci-${{ inputs.pr_number != '' && format('pr-{0}', inputs.pr_number) || github.ref }}
+      cancel-in-progress: true
 
     services:
       postgres:
@@ -66,6 +71,18 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+
+    # Fail fast on missing CI secret BEFORE we spend minutes on installs.
+    - name: Validate E2E_SEED_LOCAL secret and stage seed.local.ts
+      env:
+        E2E_SEED_LOCAL: ${{ secrets.E2E_SEED_LOCAL }}
+      run: |
+        if [ -z "$E2E_SEED_LOCAL" ]; then
+          echo "::error::E2E_SEED_LOCAL secret is not set. Stripe-dependent tests would fail with confusing timeouts on the disabled 'Complete Registration' button. Add the secret under repo Settings → Secrets and variables → Actions (use the apps/api/prisma/seeds/seed.local.template.ts as a starting point, with Stripe TEST keys: pk_test_* / sk_test_*)."
+          exit 1
+        fi
+        printf '%s' "$E2E_SEED_LOCAL" > apps/api/prisma/seeds/seed.local.ts
+        echo "Wrote apps/api/prisma/seeds/seed.local.ts ($(wc -c < apps/api/prisma/seeds/seed.local.ts) bytes)"
 
     - name: Create PR check (in-progress)
       id: pr_check
@@ -106,17 +123,6 @@ jobs:
         echo "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/playaplan_test" >> .env
         echo "JWT_SECRET=test-secret-key-for-ci" >> .env
         echo "NODE_ENV=development" >> .env
-
-    - name: Write seed.local.ts from secret
-      env:
-        E2E_SEED_LOCAL: ${{ secrets.E2E_SEED_LOCAL }}
-      run: |
-        if [ -z "$E2E_SEED_LOCAL" ]; then
-          echo "::error::E2E_SEED_LOCAL secret is not set. Stripe-dependent tests would fail with confusing timeouts on the disabled 'Complete Registration' button. Add the secret under repo Settings → Secrets and variables → Actions (use the apps/api/prisma/seeds/seed.local.template.ts as a starting point, with Stripe TEST keys: pk_test_* / sk_test_*)."
-          exit 1
-        fi
-        printf '%s' "$E2E_SEED_LOCAL" > apps/api/prisma/seeds/seed.local.ts
-        echo "Wrote apps/api/prisma/seeds/seed.local.ts ($(wc -c < apps/api/prisma/seeds/seed.local.ts) bytes)"
 
     - name: Setup database (migrate + base seed + e2e personas + local creds)
       run: |
@@ -211,17 +217,27 @@ jobs:
         script: |
           const fs = require('fs');
           const marker = '<!-- e2e-ci-summary -->';
-          const summary = fs.readFileSync('/tmp/e2e/summary.md', 'utf8');
+          let summary;
+          try {
+            summary = fs.readFileSync('/tmp/e2e/summary.md', 'utf8');
+          } catch {
+            summary = '_E2E summary unavailable — the test step may have failed before producing a report._\n';
+          }
           const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
           const body = `${marker}\n${summary}\n[View full run](${runUrl})\n`;
           const prNumber = parseInt('${{ inputs.pr_number }}', 10);
-          const { data: comments } = await github.rest.issues.listComments({
+          // Paginate so PRs with >100 comments still find the sticky comment.
+          const comments = await github.paginate(github.rest.issues.listComments, {
             owner: context.repo.owner,
             repo: context.repo.repo,
             issue_number: prNumber,
             per_page: 100,
           });
-          const existing = comments.find(c => c.body && c.body.startsWith(marker));
+          // Only consider our own bot's comments to avoid hijacking human ones.
+          const ours = comments.filter(c =>
+            c.user?.login === 'github-actions[bot]' && c.body?.includes(marker)
+          );
+          const existing = ours[0];
           if (existing) {
             await github.rest.issues.updateComment({
               owner: context.repo.owner,
@@ -229,6 +245,14 @@ jobs:
               comment_id: existing.id,
               body,
             });
+            // Clean up any duplicates left by older bugs.
+            for (const dup of ours.slice(1)) {
+              await github.rest.issues.deleteComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: dup.id,
+              });
+            }
           } else {
             await github.rest.issues.createComment({
               owner: context.repo.owner,
@@ -237,37 +261,6 @@ jobs:
               body,
             });
           }
-
-    - name: Complete PR check
-      if: always() && steps.pr_check.outputs.id != ''
-      uses: actions/github-script@v7
-      with:
-        script: |
-          const fs = require('fs');
-          const jobStatus = '${{ job.status }}';
-          const conclusion = jobStatus === 'success'
-            ? 'success'
-            : jobStatus === 'cancelled' ? 'cancelled' : 'failure';
-          let summary = '';
-          try {
-            summary = fs.readFileSync('/tmp/e2e/summary.md', 'utf8');
-          } catch {
-            summary = '_Test summary unavailable._';
-          }
-          // Check Run output.summary has a 65535-char limit; truncate defensively.
-          if (summary.length > 60000) summary = summary.slice(0, 60000) + '\n\n_…truncated…_';
-          await github.rest.checks.update({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            check_run_id: parseInt('${{ steps.pr_check.outputs.id }}', 10),
-            status: 'completed',
-            conclusion,
-            completed_at: new Date().toISOString(),
-            output: {
-              title: `E2E ${conclusion}`,
-              summary,
-            },
-          });
 
     - name: Upload Playwright Report
       uses: actions/upload-artifact@v4
@@ -316,3 +309,36 @@ jobs:
           kill $(cat apps/web/web.pid) || echo "Web server already stopped"
           rm apps/web/web.pid
         fi
+
+    # Must be the last step so job.status reflects the outcome of EVERY
+    # preceding step (test run, uploads, cleanup).
+    - name: Complete PR check
+      if: always() && steps.pr_check.outputs.id != ''
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          const jobStatus = '${{ job.status }}';
+          const conclusion = jobStatus === 'success'
+            ? 'success'
+            : jobStatus === 'cancelled' ? 'cancelled' : 'failure';
+          let summary = '';
+          try {
+            summary = fs.readFileSync('/tmp/e2e/summary.md', 'utf8');
+          } catch {
+            summary = '_Test summary unavailable._';
+          }
+          // Check Run output.summary has a 65535-char limit; truncate defensively.
+          if (summary.length > 60000) summary = summary.slice(0, 60000) + '\n\n_…truncated…_';
+          await github.rest.checks.update({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            check_run_id: parseInt('${{ steps.pr_check.outputs.id }}', 10),
+            status: 'completed',
+            conclusion,
+            completed_at: new Date().toISOString(),
+            output: {
+              title: `E2E ${conclusion}`,
+              summary,
+            },
+          });

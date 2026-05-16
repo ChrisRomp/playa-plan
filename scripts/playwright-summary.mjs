@@ -20,7 +20,15 @@ if (!existsSync(reportPath)) {
   process.exit(0);
 }
 
-const report = JSON.parse(readFileSync(reportPath, 'utf8'));
+let report;
+try {
+  report = JSON.parse(readFileSync(reportPath, 'utf8'));
+} catch (err) {
+  process.stdout.write(
+    `### Playwright\n\n_Failed to parse Playwright JSON report at \`${reportPath}\`: ${err.message}_\n`,
+  );
+  process.exit(0);
+}
 const stats = report.stats ?? {};
 const durationSec = Math.round(((stats.duration ?? 0) / 1000) * 10) / 10;
 
