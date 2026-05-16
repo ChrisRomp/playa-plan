@@ -1,23 +1,22 @@
 #!/usr/bin/env node
 /**
- * Read the Playwright JSON report and write a Markdown summary to
- * $GITHUB_STEP_SUMMARY (or stdout when run locally).
+ * Read the Playwright JSON report and print a Markdown summary to stdout.
  *
  * Usage:
  *   node scripts/playwright-summary.mjs [path/to/results.json]
  *
  * Defaults to playwright-report/results.json. Exits 0 even when tests
- * failed — the summary step should not mask the test step's exit code.
+ * failed — callers append the output to $GITHUB_STEP_SUMMARY and/or use
+ * it as a PR comment body; they should not depend on this exit code.
  */
-import { readFileSync, appendFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 
 const reportPath = process.argv[2] ?? 'playwright-report/results.json';
-const outPath = process.env.GITHUB_STEP_SUMMARY;
 
 if (!existsSync(reportPath)) {
-  const msg = `No Playwright JSON report at ${reportPath}; skipping summary.`;
-  console.warn(msg);
-  if (outPath) appendFileSync(outPath, `### Playwright\n\n${msg}\n`);
+  process.stdout.write(
+    `### Playwright\n\n_No Playwright JSON report at \`${reportPath}\`; the test step likely failed before producing one._\n`,
+  );
   process.exit(0);
 }
 
@@ -87,14 +86,6 @@ if (allPassed && totals.flaky === 0) {
   lines.push('_All tests passed._');
   lines.push('');
 }
-lines.push(
-  '_Full HTML report is uploaded as the `playwright-report` artifact._',
-);
+lines.push('_Full HTML report is uploaded as the `playwright-report` artifact._');
 
-const md = lines.join('\n') + '\n';
-if (outPath) {
-  appendFileSync(outPath, md);
-  console.log(`Wrote Playwright summary (${md.length} bytes) to $GITHUB_STEP_SUMMARY`);
-} else {
-  process.stdout.write(md);
-}
+process.stdout.write(lines.join('\n') + '\n');

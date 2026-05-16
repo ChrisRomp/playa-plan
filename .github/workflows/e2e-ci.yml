@@ -3,12 +3,22 @@ name: E2E Tests
 permissions:
   contents: read
   actions: write
+  checks: write
+  pull-requests: write
 
 on:
   workflow_dispatch:
     inputs:
       tags:
         description: 'Playwright --grep filter (e.g. "@smoke|@auth"). Empty = run all.'
+        required: false
+        default: ''
+      pr_number:
+        description: 'PR number — when set, post results as a sticky PR comment. (Set automatically by the /run-e2e slash-command dispatcher.)'
+        required: false
+        default: ''
+      head_sha:
+        description: 'PR head commit SHA — when set, create a check run on that commit so the PR shows the result. (Set automatically by the /run-e2e dispatcher.)'
         required: false
         default: ''
   # NOTE: PR/push triggers intentionally disabled until E2E timings are stable.
@@ -56,6 +66,27 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+
+    - name: Create PR check (in-progress)
+      id: pr_check
+      if: inputs.pr_number != '' && inputs.head_sha != ''
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const { data: check } = await github.rest.checks.create({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            name: 'E2E Tests',
+            head_sha: '${{ inputs.head_sha }}',
+            status: 'in_progress',
+            started_at: new Date().toISOString(),
+            details_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+            output: {
+              title: 'E2E Tests running',
+              summary: `Triggered by /run-e2e on PR #${{ inputs.pr_number }}.\n\n[View run](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})`,
+            },
+          });
+          core.setOutput('id', check.id);
 
     - name: Use Node.js 22.x
       uses: actions/setup-node@v4
@@ -166,9 +197,77 @@ jobs:
           npx --yes playwright test
         fi
 
-    - name: Publish Playwright summary to job summary
+    - name: Generate Playwright summary markdown
       if: always()
-      run: node scripts/playwright-summary.mjs playwright-report/results.json
+      run: |
+        mkdir -p /tmp/e2e
+        node scripts/playwright-summary.mjs playwright-report/results.json > /tmp/e2e/summary.md
+        cat /tmp/e2e/summary.md >> "$GITHUB_STEP_SUMMARY"
+
+    - name: Post or update PR comment with results
+      if: always() && inputs.pr_number != ''
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          const marker = '<!-- e2e-ci-summary -->';
+          const summary = fs.readFileSync('/tmp/e2e/summary.md', 'utf8');
+          const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+          const body = `${marker}\n${summary}\n[View full run](${runUrl})\n`;
+          const prNumber = parseInt('${{ inputs.pr_number }}', 10);
+          const { data: comments } = await github.rest.issues.listComments({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: prNumber,
+            per_page: 100,
+          });
+          const existing = comments.find(c => c.body && c.body.startsWith(marker));
+          if (existing) {
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: existing.id,
+              body,
+            });
+          } else {
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              body,
+            });
+          }
+
+    - name: Complete PR check
+      if: always() && steps.pr_check.outputs.id != ''
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          const jobStatus = '${{ job.status }}';
+          const conclusion = jobStatus === 'success'
+            ? 'success'
+            : jobStatus === 'cancelled' ? 'cancelled' : 'failure';
+          let summary = '';
+          try {
+            summary = fs.readFileSync('/tmp/e2e/summary.md', 'utf8');
+          } catch {
+            summary = '_Test summary unavailable._';
+          }
+          // Check Run output.summary has a 65535-char limit; truncate defensively.
+          if (summary.length > 60000) summary = summary.slice(0, 60000) + '\n\n_…truncated…_';
+          await github.rest.checks.update({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            check_run_id: parseInt('${{ steps.pr_check.outputs.id }}', 10),
+            status: 'completed',
+            conclusion,
+            completed_at: new Date().toISOString(),
+            output: {
+              title: `E2E ${conclusion}`,
+              summary,
+            },
+          });
 
     - name: Upload Playwright Report
       uses: actions/upload-artifact@v4
