@@ -56,7 +56,7 @@ export async function submitStripePayment(page: Page): Promise<void> {
  * /#/payment/success or /#/payment/cancel).
  */
 export async function waitForAppReturn(page: Page, timeoutMs = 30_000): Promise<void> {
-  await page.waitForURL((url) => !url.toString().includes('checkout.stripe.com'), {
+  await page.waitForURL((url) => url.hostname !== 'checkout.stripe.com', {
     timeout: timeoutMs,
   });
 }

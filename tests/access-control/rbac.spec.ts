@@ -1,6 +1,10 @@
 import { test, expect } from '@playwright/test';
 import { webUrl } from '../helpers/env';
 
+function escapeRegex(s: string): string {
+  return s.replace(/[\\^$.*+?()[\]{}|]/g, '\\$&');
+}
+
 /**
  * RBAC matrix: for each protected route, assert each role gets the expected outcome.
  *
@@ -63,7 +67,7 @@ const ROUTES: RouteCase[] = [
 
 async function expectAllowed(page: import('@playwright/test').Page, route: RouteCase): Promise<void> {
   await page.goto(webUrl(route.path));
-  await expect(page).toHaveURL(new RegExp(`#${route.path.replace(/\//g, '\\/')}`), {
+  await expect(page).toHaveURL(new RegExp('#' + escapeRegex(route.path)), {
     timeout: 10_000,
   });
   await expect(page.getByRole('heading').filter({ hasText: route.heading }).first()).toBeVisible({
