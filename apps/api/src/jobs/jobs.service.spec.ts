@@ -200,6 +200,7 @@ describe('JobsService', () => {
 
       expect(result).toEqual(expectedJobs);
       expect(mockPrismaService.job.findMany).toHaveBeenCalledWith({
+        where: {},
         include: {
           category: true,
           shift: true,
@@ -214,19 +215,6 @@ describe('JobsService', () => {
 
     it('should filter out staffOnly jobs when userRole is PARTICIPANT', async () => {
       const mockJobs = [
-        {
-          id: 'staff-job',
-          name: 'Staff Job',
-          location: 'Loc',
-          categoryId: 'cat-1',
-          shiftId: 'shift-1',
-          staffOnly: true,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          category: { id: 'cat-1', name: 'Cat', staffOnly: true, alwaysRequired: false },
-          shift: { id: 'shift-1', name: 'Shift', startTime: '09:00', endTime: '17:00', dayOfWeek: 'MONDAY' },
-          registrations: [],
-        },
         {
           id: 'normal-job',
           name: 'Normal Job',
@@ -248,6 +236,18 @@ describe('JobsService', () => {
 
       expect(result).toHaveLength(1);
       expect(result[0].staffOnly).toBe(false);
+      expect(mockPrismaService.job.findMany).toHaveBeenCalledWith({
+        where: { category: { staffOnly: false } },
+        include: {
+          category: true,
+          shift: true,
+          registrations: {
+            include: {
+              registration: true,
+            },
+          },
+        },
+      });
     });
 
     it('should return all jobs including staffOnly when userRole is STAFF', async () => {
