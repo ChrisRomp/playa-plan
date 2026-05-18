@@ -78,6 +78,9 @@ export class JobsService {
    */
   async findAll(userRole?: UserRole) {
     const jobs = await this.prisma.job.findMany({
+      where: {
+        ...(userRole === UserRole.PARTICIPANT && { category: { staffOnly: false } }),
+      },
       include: {
         category: true,
         shift: true,
@@ -89,11 +92,7 @@ export class JobsService {
       },
     });
 
-    const jobsWithProperties = jobs.map(job => this.addDerivedPropertiesWithRegistrations(job));
-    if (userRole === UserRole.PARTICIPANT) {
-      return jobsWithProperties.filter(job => !job.staffOnly);
-    }
-    return jobsWithProperties;
+    return jobs.map(job => this.addDerivedPropertiesWithRegistrations(job));
   }
 
   async findOne(id: string) {

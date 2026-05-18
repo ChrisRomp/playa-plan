@@ -7,6 +7,13 @@ export interface RegistrationFormData {
   customFields: Record<string, unknown>;
   jobs: string[];  // Changed from shifts to jobs
   acceptedTerms: boolean;
+  /**
+   * When true, the participant is opting to defer dues payment. The server
+   * enforces eligibility (`coreConfig.allowDeferredDuesPayment` AND
+   * `user.allowDeferredDuesPayment`) and rejects with 403 otherwise; the
+   * client should only set this when the "Pay Dues Later" button is shown.
+   */
+  deferPayment?: boolean;
 }
 
 // Using JobSchema and ShiftSchema from api.ts instead of redefining them here

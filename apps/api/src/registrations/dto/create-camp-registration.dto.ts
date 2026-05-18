@@ -33,7 +33,9 @@ export class CreateCampRegistrationDto {
   customFields?: Record<string, unknown>;
 
   @ApiProperty({
-    description: 'Array of job IDs being registered for. May be empty for users with the allowNoJob flag.',
+    description:
+      'Array of job IDs being registered for. May be empty when the user is ' +
+      'flagged with allowNoJob=true (server enforces this).',
     example: ['8089a3d6-8c57-43ea-a2c3-037ff0c99546', '4bbb66ab-fcea-40bc-bdf6-9f813cf2d48f'],
     type: [String],
   })
@@ -49,4 +51,18 @@ export class CreateCampRegistrationDto {
   @IsNotEmpty()
   @IsBoolean()
   acceptedTerms!: boolean;
-} 
+
+  @ApiProperty({
+    description:
+      'Whether the participant is opting to defer dues payment. Requires ' +
+      'both coreConfig.allowDeferredDuesPayment and user.allowDeferredDuesPayment ' +
+      'to be true; otherwise the server rejects with 403. When true (and the ' +
+      'resulting registration is not waitlisted), the registration is created ' +
+      'as CONFIRMED with paymentDeferred=true.',
+    required: false,
+    default: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  deferPayment?: boolean = false;
+}

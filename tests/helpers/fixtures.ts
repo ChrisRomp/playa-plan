@@ -33,6 +33,16 @@ interface FreshFixtures {
    * allowDeferredDuesPayment is enabled by seed.e2e.ts.
    */
   freshDeferredParticipant: FreshUser;
+  /**
+   * Same as freshParticipant but with allowNoJob=true so the server accepts
+   * a registration with an empty jobs array.
+   */
+  freshNoJobParticipant: FreshUser;
+  /**
+   * Same as freshParticipant but with allowRegistration=false. The server
+   * should reject every camp-registration attempt by this user.
+   */
+  freshDisabledParticipant: FreshUser;
 }
 
 interface CreateOpts {
@@ -46,6 +56,11 @@ interface CreateOpts {
     allowDeferredDuesPayment?: boolean;
     allowEarlyRegistration?: boolean;
     allowNoJob?: boolean;
+    /**
+     * Per-user opt-out from self-registration. Defaults to `true` (matches
+     * the schema default); set to `false` to test the rejection path.
+     */
+    allowRegistration?: boolean;
   };
 }
 
@@ -65,6 +80,7 @@ async function createAndLogin(page: import('@playwright/test').Page, opts: Creat
     isEmailVerified: true,
     phone: '555-0100',
     emergencyContact: 'E2E Auto, 555-0199, friend',
+    allowRegistration: opts.flags?.allowRegistration ?? true,
     allowDeferredDuesPayment: opts.flags?.allowDeferredDuesPayment ?? false,
     allowEarlyRegistration: opts.flags?.allowEarlyRegistration ?? false,
     allowNoJob: opts.flags?.allowNoJob ?? false,
@@ -78,6 +94,7 @@ async function createAndLogin(page: import('@playwright/test').Page, opts: Creat
     update: {
       role: opts.role,
       isEmailVerified: true,
+      allowRegistration: baseData.allowRegistration,
       allowDeferredDuesPayment: baseData.allowDeferredDuesPayment,
       allowEarlyRegistration: baseData.allowEarlyRegistration,
       allowNoJob: baseData.allowNoJob,
@@ -120,6 +137,26 @@ export const test = base.extend<FreshFixtures>({
       workerIndex: testInfo.workerIndex,
       retry: testInfo.retry,
       flags: { allowDeferredDuesPayment: true },
+    });
+    await use(user);
+  },
+  freshNoJobParticipant: async ({ page }, use, testInfo) => {
+    const user = await createAndLogin(page, {
+      role: 'PARTICIPANT',
+      scope: `${testInfo.file}:${testInfo.title}`,
+      workerIndex: testInfo.workerIndex,
+      retry: testInfo.retry,
+      flags: { allowNoJob: true },
+    });
+    await use(user);
+  },
+  freshDisabledParticipant: async ({ page }, use, testInfo) => {
+    const user = await createAndLogin(page, {
+      role: 'PARTICIPANT',
+      scope: `${testInfo.file}:${testInfo.title}`,
+      workerIndex: testInfo.workerIndex,
+      retry: testInfo.retry,
+      flags: { allowRegistration: false },
     });
     await use(user);
   },

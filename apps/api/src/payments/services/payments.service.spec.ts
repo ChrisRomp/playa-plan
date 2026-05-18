@@ -79,6 +79,7 @@ const mockPaypalService = {
 
 const mockNotificationsService = {
   sendNotification: jest.fn().mockResolvedValue(undefined),
+  sendRegistrationConfirmationEmail: jest.fn().mockResolvedValue(true),
 };
 
 describe('PaymentsService', () => {
@@ -2084,4 +2085,298 @@ describe('PaymentsService', () => {
   });
 
   // Additional tests would follow the same pattern for other methods
+
+  /**
+   * Coverage for the deferred-payment side effects introduced with
+   * issues #158/#159/#160:
+   *
+   *  - `verifyStripeSession` now clears `paymentDeferred` on the
+   *    registration when the payment completes, even if status was
+   *    already CONFIRMED (which is the deferred case).
+   *  - `recordManualPayment` now marks the registration CONFIRMED +
+   *    paymentDeferred=false when the manual payment lands COMPLETED.
+   */
+  describe('deferred-payment side effects', () => {
+    beforeEach(() => {
+      jest.clearAllMocks();
+    });
+
+    it('clears paymentDeferred when verifyStripeSession lands a paid session on a deferred registration', async () => {
+      // Deferred registration: CONFIRMED + paymentDeferred=true,
+      // payment row still PENDING (it was created when the user clicked
+      // Pay Now from the dashboard, then this verification runs after
+      // checkout success).
+      mockPrismaService.payment.findFirst.mockResolvedValueOnce({
+        id: 'payment-id',
+        status: PaymentStatus.PENDING,
+        providerRefId: 'cs_deferred_session',
+        userId: 'user-id',
+        registrationId: 'registration-id',
+        registration: {
+          id: 'registration-id',
+          status: 'CONFIRMED',
+          paymentDeferred: true,
+        },
+      });
+      mockStripeService.getCheckoutSession.mockResolvedValueOnce({
+        id: 'cs_deferred_session',
+        status: 'complete',
+        payment_status: 'paid',
+      });
+
+      await service.verifyStripeSession('cs_deferred_session');
+
+      // The transaction body issues two prisma update calls; assert the
+      // registration update sets both status and clears paymentDeferred.
+      expect(mockPrismaService.registration.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'registration-id' },
+          data: { status: 'CONFIRMED', paymentDeferred: false },
+        }),
+      );
+    });
+
+    it('skips the post-payment confirmation email when paying off a deferred registration (already emailed at creation)', async () => {
+      mockPrismaService.payment.findFirst.mockResolvedValueOnce({
+        id: 'payment-id',
+        status: PaymentStatus.PENDING,
+        providerRefId: 'cs_deferred_pay',
+        userId: 'user-id',
+        registrationId: 'registration-id',
+        registration: {
+          id: 'registration-id',
+          status: 'CONFIRMED',
+          paymentDeferred: true,
+        },
+      });
+      mockStripeService.getCheckoutSession.mockResolvedValueOnce({
+        id: 'cs_deferred_pay',
+        status: 'complete',
+        payment_status: 'paid',
+      });
+      mockPrismaService.payment.findUnique.mockResolvedValue({
+        id: 'payment-id',
+        status: PaymentStatus.COMPLETED,
+        registration: { id: 'registration-id' },
+      });
+
+      await service.verifyStripeSession('cs_deferred_pay');
+
+      expect(mockPrismaService.registration.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'registration-id' },
+          data: { status: 'CONFIRMED', paymentDeferred: false },
+        }),
+      );
+      expect(
+        mockNotificationsService.sendRegistrationConfirmationEmail,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('still clears paymentDeferred on retry when payment is already COMPLETED but registration is still flagged deferred', async () => {
+      // Edge case: previous run completed the payment update but the
+      // registration update failed and is being retried. Without the
+      // widened condition, this case would skip the update and leave
+      // paymentDeferred=true forever.
+      mockPrismaService.payment.findFirst.mockResolvedValueOnce({
+        id: 'payment-id',
+        status: PaymentStatus.COMPLETED,
+        providerRefId: 'cs_deferred_retry',
+        userId: 'user-id',
+        registrationId: 'registration-id',
+        registration: {
+          id: 'registration-id',
+          status: 'CONFIRMED',
+          paymentDeferred: true,
+        },
+      });
+      mockStripeService.getCheckoutSession.mockResolvedValueOnce({
+        id: 'cs_deferred_retry',
+        status: 'complete',
+        payment_status: 'paid',
+      });
+
+      await service.verifyStripeSession('cs_deferred_retry');
+
+      expect(mockPrismaService.registration.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'registration-id' },
+          data: { status: 'CONFIRMED', paymentDeferred: false },
+        }),
+      );
+    });
+
+    it('skips the update only when payment is COMPLETED AND registration is CONFIRMED AND paymentDeferred is false', async () => {
+      mockPrismaService.payment.findFirst.mockResolvedValueOnce({
+        id: 'payment-id',
+        status: PaymentStatus.COMPLETED,
+        providerRefId: 'cs_already_done',
+        userId: 'user-id',
+        registrationId: 'registration-id',
+        registration: {
+          id: 'registration-id',
+          status: 'CONFIRMED',
+          paymentDeferred: false,
+        },
+      });
+      mockStripeService.getCheckoutSession.mockResolvedValueOnce({
+        id: 'cs_already_done',
+        status: 'complete',
+        payment_status: 'paid',
+      });
+
+      await service.verifyStripeSession('cs_already_done');
+
+      expect(mockPrismaService.registration.update).not.toHaveBeenCalled();
+      expect(mockPrismaService.payment.update).not.toHaveBeenCalled();
+    });
+
+    it('does NOT promote a WAITLISTED deferred registration to CONFIRMED on payment — capacity wins', async () => {
+      // Deferred + WAITLISTED participant pays via Pay Now CTA. The
+      // payment must record + clear paymentDeferred, but the status
+      // must stay WAITLISTED (admin / capacity-opens-up is the only path
+      // to CONFIRMED for waitlisted registrations).
+      mockPrismaService.payment.findFirst.mockResolvedValueOnce({
+        id: 'payment-id',
+        status: PaymentStatus.PENDING,
+        providerRefId: 'cs_waitlisted_pay',
+        userId: 'user-id',
+        registrationId: 'registration-id',
+        registration: {
+          id: 'registration-id',
+          status: 'WAITLISTED',
+          paymentDeferred: true,
+        },
+      });
+      mockStripeService.getCheckoutSession.mockResolvedValueOnce({
+        id: 'cs_waitlisted_pay',
+        status: 'complete',
+        payment_status: 'paid',
+      });
+
+      await service.verifyStripeSession('cs_waitlisted_pay');
+
+      expect(mockPrismaService.registration.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'registration-id' },
+          data: { status: 'WAITLISTED', paymentDeferred: false },
+        }),
+      );
+    });
+
+    it('recordManualPayment marks the registration CONFIRMED and clears paymentDeferred when status COMPLETED', async () => {
+      const created = {
+        id: 'payment-manual',
+        status: PaymentStatus.PENDING,
+        amount: 100,
+        currency: 'USD',
+        provider: PaymentProvider.STRIPE,
+        userId: 'user-id',
+        registrationId: 'registration-id',
+        providerRefId: 'manual:check-123',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      mockPrismaService.registration.findUnique.mockResolvedValue({
+        id: 'registration-id',
+        userId: 'user-id',
+        status: 'CONFIRMED',
+        paymentDeferred: true,
+      });
+      mockPrismaService.payment.create.mockResolvedValueOnce(created);
+      mockPrismaService.payment.findUnique.mockResolvedValueOnce(created);
+      mockPrismaService.payment.update.mockResolvedValueOnce({
+        ...created,
+        status: PaymentStatus.COMPLETED,
+      });
+      mockPrismaService.registration.update.mockResolvedValueOnce({
+        id: 'registration-id',
+        status: 'CONFIRMED',
+        paymentDeferred: false,
+      });
+
+      await service.recordManualPayment({
+        amount: 100,
+        currency: 'USD',
+        userId: 'user-id',
+        registrationId: 'registration-id',
+        reference: 'check-123',
+      });
+
+      expect(mockPrismaService.registration.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'registration-id' },
+          data: { status: 'CONFIRMED', paymentDeferred: false },
+        }),
+      );
+    });
+
+    it('recordManualPayment does NOT touch the registration when status is not COMPLETED', async () => {
+      const created = {
+        id: 'payment-manual',
+        status: PaymentStatus.PENDING,
+        amount: 100,
+        currency: 'USD',
+        provider: PaymentProvider.STRIPE,
+        userId: 'user-id',
+        registrationId: 'registration-id',
+        providerRefId: 'manual',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      mockPrismaService.registration.findUnique.mockResolvedValue({
+        id: 'registration-id',
+        userId: 'user-id',
+        status: 'PENDING',
+        paymentDeferred: false,
+      });
+      mockPrismaService.payment.create.mockResolvedValueOnce(created);
+      mockPrismaService.payment.findUnique.mockResolvedValueOnce(created);
+      mockPrismaService.payment.update.mockResolvedValueOnce({
+        ...created,
+        status: PaymentStatus.FAILED,
+      });
+
+      await service.recordManualPayment({
+        amount: 100,
+        currency: 'USD',
+        userId: 'user-id',
+        registrationId: 'registration-id',
+        reference: undefined,
+        status: PaymentStatus.FAILED,
+      });
+
+      expect(mockPrismaService.registration.update).not.toHaveBeenCalled();
+    });
+
+    it('recordManualPayment does NOT touch the registration when registrationId is absent', async () => {
+      const created = {
+        id: 'payment-manual',
+        status: PaymentStatus.PENDING,
+        amount: 100,
+        currency: 'USD',
+        provider: PaymentProvider.STRIPE,
+        userId: 'user-id',
+        registrationId: null,
+        providerRefId: 'manual',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      mockPrismaService.payment.create.mockResolvedValueOnce(created);
+      mockPrismaService.payment.findUnique.mockResolvedValueOnce(created);
+      mockPrismaService.payment.update.mockResolvedValueOnce({
+        ...created,
+        status: PaymentStatus.COMPLETED,
+      });
+
+      await service.recordManualPayment({
+        amount: 100,
+        currency: 'USD',
+        userId: 'user-id',
+        reference: undefined,
+      });
+
+      expect(mockPrismaService.registration.update).not.toHaveBeenCalled();
+    });
+  });
 });

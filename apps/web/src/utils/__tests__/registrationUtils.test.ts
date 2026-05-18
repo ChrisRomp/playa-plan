@@ -46,6 +46,24 @@ describe('registrationUtils', () => {
     it('should return false when neither registration is open', () => {
       expect(isRegistrationAccessible(mockConfig, mockUser)).toBe(false);
     });
+
+    it('should return false when user.allowRegistration is explicitly false even if registration is open', () => {
+      const config = { ...mockConfig, registrationOpen: true };
+      const user = { ...mockUser, allowRegistration: false };
+      expect(isRegistrationAccessible(config, user)).toBe(false);
+    });
+
+    it('should return false when user.allowRegistration is false even if early registration is open and user is enabled', () => {
+      const config = { ...mockConfig, earlyRegistrationOpen: true };
+      const user = { ...mockUser, allowRegistration: false, isEarlyRegistrationEnabled: true };
+      expect(isRegistrationAccessible(config, user)).toBe(false);
+    });
+
+    it('should return true when user.allowRegistration is true and registration is open', () => {
+      const config = { ...mockConfig, registrationOpen: true };
+      const user = { ...mockUser, allowRegistration: true };
+      expect(isRegistrationAccessible(config, user)).toBe(true);
+    });
   });
 
   describe('getRegistrationStatusMessage', () => {
@@ -64,9 +82,23 @@ describe('registrationUtils', () => {
       const message = getRegistrationStatusMessage(mockConfig, mockUser, false);
       expect(message).toBe('Registration for 2025 is not currently open.');
     });
+
+    it('should return account-disabled message when user.allowRegistration is false', () => {
+      const config = { ...mockConfig, registrationOpen: true };
+      const user = { ...mockUser, allowRegistration: false };
+      const message = getRegistrationStatusMessage(config, user, false);
+      expect(message).toBe(
+        'Registration for 2025 is not available for your account. Please contact an administrator if you believe this is in error.'
+      );
+    });
   });
 
   describe('canUserRegister', () => {
+    it('should prevent registration when user.allowRegistration is false', () => {
+      const config = { ...mockConfig, registrationOpen: true };
+      const user = { ...mockUser, allowRegistration: false };
+      expect(canUserRegister(config, user, false)).toBe(false);
+    });
     it('should prevent registration when user already has active registration', () => {
       const config = { ...mockConfig, registrationOpen: true };
       const hasActiveRegistration = true;

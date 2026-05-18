@@ -7,6 +7,12 @@ interface Registration {
   id: string;
   year: number;
   status: 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'WAITLISTED';
+  /**
+   * When true the registration was created as CONFIRMED with payment
+   * deferred. Surfaced in the admin table next to the status so admins
+   * can distinguish "paid CONFIRMED" from "deferred CONFIRMED".
+   */
+  paymentDeferred?: boolean;
   createdAt: string;
   user: {
     id: string;
@@ -103,19 +109,29 @@ export function RegistrationSearchTable({
         id: 'status',
         header: 'Status',
         accessor: (row) => (
-          <span
-            className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-              row.status === 'CONFIRMED'
-                ? 'bg-green-100 text-green-800'
-                : row.status === 'PENDING'
-                ? 'bg-yellow-100 text-yellow-800'
-                : row.status === 'WAITLISTED'
-                ? 'bg-blue-100 text-blue-800'
-                : 'bg-red-100 text-red-800'
-            }`}
-          >
-            {row.status}
-          </span>
+          <div className="flex items-center gap-1">
+            <span
+              className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                row.status === 'CONFIRMED'
+                  ? 'bg-green-100 text-green-800'
+                  : row.status === 'PENDING'
+                  ? 'bg-yellow-100 text-yellow-800'
+                  : row.status === 'WAITLISTED'
+                  ? 'bg-blue-100 text-blue-800'
+                  : 'bg-red-100 text-red-800'
+              }`}
+            >
+              {row.status}
+            </span>
+            {row.paymentDeferred && (
+              <span
+                className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-amber-100 text-amber-800"
+                title="Participant opted to defer dues payment"
+              >
+                Deferred
+              </span>
+            )}
+          </div>
         ),
         sortable: true,
       },

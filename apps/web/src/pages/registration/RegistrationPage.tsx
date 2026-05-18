@@ -1312,7 +1312,19 @@ export default function RegistrationPage() {
                 try {
                   // Create registration if it doesn't exist yet
                   if (!registrationId) {
-                    const result = await submitRegistration(formData);
+                    // When totalCost > 0, this branch corresponds to the
+                    // "Pay Dues Later" CTA — flag the submission so the
+                    // server creates the registration as CONFIRMED with
+                    // paymentDeferred=true and skips the payment step.
+                    // For totalCost === 0 ("free") there's nothing to
+                    // defer, so we omit the flag and the registration
+                    // lands PENDING per the current free-registration
+                    // semantics.
+                    const submission =
+                      totalCost > 0
+                        ? { ...formData, deferPayment: true }
+                        : formData;
+                    const result = await submitRegistration(submission);
                     if (result?.jobRegistration?.id) {
                       setRegistrationId(result.jobRegistration.id);
                     }
