@@ -63,8 +63,7 @@ export function UserNotesPanel({ userId }: UserNotesPanelProps) {
     loadNotes();
   }, [loadNotes]);
 
-  const handleCreate = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleCreate = async () => {
     const trimmed = newContent.trim();
     if (!trimmed || submitting) return;
     setSubmitting(true);
@@ -139,7 +138,13 @@ export function UserNotesPanel({ userId }: UserNotesPanelProps) {
         timestamped and attributed to its author.
       </p>
 
-      <form onSubmit={handleCreate} className="mb-6">
+      {/*
+        Rendered inside the admin user-edit <form>, so we cannot use a
+        nested <form> here — the browser flattens nested forms and the
+        Add button would submit the outer form instead. Use a div and an
+        explicit click handler instead.
+      */}
+      <div className="mb-6">
         <label htmlFor="new-user-note" className="block text-gray-700 font-medium mb-2">
           Add a note
         </label>
@@ -158,7 +163,8 @@ export function UserNotesPanel({ userId }: UserNotesPanelProps) {
             {newContent.length} / {USER_NOTE_MAX_LENGTH}
           </span>
           <button
-            type="submit"
+            type="button"
+            onClick={handleCreate}
             disabled={!newContent.trim() || submitting}
             className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors disabled:bg-blue-300"
           >
@@ -166,7 +172,7 @@ export function UserNotesPanel({ userId }: UserNotesPanelProps) {
             Add Note
           </button>
         </div>
-      </form>
+      </div>
 
       {error && (
         <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-md border border-red-200 text-sm">

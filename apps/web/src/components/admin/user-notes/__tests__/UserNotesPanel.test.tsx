@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { UserNotesPanel } from '../UserNotesPanel';
 import { userNotes } from '../../../../lib/api';
@@ -130,5 +130,36 @@ describe('UserNotesPanel — permission-based affordances', () => {
     );
     expect(screen.queryByLabelText('Edit note')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Delete note')).not.toBeInTheDocument();
+  });
+
+  it('renders Add Note as a plain button, not a submit, so it cannot submit a parent form (regression: nested forms)', async () => {
+    // The panel renders inside the admin user-edit <form>. Real browsers
+    // flatten nested <form> tags, so if the Add button were a submit,
+    // clicking it would submit the OUTER form and the create call would
+    // never fire. JSDOM honors nested forms and cannot reproduce that,
+    // so we assert the structural invariant directly.
+    mockUseAuth.mockReturnValue(
+      buildAuthValue(makeAuthUser({ id: 'staff-1', role: 'staff' })),
+    );
+    mockUserNotes.list.mockResolvedValue([]);
+    mockUserNotes.create.mockResolvedValue(
+      makeNote({ id: 'new', content: 'fresh' }),
+    );
+
+    const { container } = render(<UserNotesPanel userId="subject-1" />);
+
+    const addButton = screen.getByRole('button', {
+      name: /add note/i,
+    }) as HTMLButtonElement;
+    expect(addButton.type).toBe('button');
+    expect(container.querySelector('form')).toBeNull();
+
+    // Verify the click handler is still wired up.
+    const textbox = await screen.findByLabelText('Add a note');
+    fireEvent.change(textbox, { target: { value: 'fresh' } });
+    fireEvent.click(addButton);
+    await waitFor(() =>
+      expect(mockUserNotes.create).toHaveBeenCalledWith('subject-1', 'fresh'),
+    );
   });
 });
