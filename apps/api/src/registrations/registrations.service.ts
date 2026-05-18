@@ -24,24 +24,6 @@ interface JobRegistrationWithJobs extends Registration {
   }>;
 }
 
-/**
- * Options passed to `create()` to control registration creation beyond what
- * the public DTO exposes. Used by `createCampRegistration` to flag a
- * registration as intentionally deferred (server-side enforcement of the
- * camp + per-user deferred-payment policy lives in
- * `RegistrationPolicyService`).
- */
-interface CreateRegistrationOptions {
-  /**
-   * When true, the registration is marked `paymentDeferred = true`, and
-   * if no chosen job is over capacity the status is set to `CONFIRMED`
-   * instead of `PENDING`. A waitlisted-by-capacity outcome still wins
-   * (capacity > deferral); the row is stored `WAITLISTED + paymentDeferred=true`
-   * in that case.
-   */
-  paymentDeferred?: boolean;
-}
-
 @Injectable()
 export class RegistrationsService {
   private readonly logger = new Logger(RegistrationsService.name);
@@ -53,13 +35,21 @@ export class RegistrationsService {
   ) {}
 
   /**
-   * Create a new registration for a user for a specific year
+   * Create a new registration for a user for a specific year.
+   *
+   * Used by the admin/staff `POST /registrations` endpoint and the
+   * single-job participant `POST /jobs/:id/register` endpoint. Sets
+   * status to `WAITLISTED` when any chosen job is over capacity, else
+   * `PENDING`. The deferred-payment branch lives entirely in
+   * `createCampRegistration` and is intentionally not exposed here —
+   * deferral is a participant choice tied to the policy gate, not a
+   * standalone admin operation.
+   *
    * @param createRegistrationDto - The data to create the registration
    * @returns The created registration
    */
   async create(
     createRegistrationDto: CreateRegistrationDto,
-    options: CreateRegistrationOptions = {},
   ): Promise<Registration> {
     // Check if user exists
     const user = await this.prisma.user.findUnique({
@@ -112,29 +102,21 @@ export class RegistrationsService {
       })
     );
 
-    // Determine overall registration status.
-    //   - WAITLISTED wins when any chosen job is over capacity, even for
-    //     deferred registrations (capacity > deferral preference).
-    //   - Otherwise: deferred registrations land CONFIRMED (no payment is
-    //     expected up front); non-deferred land PENDING (awaiting payment).
+    // Determine overall registration status. WAITLISTED wins when any
+    // chosen job is over capacity; otherwise PENDING (awaiting payment).
+    // The deferred-payment CONFIRMED branch is exclusive to
+    // `createCampRegistration` and lives in its own transactional write
+    // path — `create()` does not surface it.
     const hasWaitlistedJob = jobs.some(
       ({ job, currentRegistrationCount }) => currentRegistrationCount >= job.maxRegistrations
     );
-    const paymentDeferred = options.paymentDeferred === true;
-    let status: RegistrationStatus;
-    if (hasWaitlistedJob) {
-      status = RegistrationStatus.WAITLISTED;
-    } else if (paymentDeferred) {
-      status = RegistrationStatus.CONFIRMED;
-    } else {
-      status = RegistrationStatus.PENDING;
-    }
+
+    const status = hasWaitlistedJob ? RegistrationStatus.WAITLISTED : RegistrationStatus.PENDING;
 
     // Create registration with jobs
     return this.prisma.registration.create({
       data: {
         status,
-        paymentDeferred,
         year: createRegistrationDto.year,
         user: { connect: { id: createRegistrationDto.userId } },
         jobs: {
