@@ -125,6 +125,7 @@ export function PaymentReportsPage() {
       header: 'Name',
       accessor: (row) => row.user ? `${row.user.firstName} ${row.user.lastName}` : 'Unknown',
       sortable: true,
+      width: '20%',
     },
     {
       id: 'createdAt',
@@ -134,12 +135,14 @@ export function PaymentReportsPage() {
         return `${date.toLocaleDateString()} ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
       },
       sortable: true,
+      width: '18%',
     },
     {
       id: 'amount',
       header: 'Amount',
       accessor: (row) => `$${row.amount.toFixed(2)}`,
       sortable: true,
+      width: '12%',
     },
     {
       id: 'status',
@@ -161,12 +164,14 @@ export function PaymentReportsPage() {
         </span>
       ),
       sortable: true,
+      width: '12%',
     },
     {
       id: 'provider',
       header: 'Provider',
       accessor: (row) => row.provider,
       sortable: true,
+      width: '12%',
     },
     {
       id: 'providerRefId',
@@ -174,6 +179,8 @@ export function PaymentReportsPage() {
       accessor: (row) => row.providerRefId || 'N/A',
       sortable: true,
       hideOnMobile: true,
+      width: '26%',
+      minWidth: 100,
     },
   ];
 

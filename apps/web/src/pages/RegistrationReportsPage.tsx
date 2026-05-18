@@ -235,6 +235,7 @@ export function RegistrationReportsPage() {
       },
       sortable: true,
       hideOnMobile: true,
+      minWidth: 100,
     }));
   };
 
@@ -246,6 +247,7 @@ export function RegistrationReportsPage() {
       header: 'User',
       accessor: (row) => row.user ? `${row.user.firstName} ${row.user.lastName}` : 'Unknown User',
       sortable: true,
+      minWidth: 120,
     },
     {
       id: 'email',
@@ -253,12 +255,14 @@ export function RegistrationReportsPage() {
       accessor: (row) => row.user?.email || 'No email',
       sortable: true,
       hideOnMobile: true,
+      minWidth: 150,
     },
     {
       id: 'year',
       header: 'Year',
       accessor: (row) => row.year,
       sortable: true,
+      width: 70,
     },
     {
       id: 'shift',
@@ -268,6 +272,7 @@ export function RegistrationReportsPage() {
         return row.jobs.map(j => j.job.name).join(', ');
       },
       sortable: true,
+      minWidth: 120,
     },
     {
       id: 'status',
@@ -286,6 +291,7 @@ export function RegistrationReportsPage() {
         </span>
       ),
       sortable: true,
+      width: 100,
     },
     {
       id: 'createdAt',
@@ -293,6 +299,7 @@ export function RegistrationReportsPage() {
       accessor: (row) => new Date(row.createdAt).toLocaleDateString(),
       sortable: true,
       hideOnMobile: true,
+      width: 110,
     },
   ];
 
@@ -329,6 +336,7 @@ export function RegistrationReportsPage() {
         ),
         sortable: true,
         hideOnMobile: true,
+        minWidth: 120,
       });
 
       // Add dynamic columns for each unique field
@@ -346,6 +354,7 @@ export function RegistrationReportsPage() {
           },
           sortable: true,
           hideOnMobile: true,
+          minWidth: 100,
         });
       });
     }
