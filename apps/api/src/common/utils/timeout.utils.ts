@@ -2,10 +2,8 @@ export function withTimeout<T>(promise: Promise<T>, ms: number, message: string)
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
   const timeoutPromise = new Promise<never>((_, reject) => {
     timeoutId = setTimeout(() => reject(new Error(message)), ms);
-    const timer = timeoutId as NodeJS.Timeout;
-    if (typeof timer.unref === 'function') {
-      timer.unref();
-    }
+    // Allow process/test worker to exit when only this timeout remains pending.
+    (timeoutId as NodeJS.Timeout).unref?.();
   });
 
   return Promise.race([promise, timeoutPromise]).finally(() => {

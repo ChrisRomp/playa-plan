@@ -5,7 +5,7 @@ describe('withTimeout', () => {
     jest.useRealTimers();
   });
 
-  it('returns resolved value and clears timer', async () => {
+  it('should return resolved value and clear timer', async () => {
     jest.useFakeTimers();
 
     const result = await withTimeout(Promise.resolve('ok'), 15000, 'timeout');
@@ -14,13 +14,14 @@ describe('withTimeout', () => {
     expect(jest.getTimerCount()).toBe(0);
   });
 
-  it('rejects on timeout and clears timer', async () => {
+  it('should reject on timeout and clear timer', async () => {
     jest.useFakeTimers();
 
-    const resultPromise = withTimeout(new Promise<never>(() => undefined), 1000, 'timeout');
-    jest.advanceTimersByTime(1000);
+    const wrappedPromise = withTimeout(new Promise<never>(() => undefined), 1000, 'timeout');
+    const timeoutAssertion = expect(wrappedPromise).rejects.toThrow('timeout');
 
-    await expect(resultPromise).rejects.toThrow('timeout');
+    jest.advanceTimersByTime(1000);
+    await timeoutAssertion;
     expect(jest.getTimerCount()).toBe(0);
   });
 });
