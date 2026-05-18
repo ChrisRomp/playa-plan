@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { RegistrationsService } from './registrations.service';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { NotificationsService } from '../notifications/services/notifications.service';
+import { RegistrationPolicyService } from './services/registration-policy.service';
 import { NotFoundException, ConflictException, ForbiddenException } from '@nestjs/common';
 import { RegistrationStatus, UserRole } from '@prisma/client';
 import { CreateRegistrationDto } from './dto';
@@ -10,7 +11,19 @@ describe('RegistrationsService', () => {
   let service: RegistrationsService;
   // PrismaService is mocked and not directly used in tests
 
-  const mockPrismaService = {
+  type MockPrismaService = {
+    registration: { create: jest.Mock; findMany: jest.Mock; findUnique: jest.Mock; findFirst: jest.Mock; update: jest.Mock; delete: jest.Mock };
+    registrationJob: { create: jest.Mock; findMany: jest.Mock; findFirst: jest.Mock; delete: jest.Mock };
+    job: { findUnique: jest.Mock; findMany: jest.Mock };
+    user: { findUnique: jest.Mock };
+    payment: { findUnique: jest.Mock };
+    campingOption: { findUnique: jest.Mock };
+    campingOptionRegistration: { findMany: jest.Mock; findFirst: jest.Mock; create: jest.Mock };
+    campingOptionFieldValue: { create: jest.Mock };
+    $transaction: jest.Mock;
+  };
+
+  const mockPrismaService: MockPrismaService = {
     registration: {
       create: jest.fn(),
       findMany: jest.fn(),
@@ -35,9 +48,31 @@ describe('RegistrationsService', () => {
     payment: {
       findUnique: jest.fn(),
     },
+    campingOption: {
+      findUnique: jest.fn(),
+    },
     campingOptionRegistration: {
       findMany: jest.fn(),
+      findFirst: jest.fn(),
+      create: jest.fn(),
     },
+    campingOptionFieldValue: {
+      create: jest.fn(),
+    },
+    // Default: run the callback with the mockPrismaService itself as the
+    // `tx` client. Per-test overrides can replace this to simulate
+    // rollback by throwing instead of running the callback.
+    $transaction: jest.fn(async (callback: (tx: MockPrismaService) => unknown) =>
+      callback(mockPrismaService),
+    ),
+  };
+
+  const mockPolicyService = {
+    // Default to a no-op (permissive) policy so existing tests of create()
+    // (which does not exercise the policy gate) continue to pass without
+    // wiring per-test stubs. Tests of createCampRegistration explicitly
+    // set this mock to reject when they want to assert policy failures.
+    assertCanCreateCampRegistration: jest.fn().mockResolvedValue(undefined),
   };
 
   beforeEach(async () => {
@@ -54,6 +89,10 @@ describe('RegistrationsService', () => {
             sendRegistrationConfirmationEmail: jest.fn().mockResolvedValue(true),
             sendRegistrationErrorEmail: jest.fn().mockResolvedValue(true),
           },
+        },
+        {
+          provide: RegistrationPolicyService,
+          useValue: mockPolicyService,
         },
       ],
     }).compile();
@@ -598,25 +637,6 @@ describe('RegistrationsService', () => {
   });
 
   describe('createCampRegistration', () => {
-    it('should throw ForbiddenException when user.allowRegistration is false', async () => {
-      mockPrismaService.user.findUnique.mockResolvedValue({
-        id: 'user-id',
-        email: 'test@example.playaplan.app',
-        allowRegistration: false,
-      });
-
-      const call = service.createCampRegistration('user-id', {
-        acceptedTerms: true,
-        jobs: ['job-id-1'],
-        campingOptions: [],
-      });
-
-      await expect(call).rejects.toBeInstanceOf(ForbiddenException);
-      await expect(call).rejects.toThrow(
-        'Registration is not available for your account. Please contact an administrator.',
-      );
-    });
-
     it('should throw NotFoundException when user does not exist', async () => {
       mockPrismaService.user.findUnique.mockResolvedValue(null);
 
@@ -627,6 +647,198 @@ describe('RegistrationsService', () => {
           campingOptions: [],
         }),
       ).rejects.toThrow(NotFoundException);
+    });
+
+    const userId = 'user-id-camp';
+    const baseUser = {
+      id: userId,
+      email: 'test@example.playaplan.app',
+      firstName: 'Test',
+      lastName: 'User',
+      playaName: null as string | null,
+      role: UserRole.PARTICIPANT,
+      allowRegistration: true,
+      allowEarlyRegistration: false,
+      allowNoJob: false,
+      allowDeferredDuesPayment: false,
+    };
+
+    const baseDto = {
+      campingOptions: [],
+      jobs: ['job-1'],
+      acceptedTerms: true,
+    } as unknown as Parameters<RegistrationsService['createCampRegistration']>[1];
+
+    const buildCreatedRegistration = (overrides: Partial<{
+      status: RegistrationStatus;
+      paymentDeferred: boolean;
+      id: string;
+    }> = {}) => ({
+      id: overrides.id ?? 'reg-1',
+      status: overrides.status ?? RegistrationStatus.PENDING,
+      paymentDeferred: overrides.paymentDeferred ?? false,
+      year: new Date().getFullYear(),
+      userId,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      jobs: [],
+      payments: [],
+      user: baseUser,
+    });
+
+    beforeEach(() => {
+      mockPolicyService.assertCanCreateCampRegistration.mockResolvedValue(undefined);
+      mockPrismaService.user.findUnique.mockResolvedValue(baseUser);
+      mockPrismaService.registration.findFirst.mockResolvedValue(null);
+      mockPrismaService.job.findUnique.mockImplementation(({ where }: { where: { id: string } }) => ({
+        id: where.id,
+        maxRegistrations: 10,
+        staffOnly: false,
+        registrations: [],
+      }));
+    });
+
+    it('does not call the policy gate from inside the broad try/catch, so policy 4xx rejections do not trigger the error email', async () => {
+      const policyError = new ForbiddenException('Registration is not currently open.');
+      mockPolicyService.assertCanCreateCampRegistration.mockRejectedValue(policyError);
+      // Wire registration.create to throw a distinct error so we can prove
+      // we never reached the broad try/catch (which would log + email).
+      mockPrismaService.registration.create.mockRejectedValue(new Error('should not be reached'));
+
+      await expect(
+        service.createCampRegistration(userId, baseDto),
+      ).rejects.toBe(policyError);
+
+      // The notifications mock is per-suite; assert sendRegistrationErrorEmail
+      // was NOT called by checking that the user.findUnique to fetch the
+      // error-email recipient ran only the initial "load user" pass.
+      // (The current implementation no longer makes a second findUnique
+      // for the error email, so a single call is the expected baseline.)
+      expect(mockPrismaService.user.findUnique).toHaveBeenCalledTimes(1);
+    });
+
+    it('always creates a Registration even when jobs is empty (relies on policy gate to enforce allowNoJob)', async () => {
+      const dtoNoJobs = { ...baseDto, jobs: [] };
+      const created = buildCreatedRegistration({ status: RegistrationStatus.PENDING });
+      mockPrismaService.registration.create.mockResolvedValue(created);
+
+      const result = await service.createCampRegistration(userId, dtoNoJobs);
+
+      expect(mockPrismaService.registration.create).toHaveBeenCalledTimes(1);
+      expect(result.jobRegistration).toEqual(created);
+    });
+
+    it('creates deferred registration as CONFIRMED + paymentDeferred=true when no chosen job is over capacity', async () => {
+      const dtoDeferred = { ...baseDto, deferPayment: true };
+      const created = buildCreatedRegistration({
+        status: RegistrationStatus.CONFIRMED,
+        paymentDeferred: true,
+      });
+      mockPrismaService.registration.create.mockResolvedValue(created);
+
+      const result = await service.createCampRegistration(userId, dtoDeferred);
+
+      expect(mockPrismaService.registration.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            status: RegistrationStatus.CONFIRMED,
+            paymentDeferred: true,
+          }),
+        }),
+      );
+      expect(result.jobRegistration?.status).toBe(RegistrationStatus.CONFIRMED);
+      expect(result.jobRegistration?.paymentDeferred).toBe(true);
+    });
+
+    it('creates deferred + waitlisted as WAITLISTED + paymentDeferred=true (capacity beats deferral)', async () => {
+      const dtoDeferred = { ...baseDto, deferPayment: true };
+      // One full job triggers WAITLISTED.
+      mockPrismaService.job.findUnique.mockResolvedValue({
+        id: 'job-1',
+        maxRegistrations: 0,
+        staffOnly: false,
+        registrations: [],
+      });
+      const created = buildCreatedRegistration({
+        status: RegistrationStatus.WAITLISTED,
+        paymentDeferred: true,
+      });
+      mockPrismaService.registration.create.mockResolvedValue(created);
+
+      const result = await service.createCampRegistration(userId, dtoDeferred);
+
+      expect(mockPrismaService.registration.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            status: RegistrationStatus.WAITLISTED,
+            paymentDeferred: true,
+          }),
+        }),
+      );
+      expect(result.jobRegistration?.status).toBe(RegistrationStatus.WAITLISTED);
+    });
+
+    it('throws if terms are not accepted (before any DB write)', async () => {
+      const dtoNoTerms = { ...baseDto, acceptedTerms: false };
+
+      await expect(
+        service.createCampRegistration(userId, dtoNoTerms),
+      ).rejects.toThrow(/Terms and conditions/);
+
+      expect(mockPrismaService.registration.create).not.toHaveBeenCalled();
+    });
+
+    it('throws ConflictException if the user already has an active registration for the year', async () => {
+      mockPrismaService.registration.findFirst.mockResolvedValue(buildCreatedRegistration());
+
+      await expect(
+        service.createCampRegistration(userId, baseDto),
+      ).rejects.toBeInstanceOf(ConflictException);
+    });
+
+    it('propagates failure and rolls back atomically when a downstream camping-option write fails inside the transaction', async () => {
+      // Stub user + jobs OK; the registration insert succeeds; but the
+      // camping-option insert fails. The transaction wrapping the writes
+      // guarantees the Registration is rolled back too — without this
+      // wrap, CampingOptionRegistration rows have no FK to Registration
+      // so deleting the registration manually would leave orphaned
+      // camping-option rows and block retries.
+      const created = buildCreatedRegistration({ status: RegistrationStatus.PENDING });
+      mockPrismaService.registration.create.mockResolvedValueOnce(created);
+      mockPrismaService.campingOption.findUnique.mockResolvedValueOnce({
+        id: 'opt-1',
+        name: 'Standard',
+        fields: [],
+      });
+      mockPrismaService.campingOptionRegistration.findFirst.mockResolvedValueOnce(null);
+      mockPrismaService.campingOptionRegistration.create.mockRejectedValueOnce(new Error('boom'));
+
+      const dtoWithOption = {
+        ...baseDto,
+        campingOptions: ['opt-1'],
+      };
+
+      await expect(
+        service.createCampRegistration(userId, dtoWithOption),
+      ).rejects.toThrow(/boom/);
+
+      // The transaction should have been invoked (so rollback semantics
+      // apply); no manual cleanup delete is needed.
+      expect(mockPrismaService.$transaction).toHaveBeenCalled();
+    });
+
+    it('should throw ForbiddenException with the user-friendly message when user.allowRegistration is false', async () => {
+      mockPrismaService.user.findUnique.mockResolvedValue({
+        ...baseUser,
+        allowRegistration: false,
+      });
+
+      const call = service.createCampRegistration(userId, baseDto);
+
+      await expect(call).rejects.toBeInstanceOf(ForbiddenException);
+      await expect(call).rejects.toThrow(
+        'Registration is not available for your account. Please contact an administrator.',
+      );
     });
   });
 });

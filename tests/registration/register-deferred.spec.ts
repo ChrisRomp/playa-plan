@@ -3,18 +3,19 @@
  *  - End-to-end deferred-dues path: a participant with allowDeferredDuesPayment
  *    set both at config and user level should see "Pay Dues Later" instead of
  *    Stripe Checkout, complete registration without paying, and land on the
- *    dashboard with a PENDING registration and no completed payment.
+ *    dashboard with a CONFIRMED registration carrying paymentDeferred=true
+ *    and no completed payment.
  *
- * Note on status: the registration is created by `createCampRegistration`
- * which calls `create()` with the user's chosen jobs. That sets the row to
- * PENDING (or WAITLISTED if a chosen job is full); the only path that today
- * transitions a registration to CONFIRMED is a successful payment in
- * `payments.service.ts`. Server-side promotion of deferred registrations is
- * tracked as a separate follow-up to issue #154.
+ * Server semantics (post-#160): when the client sends `deferPayment: true`
+ * to POST /registrations/camp and policy allows it (both coreConfig and
+ * per-user flag are true), the registration is created with status =
+ * CONFIRMED and paymentDeferred = true. A later successful payment via the
+ * dashboard's "Pay Now" CTA clears paymentDeferred.
  */
 import { test, expect } from '../helpers/fixtures';
 import { walkRegistrationToPayment } from '../helpers/registration';
 import { getPrisma } from '../helpers/db';
+import { payViaStripeCheckout } from '../helpers/stripe';
 
 test.describe(
   'Registration: deferred dues',
@@ -44,11 +45,58 @@ test.describe(
           orderBy: { createdAt: 'desc' },
         });
         expect(reg).not.toBeNull();
-        expect(reg!.status).toBe('PENDING');
+        expect(reg!.status).toBe('CONFIRMED');
+        expect(reg!.paymentDeferred).toBe(true);
         expect(reg!.year).toBe(new Date().getFullYear());
         expect(reg!.jobs.length).toBeGreaterThanOrEqual(2);
         const completed = reg!.payments.filter((p) => p.status === 'COMPLETED');
         expect(completed).toHaveLength(0);
+
+        // Dashboard surfaces the deferred-payment indicator so the user
+        // knows to circle back later.
+        await expect(page.getByText(/payment deferred/i)).toBeVisible();
+      },
+    );
+
+    test(
+      'deferred participant can later complete payment, clearing paymentDeferred',
+      async ({ page, freshDeferredParticipant }) => {
+        test.setTimeout(120_000);
+
+        // First, walk through registration choosing the deferred path.
+        await walkRegistrationToPayment(page);
+        await page.getByRole('button', { name: /pay dues later/i }).click();
+        await expect(page).toHaveURL(/#\/dashboard/, { timeout: 15_000 });
+
+        // Sanity: registration landed CONFIRMED + paymentDeferred=true.
+        const prisma = getPrisma();
+        const regBefore = await prisma.registration.findFirst({
+          where: { userId: freshDeferredParticipant.id },
+          orderBy: { createdAt: 'desc' },
+        });
+        expect(regBefore?.status).toBe('CONFIRMED');
+        expect(regBefore?.paymentDeferred).toBe(true);
+
+        // Dashboard should expose a Pay Now CTA for the deferred dues.
+        const payNow = page.getByRole('button', { name: /pay now/i });
+        await expect(payNow).toBeVisible({ timeout: 15_000 });
+        await payNow.click();
+
+        // Stripe Checkout — drop in a test card and submit.
+        await payViaStripeCheckout(page, { card: 'visa' });
+
+        // Back in-app, the registration row should have paymentDeferred=false.
+        await expect(page).toHaveURL(/#\/dashboard|#\/payment/, { timeout: 30_000 });
+
+        const regAfter = await prisma.registration.findFirst({
+          where: { userId: freshDeferredParticipant.id },
+          include: { payments: true },
+          orderBy: { createdAt: 'desc' },
+        });
+        expect(regAfter?.status).toBe('CONFIRMED');
+        expect(regAfter?.paymentDeferred).toBe(false);
+        const completed = regAfter!.payments.filter((p) => p.status === 'COMPLETED');
+        expect(completed.length).toBeGreaterThanOrEqual(1);
       },
     );
   },

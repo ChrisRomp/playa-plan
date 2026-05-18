@@ -4,6 +4,7 @@ import { NotificationsService } from '../notifications/services/notifications.se
 import { CreateRegistrationDto, AddJobToRegistrationDto, CreateCampRegistrationDto, UpdateRegistrationDto } from './dto';
 import { Registration, RegistrationStatus, UserRole } from '@prisma/client';
 import { DayOfWeek } from '../common/enums/day-of-week.enum';
+import { RegistrationPolicyService } from './services/registration-policy.service';
 
 interface JobRegistrationWithJobs extends Registration {
   jobs?: Array<{
@@ -23,6 +24,24 @@ interface JobRegistrationWithJobs extends Registration {
   }>;
 }
 
+/**
+ * Options passed to `create()` to control registration creation beyond what
+ * the public DTO exposes. Used by `createCampRegistration` to flag a
+ * registration as intentionally deferred (server-side enforcement of the
+ * camp + per-user deferred-payment policy lives in
+ * `RegistrationPolicyService`).
+ */
+interface CreateRegistrationOptions {
+  /**
+   * When true, the registration is marked `paymentDeferred = true`, and
+   * if no chosen job is over capacity the status is set to `CONFIRMED`
+   * instead of `PENDING`. A waitlisted-by-capacity outcome still wins
+   * (capacity > deferral); the row is stored `WAITLISTED + paymentDeferred=true`
+   * in that case.
+   */
+  paymentDeferred?: boolean;
+}
+
 @Injectable()
 export class RegistrationsService {
   private readonly logger = new Logger(RegistrationsService.name);
@@ -30,6 +49,7 @@ export class RegistrationsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notificationsService: NotificationsService,
+    private readonly policyService: RegistrationPolicyService,
   ) {}
 
   /**
@@ -37,7 +57,10 @@ export class RegistrationsService {
    * @param createRegistrationDto - The data to create the registration
    * @returns The created registration
    */
-  async create(createRegistrationDto: CreateRegistrationDto): Promise<Registration> {
+  async create(
+    createRegistrationDto: CreateRegistrationDto,
+    options: CreateRegistrationOptions = {},
+  ): Promise<Registration> {
     // Check if user exists
     const user = await this.prisma.user.findUnique({
       where: { id: createRegistrationDto.userId },
@@ -89,17 +112,29 @@ export class RegistrationsService {
       })
     );
 
-    // Determine overall registration status
+    // Determine overall registration status.
+    //   - WAITLISTED wins when any chosen job is over capacity, even for
+    //     deferred registrations (capacity > deferral preference).
+    //   - Otherwise: deferred registrations land CONFIRMED (no payment is
+    //     expected up front); non-deferred land PENDING (awaiting payment).
     const hasWaitlistedJob = jobs.some(
       ({ job, currentRegistrationCount }) => currentRegistrationCount >= job.maxRegistrations
     );
-    
-    const status = hasWaitlistedJob ? RegistrationStatus.WAITLISTED : RegistrationStatus.PENDING;
+    const paymentDeferred = options.paymentDeferred === true;
+    let status: RegistrationStatus;
+    if (hasWaitlistedJob) {
+      status = RegistrationStatus.WAITLISTED;
+    } else if (paymentDeferred) {
+      status = RegistrationStatus.CONFIRMED;
+    } else {
+      status = RegistrationStatus.PENDING;
+    }
 
     // Create registration with jobs
     return this.prisma.registration.create({
       data: {
         status,
+        paymentDeferred,
         year: createRegistrationDto.year,
         user: { connect: { id: createRegistrationDto.userId } },
         jobs: {
@@ -513,150 +548,238 @@ export class RegistrationsService {
 
   /**
    * Create a comprehensive camp registration
+   *
+   * Runs the participant-side policy gates (`RegistrationPolicyService`)
+   * BEFORE entering the broad try/catch that emits a registration-error
+   * email, so policy 4xx rejections (`closed window`, `not eligible`,
+   * `must pick a job`, `not eligible to defer`) propagate cleanly and do
+   * NOT trigger an "unexpected error" email. The broad try/catch only wraps
+   * the create-database-rows section where any failure really is unexpected
+   * and worth notifying the user about.
+   *
+   * Always creates a `Registration` row when policy passes, even when the
+   * user has chosen no jobs (relies on `user.allowNoJob` for eligibility,
+   * checked by the policy service). This is a change from the previous
+   * behavior, which silently created no `Registration` at all for a
+   * camping-only signup — leaving nowhere to track payment or surface the
+   * signup on the dashboard.
+   *
    * @param userId - The ID of the user
    * @param createCampRegistrationDto - The camp registration data
    * @returns The created registrations and camping option registrations
    */
   async createCampRegistration(userId: string, createCampRegistrationDto: CreateCampRegistrationDto) {
-    try {
-      // Check if user exists
-      const user = await this.prisma.user.findUnique({
-        where: { id: userId },
+    // Load user once so the policy gate and downstream queries share it.
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+    if (!user) {
+      throw new NotFoundException(`User with ID ${userId} not found`);
+    }
+
+    // Policy gates run OUTSIDE the broad try/catch — a 4xx from these is
+    // an expected rejection, not an "unexpected registration error".
+    await this.policyService.assertCanCreateCampRegistration(user, {
+      jobs: createCampRegistrationDto.jobs ?? [],
+      deferPayment: createCampRegistrationDto.deferPayment ?? false,
+    });
+
+    // Validate that terms have been accepted. Kept outside the broad
+    // try/catch for the same reason — terms-missing is a user-correctable
+    // input error, not an "unexpected" failure.
+    if (!createCampRegistrationDto.acceptedTerms) {
+      throw new BadRequestException('Terms and conditions must be accepted');
+    }
+
+    // Pre-flight: active-registration conflict and camping-option existence
+    // checks. These are expected 4xx rejections and stay outside the
+    // broad try/catch that emits the registration-error email.
+    const currentYear = new Date().getFullYear();
+    const existingActiveRegistration = await this.prisma.registration.findFirst({
+      where: {
+        userId,
+        year: currentYear,
+        status: { notIn: [RegistrationStatus.CANCELLED] },
+      },
+    });
+    if (existingActiveRegistration) {
+      throw new ConflictException(`User already has an active registration for ${currentYear}`);
+    }
+
+    const campingOptionIds = createCampRegistrationDto.campingOptions ?? [];
+    // Validate every camping option up front: must exist and the user must
+    // not already be registered for it. This catches a stale option id or
+    // a duplicate signup before any writes happen, avoiding the
+    // half-created-registration trap.
+    const validatedCampingOptions: Array<{
+      campingOptionId: string;
+      fields: Array<{ id: string }>;
+      name: string;
+    }> = [];
+    for (const campingOptionId of campingOptionIds) {
+      const campingOption = await this.prisma.campingOption.findUnique({
+        where: { id: campingOptionId },
+        include: { fields: true },
       });
-
-      if (!user) {
-        throw new NotFoundException(`User with ID ${userId} not found`);
+      if (!campingOption) {
+        throw new NotFoundException(`Camping option with ID ${campingOptionId} not found`);
       }
-
-      // Enforce the per-user allowRegistration flag. Admins can disable the
-      // ability for a specific user to register; respect that here so the
-      // toggle cannot be bypassed by calling the API directly.
-      if (user.allowRegistration === false) {
-        throw new ForbiddenException('Registration is not available for your account. Please contact an administrator.');
+      const existingCampingRegistration =
+        await this.prisma.campingOptionRegistration.findFirst({
+          where: { userId, campingOptionId },
+        });
+      if (existingCampingRegistration) {
+        throw new ConflictException(
+          `User already registered for camping option: ${campingOption.name}`,
+        );
       }
+      validatedCampingOptions.push({
+        campingOptionId,
+        fields: campingOption.fields,
+        name: campingOption.name,
+      });
+    }
 
-      // Validate that terms have been accepted
-      if (!createCampRegistrationDto.acceptedTerms) {
-        throw new BadRequestException('Terms and conditions must be accepted');
-      }
+    // Job validation reads. Done outside the transaction (reads can race
+    // with concurrent writers — that's a pre-existing limitation we
+    // accept) and used both to determine WAITLISTED status and to block
+    // participants from grabbing staff-only jobs.
+    const jobIds = createCampRegistrationDto.jobs ?? [];
+    await this.validateNoStaffOnlyJobsForParticipant(user.role, jobIds);
 
-      // Get current year for job registration
-      const currentYear = new Date().getFullYear();
-
-      let jobRegistration = null;
-      const campingOptionRegistrations: Array<{
-        id: string;
-        userId: string;
-        campingOptionId: string;
-        createdAt: Date;
-        updatedAt: Date;
-        campingOption: {
-          id: string;
-          name: string;
-          description: string | null;
-          enabled: boolean;
-          workShiftsRequired: number;
-          participantDues: number;
-          staffDues: number;
-          maxSignups: number;
-          createdAt: Date;
-          updatedAt: Date;
-          fields: Array<{
-            id: string;
-            displayName: string;
-            description: string | null;
-            dataType: string;
-            required: boolean;
-            maxLength: number | null;
-            minValue: number | null;
-            maxValue: number | null;
-            createdAt: Date;
-            updatedAt: Date;
-            campingOptionId: string;
-          }>;
-        };
-      }> = [];
-
-      // Create job registration if jobs are provided
-      if (createCampRegistrationDto.jobs && createCampRegistrationDto.jobs.length > 0) {
-        // Check if user already has an active registration for this year
-        const existingActiveRegistration = await this.prisma.registration.findFirst({
-          where: {
-            userId,
-            year: currentYear,
-            status: { notIn: [RegistrationStatus.CANCELLED] },
+    const jobsWithCounts = await Promise.all(
+      jobIds.map(async (jobId) => {
+        const job = await this.prisma.job.findUnique({
+          where: { id: jobId },
+          include: {
+            registrations: { include: { registration: true } },
           },
         });
-
-        if (existingActiveRegistration) {
-          throw new ConflictException(`User already has an active registration for ${currentYear}`);
+        if (!job) {
+          throw new NotFoundException(`Job with ID ${jobId} not found`);
         }
+        const currentRegistrationCount = job.registrations.filter(
+          (r) => r.registration.status !== RegistrationStatus.CANCELLED,
+        ).length;
+        return { job, currentRegistrationCount };
+      }),
+    );
 
-        // Create the job registration
-        jobRegistration = await this.create({
-          userId,
-          year: currentYear,
-          jobIds: createCampRegistrationDto.jobs,
-        });
-      }
+    const deferPayment = createCampRegistrationDto.deferPayment ?? false;
+    const hasWaitlistedJob = jobsWithCounts.some(
+      ({ job, currentRegistrationCount }) =>
+        currentRegistrationCount >= job.maxRegistrations,
+    );
 
-      // Create camping option registrations
-      if (createCampRegistrationDto.campingOptions && createCampRegistrationDto.campingOptions.length > 0) {
-        for (const campingOptionId of createCampRegistrationDto.campingOptions) {
-          // Check if camping option exists
-          const campingOption = await this.prisma.campingOption.findUnique({
-            where: { id: campingOptionId },
-            include: { fields: true },
-          });
+    // Status semantics (Option A from issue #160 design):
+    //   - WAITLISTED wins when any chosen job is over capacity, even for
+    //     deferred registrations (capacity > deferral preference).
+    //   - Otherwise: deferred registrations land CONFIRMED (no payment is
+    //     expected up front); non-deferred land PENDING (awaiting payment).
+    let status: RegistrationStatus;
+    if (hasWaitlistedJob) {
+      status = RegistrationStatus.WAITLISTED;
+    } else if (deferPayment) {
+      status = RegistrationStatus.CONFIRMED;
+    } else {
+      status = RegistrationStatus.PENDING;
+    }
 
-          if (!campingOption) {
-            throw new NotFoundException(`Camping option with ID ${campingOptionId} not found`);
-          }
-
-          // Check if user already has this camping option registered
-          const existingCampingRegistration = await this.prisma.campingOptionRegistration.findFirst({
-            where: {
-              userId,
-              campingOptionId,
-            },
-          });
-
-          if (existingCampingRegistration) {
-            throw new ConflictException(`User already registered for camping option: ${campingOption.name}`);
-          }
-
-          // Create the camping option registration
-          const campingRegistration = await this.prisma.campingOptionRegistration.create({
+    try {
+      // Atomic write of Registration + RegistrationJobs + CampingOptionRegistrations
+      // + CampingOptionFieldValues. Wrapping in $transaction guarantees that
+      // a downstream failure (e.g., the 3rd camping option fails to insert)
+      // rolls back ALL earlier writes — including the Registration and any
+      // CampingOptionRegistrations that already succeeded. Without this,
+      // CampingOptionRegistration has no FK to Registration so deleting the
+      // Registration in a manual catch leaves orphaned rows behind that
+      // block retries with "already registered for camping option X".
+      const { jobRegistration, campingOptionRegistrations } =
+        await this.prisma.$transaction(async (tx) => {
+          const jobRegistration = await tx.registration.create({
             data: {
-              userId,
-              campingOptionId,
-            },
-            include: {
-              campingOption: {
-                include: { fields: true },
+              status,
+              paymentDeferred: deferPayment,
+              year: currentYear,
+              user: { connect: { id: userId } },
+              jobs: {
+                create: jobIds.map((jobId) => ({
+                  job: { connect: { id: jobId } },
+                })),
               },
             },
+            include: {
+              user: true,
+              jobs: {
+                include: {
+                  job: { include: { category: true, shift: true } },
+                },
+              },
+              payments: true,
+            },
           });
 
-          // Create custom field values if provided
-          if (createCampRegistrationDto.customFields && campingOption.fields.length > 0) {
-            for (const field of campingOption.fields) {
-              const fieldValue = createCampRegistrationDto.customFields[field.id];
-              if (fieldValue !== undefined) {
-                await this.prisma.campingOptionFieldValue.create({
-                  data: {
-                    fieldId: field.id,
-                    registrationId: campingRegistration.id,
-                    value: String(fieldValue),
-                  },
-                });
+          const created: Array<{
+            id: string;
+            userId: string;
+            campingOptionId: string;
+            createdAt: Date;
+            updatedAt: Date;
+            campingOption: {
+              id: string;
+              name: string;
+              description: string | null;
+              enabled: boolean;
+              workShiftsRequired: number;
+              participantDues: number;
+              staffDues: number;
+              maxSignups: number;
+              createdAt: Date;
+              updatedAt: Date;
+              fields: Array<{
+                id: string;
+                displayName: string;
+                description: string | null;
+                dataType: string;
+                required: boolean;
+                maxLength: number | null;
+                minValue: number | null;
+                maxValue: number | null;
+                createdAt: Date;
+                updatedAt: Date;
+                campingOptionId: string;
+              }>;
+            };
+          }> = [];
+
+          for (const opt of validatedCampingOptions) {
+            const campingRegistration =
+              await tx.campingOptionRegistration.create({
+                data: { userId, campingOptionId: opt.campingOptionId },
+                include: { campingOption: { include: { fields: true } } },
+              });
+
+            if (createCampRegistrationDto.customFields && opt.fields.length > 0) {
+              for (const field of opt.fields) {
+                const fieldValue =
+                  createCampRegistrationDto.customFields[field.id];
+                if (fieldValue !== undefined) {
+                  await tx.campingOptionFieldValue.create({
+                    data: {
+                      fieldId: field.id,
+                      registrationId: campingRegistration.id,
+                      value: String(fieldValue),
+                    },
+                  });
+                }
               }
             }
+
+            created.push(campingRegistration);
           }
 
-          campingOptionRegistrations.push(campingRegistration);
-        }
-      }
+          return { jobRegistration, campingOptionRegistrations: created };
+        });
 
       const result = {
         jobRegistration,
@@ -664,8 +787,37 @@ export class RegistrationsService {
         message: 'Camp registration completed successfully',
       };
 
-      // Note: Registration confirmation email will be sent after payment completion
-      // This prevents race condition where email shows "pending" status before payment is processed
+      // Send registration confirmation email immediately when the
+      // registration lands CONFIRMED (which today happens only when
+      // paymentDeferred=true and no chosen job was waitlisted). For
+      // non-deferred PENDING registrations the email is still sent by the
+      // payments webhook on completed payment. For deferred WAITLISTED
+      // registrations we skip auto-email — the standard waitlist flow
+      // handles user communication and "confirmation" copy would mislead.
+      if (
+        jobRegistration.paymentDeferred &&
+        jobRegistration.status === RegistrationStatus.CONFIRMED
+      ) {
+        // Best-effort: log and swallow failures so a transient email
+        // outage never blocks the registration response.
+        this.sendRegistrationConfirmationEmail(
+          {
+            email: user.email,
+            firstName: user.firstName ?? undefined,
+            lastName: user.lastName ?? undefined,
+            playaName: user.playaName,
+          },
+          jobRegistration,
+          campingOptionRegistrations,
+          currentYear,
+          { paymentDeferred: true },
+        ).catch((emailErr) => {
+          const message = emailErr instanceof Error ? emailErr.message : String(emailErr);
+          this.logger.warn(
+            `Failed to send deferred-registration confirmation email to ${user.email}: ${message}`,
+          );
+        });
+      }
 
       return result;
     } catch (error: unknown) {
@@ -680,20 +832,19 @@ export class RegistrationsService {
 
       const err = error as Error;
       this.logger.error(`Registration creation failed for user ${userId}: ${err.message}`, err.stack);
-      
-      // Send registration error email (non-blocking)
-      const user = await this.prisma.user.findUnique({
-        where: { id: userId },
-        select: { email: true },
-      });
-      
-      if (user) {
-        this.sendRegistrationErrorEmail(user.email, err, userId)
-          .catch(emailError => {
-            this.logger.warn(`Failed to send registration error email to ${user.email}: ${emailError.message}`);
-          });
-      }
-      
+
+      // The transaction above rolls back all writes on failure, so there
+      // is no half-created Registration or CampingOptionRegistration to
+      // clean up here. The catch only logs and emails the user.
+
+      // Send registration error email (non-blocking). Only fires for
+      // unexpected failures inside the transaction — policy/terms/conflict
+      // 4xx rejections short-circuited above and never reach this catch.
+      this.sendRegistrationErrorEmail(user.email, err, userId)
+        .catch(emailError => {
+          this.logger.warn(`Failed to send registration error email to ${user.email}: ${emailError.message}`);
+        });
+
       // Re-throw the original error
       throw error;
     }
@@ -741,7 +892,8 @@ export class RegistrationsService {
         }>;
       };
     }>,
-    year: number
+    year: number,
+    options: { paymentDeferred?: boolean } = {},
   ): Promise<void> {
     try {
       // Calculate total cost from camping options
@@ -795,6 +947,7 @@ export class RegistrationsService {
         jobs,
         totalCost: totalCost > 0 ? totalCost * 100 : undefined, // Convert to cents
         currency: 'USD',
+        paymentDeferred: options.paymentDeferred === true,
       };
 
       // Build user name for email personalization
