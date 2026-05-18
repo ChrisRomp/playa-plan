@@ -28,7 +28,7 @@ type UserType = User | { allowRegistration?: boolean; allowEarlyRegistration?: b
  * older API responses that do not surface the flag.
  */
 function isUserRegistrationBlocked(user: UserType | null): boolean {
-  return !!user && 'allowRegistration' in user && user.allowRegistration === false;
+  return user?.allowRegistration === false;
 }
 
 /**

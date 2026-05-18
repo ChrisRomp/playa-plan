@@ -605,13 +605,16 @@ describe('RegistrationsService', () => {
         allowRegistration: false,
       });
 
-      await expect(
-        service.createCampRegistration('user-id', {
-          acceptedTerms: true,
-          jobs: ['job-id-1'],
-          campingOptions: [],
-        }),
-      ).rejects.toThrow(ForbiddenException);
+      const call = service.createCampRegistration('user-id', {
+        acceptedTerms: true,
+        jobs: ['job-id-1'],
+        campingOptions: [],
+      });
+
+      await expect(call).rejects.toBeInstanceOf(ForbiddenException);
+      await expect(call).rejects.toThrow(
+        'Registration is not available for your account. Please contact an administrator.',
+      );
     });
 
     it('should throw NotFoundException when user does not exist', async () => {
