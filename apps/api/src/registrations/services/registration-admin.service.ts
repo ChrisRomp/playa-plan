@@ -89,7 +89,13 @@ export class RegistrationAdminService {
         // lastName is "Smith" (and vice versa), as well as matching single
         // tokens against firstName, lastName, or playaName.
         const tokens = query.name.split(/\s+/).filter(Boolean);
-        if (tokens.length > 0) {
+        if (tokens.length === 1) {
+          where.user.OR = [
+            { firstName: { contains: tokens[0], mode: 'insensitive' } },
+            { lastName: { contains: tokens[0], mode: 'insensitive' } },
+            { playaName: { contains: tokens[0], mode: 'insensitive' } },
+          ];
+        } else if (tokens.length > 1) {
           where.user.AND = tokens.map((token) => ({
             OR: [
               { firstName: { contains: token, mode: 'insensitive' } },

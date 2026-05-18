@@ -737,14 +737,10 @@ describe('RegistrationAdminService', () => {
         where: {
           user: {
             email: { contains: 'test@example.com', mode: 'insensitive' },
-            AND: [
-              {
-                OR: [
-                  { firstName: { contains: 'John', mode: 'insensitive' } },
-                  { lastName: { contains: 'John', mode: 'insensitive' } },
-                  { playaName: { contains: 'John', mode: 'insensitive' } },
-                ],
-              },
+            OR: [
+              { firstName: { contains: 'John', mode: 'insensitive' } },
+              { lastName: { contains: 'John', mode: 'insensitive' } },
+              { playaName: { contains: 'John', mode: 'insensitive' } },
             ],
           },
         },
