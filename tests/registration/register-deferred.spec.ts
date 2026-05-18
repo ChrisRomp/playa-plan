@@ -82,11 +82,22 @@ test.describe(
         await expect(payNow).toBeVisible({ timeout: 15_000 });
         await payNow.click();
 
-        // Stripe Checkout — drop in a test card and submit.
-        await payViaStripeCheckout(page, { card: 'visa' });
+        // Stripe Checkout — drop in a test card and submit. `success` is
+        // the standard Stripe test-mode happy-path card from STRIPE_TEST_CARDS
+        // in tests/helpers/stripe.ts.
+        await payViaStripeCheckout(page, { card: 'success' });
 
-        // Back in-app, the registration row should have paymentDeferred=false.
-        await expect(page).toHaveURL(/#\/dashboard|#\/payment/, { timeout: 30_000 });
+        // After redirect back to /#/payment-success, the page calls
+        // `handleStripeSuccess` which hits POST /payments/verify-stripe-session.
+        // That endpoint is what flips `paymentDeferred` to false on the
+        // registration. Wait for the in-page spinner to disappear before
+        // reading the DB so we don't race the verification request.
+        await expect(page).toHaveURL(/#\/payment(-success)?|#\/dashboard/, {
+          timeout: 30_000,
+        });
+        await expect(page.getByText(/processing your payment/i)).toHaveCount(0, {
+          timeout: 30_000,
+        });
 
         const regAfter = await prisma.registration.findFirst({
           where: { userId: freshDeferredParticipant.id },
