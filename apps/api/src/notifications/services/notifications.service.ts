@@ -54,6 +54,8 @@ export interface TemplateData {
     }>;
     totalCost?: number;
     currency?: string;
+    /** True when the participant opted to defer dues payment. */
+    paymentDeferred?: boolean;
   };
   errorDetails?: {
     error: string;
@@ -301,6 +303,14 @@ export class NotificationsService {
       }>;
       totalCost?: number;
       currency?: string;
+      /**
+       * Whether the participant has opted to defer dues payment. When true
+       * the registration was created CONFIRMED with no associated payment;
+       * the template should render a "Payment deferred — please complete
+       * payment later from your dashboard" line so the participant knows
+       * to circle back.
+       */
+      paymentDeferred?: boolean;
     },
     userId: string,
     userName?: string,
@@ -796,8 +806,9 @@ export class NotificationsService {
     }>;
     totalCost?: number;
     currency?: string;
+    paymentDeferred?: boolean;
   }, campName: string, data?: TemplateData): NotificationTemplate {
-    const { status, campingOptions, jobs, totalCost, currency } = registrationDetails;
+    const { status, campingOptions, jobs, totalCost, currency, paymentDeferred } = registrationDetails;
     const formattedDate = new Date().toLocaleDateString();
     const formattedAmount = totalCost ? new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(totalCost / 100) : 'N/A';
     
@@ -816,6 +827,9 @@ export class NotificationsService {
       : this.getRegistrationStatusMessage(status);
     
     const duesLine = isAdminModification ? '' : `Total Dues: ${formattedAmount}\n`;
+    const deferredLine = paymentDeferred
+      ? `Payment Deferred: Yes — please complete dues payment later from your dashboard.\n`
+      : '';
     
     const text = `${greeting}
       
@@ -823,7 +837,7 @@ ${statusMessage}
       
 Status: ${friendlyStatus}
 Date: ${formattedDate}
-${duesLine}      
+${duesLine}${deferredLine}      
 Selected Options:
 ${campingOptions ? campingOptions.map(option => `- ${option.name}`).join('\n') : 'N/A'}
       
@@ -836,6 +850,9 @@ Best regards,
 The ${campName} Team`;
 
     const duesHtml = isAdminModification ? '' : `<p><strong>Total Dues:</strong> ${formattedAmount}</p>`;
+    const deferredHtml = paymentDeferred
+      ? `<p style="color: #b45309;"><strong>Payment Deferred:</strong> Please complete dues payment later from your dashboard.</p>`
+      : '';
 
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
@@ -848,6 +865,7 @@ The ${campName} Team`;
           <p><strong>Status:</strong> ${friendlyStatus}</p>
           <p><strong>Date:</strong> ${formattedDate}</p>
           ${duesHtml}
+          ${deferredHtml}
         </div>
         
         <div style="background-color: #f0f9ff; padding: 15px; border-radius: 5px; margin: 20px 0;">

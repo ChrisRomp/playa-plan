@@ -316,7 +316,55 @@ export class PaymentsService {
     //   updateDto.notes = data.reference;
     // }
     
-    return this.update(payment.id, updateDto);
+    const updatedPayment = await this.update(payment.id, updateDto);
+
+    // When a manual payment is recorded as COMPLETED against a registration,
+    // mark the registration paid: status CONFIRMED, paymentDeferred=false.
+    // This also closes out any deferred registrations that an admin records
+    // a manual payment for.
+    if (
+      data.registrationId &&
+      (data.status ?? PaymentStatus.COMPLETED) === PaymentStatus.COMPLETED
+    ) {
+      try {
+        await this.markRegistrationPaid(data.registrationId);
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : 'Unknown error';
+        this.logger.warn(
+          `Manual payment ${payment.id} recorded, but failed to mark registration ${data.registrationId} paid: ${message}`,
+        );
+      }
+    }
+
+    return updatedPayment;
+  }
+
+  /**
+   * Mark a registration as paid: clear `paymentDeferred` and set status
+   * to CONFIRMED — UNLESS the registration is currently WAITLISTED, in
+   * which case status stays WAITLISTED (capacity beats payment). Payment
+   * does not buy a slot the user can't have. The WAITLISTED case is
+   * unreachable for participants through normal UI but possible via
+   * direct API call or a TOCTOU race against capacity; mirrors the same
+   * guard in `verifyStripeSession`.
+   *
+   * Idempotent — safe to call multiple times. Called from every
+   * successful payment-completion path (today: Stripe verification path
+   * and `recordManualPayment`; any future payment provider should call
+   * this too) so the registration is always brought to a consistent
+   * paid state when a payment lands.
+   */
+  private async markRegistrationPaid(registrationId: string): Promise<void> {
+    const current = await this.prisma.registration.findUnique({
+      where: { id: registrationId },
+      select: { status: true },
+    });
+    if (!current) return;
+    const targetStatus = current.status === 'WAITLISTED' ? 'WAITLISTED' : 'CONFIRMED';
+    await this.prisma.registration.update({
+      where: { id: registrationId },
+      data: { status: targetStatus, paymentDeferred: false },
+    });
   }
 
   /**
@@ -529,12 +577,41 @@ export class PaymentsService {
         updatedPaymentStatus = PaymentStatus.COMPLETED;
         
         if (payment.registration) {
-          updatedRegistrationStatus = 'CONFIRMED';
+          // Capacity beats payment: a WAITLISTED registration must NOT be
+          // promoted to CONFIRMED just because the user paid. The
+          // standard waitlist flow (admin or capacity-opens-up) is the
+          // only path that should transition WAITLISTED → CONFIRMED.
+          // We still record the payment as COMPLETED and clear
+          // `paymentDeferred` so the row reflects the paid state, but
+          // the status stays WAITLISTED.
+          //
+          // This is the only WAITLISTED-deferred interaction that is
+          // actually reachable via this PR's new UI: the dashboard's
+          // "Pay Now" CTA hides itself for WAITLISTED registrations
+          // (DashboardPage.tsx), but a direct API call or a TOCTOU race
+          // that produced a WAITLISTED + paymentDeferred=true row would
+          // expose the bug this guard prevents. Pre-#160, this method
+          // always set the registration to CONFIRMED on paid sessions
+          // — a latent issue that became reachable once dashboard
+          // "Pay Now" was added.
+          const isWaitlisted = payment.registration.status === 'WAITLISTED';
+          updatedRegistrationStatus = isWaitlisted ? 'WAITLISTED' : 'CONFIRMED';
+          const targetStatus = updatedRegistrationStatus;
 
-          // If either the payment or registration status needs updating
-          if (payment.status !== PaymentStatus.COMPLETED || payment.registration.status !== 'CONFIRMED') {
+          // Update path fires when ANY of (a) payment not yet COMPLETED,
+          // (b) registration not at its target status (CONFIRMED unless
+          // WAITLISTED, in which case it stays WAITLISTED), (c) registration
+          // still flagged paymentDeferred=true. The third clause matters
+          // for deferred registrations: a deferred row starts as CONFIRMED
+          // + paymentDeferred=true, so without this clause a retry after
+          // payment would skip the update and leave paymentDeferred true.
+          if (
+            payment.status !== PaymentStatus.COMPLETED ||
+            payment.registration.status !== targetStatus ||
+            payment.registration.paymentDeferred
+          ) {
             try {
-              this.logger.log(`Updating payment ${payment.id} to COMPLETED and registration ${payment.registration.id} to CONFIRMED`);
+              this.logger.log(`Updating payment ${payment.id} to COMPLETED and registration ${payment.registration.id} to ${targetStatus} (paymentDeferred cleared)`);
               
               try {
                 // Use transaction to ensure atomicity between payment and registration updates
@@ -545,7 +622,7 @@ export class PaymentsService {
                   }),
                   this.prisma.registration.update({
                     where: { id: payment.registration.id },
-                    data: { status: 'CONFIRMED' },
+                    data: { status: targetStatus, paymentDeferred: false },
                   }),
                 ]);
                 
@@ -555,11 +632,18 @@ export class PaymentsService {
                   registration: transactionResults[1].id
                 })}`);
 
-                // Send registration confirmation email with the updated status
-                this.sendRegistrationConfirmationEmailAfterPayment(payment.registration.id)
-                  .catch(emailError => {
-                    this.logger.warn(`Failed to send registration confirmation email: ${emailError instanceof Error ? emailError.message : 'Unknown error'}`);
-                  });
+                // Send registration confirmation email with the updated
+                // status — but skip it for a deferred → paid transition,
+                // because the participant already received a confirmation
+                // email at registration creation time (with a "payment
+                // deferred" notice). Sending it again would duplicate.
+                const wasDeferred = payment.registration.paymentDeferred === true;
+                if (!wasDeferred) {
+                  this.sendRegistrationConfirmationEmailAfterPayment(payment.registration.id)
+                    .catch(emailError => {
+                      this.logger.warn(`Failed to send registration confirmation email: ${emailError instanceof Error ? emailError.message : 'Unknown error'}`);
+                    });
+                }
               } catch (transactionError) {
                 // If the transaction fails, at least try to update the payment status
                 // This ensures we record the successful Stripe payment even if registration update fails

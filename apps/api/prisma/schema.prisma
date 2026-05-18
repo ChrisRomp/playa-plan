@@ -173,15 +173,16 @@ model Shift {
 }
 
 model Registration {
-  id        String             @id @default(uuid())
-  status    RegistrationStatus @default(PENDING)
-  year      Int
-  createdAt DateTime           @default(now())
-  updatedAt DateTime           @updatedAt
-  userId    String
-  user      User               @relation(fields: [userId], references: [id])
-  jobs      RegistrationJob[]
-  payments  Payment[]
+  id              String             @id @default(uuid())
+  status          RegistrationStatus @default(PENDING)
+  paymentDeferred Boolean            @default(false)
+  year            Int
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  userId          String
+  user            User               @relation(fields: [userId], references: [id])
+  jobs            RegistrationJob[]
+  payments        Payment[]
 
   @@map("registrations")
 }

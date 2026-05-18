@@ -456,6 +456,235 @@ describe('DashboardPage Registration Status', () => {
       expect(screen.queryByTestId('payment-button')).not.toBeInTheDocument();
     });
   });
+
+  /**
+   * Coverage for the deferred-payment dashboard UX introduced with #160:
+   * a CONFIRMED registration with paymentDeferred=true must surface both
+   * a "Payment Deferred" badge AND a "Pay Now" CTA driven by the camping
+   * option dues (no PENDING payment row exists for a deferred reg).
+   */
+  describe('Deferred payment registration', () => {
+    const baseDeferredRegistration = {
+      id: 'reg-deferred-1',
+      userId: 'user-1',
+      year: 2025,
+      status: 'CONFIRMED' as const,
+      paymentDeferred: true,
+      jobs: [],
+      payments: [],
+      createdAt: '2025-01-01T00:00:00.000Z',
+      updatedAt: '2025-01-01T00:00:00.000Z',
+    };
+
+    const openConfig = {
+      name: 'Test Camp',
+      description: 'Test Description',
+      homePageBlurb: 'Test Blurb',
+      registrationOpen: true,
+      earlyRegistrationOpen: false,
+      currentYear: 2025,
+    };
+
+    beforeEach(() => {
+      mockUseConfig.mockReturnValue({
+        config: openConfig,
+        isLoading: false,
+        error: null,
+        refreshConfig: vi.fn(),
+        isConnecting: false,
+        isConnected: true,
+        connectionError: null,
+      });
+    });
+
+    it('renders a Payment Deferred badge for a deferred CONFIRMED registration', () => {
+      mockUseUserRegistrations.mockReturnValue({
+        registrations: [baseDeferredRegistration],
+        loading: false,
+        error: null,
+        refetch: vi.fn(),
+      });
+      mockUseCampRegistration.mockReturnValue({
+        campRegistration: {
+          campingOptions: [],
+          customFieldValues: [],
+          jobRegistrations: [],
+          hasRegistration: true,
+        },
+        loading: false,
+        error: null,
+        refetch: vi.fn(),
+      });
+
+      render(<DashboardPageWrapper />);
+
+      expect(screen.getByText('Payment Deferred')).toBeInTheDocument();
+    });
+
+    it('renders the Pay Now CTA with the dues amount computed from camping options', () => {
+      mockUseUserRegistrations.mockReturnValue({
+        registrations: [baseDeferredRegistration],
+        loading: false,
+        error: null,
+        refetch: vi.fn(),
+      });
+      mockUseCampRegistration.mockReturnValue({
+        campRegistration: {
+          campingOptions: [
+            {
+              id: 'cor-1',
+              userId: 'user-1',
+              campingOptionId: 'opt-1',
+              createdAt: '2025-01-01T00:00:00.000Z',
+              updatedAt: '2025-01-01T00:00:00.000Z',
+              campingOption: {
+                id: 'opt-1',
+                name: 'Standard',
+                description: null,
+                enabled: true,
+                workShiftsRequired: 0,
+                participantDues: 200,
+                staffDues: 100,
+                maxSignups: 100,
+                createdAt: '2025-01-01T00:00:00.000Z',
+                updatedAt: '2025-01-01T00:00:00.000Z',
+                fields: [],
+              },
+            },
+          ],
+          customFieldValues: [],
+          jobRegistrations: [],
+          hasRegistration: true,
+        },
+        loading: false,
+        error: null,
+        refetch: vi.fn(),
+      });
+
+      render(<DashboardPageWrapper />);
+
+      const payButton = screen.getByTestId('payment-button');
+      expect(payButton).toBeInTheDocument();
+      expect(payButton).toHaveAttribute('data-amount', '200');
+      expect(payButton).toHaveTextContent('Pay Now - $200.00');
+    });
+
+    it('omits the deferred CTA when camping options total $0', () => {
+      mockUseUserRegistrations.mockReturnValue({
+        registrations: [baseDeferredRegistration],
+        loading: false,
+        error: null,
+        refetch: vi.fn(),
+      });
+      mockUseCampRegistration.mockReturnValue({
+        campRegistration: {
+          campingOptions: [],
+          customFieldValues: [],
+          jobRegistrations: [],
+          hasRegistration: true,
+        },
+        loading: false,
+        error: null,
+        refetch: vi.fn(),
+      });
+
+      render(<DashboardPageWrapper />);
+
+      // Badge still renders (status indicator); CTA does not (nothing to pay).
+      expect(screen.getByText('Payment Deferred')).toBeInTheDocument();
+      expect(screen.queryByTestId('payment-button')).not.toBeInTheDocument();
+    });
+
+    it('does NOT render the Pay Now CTA for a WAITLISTED deferred registration (capacity wins)', () => {
+      mockUseUserRegistrations.mockReturnValue({
+        registrations: [{ ...baseDeferredRegistration, status: 'WAITLISTED' as const }],
+        loading: false,
+        error: null,
+        refetch: vi.fn(),
+      });
+      mockUseCampRegistration.mockReturnValue({
+        campRegistration: {
+          campingOptions: [
+            {
+              id: 'cor-1',
+              userId: 'user-1',
+              campingOptionId: 'opt-1',
+              createdAt: '2025-01-01T00:00:00.000Z',
+              updatedAt: '2025-01-01T00:00:00.000Z',
+              campingOption: {
+                id: 'opt-1',
+                name: 'Standard',
+                description: null,
+                enabled: true,
+                workShiftsRequired: 0,
+                participantDues: 200,
+                staffDues: 100,
+                maxSignups: 100,
+                createdAt: '2025-01-01T00:00:00.000Z',
+                updatedAt: '2025-01-01T00:00:00.000Z',
+                fields: [],
+              },
+            },
+          ],
+          customFieldValues: [],
+          jobRegistrations: [],
+          hasRegistration: true,
+        },
+        loading: false,
+        error: null,
+        refetch: vi.fn(),
+      });
+
+      render(<DashboardPageWrapper />);
+
+      // Badge shows (registration IS deferred), but the Pay Now CTA is
+      // hidden because a WAITLISTED registration must not buy a slot
+      // the user can't have. The payments webhook also refuses to
+      // promote WAITLISTED → CONFIRMED on payment.
+      expect(screen.getByText('Payment Deferred')).toBeInTheDocument();
+      expect(screen.queryByTestId('payment-button')).not.toBeInTheDocument();
+    });
+
+    it('renders a loading state for deferred dues while the camp registration query is in flight (no CTA, no error)', () => {
+      mockUseUserRegistrations.mockReturnValue({
+        registrations: [baseDeferredRegistration],
+        loading: false,
+        error: null,
+        refetch: vi.fn(),
+      });
+      mockUseCampRegistration.mockReturnValue({
+        campRegistration: null,
+        loading: true,
+        error: null,
+        refetch: vi.fn(),
+      });
+
+      render(<DashboardPageWrapper />);
+
+      expect(screen.getByText(/Loading deferred dues/i)).toBeInTheDocument();
+      expect(screen.queryByTestId('payment-button')).not.toBeInTheDocument();
+    });
+
+    it('renders an error message for deferred dues when the camp registration query fails (no silent CTA hide)', () => {
+      mockUseUserRegistrations.mockReturnValue({
+        registrations: [baseDeferredRegistration],
+        loading: false,
+        error: null,
+        refetch: vi.fn(),
+      });
+      mockUseCampRegistration.mockReturnValue({
+        campRegistration: null,
+        loading: false,
+        error: 'Failed to fetch camp registration',
+        refetch: vi.fn(),
+      });
+
+      render(<DashboardPageWrapper />);
+
+      expect(screen.getByText(/couldn't load your deferred dues/i)).toBeInTheDocument();
+      expect(screen.queryByTestId('payment-button')).not.toBeInTheDocument();
+    });
+  });
 });
 
 describe('DashboardPage - Registration after cancellation', () => {

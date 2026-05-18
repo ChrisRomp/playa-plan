@@ -114,16 +114,91 @@ const DashboardPage: React.FC = () => {
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                   <div className="flex items-center justify-between">
                     <h4 className="font-medium text-blue-900">Registration Status</h4>
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                      currentRegistration.status === 'CONFIRMED' ? 'bg-green-100 text-green-800' :
-                      currentRegistration.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' :
-                      currentRegistration.status === 'WAITLISTED' ? 'bg-orange-100 text-orange-800' :
-                      'bg-gray-100 text-gray-800'
-                    }`}>
-                      {currentRegistration.status}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                        currentRegistration.status === 'CONFIRMED' ? 'bg-green-100 text-green-800' :
+                        currentRegistration.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' :
+                        currentRegistration.status === 'WAITLISTED' ? 'bg-orange-100 text-orange-800' :
+                        'bg-gray-100 text-gray-800'
+                      }`}>
+                        {currentRegistration.status}
+                      </span>
+                      {currentRegistration.paymentDeferred && (
+                        <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-amber-100 text-amber-800">
+                          Payment Deferred
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
+
+                {/* Deferred Payment CTA — surfaces a Pay Now button for
+                    CONFIRMED registrations created with paymentDeferred=true.
+                    Excludes WAITLISTED: payment must not buy a slot the
+                    user can't have (capacity > payment), and the payments
+                    webhook will refuse to promote WAITLISTED → CONFIRMED.
+                    Distinct loading / error states avoid the trap where
+                    the badge shows but the CTA is hidden because the
+                    camp-registration query is still in flight. */}
+                {currentRegistration.paymentDeferred &&
+                  currentRegistration.status === 'CONFIRMED' && (
+                  <>
+                    {campLoading && (
+                      <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-center">
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-amber-600 mr-3"></div>
+                        <span className="text-sm text-amber-800">Loading deferred dues…</span>
+                      </div>
+                    )}
+                    {!campLoading && campError && (
+                      <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                        <h5 className="font-medium text-amber-900">Deferred Dues</h5>
+                        <p className="text-sm text-amber-800">
+                          We couldn't load your deferred dues right now. Please refresh or contact the admins to complete payment.
+                        </p>
+                      </div>
+                    )}
+                    {!campLoading && !campError && (() => {
+                      const isStaffOrAdmin =
+                        user?.role === 'staff' || user?.role === 'admin';
+                      const deferredAmount =
+                        campRegistration?.campingOptions.reduce((sum, opt) => {
+                          const dues = isStaffOrAdmin
+                            ? opt.campingOption?.staffDues
+                            : opt.campingOption?.participantDues;
+                          return sum + (dues ?? 0);
+                        }, 0) ?? 0;
+
+                      if (deferredAmount <= 0) return null;
+
+                      return (
+                        <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                          <div className="flex items-center justify-between mb-3">
+                            <div>
+                              <h5 className="font-medium text-amber-900">Deferred Dues</h5>
+                              <p className="text-sm text-amber-800">
+                                You opted to defer payment. Complete your ${deferredAmount.toFixed(2)} dues whenever you're ready.
+                              </p>
+                            </div>
+                          </div>
+                          <PaymentButton
+                            amount={deferredAmount}
+                            registrationId={currentRegistration.id}
+                            description={`${config?.name || 'Camp'} Deferred Dues Payment ${config?.currentYear || new Date().getFullYear()}`}
+                            onPaymentStart={() => {
+                              console.log('Completing deferred payment for registration:', currentRegistration.id);
+                            }}
+                            onPaymentError={(error) => {
+                              console.error('Payment error:', error);
+                            }}
+                            className="w-full"
+                          >
+                            Pay Now - ${deferredAmount.toFixed(2)}
+                          </PaymentButton>
+                        </div>
+                      );
+                    })()}
+                  </>
+                )}
 
                 {/* Work Shifts Section */}
                 {currentRegistration.jobs.length > 0 && (
