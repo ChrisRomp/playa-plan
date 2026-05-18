@@ -1356,7 +1356,8 @@ export const userNotes = {
   },
 
   /**
-   * Update an existing note. Allowed for the original author or admins.
+   * Update an existing note. Allowed only for the original author —
+   * admins cannot edit notes authored by other users.
    */
   update: async (
     userId: string,

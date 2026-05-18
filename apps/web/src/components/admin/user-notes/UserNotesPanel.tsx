@@ -117,9 +117,15 @@ export function UserNotesPanel({ userId }: UserNotesPanelProps) {
     }
   };
 
-  // Staff can only mutate their own notes; admins can mutate any.
-  // Server enforces the same rule — this is purely UI affordance.
-  const canMutate = (note: UserNote): boolean => {
+  // Edit is author-only (regardless of role) so attribution is preserved.
+  // Delete is allowed for the author or any admin.
+  // Server enforces the same rules — these gates are purely UI affordance.
+  const canEdit = (note: UserNote): boolean => {
+    if (!currentUser) return false;
+    return note.authorId === currentUser.id;
+  };
+
+  const canDelete = (note: UserNote): boolean => {
     if (!currentUser) return false;
     if (currentUser.role === 'admin') return true;
     return note.authorId === currentUser.id;
@@ -175,7 +181,8 @@ export function UserNotesPanel({ userId }: UserNotesPanelProps) {
       ) : (
         <ul className="space-y-3">
           {notes.map(note => {
-            const editable = canMutate(note);
+            const editable = canEdit(note);
+            const deletable = canDelete(note);
             const isEditing = editingId === note.id;
             return (
               <li
@@ -195,24 +202,28 @@ export function UserNotesPanel({ userId }: UserNotesPanelProps) {
                       <span className="ml-1 italic">(edited)</span>
                     )}
                   </div>
-                  {editable && !isEditing && (
+                  {!isEditing && (editable || deletable) && (
                     <div className="flex items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => startEdit(note)}
-                        className="p-1 text-gray-500 hover:text-blue-600"
-                        aria-label="Edit note"
-                      >
-                        <Pencil className="w-4 h-4" aria-hidden="true" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(note.id)}
-                        className="p-1 text-gray-500 hover:text-red-600"
-                        aria-label="Delete note"
-                      >
-                        <Trash2 className="w-4 h-4" aria-hidden="true" />
-                      </button>
+                      {editable && (
+                        <button
+                          type="button"
+                          onClick={() => startEdit(note)}
+                          className="p-1 text-gray-500 hover:text-blue-600"
+                          aria-label="Edit note"
+                        >
+                          <Pencil className="w-4 h-4" aria-hidden="true" />
+                        </button>
+                      )}
+                      {deletable && (
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(note.id)}
+                          className="p-1 text-gray-500 hover:text-red-600"
+                          aria-label="Delete note"
+                        >
+                          <Trash2 className="w-4 h-4" aria-hidden="true" />
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>

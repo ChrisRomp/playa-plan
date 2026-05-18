@@ -90,7 +90,8 @@ export class UserNotesService {
   /**
    * Update an existing note's content.
    *
-   * Only the original author or an ADMIN may edit a note.
+   * Only the original author may edit a note. Admins cannot edit notes
+   * authored by another user — content attribution is preserved.
    * The note must belong to the specified user (URL-path scoping).
    */
   async update(
@@ -100,7 +101,7 @@ export class UserNotesService {
     dto: UpdateUserNoteDto,
   ): Promise<UserNoteWithAuthor> {
     const note = await this.findOneScoped(userId, noteId);
-    this.assertCanMutate(note, actor);
+    this.assertCanEdit(note, actor);
 
     const updated = await this.prisma.userNote.update({
       where: { id: noteId },
@@ -114,7 +115,7 @@ export class UserNotesService {
   /**
    * Delete a note.
    *
-   * Only the original author or an ADMIN may delete a note.
+   * The original author may delete their own note; ADMINs may delete any note.
    * The note must belong to the specified user (URL-path scoping).
    */
   async delete(
@@ -123,7 +124,7 @@ export class UserNotesService {
     actor: { id: string; role: UserRole },
   ): Promise<void> {
     const note = await this.findOneScoped(userId, noteId);
-    this.assertCanMutate(note, actor);
+    this.assertCanDelete(note, actor);
 
     await this.prisma.userNote.delete({ where: { id: noteId } });
     this.logger.log(`User note ${noteId} deleted by ${actor.id}`);
@@ -174,7 +175,18 @@ export class UserNotesService {
     return note;
   }
 
-  private assertCanMutate(
+  private assertCanEdit(
+    note: PrismaUserNote,
+    actor: { id: string; role: UserRole },
+  ): void {
+    if (note.authorId !== actor.id) {
+      throw new ForbiddenException(
+        'Only the original author can edit this note',
+      );
+    }
+  }
+
+  private assertCanDelete(
     note: PrismaUserNote,
     actor: { id: string; role: UserRole },
   ): void {
@@ -183,7 +195,7 @@ export class UserNotesService {
     }
     if (note.authorId !== actor.id) {
       throw new ForbiddenException(
-        'Only the original author or an administrator can modify this note',
+        'Only the original author or an administrator can delete this note',
       );
     }
   }

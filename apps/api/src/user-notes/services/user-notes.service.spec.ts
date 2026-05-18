@@ -155,9 +155,20 @@ describe('UserNotesService', () => {
       expect(result).toBe(updated);
     });
 
-    it('allows admins to update notes authored by other users', async () => {
+    it('forbids admins from editing notes authored by another user', async () => {
       prisma.userNote.findUnique.mockResolvedValue(
         makeNote({ authorId: 'someone-else' }),
+      );
+
+      await expect(
+        service.update('user-1', 'note-1', adminActor, { content: 'x' }),
+      ).rejects.toThrow(ForbiddenException);
+      expect(prisma.userNote.update).not.toHaveBeenCalled();
+    });
+
+    it('allows an admin to edit their own note', async () => {
+      prisma.userNote.findUnique.mockResolvedValue(
+        makeNote({ authorId: adminActor.id }),
       );
       prisma.userNote.update.mockResolvedValue(makeNoteWithAuthor());
 

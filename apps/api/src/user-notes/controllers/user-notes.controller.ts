@@ -101,8 +101,10 @@ export class UserNotesController {
   }
 
   /**
-   * Update the content of an existing note. Only the original author or
-   * an administrator may edit a note.
+   * Update the content of an existing note. Only the original author may
+   * edit a note — admins cannot edit notes authored by other users so that
+   * attribution is preserved. To remove an objectionable note authored by
+   * someone else, an admin must delete it.
    */
   @Patch(':noteId')
   @ApiOperation({ summary: 'Update an internal note' })
@@ -116,7 +118,7 @@ export class UserNotesController {
   @ApiResponse({ status: 400, description: 'Invalid input' })
   @ApiResponse({
     status: 403,
-    description: 'Forbidden — staff can only edit their own notes',
+    description: 'Forbidden — only the original author may edit a note',
   })
   @ApiResponse({ status: 404, description: 'Note not found' })
   async update(
