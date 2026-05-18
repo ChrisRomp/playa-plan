@@ -4,6 +4,7 @@ import { CoreConfigService } from '../../core-config/services/core-config.servic
 import { EmailAuditService } from './email-audit.service';
 import { NotificationType } from '@prisma/client';
 import * as nodemailer from 'nodemailer';
+import { withTimeout } from '../../common/utils/timeout.utils';
 
 export interface EmailOptions {
   to: string | string[];
@@ -359,16 +360,11 @@ export class EmailService implements OnModuleInit {
         return false;
       }
       
-      // Create a timeout promise to prevent hanging
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error('Email send timeout after 30 seconds')), 30000);
-      });
-      
-      // Race between sending email and timeout
-      await Promise.race([
+      await withTimeout(
         this.transporter.sendMail(mailOptions),
-        timeoutPromise
-      ]);
+        30000,
+        'Email send timeout after 30 seconds',
+      );
       
       this.logger.log(`Email sent via SMTP to ${Array.isArray(mailOptions.to) ? mailOptions.to.join(', ') : mailOptions.to}`);
       return true;
@@ -489,15 +485,11 @@ export class EmailService implements OnModuleInit {
         socketTimeout: 10000,     // 10 seconds
       });
 
-      // Test the connection with timeout protection
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error('SMTP connection test timeout after 15 seconds')), 15000);
-      });
-      
-      await Promise.race([
+      await withTimeout(
         testTransporter.verify(),
-        timeoutPromise
-      ]);
+        15000,
+        'SMTP connection test timeout after 15 seconds',
+      );
       
       return {
         success: true,
