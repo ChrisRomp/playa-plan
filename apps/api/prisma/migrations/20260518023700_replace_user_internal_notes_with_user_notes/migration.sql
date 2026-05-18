@@ -29,7 +29,11 @@ ALTER TABLE "user_notes"
 
 -- Migrate any existing internal notes into the new table.
 -- The original column did not record an author, so the migrated note is
--- attributed to the user themselves; admins can edit/delete after migration.
+-- attributed to the subject user. Under the current authorization rules
+-- (edit is author-only, delete is author-or-admin) and because the notes
+-- endpoint is staff/admin-only, the subject user cannot reach their own
+-- note; in practice admins can only delete these migrated notes, not edit
+-- them.
 INSERT INTO "user_notes" ("id", "userId", "authorId", "content", "createdAt", "updatedAt")
 SELECT gen_random_uuid(), "id", "id", "internalNotes", NOW(), NOW()
 FROM "users"
