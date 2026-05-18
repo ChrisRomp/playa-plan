@@ -4,9 +4,11 @@ import { waitForRegistrationProfileHydrated } from './hydration';
 
 /**
  * Walk a logged-in participant through the full multi-step registration flow up to
- * the Payment step. Stops at "Complete Registration" — the caller is responsible
- * for clicking that button (or calling `payViaStripeCheckout` from stripe.ts) so
- * different specs can compose payment vs. deferred vs. failure paths.
+ * the Payment step. Stops on the Payment step's CTA — which may be either
+ * "Complete Registration" (paid path) or "Pay Dues Later" (deferred path).
+ * Callers are responsible for asserting which CTA they expected and clicking
+ * it (or invoking `payViaStripeCheckout` from stripe.ts) so different specs
+ * can compose payment vs. deferred vs. failure paths.
  *
  * Assumes the seed.ts fixture (Skydiving camping option, 4 work-shift categories,
  * and Teardown as the always-required category). Picks shifts by capacity rather
@@ -89,9 +91,15 @@ export async function walkRegistrationToPayment(
   await page.getByRole('checkbox', { name: /i accept the terms/i }).check();
   await page.getByRole('button', { name: /Review & Pay|Submit/ }).click();
 
-  // Step 6 — Payment.
+  // Step 6 — Payment. The page renders either a "Complete Registration"
+  // payment button (Stripe / PayPal path) or a "Pay Dues Later" button
+  // (deferred path, when both config and user flags allow). Match either so
+  // both payment and deferred specs can share this helper; the caller
+  // asserts which one it actually expected.
   await expect(page.getByRole('heading', { name: 'Payment' })).toBeVisible({ timeout: 10_000 });
-  await expect(page.getByRole('button', { name: /Complete Registration/ })).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: /Complete Registration|Pay Dues Later/ }),
+  ).toBeVisible();
 }
 
 /**
