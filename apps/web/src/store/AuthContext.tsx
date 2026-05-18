@@ -1,6 +1,6 @@
 import React, { useState, useEffect, ReactNode } from 'react';
 import { User } from '../types';
-import { auth, clearJwtToken, JWT_TOKEN_STORAGE_KEY, type AuthResponse } from '../lib/api';
+import { auth, clearJwtToken, JWT_TOKEN_STORAGE_KEY, type UserProfile } from '../lib/api';
 import { passkeysApi, isPasskeySupported } from '../lib/api/passkeys';
 import { startAuthentication } from '@simplewebauthn/browser';
 import cookieService from '../lib/cookieService';
@@ -18,7 +18,52 @@ const isPasskeyCancellation = (err: unknown): boolean => {
   return e.name === 'NotAllowedError' || e.code === 'ERROR_CEREMONY_ABORTED';
 };
 
-
+/**
+ * Build the client-side `User` from a parsed API user profile.
+ *
+ * Spreads the backend profile through to the store and overlays only the
+ * derived/client-shaped fields below. Compared with the pre-#154 hand-rolled
+ * whitelist, this collapses the field list to a single source of truth —
+ * `UserSchema` in `apps/web/src/lib/api.ts` — so adding a new safe profile
+ * field is a one-place change rather than two.
+ *
+ * Note: Zod's default object parsing strips unknown keys, so this is NOT a
+ * blanket pass-through. A new backend field still needs to be added to
+ * `UserSchema` to reach the client; that is deliberate.
+ *
+ * Overlaid fields:
+ *
+ * - `name`                       — composed from firstName + lastName.
+ * - `role`                       — mapped from the backend's uppercase enum
+ *                                  (`ADMIN`/`STAFF`/`PARTICIPANT`) to the
+ *                                  client's lowercase enum.
+ * - `isAuthenticated`            — always true at this point in the flow.
+ * - `isEarlyRegistrationEnabled` — backward-compatible alias of
+ *                                  `allowEarlyRegistration`. The raw flag is
+ *                                  also surfaced by the spread above.
+ * - `hasRegisteredForCurrentYear`— placeholder; would come from registration
+ *                                  data fetched elsewhere.
+ *
+ * Excluded fields:
+ *
+ * - `internalNotes` — admin-only field about the user. Even though the
+ *                    `/auth/profile` endpoint returns it for the user
+ *                    themselves, it has no current-user use case on the
+ *                    client and should not become part of global auth state.
+ */
+const buildClientUser = (userProfile: UserProfile): User => {
+  // Intentionally drop internalNotes — see docstring above.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { internalNotes, ...safe } = userProfile;
+  return {
+    ...safe,
+    name: `${userProfile.firstName} ${userProfile.lastName}`,
+    role: mapApiRoleToClientRole(userProfile.role),
+    isAuthenticated: true,
+    isEarlyRegistrationEnabled: userProfile.allowEarlyRegistration || false,
+    hasRegisteredForCurrentYear: false,
+  };
+};
 
 /**
  * AuthProvider component that manages authentication state
@@ -87,15 +132,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             const userProfile = await auth.getProfile();
             
             // Transform API user data to our client User type
-            setUser({
-              id: userProfile.id,
-              name: `${userProfile.firstName} ${userProfile.lastName}`,
-              email: userProfile.email,
-              role: mapApiRoleToClientRole(userProfile.role),
-              isAuthenticated: true,
-              isEarlyRegistrationEnabled: userProfile.allowEarlyRegistration || false,
-              hasRegisteredForCurrentYear: false // This would come from registration data
-            });
+            setUser(buildClientUser(userProfile));
             
             // Set the client-side auth state cookie for UI state
             await cookieService.setAuthenticatedState();
@@ -156,19 +193,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
    * profile-fetch failure the partial auth artifacts can be rolled
    * back before flipping isAuthenticated/user state.
    */
-  const completeLogin = async (authResponse: AuthResponse): Promise<void> => {
+  const completeLogin = async (): Promise<void> => {
     try {
       await cookieService.setAuthenticatedState();
       const userProfile = await auth.getProfile();
-      setUser({
-        id: authResponse.userId,
-        email: authResponse.email,
-        name: `${authResponse.firstName} ${authResponse.lastName}`,
-        role: mapApiRoleToClientRole(authResponse.role),
-        isAuthenticated: true,
-        isEarlyRegistrationEnabled: userProfile.allowEarlyRegistration || false,
-        hasRegisteredForCurrentYear: false,
-      });
+      setUser(buildClientUser(userProfile));
       setIsAuthenticated(true);
       localStorage.removeItem('pendingLoginEmail');
     } catch (err) {
@@ -189,8 +218,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setError(null);
     setIsLoading(true);
     try {
-      const authResponse = await auth.verifyCode(email, code);
-      await completeLogin(authResponse);
+      await auth.verifyCode(email, code);
+      await completeLogin();
     } catch (err) {
       const errorMessage = err instanceof Error
         ? err.message
@@ -228,8 +257,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         typeof startAuthentication
       >[0]['optionsJSON'];
       const assertion = await startAuthentication({ optionsJSON });
-      const authResponse = await passkeysApi.authenticationVerify(assertion);
-      await completeLogin(authResponse);
+      await passkeysApi.authenticationVerify(assertion);
+      await completeLogin();
     } catch (err) {
       if (isPasskeyCancellation(err)) {
         // Don't surface cancellations to the UI.

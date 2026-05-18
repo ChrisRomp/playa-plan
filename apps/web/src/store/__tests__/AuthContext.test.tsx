@@ -417,4 +417,116 @@ describe('AuthContext', () => {
       expect(screen.getByTestId('user').textContent).toBe('no user');
     });
   });
+
+  /**
+   * Regression coverage for issue #154: the client user object must surface
+   * per-user permission flags from the API profile so registration and other
+   * flows can gate on them. Before the fix, AuthContext hand-rolled the user
+   * object and dropped these fields, so e.g. `user.allowDeferredDuesPayment`
+   * was always undefined and the "Pay Dues Later" path was unreachable.
+   *
+   * Both authentication entry points must propagate the flags:
+   *   - bootstrap (`checkAuthStatus` runs on mount when a JWT is present)
+   *   - login completion (`completeLogin`, used by `verifyCode` and passkey)
+   */
+  describe('per-user permission flags from API profile (issue #154)', () => {
+    const profileWithFlags = {
+      id: 'user-123',
+      email: 'test@example.playaplan.app',
+      firstName: 'Test',
+      lastName: 'User',
+      playaName: null,
+      profilePicture: null,
+      role: 'PARTICIPANT',
+      isEmailVerified: true,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+      phone: null,
+      city: null,
+      stateProvince: null,
+      country: null,
+      emergencyContact: null,
+      allowRegistration: true,
+      allowEarlyRegistration: true,
+      allowDeferredDuesPayment: true,
+      allowNoJob: true,
+      // Admin-only — must NOT be spread onto the client auth user.
+      internalNotes: 'admin-only note about this user',
+    };
+
+    it('should surface allowDeferredDuesPayment and other flags on bootstrap when a JWT is present', async () => {
+      const cookieService = (await import('../../lib/cookieService')).default;
+      (localStorage.getItem as Mock).mockReturnValue('mock-jwt-token');
+      (cookieService.isAuthenticated as Mock).mockReturnValue(false);
+      (authApi.checkAuth as Mock).mockResolvedValue(true);
+      (authApi.getProfile as Mock).mockResolvedValue(profileWithFlags);
+
+      await act(async () => {
+        render(
+          <AuthProvider>
+            <TestComponent />
+          </AuthProvider>
+        );
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId('authenticated').textContent).toBe('true');
+      });
+
+      const userJson = screen.getByTestId('user').textContent ?? '';
+      const actualUser = JSON.parse(userJson);
+      expect(actualUser.allowDeferredDuesPayment).toBe(true);
+      expect(actualUser.allowEarlyRegistration).toBe(true);
+      expect(actualUser.allowRegistration).toBe(true);
+      expect(actualUser.allowNoJob).toBe(true);
+      // Derived alias must still be present for back-compat with existing consumers.
+      expect(actualUser.isEarlyRegistrationEnabled).toBe(true);
+      // Role must be mapped to the lowercase client enum, not the raw API value.
+      expect(actualUser.role).toBe('user');
+      // internalNotes is admin-only and must not bleed into the auth user.
+      expect(actualUser).not.toHaveProperty('internalNotes');
+    });
+
+    it('should surface allowDeferredDuesPayment and other flags after verifyCode → completeLogin', async () => {
+      (authApi.verifyCode as Mock).mockResolvedValue({
+        userId: 'user-123',
+        email: 'test@example.playaplan.app',
+        firstName: 'Test',
+        lastName: 'User',
+        role: 'PARTICIPANT',
+        accessToken: 'mock-token',
+      });
+      (authApi.getProfile as Mock).mockResolvedValue(profileWithFlags);
+
+      await act(async () => {
+        render(
+          <AuthProvider>
+            <TestComponent />
+          </AuthProvider>
+        );
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId('loading').textContent).toBe('false');
+      });
+
+      await act(async () => {
+        screen.getByTestId('verify-code-btn').click();
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId('authenticated').textContent).toBe('true');
+      });
+
+      const userJson = screen.getByTestId('user').textContent ?? '';
+      const actualUser = JSON.parse(userJson);
+      expect(actualUser.allowDeferredDuesPayment).toBe(true);
+      expect(actualUser.allowEarlyRegistration).toBe(true);
+      expect(actualUser.allowRegistration).toBe(true);
+      expect(actualUser.allowNoJob).toBe(true);
+      expect(actualUser.isEarlyRegistrationEnabled).toBe(true);
+      expect(actualUser.role).toBe('user');
+      expect(actualUser).not.toHaveProperty('internalNotes');
+    });
+  });
 });

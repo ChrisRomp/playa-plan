@@ -331,6 +331,12 @@ export const CampingOptionSchema = z.object({
 
 // API Types
 export type User = z.infer<typeof UserSchema>;
+/**
+ * Backend user profile shape returned from `/auth/profile`. Alias for the
+ * Zod-parsed `User` schema to make import sites read more clearly when the
+ * client also has its own `User` type (apps/web/src/types/index.ts).
+ */
+export type UserProfile = User;
 export type AuthResponse = z.infer<typeof AuthResponseSchema>;
 export type CoreConfig = z.infer<typeof CoreConfigSchema>;
 export type CampingOption = z.infer<typeof CampingOptionSchema>;
