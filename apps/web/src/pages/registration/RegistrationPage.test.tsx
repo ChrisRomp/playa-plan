@@ -297,8 +297,8 @@ describe('RegistrationPage', () => {
     );
   };
 
-  const navigateToJobsStep = async () => {
-    renderWithAuth();
+  const navigateToJobsStep = async (user = mockUser) => {
+    renderWithAuth(true, user);
     
     // Step 1: Fill profile form
     fireEvent.change(screen.getByLabelText('First Name*'), { target: { value: 'Test' } });
@@ -860,6 +860,34 @@ describe('RegistrationPage', () => {
       // Should show detailed camping job validation error for multiple options
       await waitFor(() => {
         expect(screen.getAllByText('You must select at least 1 Skydiving work shift and 2 Premium Camping work shifts')).toHaveLength(2);
+      });
+    });
+
+    describe('allowNoJob flag', () => {
+      it('should render the jobs step as optional and skip minimum-shift validation', async () => {
+        const allowNoJobUser = { ...mockUser, allowNoJob: true };
+        await navigateToJobsStep(allowNoJobUser);
+
+        // Optional copy is shown and "required" counters are suppressed
+        expect(
+          screen.getByText(/Work shifts are optional for your account\./i),
+        ).toBeInTheDocument();
+        expect(screen.queryByText(/Camp Shifts:.*required/)).not.toBeInTheDocument();
+        expect(screen.queryByText(/Additional Shifts:.*required/)).not.toBeInTheDocument();
+
+        // Advance with zero jobs selected; no validation errors should appear
+        fireEvent.click(screen.getByText('Continue'));
+
+        await waitFor(() => {
+          expect(screen.getByText('Review & Accept Terms')).toBeInTheDocument();
+        });
+        expect(screen.queryByText(/You need to select at least/)).not.toBeInTheDocument();
+        expect(
+          screen.queryByText(/You must select at least 1 Skydiving work shift/),
+        ).not.toBeInTheDocument();
+        expect(
+          screen.queryByText(/You must select at least one Teardown shift/),
+        ).not.toBeInTheDocument();
       });
     });
   });

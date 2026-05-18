@@ -223,6 +223,11 @@ export default function RegistrationPage() {
 
   // Calculate total jobs required based on camping options and always required categories
   const calculateRequiredJobCount = (): number => {
+    // Users with the allowNoJob flag are exempt from all job requirements
+    if (user?.allowNoJob) {
+      return 0;
+    }
+
     // Get job requirements from camping options
     const selectedOptions = campingOptions.filter(option => 
       formData.campingOptions.includes(option.id)
@@ -370,60 +375,63 @@ export default function RegistrationPage() {
       });
     }
     else if (currentStep === 4) {
-      // Validate jobs selection
-      const requiredCount = calculateRequiredJobCount();
-      if (formData.jobs.length < requiredCount) {
-        errors.jobs = `You need to select at least ${requiredCount} shifts`;
-      }
-      
-      // Ensure all always required categories have at least one job
-      const alwaysRequiredCategories = getAlwaysRequiredCategories();
-      
-      alwaysRequiredCategories.forEach(category => {
-        const categoryJobs = getAlwaysRequiredJobs().filter(
-          job => job.categoryId === category.id
-        );
-        
-        const selectedCategoryJobs = categoryJobs.filter(
-          job => formData.jobs.includes(job.id)
-        );
-        
-        if (selectedCategoryJobs.length === 0) {
-          errors[`category_${category.id}`] = 
-            `You must select at least one ${category.name} shift`;
+      // Users with the allowNoJob flag may complete registration without selecting any shifts
+      if (!user?.allowNoJob) {
+        // Validate jobs selection
+        const requiredCount = calculateRequiredJobCount();
+        if (formData.jobs.length < requiredCount) {
+          errors.jobs = `You need to select at least ${requiredCount} shifts`;
         }
-      });
-      
-      // Ensure camping option job requirements are met
-      const selectedOptions = campingOptions.filter(option => 
-        formData.campingOptions.includes(option.id)
-      );
-      
-      const campingJobsRequired = selectedOptions.reduce(
-        (total, option) => total + option.workShiftsRequired, 
-        0
-      );
-      
-      if (campingJobsRequired > 0) {
-        const campingOptionJobs = getCampingOptionJobs();
-        const selectedCampingJobs = campingOptionJobs.filter(
-          job => formData.jobs.includes(job.id)
+
+        // Ensure all always required categories have at least one job
+        const alwaysRequiredCategories = getAlwaysRequiredCategories();
+
+        alwaysRequiredCategories.forEach(category => {
+          const categoryJobs = getAlwaysRequiredJobs().filter(
+            job => job.categoryId === category.id
+          );
+
+          const selectedCategoryJobs = categoryJobs.filter(
+            job => formData.jobs.includes(job.id)
+          );
+
+          if (selectedCategoryJobs.length === 0) {
+            errors[`category_${category.id}`] =
+              `You must select at least one ${category.name} shift`;
+          }
+        });
+
+        // Ensure camping option job requirements are met
+        const selectedOptions = campingOptions.filter(option =>
+          formData.campingOptions.includes(option.id)
         );
-        
-        if (selectedCampingJobs.length < campingJobsRequired) {
-          // Create a detailed error message showing each camping option's requirements
-          const optionMessages = selectedOptions
-            .filter(option => option.workShiftsRequired > 0)
-            .map(option => {
-              const shiftText = option.workShiftsRequired === 1 ? 'work shift' : 'work shifts';
-              return `${option.workShiftsRequired} ${option.name} ${shiftText}`;
-            });
-          
-          if (optionMessages.length === 1) {
-            errors.campingJobs = `You must select at least ${optionMessages[0]}`;
-          } else {
-            const lastOption = optionMessages.pop();
-            errors.campingJobs = `You must select at least ${optionMessages.join(', ')} and ${lastOption}`;
+
+        const campingJobsRequired = selectedOptions.reduce(
+          (total, option) => total + option.workShiftsRequired,
+          0
+        );
+
+        if (campingJobsRequired > 0) {
+          const campingOptionJobs = getCampingOptionJobs();
+          const selectedCampingJobs = campingOptionJobs.filter(
+            job => formData.jobs.includes(job.id)
+          );
+
+          if (selectedCampingJobs.length < campingJobsRequired) {
+            // Create a detailed error message showing each camping option's requirements
+            const optionMessages = selectedOptions
+              .filter(option => option.workShiftsRequired > 0)
+              .map(option => {
+                const shiftText = option.workShiftsRequired === 1 ? 'work shift' : 'work shifts';
+                return `${option.workShiftsRequired} ${option.name} ${shiftText}`;
+              });
+
+            if (optionMessages.length === 1) {
+              errors.campingJobs = `You must select at least ${optionMessages[0]}`;
+            } else {
+              const lastOption = optionMessages.pop();
+              errors.campingJobs = `You must select at least ${optionMessages.join(', ')} and ${lastOption}`;
+            }
           }
         }
       }
@@ -1050,34 +1058,41 @@ export default function RegistrationPage() {
     const alwaysRequiredJobs = getAlwaysRequiredJobs();
     const campingOptionJobs = getCampingOptionJobs();
     const alwaysRequiredCategories = getAlwaysRequiredCategories();
-    
+    const jobsAreOptional = !!user?.allowNoJob;
+
     // Group camping option jobs by category
     const groupedCampingJobs = groupJobsByCategory(campingOptionJobs);
-    
+
     // Calculate required shifts for camping options
-    const selectedOptions = campingOptions.filter(option => 
+    const selectedOptions = campingOptions.filter(option =>
       formData.campingOptions.includes(option.id)
     );
-    const campingShiftsRequired = selectedOptions.reduce(
-      (total, option) => total + option.workShiftsRequired, 
-      0
-    );
-    
+    const campingShiftsRequired = jobsAreOptional
+      ? 0
+      : selectedOptions.reduce(
+          (total, option) => total + option.workShiftsRequired,
+          0
+        );
+
     return (
       <div>
         <h2 className="text-xl font-semibold mb-4">Select Work Shifts</h2>
         <p className="mb-4">
-          You need to select at least {requiredCount} shifts to complete registration.
+          {jobsAreOptional
+            ? 'Work shifts are optional for your account. You may select any shifts you would like to sign up for.'
+            : `You need to select at least ${requiredCount} shifts to complete registration.`}
         </p>
         
         {/* Camp Shifts Section */}
         {Object.keys(groupedCampingJobs).length > 0 && (
           <div className="mb-6">
             <h3 className="text-lg font-medium mb-2">
-              Camp Shifts{campingShiftsRequired > 0 ? `: ${campingShiftsRequired} required` : ''}
+              Camp Shifts{!jobsAreOptional && campingShiftsRequired > 0 ? `: ${campingShiftsRequired} required` : ''}
             </h3>
             <p className="text-sm text-gray-700 mb-4">
-              Please select work shifts for camp.
+              {jobsAreOptional
+                ? 'Optional: select any camp work shifts you would like to sign up for.'
+                : 'Please select work shifts for camp.'}
             </p>
             
             {formErrors.campingJobs && (
@@ -1104,11 +1119,12 @@ export default function RegistrationPage() {
         {alwaysRequiredCategories.length > 0 && (
           <div className="mb-6">
             <h3 className="text-lg font-medium mb-2">
-              Additional Shifts{alwaysRequiredCategories.length > 0 ? `: ${alwaysRequiredCategories.length} required` : ''}
+              Additional Shifts{!jobsAreOptional && alwaysRequiredCategories.length > 0 ? `: ${alwaysRequiredCategories.length} required` : ''}
             </h3>
             <p className="text-sm text-gray-700 mb-4">
-              These shifts are required for all participants regardless of camping options.
-              You must select at least one shift from each required category.
+              {jobsAreOptional
+                ? 'Optional: select any additional shifts you would like to sign up for.'
+                : 'These shifts are required for all participants regardless of camping options. You must select at least one shift from each required category.'}
             </p>
             
             <div className="space-y-2">
@@ -1123,7 +1139,7 @@ export default function RegistrationPage() {
                   category.name,
                   category.description || '',
                   categoryJobs,
-                  true,
+                  !jobsAreOptional,
                   errorKey
                 );
               })}
