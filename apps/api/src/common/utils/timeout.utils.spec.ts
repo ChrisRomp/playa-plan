@@ -24,4 +24,13 @@ describe('withTimeout', () => {
     await timeoutAssertion;
     expect(jest.getTimerCount()).toBe(0);
   });
+
+  it('should reject with original error and clear timer', async () => {
+    jest.useFakeTimers();
+
+    const wrappedPromise = withTimeout(Promise.reject(new Error('failure')), 1000, 'timeout');
+
+    await expect(wrappedPromise).rejects.toThrow('failure');
+    expect(jest.getTimerCount()).toBe(0);
+  });
 });

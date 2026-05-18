@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { withTimeout } from '../../common/utils/timeout.utils';
 import { HealthStatus, HealthCheckResult, SystemInfo, HealthResponseDto } from '../dto/health-response.dto';
 
 @Injectable()
@@ -55,7 +56,7 @@ export class HealthService {
     const startTime = Date.now();
     
     try {
-      await this.withTimeout(
+      await withTimeout(
         this.prisma.$queryRaw`SELECT 1`,
         3000,
         'Database check timeout'
@@ -118,7 +119,7 @@ export class HealthService {
       throw new Error('Stripe not configured');
     }
     
-    await this.withTimeout(
+    await withTimeout(
       fetch('https://api.stripe.com/v1/account', {
         method: 'GET',
         headers: { 'Authorization': `Bearer ${stripeKey}` },
@@ -139,7 +140,7 @@ export class HealthService {
     }
     
     const baseUrl = this.configService.get<string>('paypal.baseUrl');
-    await this.withTimeout(
+    await withTimeout(
       fetch(`${baseUrl}/v1/oauth2/token`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -205,17 +206,6 @@ export class HealthService {
       memoryUsage: `${memoryPercent}%`,
       uptime: uptimeFormatted,
     };
-  }
-
-  private withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
-    let timeoutId: NodeJS.Timeout | undefined;
-    const timeout = new Promise<never>((_, reject) => {
-      timeoutId = setTimeout(() => reject(new Error(message)), ms);
-    });
-    return Promise.race([promise, timeout])
-      .finally(() => {
-        if (timeoutId) clearTimeout(timeoutId);
-      });
   }
 
   private extractResult(settledResult: PromiseSettledResult<HealthCheckResult | SystemInfo>): HealthCheckResult | SystemInfo {
