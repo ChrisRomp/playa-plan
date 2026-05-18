@@ -528,6 +528,13 @@ export class RegistrationsService {
         throw new NotFoundException(`User with ID ${userId} not found`);
       }
 
+      // Enforce the per-user allowRegistration flag. Admins can disable the
+      // ability for a specific user to register; respect that here so the
+      // toggle cannot be bypassed by calling the API directly.
+      if (user.allowRegistration === false) {
+        throw new ForbiddenException('Registration is not available for your account. Please contact an administrator.');
+      }
+
       // Validate that terms have been accepted
       if (!createCampRegistrationDto.acceptedTerms) {
         throw new BadRequestException('Terms and conditions must be accepted');
