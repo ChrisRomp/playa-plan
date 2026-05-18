@@ -23,7 +23,6 @@ export const UserSchema = z.object({
   stateProvince: z.string().optional().nullable(),
   country: z.string().optional().nullable(),
   emergencyContact: z.string().optional().nullable(),
-  internalNotes: z.string().optional().nullable(),
 });
 
 /**
@@ -52,7 +51,6 @@ export const CreateUserSchema = z.object({
   allowEarlyRegistration: z.boolean().optional(),
   allowDeferredDuesPayment: z.boolean().optional(),
   allowNoJob: z.boolean().optional(),
-  internalNotes: z.string().optional(),
 });
 
 /**
@@ -80,10 +78,41 @@ export const UpdateUserSchema = z.object({
   allowEarlyRegistration: z.boolean().optional(),
   allowDeferredDuesPayment: z.boolean().optional(),
   allowNoJob: z.boolean().optional(),
-  internalNotes: z.string().optional(),
 });
 
 /**
  * UpdateUserDTO type derived from the schema
  */
-export type UpdateUserDTO = z.infer<typeof UpdateUserSchema>; 
+export type UpdateUserDTO = z.infer<typeof UpdateUserSchema>;
+
+/**
+ * Schema for the author summary attached to a user note.
+ */
+export const UserNoteAuthorSchema = z.object({
+  id: z.string(),
+  email: z.string(),
+  firstName: z.string(),
+  lastName: z.string(),
+});
+
+/**
+ * Schema for an internal note about a user. Visible only to staff/admin.
+ */
+export const UserNoteSchema = z.object({
+  id: z.string(),
+  userId: z.string(),
+  authorId: z.string(),
+  content: z.string(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  author: UserNoteAuthorSchema.optional(),
+});
+
+export const UserNotesArraySchema = z.array(UserNoteSchema);
+
+export type UserNote = z.infer<typeof UserNoteSchema>;
+
+/**
+ * Maximum allowed length for an internal user note (matches the API).
+ */
+export const USER_NOTE_MAX_LENGTH = 4096;

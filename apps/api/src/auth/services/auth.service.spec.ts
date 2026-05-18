@@ -42,7 +42,6 @@ describe('AuthService', () => {
     allowEarlyRegistration: false,
     allowDeferredDuesPayment: false,
     allowNoJob: false,
-    internalNotes: null,
     verificationToken: 'verification-token',
     resetToken: null,
     resetTokenExpiry: null,

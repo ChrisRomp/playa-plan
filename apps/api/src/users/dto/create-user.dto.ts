@@ -133,14 +133,6 @@ export class CreateUserDto {
   allowNoJob?: boolean;
 
   @ApiPropertyOptional({
-    description: 'Internal notes about the user (admin only)',
-    example: 'Previous volunteer coordinator',
-  })
-  @IsString()
-  @IsOptional()
-  internalNotes?: string;
-
-  @ApiPropertyOptional({
     description: 'User role',
     enum: UserRole,
     default: UserRole.PARTICIPANT,

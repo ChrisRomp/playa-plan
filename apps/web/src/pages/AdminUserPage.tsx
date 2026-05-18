@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useUsers } from '../hooks/useUsers';
 import { User, CreateUserDTO, UpdateUserDTO } from '../types/users';
 import { ROUTES } from '../routes';
+import { UserNotesPanel } from '../components/admin/user-notes/UserNotesPanel';
 
 /**
  * Admin User Management Page
@@ -84,7 +85,6 @@ const AdminUserPage: React.FC = () => {
       allowEarlyRegistration: user.allowEarlyRegistration || false,
       allowDeferredDuesPayment: user.allowDeferredDuesPayment || false,
       allowNoJob: user.allowNoJob || false,
-      internalNotes: user.internalNotes || '',
     });
     setIsEditing(true);
     setIsCreating(false);
@@ -417,28 +417,10 @@ const AdminUserPage: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Internal Notes */}
-                  <div>
-                    <h3 className="text-lg font-semibold mb-4 pb-2 border-b">Internal Notes</h3>
-                    <div>
-                      <label htmlFor="internalNotes" className="block text-gray-700 font-medium mb-2">
-                        Notes (visible to administrators only)
-                      </label>
-                      <div className="text-sm text-amber-600 mb-2">
-                        Note: Internal notes functionality is not yet implemented and will be moved in a future update.
-                      </div>
-                      <textarea
-                        name="internalNotes"
-                        id="internalNotes"
-                        rows={3}
-                        value={formData.internalNotes || ''}
-                        onChange={handleInputChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-100"
-                        disabled
-                        placeholder="Not yet implemented"
-                      />
-                    </div>
-                  </div>
+                  {/* Internal Notes — only available when editing an existing user */}
+                  {isEditing && selectedUser && (
+                    <UserNotesPanel userId={selectedUser.id} />
+                  )}
 
                   <div className="flex justify-end space-x-4 mt-8">
                     <button

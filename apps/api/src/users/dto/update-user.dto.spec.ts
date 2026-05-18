@@ -182,21 +182,6 @@ describe('UpdateUserDto', () => {
     expect(errors[0].constraints?.maxLength).toContain('at most 1024 characters');
   });
 
-  it('should fail validation when internalNotes exceeds maximum length', async () => {
-    // Arrange
-    const dto = plainToInstance(UpdateUserDto, {
-      internalNotes: 'A'.repeat(1025) // 1025 characters, max is 1024
-    });
-
-    // Act
-    const errors = await validate(dto);
-
-    // Assert
-    expect(errors.length).toBeGreaterThan(0);
-    expect(errors[0].constraints).toHaveProperty('maxLength');
-    expect(errors[0].constraints?.maxLength).toContain('at most 1024 characters');
-  });
-
   it('should validate an email field with valid email', async () => {
     // Arrange
     const dto = plainToInstance(UpdateUserDto, {

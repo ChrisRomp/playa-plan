@@ -34,7 +34,6 @@ describe('PasskeyController', () => {
     allowEarlyRegistration: false,
     allowDeferredDuesPayment: false,
     allowNoJob: false,
-    internalNotes: null,
     verificationToken: null,
     resetToken: null,
     resetTokenExpiry: null,

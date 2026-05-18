@@ -29,7 +29,6 @@ model User {
   city                       String?
   country                    String?
   emergencyContact           String?
-  internalNotes              String?
   phone                      String?
   stateProvince              String?
   loginCode                  String?
@@ -41,8 +40,27 @@ model User {
   adminAuditRecords          AdminAudit[]                @relation("AdminAuditRecords")
   passkeys                   Passkey[]
   webAuthnChallenges         WebAuthnChallenge[]
+  notes                      UserNote[]                  @relation("UserNoteSubject")
+  authoredNotes              UserNote[]                  @relation("UserNoteAuthor")
 
   @@map("users")
+}
+
+/// Free-form internal notes about a user, authored by staff or admins.
+/// Hidden from participant-level API calls and views.
+model UserNote {
+  id        String   @id @default(uuid())
+  userId    String
+  authorId  String
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation("UserNoteSubject", fields: [userId], references: [id], onDelete: Cascade)
+  author    User     @relation("UserNoteAuthor", fields: [authorId], references: [id])
+
+  @@index([userId])
+  @@index([authorId])
+  @@map("user_notes")
 }
 
 // Camp model has been removed

@@ -12,6 +12,7 @@ import { JobsModule } from './jobs/jobs.module';
 import { PasskeysModule } from './passkeys/passkeys.module';
 import { CoreConfigModule } from './core-config/core-config.module';
 import { HealthModule } from './health/health.module';
+import { UserNotesModule } from './user-notes/user-notes.module';
 import { APP_FILTER } from '@nestjs/core';
 import { GlobalExceptionFilter } from './common/filters/http-exception.filter';
 import { ThrottlingModule } from './common/throttling/throttling.module';
@@ -61,6 +62,7 @@ import validationSchema from './config/validation.schema';
     PasskeysModule,
     CoreConfigModule,
     HealthModule,
+    UserNotesModule,
     // Other feature modules will be added here as they are implemented
   ],
   providers: [
