@@ -596,4 +596,37 @@ describe('RegistrationsService', () => {
       await expect(service.remove(registrationId)).rejects.toThrow(NotFoundException);
     });
   });
+
+  describe('createCampRegistration', () => {
+    it('should throw ForbiddenException when user.allowRegistration is false', async () => {
+      mockPrismaService.user.findUnique.mockResolvedValue({
+        id: 'user-id',
+        email: 'test@example.playaplan.app',
+        allowRegistration: false,
+      });
+
+      const call = service.createCampRegistration('user-id', {
+        acceptedTerms: true,
+        jobs: ['job-id-1'],
+        campingOptions: [],
+      });
+
+      await expect(call).rejects.toBeInstanceOf(ForbiddenException);
+      await expect(call).rejects.toThrow(
+        'Registration is not available for your account. Please contact an administrator.',
+      );
+    });
+
+    it('should throw NotFoundException when user does not exist', async () => {
+      mockPrismaService.user.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.createCampRegistration('missing-user', {
+          acceptedTerms: true,
+          jobs: [],
+          campingOptions: [],
+        }),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
 });

@@ -19,7 +19,17 @@ type ConfigType = CoreConfig | CampConfig | null;
 /**
  * Type union for user that includes both API User and types User
  */
-type UserType = User | { allowEarlyRegistration?: boolean; isEarlyRegistrationEnabled?: boolean } | null;
+type UserType = User | { allowRegistration?: boolean; allowEarlyRegistration?: boolean; isEarlyRegistrationEnabled?: boolean } | null;
+
+/**
+ * Determine whether the per-user allowRegistration flag explicitly denies
+ * registration. A value of `false` blocks registration entirely; `undefined`
+ * is treated as allowed for backward compatibility with user fixtures and
+ * older API responses that do not surface the flag.
+ */
+function isUserRegistrationBlocked(user: UserType | null): boolean {
+  return user?.allowRegistration === false;
+}
 
 /**
  * Check if registration is currently accessible to the user
@@ -29,7 +39,11 @@ type UserType = User | { allowEarlyRegistration?: boolean; isEarlyRegistrationEn
  */
 export function isRegistrationAccessible(config: ConfigType, user: UserType | null): boolean {
   if (!config) return false;
-  
+
+  // If the per-user allowRegistration flag is explicitly disabled, the user
+  // cannot register regardless of the global registration toggles.
+  if (isUserRegistrationBlocked(user)) return false;
+
   // Check if general registration is open
   if ('registrationOpen' in config && config.registrationOpen) return true;
   
@@ -92,7 +106,14 @@ export function getRegistrationStatusMessage(
   if (hasActiveRegistration) {
     return `You are already registered for ${year}. You can view your registration details on the dashboard.`;
   }
-  
+
+  // If the per-user allowRegistration flag is explicitly disabled, surface a
+  // specific message so the user knows registration has been disabled for
+  // their account rather than implying registration is globally closed.
+  if (isUserRegistrationBlocked(user)) {
+    return `Registration for ${year} is not available for your account. Please contact an administrator if you believe this is in error.`;
+  }
+
   const isRegistrationOpen = 'registrationOpen' in config && config.registrationOpen;
   const isEarlyRegistrationOpen = 'earlyRegistrationOpen' in config && config.earlyRegistrationOpen;
   

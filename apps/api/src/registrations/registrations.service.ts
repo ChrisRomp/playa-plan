@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException, ConflictException, Logger } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, HttpException, Injectable, NotFoundException, ConflictException, Logger } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { NotificationsService } from '../notifications/services/notifications.service';
 import { CreateRegistrationDto, AddJobToRegistrationDto, CreateCampRegistrationDto, UpdateRegistrationDto } from './dto';
@@ -528,6 +528,13 @@ export class RegistrationsService {
         throw new NotFoundException(`User with ID ${userId} not found`);
       }
 
+      // Enforce the per-user allowRegistration flag. Admins can disable the
+      // ability for a specific user to register; respect that here so the
+      // toggle cannot be bypassed by calling the API directly.
+      if (user.allowRegistration === false) {
+        throw new ForbiddenException('Registration is not available for your account. Please contact an administrator.');
+      }
+
       // Validate that terms have been accepted
       if (!createCampRegistrationDto.acceptedTerms) {
         throw new BadRequestException('Terms and conditions must be accepted');
@@ -662,6 +669,15 @@ export class RegistrationsService {
 
       return result;
     } catch (error: unknown) {
+      // Known HTTP exceptions (e.g., ForbiddenException for blocked users,
+      // NotFoundException, BadRequestException, ConflictException) represent
+      // expected client-facing errors, not system failures. Re-throw them
+      // directly without logging an error or sending a registration error
+      // email to the user.
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
       const err = error as Error;
       this.logger.error(`Registration creation failed for user ${userId}: ${err.message}`, err.stack);
       
