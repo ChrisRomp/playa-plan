@@ -84,11 +84,20 @@ export class RegistrationAdminService {
         where.user.email = { contains: query.email, mode: 'insensitive' };
       }
       if (query.name) {
-        where.user.OR = [
-          { firstName: { contains: query.name, mode: 'insensitive' } },
-          { lastName: { contains: query.name, mode: 'insensitive' } },
-          { playaName: { contains: query.name, mode: 'insensitive' } },
-        ];
+        // Split the name into whitespace-separated tokens so that a search
+        // like "John Smith" matches users whose firstName is "John" and
+        // lastName is "Smith" (and vice versa), as well as matching single
+        // tokens against firstName, lastName, or playaName.
+        const tokens = query.name.split(/\s+/).filter(Boolean);
+        if (tokens.length > 0) {
+          where.user.AND = tokens.map((token) => ({
+            OR: [
+              { firstName: { contains: token, mode: 'insensitive' } },
+              { lastName: { contains: token, mode: 'insensitive' } },
+              { playaName: { contains: token, mode: 'insensitive' } },
+            ],
+          }));
+        }
       }
     }
 

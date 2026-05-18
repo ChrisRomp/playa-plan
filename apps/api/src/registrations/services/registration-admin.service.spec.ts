@@ -737,16 +737,57 @@ describe('RegistrationAdminService', () => {
         where: {
           user: {
             email: { contains: 'test@example.com', mode: 'insensitive' },
-            OR: [
-              { firstName: { contains: 'John', mode: 'insensitive' } },
-              { lastName: { contains: 'John', mode: 'insensitive' } },
-              { playaName: { contains: 'John', mode: 'insensitive' } },
+            AND: [
+              {
+                OR: [
+                  { firstName: { contains: 'John', mode: 'insensitive' } },
+                  { lastName: { contains: 'John', mode: 'insensitive' } },
+                  { playaName: { contains: 'John', mode: 'insensitive' } },
+                ],
+              },
             ],
           },
         },
         include: expect.any(Object),
         orderBy: { createdAt: 'desc' },
         // No skip/take parameters - returns all matching records
+      });
+    });
+
+    it('should match each whitespace-separated name token against firstName, lastName, or playaName', async () => {
+      const query: AdminRegistrationQueryDto = {
+        name: 'John Smith',
+      };
+
+      const mockRegistrations: typeof mockRegistration[] = [];
+      (prismaService.registration.findMany as jest.Mock).mockResolvedValue(mockRegistrations);
+      (prismaService.registration.count as jest.Mock).mockResolvedValue(0);
+
+      await service.getRegistrations(query);
+
+      expect(prismaService.registration.findMany).toHaveBeenCalledWith({
+        where: {
+          user: {
+            AND: [
+              {
+                OR: [
+                  { firstName: { contains: 'John', mode: 'insensitive' } },
+                  { lastName: { contains: 'John', mode: 'insensitive' } },
+                  { playaName: { contains: 'John', mode: 'insensitive' } },
+                ],
+              },
+              {
+                OR: [
+                  { firstName: { contains: 'Smith', mode: 'insensitive' } },
+                  { lastName: { contains: 'Smith', mode: 'insensitive' } },
+                  { playaName: { contains: 'Smith', mode: 'insensitive' } },
+                ],
+              },
+            ],
+          },
+        },
+        include: expect.any(Object),
+        orderBy: { createdAt: 'desc' },
       });
     });
 
