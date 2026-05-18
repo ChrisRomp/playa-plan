@@ -2082,6 +2082,7 @@ describe('PaymentsService', () => {
         expect(mockPrismaService.registration.update).not.toHaveBeenCalled();
       });
     });
+  });
 
   // Additional tests would follow the same pattern for other methods
 
@@ -2170,39 +2171,6 @@ describe('PaymentsService', () => {
       expect(
         mockNotificationsService.sendRegistrationConfirmationEmail,
       ).not.toHaveBeenCalled();
-    });
-
-    it('still clears paymentDeferred on retry when payment is already COMPLETED but registration is still flagged deferred', async () => {
-      // Edge case: previous run completed the payment update but the
-      // registration update failed and is being retried. Without the
-      // widened condition, this case would skip the update and leave
-      // paymentDeferred=true forever.
-      mockPrismaService.payment.findFirst.mockResolvedValueOnce({
-        id: 'payment-id',
-        status: PaymentStatus.COMPLETED,
-        providerRefId: 'cs_deferred_retry',
-        userId: 'user-id',
-        registrationId: 'registration-id',
-        registration: {
-          id: 'registration-id',
-          status: 'CONFIRMED',
-          paymentDeferred: true,
-        },
-      });
-      mockStripeService.getCheckoutSession.mockResolvedValueOnce({
-        id: 'cs_deferred_retry',
-        status: 'complete',
-        payment_status: 'paid',
-      });
-
-      await service.verifyStripeSession('cs_deferred_retry');
-
-      expect(mockPrismaService.registration.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { id: 'registration-id' },
-          data: { status: 'CONFIRMED', paymentDeferred: false },
-        }),
-      );
     });
 
     it('still clears paymentDeferred on retry when payment is already COMPLETED but registration is still flagged deferred', async () => {
@@ -2411,5 +2379,4 @@ describe('PaymentsService', () => {
       expect(mockPrismaService.registration.update).not.toHaveBeenCalled();
     });
   });
-});
 });

@@ -832,6 +832,15 @@ describe('RegistrationsService', () => {
         ...baseUser,
         allowRegistration: false,
       });
+      // Simulate the policy service rejecting because allowRegistration=false.
+      // The policy service's own spec covers the exact message; this test
+      // verifies the integration surface — that the message reaches the
+      // caller unchanged.
+      mockPolicyService.assertCanCreateCampRegistration.mockRejectedValueOnce(
+        new ForbiddenException(
+          'Registration is not available for your account. Please contact an administrator.',
+        ),
+      );
 
       const call = service.createCampRegistration(userId, baseDto);
 
