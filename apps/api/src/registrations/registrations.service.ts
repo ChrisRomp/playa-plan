@@ -573,20 +573,8 @@ export class RegistrationsService {
       // Always create a Registration row for the user's camp registration so
       // payments, dashboard state, and reports have something to anchor to —
       // even when the user has the allowNoJob flag and selected no jobs.
+      // (this.create() handles the duplicate-active-year ConflictException.)
       const requestedJobIds = createCampRegistrationDto.jobs ?? [];
-
-      // Check if user already has an active registration for this year
-      const existingActiveRegistration = await this.prisma.registration.findFirst({
-        where: {
-          userId,
-          year: currentYear,
-          status: { notIn: [RegistrationStatus.CANCELLED] },
-        },
-      });
-
-      if (existingActiveRegistration) {
-        throw new ConflictException(`User already has an active registration for ${currentYear}`);
-      }
 
       // Create the registration (with attached jobs if any were provided)
       jobRegistration = await this.create({
