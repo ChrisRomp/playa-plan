@@ -648,6 +648,17 @@ export class RegistrationsService {
     );
 
     const deferPayment = createCampRegistrationDto.deferPayment ?? false;
+    // hasWaitlistedJob: under normal UI flow this is unreachable — the
+    // RegistrationPage disables full-job checkboxes
+    // (RegistrationPage.tsx:1017) so a participant cannot select an
+    // over-capacity job. Kept as defense-in-depth for two paths the
+    // UI does not guard: (a) a direct API call from a malicious or
+    // out-of-date client, and (b) a TOCTOU race where two participants
+    // load the form with a job at N-1 of N spots taken and both submit.
+    // The check costs one extra prisma read per job and keeps capacity
+    // enforced server-side, consistent with what
+    // `RegistrationsService.create()` (used by admin/staff and
+    // `POST /jobs/:id/register`) already does.
     const hasWaitlistedJob = jobsWithCounts.some(
       ({ job, currentRegistrationCount }) =>
         currentRegistrationCount >= job.maxRegistrations,
@@ -655,7 +666,11 @@ export class RegistrationsService {
 
     // Status semantics (Option A from issue #160 design):
     //   - WAITLISTED wins when any chosen job is over capacity, even for
-    //     deferred registrations (capacity > deferral preference).
+    //     deferred registrations (capacity > deferral preference). Payment
+    //     must not buy a slot the user can't have; see also the matching
+    //     guard in `payments.service.ts` `verifyStripeSession` and
+    //     `markRegistrationPaid` which refuse to promote WAITLISTED →
+    //     CONFIRMED on payment.
     //   - Otherwise: deferred registrations land CONFIRMED (no payment is
     //     expected up front); non-deferred land PENDING (awaiting payment).
     let status: RegistrationStatus;
@@ -773,9 +788,15 @@ export class RegistrationsService {
       // registration lands CONFIRMED (which today happens only when
       // paymentDeferred=true and no chosen job was waitlisted). For
       // non-deferred PENDING registrations the email is still sent by the
-      // payments webhook on completed payment. For deferred WAITLISTED
-      // registrations we skip auto-email — the standard waitlist flow
-      // handles user communication and "confirmation" copy would mislead.
+      // payments webhook on completed payment.
+      //
+      // For deferred WAITLISTED registrations we skip auto-email. This
+      // state is unreachable via the normal UI flow (RegistrationPage
+      // disables full-job checkboxes), but a direct API call or a TOCTOU
+      // race could produce it. If it does, "Registration Confirmation"
+      // copy would mislead a waitlisted participant into thinking they
+      // have a slot; the standard waitlist flow (admin-driven via
+      // RegistrationAdminService) is responsible for their communication.
       if (
         jobRegistration.paymentDeferred &&
         jobRegistration.status === RegistrationStatus.CONFIRMED

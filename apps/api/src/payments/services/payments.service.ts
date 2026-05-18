@@ -343,12 +343,16 @@ export class PaymentsService {
    * Mark a registration as paid: clear `paymentDeferred` and set status
    * to CONFIRMED — UNLESS the registration is currently WAITLISTED, in
    * which case status stays WAITLISTED (capacity beats payment). Payment
-   * does not buy a slot the user can't have.
+   * does not buy a slot the user can't have. The WAITLISTED case is
+   * unreachable for participants through normal UI but possible via
+   * direct API call or a TOCTOU race against capacity; mirrors the same
+   * guard in `verifyStripeSession`.
    *
    * Idempotent — safe to call multiple times. Called from every
-   * successful payment-completion path (Stripe verification, manual
-   * payment, and any future payment provider) so the registration is
-   * always brought to a consistent paid state when a payment lands.
+   * successful payment-completion path (today: Stripe verification path
+   * and `recordManualPayment`; any future payment provider should call
+   * this too) so the registration is always brought to a consistent
+   * paid state when a payment lands.
    */
   private async markRegistrationPaid(registrationId: string): Promise<void> {
     const current = await this.prisma.registration.findUnique({
@@ -580,6 +584,16 @@ export class PaymentsService {
           // We still record the payment as COMPLETED and clear
           // `paymentDeferred` so the row reflects the paid state, but
           // the status stays WAITLISTED.
+          //
+          // This is the only WAITLISTED-deferred interaction that is
+          // actually reachable via this PR's new UI: the dashboard's
+          // "Pay Now" CTA hides itself for WAITLISTED registrations
+          // (DashboardPage.tsx), but a direct API call or a TOCTOU race
+          // that produced a WAITLISTED + paymentDeferred=true row would
+          // expose the bug this guard prevents. Pre-#160, this method
+          // always set the registration to CONFIRMED on paid sessions
+          // — a latent issue that became reachable once dashboard
+          // "Pay Now" was added.
           const isWaitlisted = payment.registration.status === 'WAITLISTED';
           updatedRegistrationStatus = isWaitlisted ? 'WAITLISTED' : 'CONFIRMED';
           const targetStatus = updatedRegistrationStatus;
