@@ -35,8 +35,16 @@ describe('RegistrationsService', () => {
     payment: {
       findUnique: jest.fn(),
     },
+    campingOption: {
+      findUnique: jest.fn(),
+    },
     campingOptionRegistration: {
+      findFirst: jest.fn(),
       findMany: jest.fn(),
+      create: jest.fn(),
+    },
+    campingOptionFieldValue: {
+      create: jest.fn(),
     },
   };
 
@@ -594,6 +602,91 @@ describe('RegistrationsService', () => {
       mockPrismaService.registration.findUnique.mockResolvedValue(null);
 
       await expect(service.remove(registrationId)).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('createCampRegistration', () => {
+    const userId = 'user-id';
+    const currentYear = new Date().getFullYear();
+    const campingOptionId = 'a8c8d3a7-9b2a-4c4e-9f0f-1d2e3f4a5b60';
+
+    const mockUser = { id: userId, email: 'test@example.playaplan.app', role: UserRole.PARTICIPANT };
+    const mockCampingOption = { id: campingOptionId, name: 'Skydiving', fields: [] };
+
+    beforeEach(() => {
+      mockPrismaService.user.findUnique.mockResolvedValue(mockUser);
+      mockPrismaService.registration.findFirst.mockResolvedValue(null);
+      mockPrismaService.campingOption.findUnique.mockResolvedValue(mockCampingOption);
+      mockPrismaService.campingOptionRegistration.findFirst.mockResolvedValue(null);
+      mockPrismaService.campingOptionRegistration.create.mockResolvedValue({
+        id: 'cor-id',
+        userId,
+        campingOptionId,
+        campingOption: mockCampingOption,
+      });
+      mockPrismaService.registration.create.mockResolvedValue({
+        id: 'registration-id',
+        userId,
+        year: currentYear,
+        status: RegistrationStatus.PENDING,
+        jobs: [],
+        payments: [],
+      });
+    });
+
+    it('should create a Registration row even when jobs array is empty', async () => {
+      const result = await service.createCampRegistration(userId, {
+        campingOptions: [campingOptionId],
+        jobs: [],
+        acceptedTerms: true,
+      });
+
+      // A registration must exist so payment/dashboard/reports can anchor to it
+      expect(mockPrismaService.registration.create).toHaveBeenCalledTimes(1);
+      const createArgs = mockPrismaService.registration.create.mock.calls[0][0];
+      expect(createArgs.data.user.connect.id).toBe(userId);
+      expect(createArgs.data.year).toBe(currentYear);
+      expect(createArgs.data.jobs.create).toEqual([]);
+
+      expect(result.jobRegistration).toBeDefined();
+      expect(result.jobRegistration?.id).toBe('registration-id');
+      expect(result.campingOptionRegistrations).toHaveLength(1);
+    });
+
+    it('should still create a Registration with attached jobs when jobs are provided', async () => {
+      mockPrismaService.job.findUnique.mockResolvedValue({
+        id: 'job-id-1',
+        staffOnly: false,
+        category: { staffOnly: false },
+        maxRegistrations: 10,
+        registrations: [],
+      });
+
+      await service.createCampRegistration(userId, {
+        campingOptions: [campingOptionId],
+        jobs: ['job-id-1'],
+        acceptedTerms: true,
+      });
+
+      const createArgs = mockPrismaService.registration.create.mock.calls[0][0];
+      expect(createArgs.data.jobs.create).toEqual([
+        { job: { connect: { id: 'job-id-1' } } },
+      ]);
+    });
+
+    it('should throw ConflictException when user already has an active registration', async () => {
+      mockPrismaService.registration.findFirst.mockResolvedValue({
+        id: 'existing',
+        status: RegistrationStatus.PENDING,
+      });
+
+      await expect(
+        service.createCampRegistration(userId, {
+          campingOptions: [campingOptionId],
+          jobs: [],
+          acceptedTerms: true,
+        }),
+      ).rejects.toThrow(ConflictException);
     });
   });
 });

@@ -33,11 +33,10 @@ export class CreateCampRegistrationDto {
   customFields?: Record<string, unknown>;
 
   @ApiProperty({
-    description: 'Array of job IDs being registered for',
+    description: 'Array of job IDs being registered for. May be empty for users with the allowNoJob flag.',
     example: ['8089a3d6-8c57-43ea-a2c3-037ff0c99546', '4bbb66ab-fcea-40bc-bdf6-9f813cf2d48f'],
     type: [String],
   })
-  @IsNotEmpty()
   @IsArray()
   @IsString({ each: true })
   @IsUUID(4, { each: true })

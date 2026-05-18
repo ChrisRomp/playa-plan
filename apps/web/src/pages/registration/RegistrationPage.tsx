@@ -1178,16 +1178,20 @@ export default function RegistrationPage() {
         
         <div className="mb-6">
           <h3 className="text-lg font-medium mb-2">Selected Shifts</h3>
-          <ul className="list-disc pl-5">
-            {formData.jobs.map(jobId => {
-              const job = jobs.find(j => j.id === jobId);
-              return job ? (
-                <li key={jobId}>
-                  {job.name} | {getShiftInfoForJob(job)}
-                </li>
-              ) : null;
-            })}
-          </ul>
+          {formData.jobs.length === 0 ? (
+            <p className="text-gray-600 italic">No work shifts selected.</p>
+          ) : (
+            <ul className="list-disc pl-5">
+              {formData.jobs.map(jobId => {
+                const job = jobs.find(j => j.id === jobId);
+                return job ? (
+                  <li key={jobId}>
+                    {job.name} | {getShiftInfoForJob(job)}
+                  </li>
+                ) : null;
+              })}
+            </ul>
+          )}
         </div>
         
         <div className="mb-6">

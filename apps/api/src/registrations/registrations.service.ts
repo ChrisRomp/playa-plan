@@ -570,28 +570,30 @@ export class RegistrationsService {
         };
       }> = [];
 
-      // Create job registration if jobs are provided
-      if (createCampRegistrationDto.jobs && createCampRegistrationDto.jobs.length > 0) {
-        // Check if user already has an active registration for this year
-        const existingActiveRegistration = await this.prisma.registration.findFirst({
-          where: {
-            userId,
-            year: currentYear,
-            status: { notIn: [RegistrationStatus.CANCELLED] },
-          },
-        });
+      // Always create a Registration row for the user's camp registration so
+      // payments, dashboard state, and reports have something to anchor to —
+      // even when the user has the allowNoJob flag and selected no jobs.
+      const requestedJobIds = createCampRegistrationDto.jobs ?? [];
 
-        if (existingActiveRegistration) {
-          throw new ConflictException(`User already has an active registration for ${currentYear}`);
-        }
-
-        // Create the job registration
-        jobRegistration = await this.create({
+      // Check if user already has an active registration for this year
+      const existingActiveRegistration = await this.prisma.registration.findFirst({
+        where: {
           userId,
           year: currentYear,
-          jobIds: createCampRegistrationDto.jobs,
-        });
+          status: { notIn: [RegistrationStatus.CANCELLED] },
+        },
+      });
+
+      if (existingActiveRegistration) {
+        throw new ConflictException(`User already has an active registration for ${currentYear}`);
       }
+
+      // Create the registration (with attached jobs if any were provided)
+      jobRegistration = await this.create({
+        userId,
+        year: currentYear,
+        jobIds: requestedJobIds,
+      });
 
       // Create camping option registrations
       if (createCampRegistrationDto.campingOptions && createCampRegistrationDto.campingOptions.length > 0) {
