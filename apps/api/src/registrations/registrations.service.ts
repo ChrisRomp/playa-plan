@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException, ConflictException, Logger } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, HttpException, Injectable, NotFoundException, ConflictException, Logger } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { NotificationsService } from '../notifications/services/notifications.service';
 import { CreateRegistrationDto, AddJobToRegistrationDto, CreateCampRegistrationDto, UpdateRegistrationDto } from './dto';
@@ -669,6 +669,15 @@ export class RegistrationsService {
 
       return result;
     } catch (error: unknown) {
+      // Known HTTP exceptions (e.g., ForbiddenException for blocked users,
+      // NotFoundException, BadRequestException, ConflictException) represent
+      // expected client-facing errors, not system failures. Re-throw them
+      // directly without logging an error or sending a registration error
+      // email to the user.
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
       const err = error as Error;
       this.logger.error(`Registration creation failed for user ${userId}: ${err.message}`, err.stack);
       
