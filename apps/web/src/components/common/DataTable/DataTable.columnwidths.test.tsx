@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  */
-import { render } from '@testing-library/react';
+import { render, fireEvent } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 import { DataTable, type DataTableColumn } from './DataTable';
@@ -157,5 +157,61 @@ describe('DataTable column widths', () => {
     const cols = container.querySelectorAll('colgroup col');
     // 1 col for grouping spacer + 1 for the column
     expect(cols).toHaveLength(2);
+  });
+
+  it('offsets aria-colindex by 1 when grouping spacer column is present', () => {
+    const columns: DataTableColumn<TestItem>[] = [
+      { id: 'name', header: 'Name', accessor: (row) => row.name },
+      { id: 'email', header: 'Email', accessor: (row) => row.email },
+    ];
+
+    const { container } = render(
+      <DataTable
+        data={testData}
+        columns={columns}
+        getRowKey={(row) => row.id}
+        groupable={true}
+        groupByField={(row) => row.name.charAt(0)}
+      />
+    );
+
+    // Header th elements should start at aria-colindex 2
+    const headers = container.querySelectorAll('thead th[aria-colindex]');
+    expect(headers[0]).toHaveAttribute('aria-colindex', '2');
+    expect(headers[1]).toHaveAttribute('aria-colindex', '3');
+
+    // Expand a group to reveal data rows
+    const groupRow = container.querySelector('tbody tr[aria-expanded]') as HTMLElement;
+    fireEvent.click(groupRow);
+
+    // Body td elements should also start at aria-colindex 2
+    const dataCells = container.querySelectorAll('tbody td[aria-colindex]');
+    expect(dataCells[0]).toHaveAttribute('aria-colindex', '2');
+    expect(dataCells[1]).toHaveAttribute('aria-colindex', '3');
+  });
+
+  it('does not offset aria-colindex when grouping is not active', () => {
+    const columns: DataTableColumn<TestItem>[] = [
+      { id: 'name', header: 'Name', accessor: (row) => row.name },
+      { id: 'email', header: 'Email', accessor: (row) => row.email },
+    ];
+
+    const { container } = render(
+      <DataTable
+        data={testData}
+        columns={columns}
+        getRowKey={(row) => row.id}
+      />
+    );
+
+    // Header th elements should start at aria-colindex 1
+    const headers = container.querySelectorAll('thead th[aria-colindex]');
+    expect(headers[0]).toHaveAttribute('aria-colindex', '1');
+    expect(headers[1]).toHaveAttribute('aria-colindex', '2');
+
+    // Body td elements should also start at aria-colindex 1
+    const dataCells = container.querySelectorAll('tbody td[aria-colindex]');
+    expect(dataCells[0]).toHaveAttribute('aria-colindex', '1');
+    expect(dataCells[1]).toHaveAttribute('aria-colindex', '2');
   });
 });

@@ -19,10 +19,8 @@ export interface DataTableColumn<T> {
   Cell?: (props: { value: React.ReactNode; row: T }) => React.ReactNode;
   /** Initial column width (px number or CSS string like '20%') */
   width?: number | string;
-  /** Minimum column width in px */
+  /** Fallback column width in px, used when `width` is not set */
   minWidth?: number;
-  /** Maximum column width in px */
-  maxWidth?: number;
 }
 
 /**
@@ -293,6 +291,9 @@ export function DataTable<T>({
     }
   }, [processedData]);
 
+  // Offset for aria-colindex when a grouping spacer column is present
+  const colIndexOffset = (groupable && groupByField) ? 1 : 0;
+
   // Handle page change with announcement
   const handlePageChange = useCallback((newPage: number) => {
     setCurrentPage(newPage);
@@ -396,7 +397,7 @@ export function DataTable<T>({
                         : 'descending'
                       : 'none'
                   }
-                  aria-colindex={colIndex + 1}
+                  aria-colindex={colIndex + 1 + colIndexOffset}
                 >
                   <div className="flex items-center space-x-1">
                     <span>{column.header}</span>
@@ -489,7 +490,7 @@ export function DataTable<T>({
                               column.hideOnMobile ? 'hidden md:table-cell' : ''
                             }`}
                             role="gridcell"
-                            aria-colindex={colIndex + 1}
+                            aria-colindex={colIndex + 1 + colIndexOffset}
                             title={titleText}
                           >
                             {column.Cell ? (
@@ -530,7 +531,7 @@ export function DataTable<T>({
                           column.hideOnMobile ? 'hidden md:table-cell' : ''
                         }`}
                         role="gridcell"
-                        aria-colindex={colIndex + 1}
+                        aria-colindex={colIndex + 1 + colIndexOffset}
                         title={titleText}
                       >
                         {column.Cell ? (

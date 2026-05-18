@@ -180,7 +180,6 @@ export function PaymentReportsPage() {
       sortable: true,
       hideOnMobile: true,
       width: '26%',
-      minWidth: 100,
     },
   ];
 
