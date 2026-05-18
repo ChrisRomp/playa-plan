@@ -450,8 +450,6 @@ describe('AuthContext', () => {
       allowEarlyRegistration: true,
       allowDeferredDuesPayment: true,
       allowNoJob: true,
-      // Admin-only — must NOT be spread onto the client auth user.
-      internalNotes: 'admin-only note about this user',
     };
 
     it('should surface allowDeferredDuesPayment and other flags on bootstrap when a JWT is present', async () => {

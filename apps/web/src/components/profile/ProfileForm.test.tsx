@@ -36,7 +36,6 @@ describe('ProfileForm', () => {
         allowEarlyRegistration: false,
         allowDeferredDuesPayment: false,
         allowNoJob: false,
-        internalNotes: null,
       },
       updateProfile: vi.fn(),
       isLoading: false,

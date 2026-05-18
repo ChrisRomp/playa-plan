@@ -44,19 +44,13 @@ const isPasskeyCancellation = (err: unknown): boolean => {
  * - `hasRegisteredForCurrentYear`— placeholder; would come from registration
  *                                  data fetched elsewhere.
  *
- * Excluded fields:
- *
- * - `internalNotes` — admin-only field about the user. Even though the
- *                    `/auth/profile` endpoint returns it for the user
- *                    themselves, it has no current-user use case on the
- *                    client and should not become part of global auth state.
+ * Note on internal notes: internal notes about a user are stored in a
+ * separate staff/admin-only resource (`/users/:id/notes`) and are never
+ * embedded on the profile — so there is nothing to strip here.
  */
 const buildClientUser = (userProfile: UserProfile): User => {
-  // Intentionally drop internalNotes — see docstring above.
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { internalNotes, ...safe } = userProfile;
   return {
-    ...safe,
+    ...userProfile,
     name: `${userProfile.firstName} ${userProfile.lastName}`,
     role: mapApiRoleToClientRole(userProfile.role),
     isAuthenticated: true,

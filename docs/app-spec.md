@@ -49,7 +49,7 @@ A user's profile contains the following information:
 12. Allow Early Registration: boolean, default false, hidden from user; editable by staff/admin
 13. Allow deferred dues payment: boolean, default false, hidden from user/staff; editable by admin
 14. Allow no job: boolean, default false, editable by staff/admin
-15. Internal Notes: optional string, hidden from user; editable by staff/admin
+15. Internal Notes: a 1:many collection of free-form notes about the user, authored by individual staff/admin members with timestamps. Hidden from the user; only listed/edited in user reports and admin-users views, never returned by participant-level API calls.
 16. Role: hidden from user/staff, editable by admin: Enum for Participant/Staff/Admin
 
 ### Profile Customization

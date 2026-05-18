@@ -2133,7 +2133,6 @@ describe('AdminAuditService', () => {
           password: 'hashed-password',
           personalInfo: { phone: '555-0123' },
           emergencyContact: { name: 'Emergency' },
-          internalNotes: 'Internal admin notes',
         };
 
         const mockAuditWithSelectiveAdmin = {
@@ -2144,7 +2143,7 @@ describe('AdminAuditService', () => {
             email: fullAdminUserData.email,
             firstName: fullAdminUserData.firstName,
             lastName: fullAdminUserData.lastName,
-            // password, personalInfo, emergencyContact, internalNotes should NOT be included
+            // password, personalInfo, emergencyContact should NOT be included
           },
         };
 
@@ -2167,7 +2166,6 @@ describe('AdminAuditService', () => {
         expect((adminUser as Record<string, unknown>).password).toBeUndefined();
         expect((adminUser as Record<string, unknown>).personalInfo).toBeUndefined();
         expect((adminUser as Record<string, unknown>).emergencyContact).toBeUndefined();
-        expect((adminUser as Record<string, unknown>).internalNotes).toBeUndefined();
 
         // Verify the correct select clause was used
         expect(prismaService.adminAudit.findMany).toHaveBeenCalledWith(
@@ -2182,7 +2180,6 @@ describe('AdminAuditService', () => {
                   // password: NOT included
                   // personalInfo: NOT included
                   // emergencyContact: NOT included
-                  // internalNotes: NOT included
                 },
               },
             },

@@ -1,6 +1,11 @@
 import axios from 'axios';
 import cookieService from './cookieService';
 import { z } from 'zod';
+import {
+  UserNote,
+  UserNotesArraySchema,
+  UserNoteSchema,
+} from '../types/users';
 
 // Track authentication state to prevent duplicate API calls
 let _pendingAuthCheck = false;
@@ -257,7 +262,6 @@ export const UserSchema = z.object({
   allowEarlyRegistration: z.boolean().optional(),
   allowDeferredDuesPayment: z.boolean().optional(),
   allowNoJob: z.boolean().optional(),
-  internalNotes: z.string().nullable().optional(),
 });
 
 export const AuthResponseSchema = z.object({
@@ -1330,5 +1334,55 @@ export const reports = {
       console.error('Error fetching work schedule data:', error);
       throw error;
     }
+  },
+};
+
+/**
+ * Internal user notes (staff/admin only). 1:many notes per user, authored
+ * by individual staff/admin members. Never available to participants.
+ */
+export const userNotes = {
+  /**
+   * List all notes for a given user, newest first.
+   */
+  list: async (userId: string): Promise<UserNote[]> => {
+    const response = await api.get(`/users/${encodeURIComponent(userId)}/notes`);
+    return UserNotesArraySchema.parse(response.data);
+  },
+
+  /**
+   * Create a new note for the user; the authenticated user is recorded as author.
+   */
+  create: async (userId: string, content: string): Promise<UserNote> => {
+    const response = await api.post(
+      `/users/${encodeURIComponent(userId)}/notes`,
+      { content },
+    );
+    return UserNoteSchema.parse(response.data);
+  },
+
+  /**
+   * Update an existing note. Allowed only for the original author —
+   * admins cannot edit notes authored by other users.
+   */
+  update: async (
+    userId: string,
+    noteId: string,
+    content: string,
+  ): Promise<UserNote> => {
+    const response = await api.patch(
+      `/users/${encodeURIComponent(userId)}/notes/${encodeURIComponent(noteId)}`,
+      { content },
+    );
+    return UserNoteSchema.parse(response.data);
+  },
+
+  /**
+   * Delete a note. Allowed for the original author or admins.
+   */
+  delete: async (userId: string, noteId: string): Promise<void> => {
+    await api.delete(
+      `/users/${encodeURIComponent(userId)}/notes/${encodeURIComponent(noteId)}`,
+    );
   },
 };
