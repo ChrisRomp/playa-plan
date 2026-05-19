@@ -1048,41 +1048,52 @@ The ${campName} Team`;
     const isHtmlFormat = customContent?.format !== 'text'; // Default to HTML
 
     if (isHtmlFormat) {
+      const safeSubject = this.escapeHtml(subject);
+      const safeMessage = this.escapeHtml(customMessage);
+      const safeSmtpHost = this.escapeHtml(smtpHost);
+      const safeSmtpPort = this.escapeHtml(String(smtpPort));
+      const safeSenderName = this.escapeHtml(senderName);
+      const safeSenderEmail = this.escapeHtml(senderEmail);
+      const safeAdminUserName = this.escapeHtml(adminUserName);
+      const safeAdminEmail = this.escapeHtml(adminEmail);
+      const safeFormattedTimestamp = this.escapeHtml(formattedTimestamp);
+      const safeCampName = this.escapeHtml(campName);
+
       // HTML format
       const smtpDetailsHtml = includeSmtpDetails ? `
         <div style="margin-top: 24px; padding: 16px; background-color: #f8f9fa; border-left: 4px solid #007bff; border-radius: 4px;">
           <h3 style="margin-top: 0; color: #495057; font-size: 16px;">SMTP Configuration</h3>
           <table style="width: 100%; font-family: monospace; font-size: 14px;">
-            <tr><td style="padding: 4px 8px; font-weight: bold;">Host:</td><td style="padding: 4px 8px;">${smtpHost}</td></tr>
-            <tr><td style="padding: 4px 8px; font-weight: bold;">Port:</td><td style="padding: 4px 8px;">${smtpPort}</td></tr>
+            <tr><td style="padding: 4px 8px; font-weight: bold;">Host:</td><td style="padding: 4px 8px;">${safeSmtpHost}</td></tr>
+            <tr><td style="padding: 4px 8px; font-weight: bold;">Port:</td><td style="padding: 4px 8px;">${safeSmtpPort}</td></tr>
             <tr><td style="padding: 4px 8px; font-weight: bold;">SSL:</td><td style="padding: 4px 8px;">${smtpSecure ? 'Yes' : 'No'}</td></tr>
-            <tr><td style="padding: 4px 8px; font-weight: bold;">Sender:</td><td style="padding: 4px 8px;">${senderName} &lt;${senderEmail}&gt;</td></tr>
+            <tr><td style="padding: 4px 8px; font-weight: bold;">Sender:</td><td style="padding: 4px 8px;">${safeSenderName} &lt;${safeSenderEmail}&gt;</td></tr>
           </table>
         </div>` : '';
 
       const html = `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #ffffff;">
           <div style="text-align: center; margin-bottom: 32px;">
-            <h1 style="color: #343a40; margin-bottom: 8px;">${subject}</h1>
-            <p style="color: #6c757d; margin: 0;">Sent at ${formattedTimestamp}</p>
+            <h1 style="color: #343a40; margin-bottom: 8px;">${safeSubject}</h1>
+            <p style="color: #6c757d; margin: 0;">Sent at ${safeFormattedTimestamp}</p>
           </div>
           
           <div style="background-color: #d4edda; border: 1px solid #c3e6cb; border-radius: 4px; padding: 16px; margin-bottom: 24px;">
             <h2 style="color: #155724; margin-top: 0; font-size: 18px;">✅ Test Email Successful!</h2>
-            <p style="color: #155724; margin-bottom: 0;">${customMessage}</p>
+            <p style="color: #155724; margin-bottom: 0;">${safeMessage}</p>
           </div>
 
           ${smtpDetailsHtml}
 
           <div style="margin-top: 24px; padding: 16px; background-color: #f8f9fa; border-radius: 4px;">
             <h3 style="margin-top: 0; color: #495057; font-size: 16px;">Test Details</h3>
-            <p style="margin: 8px 0; font-size: 14px;"><strong>Sent by:</strong> ${adminUserName} (${adminEmail})</p>
-            <p style="margin: 8px 0; font-size: 14px;"><strong>Timestamp:</strong> ${formattedTimestamp}</p>
-            <p style="margin: 8px 0; font-size: 14px;"><strong>Application:</strong> ${campName} Email System</p>
+            <p style="margin: 8px 0; font-size: 14px;"><strong>Sent by:</strong> ${safeAdminUserName} (${safeAdminEmail})</p>
+            <p style="margin: 8px 0; font-size: 14px;"><strong>Timestamp:</strong> ${safeFormattedTimestamp}</p>
+            <p style="margin: 8px 0; font-size: 14px;"><strong>Application:</strong> ${safeCampName} Email System</p>
           </div>
 
           <div style="margin-top: 32px; text-align: center; color: #6c757d; font-size: 12px;">
-            <p>This is an automated test email from ${campName}. If you received this unexpectedly, please contact your administrator.</p>
+            <p>This is an automated test email from ${safeCampName}. If you received this unexpectedly, please contact your administrator.</p>
           </div>
         </div>
       `;
@@ -1138,7 +1149,7 @@ Test Details:
 This is an automated test email from ${campName}. If you received this unexpectedly, please contact your administrator.
       `.trim();
 
-      return { subject, html: text, text };
+      return { subject, html: `<pre>${this.escapeHtml(text)}</pre>`, text };
     }
   }
 
