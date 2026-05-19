@@ -872,7 +872,7 @@ describe('RegistrationAdminService', () => {
 
       expect(result).toEqual(mockCampingOptionRegistrations);
       expect(prismaService.campingOptionRegistration.findMany).toHaveBeenCalledWith({
-        where: { userId: 'user-123' },
+        where: { userId: 'user-123', registrationId: 'reg-123' },
         include: {
           campingOption: {
             select: {
@@ -1095,7 +1095,7 @@ describe('RegistrationAdminService', () => {
       );
     });
 
-    it('should filter by year through user registrations', async () => {
+    it('should filter by year through registration relation', async () => {
       (prismaService.campingOptionRegistration.findMany as jest.Mock).mockResolvedValue([mockCampingOptionRegistration]);
 
       await service.getCampingOptionRegistrationsWithFields({ year: 2024 });
@@ -1103,12 +1103,8 @@ describe('RegistrationAdminService', () => {
       expect(prismaService.campingOptionRegistration.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
-            user: {
-              registrations: {
-                some: {
-                  year: 2024,
-                },
-              },
+            registration: {
+              year: 2024,
             },
           }),
         })
@@ -1127,6 +1123,7 @@ describe('RegistrationAdminService', () => {
     const mockCampingOptionRegistration = {
       id: 'cor-123',
       userId: 'user-123',
+      registrationId: 'reg-123',
       campingOptionId: 'co-123',
       createdAt: new Date('2024-01-01'),
       updatedAt: new Date('2024-01-01'),
@@ -1153,7 +1150,7 @@ describe('RegistrationAdminService', () => {
       
       expect(prismaService.campingOptionRegistration.findMany).toHaveBeenCalledWith({
         where: {
-          userId: { in: ['user-123'] },
+          registrationId: { in: ['reg-123'] },
           campingOption: {
             enabled: true,
           },

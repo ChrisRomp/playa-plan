@@ -739,9 +739,9 @@ export class PaymentsService {
         return;
       }
 
-      // Get camping option registrations for this user
+      // Get camping option registrations for this registration
       const campingOptionRegistrations = await this.prisma.campingOptionRegistration.findMany({
-        where: { userId: registration.userId },
+        where: { userId: registration.userId, registrationId },
         include: {
           campingOption: {
             include: { fields: true },

@@ -94,6 +94,7 @@ describe('AdminRegistrationsController', () => {
       createdAt: new Date(),
       updatedAt: new Date(),
       userId: 'user-123',
+      registrationId: 'reg-123',
       campingOptionId: 'camping-option-1',
       campingOption: {
         id: 'camping-option-1',
