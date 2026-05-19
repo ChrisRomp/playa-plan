@@ -95,12 +95,14 @@ export function UserReportsPage() {
       header: 'Name',
       accessor: (row) => `${row.firstName} ${row.lastName}`,
       sortable: true,
+      width: '25%',
     },
     {
       id: 'email',
       header: 'Email',
       accessor: (row) => row.email,
       sortable: true,
+      width: '30%',
     },
     {
       id: 'role',
@@ -120,6 +122,7 @@ export function UserReportsPage() {
         </span>
       ),
       sortable: true,
+      width: '15%',
     },
     {
       id: 'isEmailVerified',
@@ -137,6 +140,7 @@ export function UserReportsPage() {
         </span>
       ),
       sortable: true,
+      width: '15%',
     },
     {
       id: 'createdAt',
@@ -144,6 +148,7 @@ export function UserReportsPage() {
       accessor: (row) => new Date(row.createdAt).toLocaleDateString(),
       sortable: true,
       hideOnMobile: true,
+      width: '15%',
     },
   ];
 

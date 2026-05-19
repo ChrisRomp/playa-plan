@@ -17,6 +17,10 @@ export interface DataTableColumn<T> {
   hideOnMobile?: boolean;
   /** Optional custom cell renderer */
   Cell?: (props: { value: React.ReactNode; row: T }) => React.ReactNode;
+  /** Initial column width (px number or CSS string like '20%') */
+  width?: number | string;
+  /** Fallback column width in px, used when `width` is not set */
+  minWidth?: number;
 }
 
 /**
@@ -287,6 +291,9 @@ export function DataTable<T>({
     }
   }, [processedData]);
 
+  // Offset for aria-colindex when a grouping spacer column is present
+  const colIndexOffset = (groupable && groupByField) ? 1 : 0;
+
   // Handle page change with announcement
   const handlePageChange = useCallback((newPage: number) => {
     setCurrentPage(newPage);
@@ -343,7 +350,7 @@ export function DataTable<T>({
         <table 
           ref={tableRef}
           id={id}
-          className={`min-w-full bg-white border border-gray-200 ${className}`}
+          className={`w-full min-w-full bg-white border border-gray-200 table-fixed ${className}`}
           role="grid"
           aria-busy={false}
           aria-rowcount={hasData ? (
@@ -353,6 +360,20 @@ export function DataTable<T>({
           ) : 0}
         >
           {caption && <caption className="sr-only">{caption}</caption>}
+
+          <colgroup>
+            {groupable && groupByField && <col style={{ width: '40px' }} />}
+            {columns.map((column) => {
+              const style: React.CSSProperties = {};
+              // Use explicit width, or fall back to minWidth as width
+              // (CSS min-width/max-width are not reliably supported on <col>)
+              const effectiveWidth = column.width ?? column.minWidth;
+              if (effectiveWidth) {
+                style.width = typeof effectiveWidth === 'number' ? `${effectiveWidth}px` : effectiveWidth;
+              }
+              return <col key={column.id} style={style} />;
+            })}
+          </colgroup>
           
           <thead className="bg-gray-50">
             <tr>
@@ -376,7 +397,7 @@ export function DataTable<T>({
                         : 'descending'
                       : 'none'
                   }
-                  aria-colindex={colIndex + 1}
+                  aria-colindex={colIndex + 1 + colIndexOffset}
                 >
                   <div className="flex items-center space-x-1">
                     <span>{column.header}</span>
@@ -458,25 +479,31 @@ export function DataTable<T>({
                       tabIndex={onRowClick ? 0 : undefined}
                     >
                       <td className="px-4 py-2" role="gridcell" />
-                      {columns.map((column, colIndex) => (
-                        <td 
-                          key={`${getRowKey(row)}-${column.id}`}
-                          className={`px-4 py-2 whitespace-nowrap ${
-                            column.hideOnMobile ? 'hidden md:table-cell' : ''
-                          }`}
-                          role="gridcell"
-                          aria-colindex={colIndex + 1}
-                        >
-                          {column.Cell ? (
-                            column.Cell({ 
-                              value: column.accessor(row), 
-                              row 
-                            })
-                          ) : (
-                            column.accessor(row)
-                          )}
-                        </td>
-                      ))}
+                      {columns.map((column, colIndex) => {
+                        const cellValue = column.accessor(row);
+                        const titleText = typeof cellValue === 'string' || typeof cellValue === 'number'
+                          ? String(cellValue) : undefined;
+                        return (
+                          <td 
+                            key={`${getRowKey(row)}-${column.id}`}
+                            className={`px-4 py-2 overflow-hidden text-ellipsis whitespace-nowrap ${
+                              column.hideOnMobile ? 'hidden md:table-cell' : ''
+                            }`}
+                            role="gridcell"
+                            aria-colindex={colIndex + 1 + colIndexOffset}
+                            title={titleText}
+                          >
+                            {column.Cell ? (
+                              column.Cell({ 
+                                value: cellValue, 
+                                row 
+                              })
+                            ) : (
+                              cellValue
+                            )}
+                          </td>
+                        );
+                      })}
                     </tr>
                   ))}
                 </React.Fragment>
@@ -493,25 +520,31 @@ export function DataTable<T>({
                   tabIndex={onRowClick ? 0 : undefined}
                 >
                   {groupable && groupByField && <td className="px-4 py-2" role="gridcell" />}
-                  {columns.map((column, colIndex) => (
-                    <td 
-                      key={`${getRowKey(row)}-${column.id}`}
-                      className={`px-4 py-2 whitespace-nowrap ${
-                        column.hideOnMobile ? 'hidden md:table-cell' : ''
-                      }`}
-                      role="gridcell"
-                      aria-colindex={colIndex + 1}
-                    >
-                      {column.Cell ? (
-                        column.Cell({ 
-                          value: column.accessor(row), 
-                          row 
-                        })
-                      ) : (
-                        column.accessor(row)
-                      )}
-                    </td>
-                  ))}
+                  {columns.map((column, colIndex) => {
+                    const cellValue = column.accessor(row);
+                    const titleText = typeof cellValue === 'string' || typeof cellValue === 'number'
+                      ? String(cellValue) : undefined;
+                    return (
+                      <td 
+                        key={`${getRowKey(row)}-${column.id}`}
+                        className={`px-4 py-2 overflow-hidden text-ellipsis whitespace-nowrap ${
+                          column.hideOnMobile ? 'hidden md:table-cell' : ''
+                        }`}
+                        role="gridcell"
+                        aria-colindex={colIndex + 1 + colIndexOffset}
+                        title={titleText}
+                      >
+                        {column.Cell ? (
+                          column.Cell({ 
+                            value: cellValue, 
+                            row 
+                          })
+                        ) : (
+                          cellValue
+                        )}
+                      </td>
+                    );
+                  })}
                 </tr>
               ))
             )}
