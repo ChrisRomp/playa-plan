@@ -336,9 +336,14 @@ export class AuthService {
         },
       });
 
+      let bootstrapResult: { user: User; shouldPromote: boolean } | null = null;
+
       if (!user) {
         // Normal code lookup failed — try bootstrap auth via INITIAL_ADMIN_CODE
-        user = await this.tryBootstrapAdminAuth(normalizedEmail, code);
+        bootstrapResult = await this.tryBootstrapAdminAuth(normalizedEmail, code);
+        if (bootstrapResult) {
+          user = bootstrapResult.user;
+        }
       }
 
       if (!user) {
@@ -346,8 +351,12 @@ export class AuthService {
         return null;
       }
 
-      // Step 2: Check if this should be the first admin user (before marking as verified)
-      const shouldBeAdmin = await this.shouldMakeFirstUserAdmin();
+      // Step 2: Determine if this should be the first admin user.
+      // If bootstrap auth was used, trust its decision to avoid a race condition
+      // where the user count could change between the two queries.
+      const shouldBeAdmin = bootstrapResult
+        ? bootstrapResult.shouldPromote
+        : await this.shouldMakeFirstUserAdmin();
 
       // Step 3: Clear the login code and mark as verified, potentially promoting to admin
       const updatedUser = await this.prisma.user.update({
@@ -384,9 +393,12 @@ export class AuthService {
    *
    * @param email Normalized user email
    * @param code Code submitted by the user
-   * @returns User if bootstrap auth succeeds, null otherwise
+   * @returns Object with user and shouldPromote flag if bootstrap auth succeeds, null otherwise
    */
-  private async tryBootstrapAdminAuth(email: string, code: string): Promise<User | null> {
+  private async tryBootstrapAdminAuth(
+    email: string,
+    code: string,
+  ): Promise<{ user: User; shouldPromote: boolean } | null> {
     const initialAdminCode = this.configService.get<string>('INITIAL_ADMIN_CODE');
     if (!initialAdminCode || code !== initialAdminCode) {
       return null;
@@ -414,7 +426,7 @@ export class AuthService {
     }
 
     this.logger.log(`[BOOTSTRAP] INITIAL_ADMIN_CODE matched for ${email} (completing login...)`);
-    return user;
+    return { user, shouldPromote: isFirstAdmin && user.role !== UserRole.ADMIN };
   }
 
   /**

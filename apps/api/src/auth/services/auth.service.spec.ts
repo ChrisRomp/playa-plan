@@ -923,12 +923,12 @@ describe('AuthService', () => {
       });
       mockEmailService.isEmailConfigured.mockResolvedValue(false);
       mockConfigService.get.mockImplementation((key: string) => {
-        if (key === 'INITIAL_ADMIN_CODE') return 'bootstrap-secret-123';
+        if (key === 'INITIAL_ADMIN_CODE') return '999888';
         return undefined;
       });
 
       // Act
-      const result = await service.validateLoginCode('admin@example.playaplan.app', 'bootstrap-secret-123');
+      const result = await service.validateLoginCode('admin@example.playaplan.app', '999888');
 
       // Assert
       expect(result).not.toBeNull();
@@ -959,12 +959,12 @@ describe('AuthService', () => {
       });
       mockEmailService.isEmailConfigured.mockResolvedValue(false);
       mockConfigService.get.mockImplementation((key: string) => {
-        if (key === 'INITIAL_ADMIN_CODE') return 'bootstrap-secret-123';
+        if (key === 'INITIAL_ADMIN_CODE') return '999888';
         return undefined;
       });
 
       // Act
-      const result = await service.validateLoginCode('first@example.playaplan.app', 'bootstrap-secret-123');
+      const result = await service.validateLoginCode('first@example.playaplan.app', '999888');
 
       // Assert
       expect(result).not.toBeNull();
@@ -986,12 +986,12 @@ describe('AuthService', () => {
       mockPrismaService.user.findUnique.mockResolvedValue(mockAdminUser);
       mockEmailService.isEmailConfigured.mockResolvedValue(true);
       mockConfigService.get.mockImplementation((key: string) => {
-        if (key === 'INITIAL_ADMIN_CODE') return 'bootstrap-secret-123';
+        if (key === 'INITIAL_ADMIN_CODE') return '999888';
         return undefined;
       });
 
       // Act
-      const result = await service.validateLoginCode('admin@example.playaplan.app', 'bootstrap-secret-123');
+      const result = await service.validateLoginCode('admin@example.playaplan.app', '999888');
 
       // Assert
       expect(result).toBeNull();
@@ -1008,12 +1008,12 @@ describe('AuthService', () => {
       mockPrismaService.user.count.mockResolvedValue(1); // Already has verified users
       mockEmailService.isEmailConfigured.mockResolvedValue(false);
       mockConfigService.get.mockImplementation((key: string) => {
-        if (key === 'INITIAL_ADMIN_CODE') return 'bootstrap-secret-123';
+        if (key === 'INITIAL_ADMIN_CODE') return '999888';
         return undefined;
       });
 
       // Act
-      const result = await service.validateLoginCode('test@example.playaplan.app', 'bootstrap-secret-123');
+      const result = await service.validateLoginCode('test@example.playaplan.app', '999888');
 
       // Assert
       expect(result).toBeNull();
@@ -1030,7 +1030,7 @@ describe('AuthService', () => {
       });
 
       // Act
-      const result = await service.validateLoginCode('admin@example.playaplan.app', 'some-code');
+      const result = await service.validateLoginCode('admin@example.playaplan.app', '111111');
 
       // Assert
       expect(result).toBeNull();
@@ -1042,12 +1042,12 @@ describe('AuthService', () => {
       mockPrismaService.user.findUnique.mockResolvedValue(mockAdminUser);
       mockEmailService.isEmailConfigured.mockResolvedValue(false);
       mockConfigService.get.mockImplementation((key: string) => {
-        if (key === 'INITIAL_ADMIN_CODE') return 'bootstrap-secret-123';
+        if (key === 'INITIAL_ADMIN_CODE') return '999888';
         return undefined;
       });
 
       // Act
-      const result = await service.validateLoginCode('admin@example.playaplan.app', 'wrong-code');
+      const result = await service.validateLoginCode('admin@example.playaplan.app', '000000');
 
       // Assert
       expect(result).toBeNull();
@@ -1082,7 +1082,7 @@ describe('AuthService', () => {
       mockPrismaService.user.findUnique.mockResolvedValue(mockUser);
       mockNotificationsService.sendLoginCodeEmail.mockResolvedValue(false); // Email send fails
       mockConfigService.get.mockImplementation((key: string) => {
-        if (key === 'INITIAL_ADMIN_CODE') return 'my-admin-code';
+        if (key === 'INITIAL_ADMIN_CODE') return '777666';
         if (key === 'nodeEnv') return 'production';
         return undefined;
       });
