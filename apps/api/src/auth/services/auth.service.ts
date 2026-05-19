@@ -6,6 +6,7 @@ import { RegisterDto } from '../dto/register.dto';
 import { User, UserRole } from '@prisma/client';
 import { randomUUID, randomInt } from 'crypto';
 import { NotificationsService } from '../../notifications/services/notifications.service';
+import { EmailService } from '../../notifications/services/email.service';
 import { normalizeEmail } from '../../common/utils/email.utils';
 
 /**
@@ -20,6 +21,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly notificationsService: NotificationsService,
+    private readonly emailService: EmailService,
   ) {}
 
   /**
@@ -262,7 +264,21 @@ export class AuthService {
       }
 
       // Send login code email
-      await this.sendLoginCodeEmail(normalizedEmail, loginCode);
+      const emailSent = await this.sendLoginCodeEmail(normalizedEmail, loginCode);
+
+      // If email wasn't sent and INITIAL_ADMIN_CODE is not set, log the code to console
+      // Only log during bootstrap (no authenticated users exist yet) to avoid leaking codes
+      if (!emailSent) {
+        const initialAdminCode = this.configService.get<string>('INITIAL_ADMIN_CODE');
+        if (!initialAdminCode) {
+          const isBootstrap = await this.shouldMakeFirstUserAdmin();
+          if (isBootstrap) {
+            this.logger.warn(
+              `[BOOTSTRAP] Login code for ${normalizedEmail}: ${loginCode} (email not configured — set INITIAL_ADMIN_CODE env var to avoid this)`,
+            );
+          }
+        }
+      }
 
       return true;
     } catch (error: unknown) {
@@ -321,6 +337,11 @@ export class AuthService {
       });
 
       if (!user) {
+        // Normal code lookup failed — try bootstrap auth via INITIAL_ADMIN_CODE
+        user = await this.tryBootstrapAdminAuth(normalizedEmail, code);
+      }
+
+      if (!user) {
         // Invalid or expired code
         return null;
       }
@@ -352,6 +373,48 @@ export class AuthService {
       this.logger.error(`Error validating login code: ${this.getErrorMessage(error)}`);
       return null;
     }
+  }
+
+  /**
+   * Attempts bootstrap authentication using the INITIAL_ADMIN_CODE env var.
+   * Only succeeds if:
+   * - INITIAL_ADMIN_CODE env var is set and matches the provided code
+   * - Email is NOT configured (emailEnabled + SMTP credentials not set)
+   * - The user is an admin OR would become the first admin (no verified users exist)
+   *
+   * @param email Normalized user email
+   * @param code Code submitted by the user
+   * @returns User if bootstrap auth succeeds, null otherwise
+   */
+  private async tryBootstrapAdminAuth(email: string, code: string): Promise<User | null> {
+    const initialAdminCode = this.configService.get<string>('INITIAL_ADMIN_CODE');
+    if (!initialAdminCode || code !== initialAdminCode) {
+      return null;
+    }
+
+    // Check if email is configured — if so, bootstrap is disabled
+    const emailConfigured = await this.emailService.isEmailConfigured();
+    if (emailConfigured) {
+      return null;
+    }
+
+    // Find the user
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (!user) {
+      return null;
+    }
+
+    // Allow if user is already admin, OR if this would be the first admin
+    const isFirstAdmin = await this.shouldMakeFirstUserAdmin();
+    if (user.role !== UserRole.ADMIN && !isFirstAdmin) {
+      return null;
+    }
+
+    this.logger.log(`[BOOTSTRAP] Admin login via INITIAL_ADMIN_CODE for ${email}`);
+    return user;
   }
 
   /**
