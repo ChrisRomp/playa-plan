@@ -243,6 +243,38 @@ describe('NotificationsController', () => {
       expect(result.message).toContain('Email notifications are currently disabled');
       expect(mockNotificationsService.sendTestEmail).not.toHaveBeenCalled();
     });
+
+    it('should return error when SMTP authentication credentials are missing', async () => {
+      const mockRequest = {
+        user: {
+          id: 'user-123',
+          email: 'admin@example.com',
+          firstName: 'John',
+          lastName: 'Doe',
+          role: UserRole.ADMIN,
+        },
+      };
+
+      const mockEmailConfig = {
+        emailEnabled: true,
+        smtpHost: 'smtp.test.com',
+        smtpPort: 587,
+        smtpUsername: '',
+        smtpPassword: '',
+        smtpUseSsl: false,
+        senderEmail: 'test@example.playaplan.app',
+        senderName: 'PlayaPlan Test',
+      };
+
+      mockCoreConfigService.getEmailConfiguration.mockResolvedValue(mockEmailConfig);
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const result = await controller.sendTestEmail({ email: 'test@example.playaplan.app' }, mockRequest as any);
+
+      expect(result.success).toBe(false);
+      expect(result.message).toContain('SMTP configuration is incomplete');
+      expect(mockNotificationsService.sendTestEmail).not.toHaveBeenCalled();
+    });
   });
 
   describe('getEmailStatistics', () => {

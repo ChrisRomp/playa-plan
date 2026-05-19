@@ -156,11 +156,8 @@ export class NotificationsController {
     if (!emailConfig.emailEnabled) {
       throw new Error('Email notifications are currently disabled. Please enable email notifications first.');
     }
-    if (!emailConfig.smtpHost || !emailConfig.senderEmail) {
+    if (!emailConfig.smtpHost || !emailConfig.senderEmail || !emailConfig.smtpUsername || !emailConfig.smtpPassword) {
       throw new Error('SMTP configuration is incomplete. Please configure SMTP settings before sending test emails.');
-    }
-    if (!emailConfig.smtpUsername || !emailConfig.smtpPassword) {
-      throw new Error('SMTP authentication credentials are not configured. Please set SMTP username and password.');
     }
   }
 
