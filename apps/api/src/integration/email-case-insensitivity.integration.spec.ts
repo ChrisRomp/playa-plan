@@ -5,6 +5,7 @@ import { PrismaService } from '../common/prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { NotificationsService } from '../notifications/services/notifications.service';
+import { EmailService } from '../notifications/services/email.service';
 import { ConflictException } from '@nestjs/common';
 import { normalizeEmail } from '../common/utils/email.utils';
 
@@ -46,6 +47,10 @@ describe('Email Case Insensitivity Integration', () => {
     sendEmailChangeNotificationToNewEmail: jest.fn().mockResolvedValue(true),
   };
 
+  const mockEmailService = {
+    isEmailConfigured: jest.fn().mockResolvedValue(true),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -66,6 +71,10 @@ describe('Email Case Insensitivity Integration', () => {
         {
           provide: NotificationsService,
           useValue: mockNotificationsService,
+        },
+        {
+          provide: EmailService,
+          useValue: mockEmailService,
         },
       ],
     }).compile();

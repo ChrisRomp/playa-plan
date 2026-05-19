@@ -6,6 +6,7 @@ import { PrismaService } from '../../common/prisma/prisma.service';
 import { RegisterDto } from '../dto/register.dto';
 import { User, UserRole } from '@prisma/client';
 import { NotificationsService } from '../../notifications/services/notifications.service';
+import { EmailService } from '../../notifications/services/email.service';
 import { randomUUID } from 'crypto';
 import { BadRequestException, ConflictException } from '@nestjs/common';
 
@@ -87,6 +88,11 @@ describe('AuthService', () => {
     sendLoginCodeEmail: jest.fn().mockResolvedValue(true),
   };
 
+  // Mock email service
+  const mockEmailService = {
+    isEmailConfigured: jest.fn().mockResolvedValue(false),
+  };
+
   beforeEach(async () => {
     jest.clearAllMocks();
     
@@ -97,6 +103,7 @@ describe('AuthService', () => {
         { provide: JwtService, useValue: mockJwtService },
         { provide: ConfigService, useValue: mockConfigService },
         { provide: NotificationsService, useValue: mockNotificationsService },
+        { provide: EmailService, useValue: mockEmailService },
       ],
     }).compile();
 
@@ -890,6 +897,248 @@ describe('AuthService', () => {
           },
         });
       });
+    });
+  });
+
+  describe('Bootstrap Admin Auth (INITIAL_ADMIN_CODE)', () => {
+    const mockAdminUser = {
+      ...mockUser,
+      id: 'admin-id-1',
+      email: 'admin@example.playaplan.app',
+      role: UserRole.ADMIN,
+      isEmailVerified: true,
+      loginCode: null,
+      loginCodeExpiry: null,
+    } as User;
+
+    it('should accept INITIAL_ADMIN_CODE for admin user when email is not configured', async () => {
+      // Arrange
+      mockPrismaService.user.findFirst.mockResolvedValue(null); // Normal code lookup fails
+      mockPrismaService.user.findUnique.mockResolvedValue(mockAdminUser);
+      mockPrismaService.user.count.mockResolvedValue(1); // Already has authenticated users
+      mockPrismaService.user.update.mockResolvedValue({
+        ...mockAdminUser,
+        loginCode: null,
+        loginCodeExpiry: null,
+      });
+      mockEmailService.isEmailConfigured.mockResolvedValue(false);
+      mockConfigService.get.mockImplementation((key: string) => {
+        if (key === 'INITIAL_ADMIN_CODE') return '999888';
+        return undefined;
+      });
+
+      // Act
+      const result = await service.validateLoginCode('admin@example.playaplan.app', '999888');
+
+      // Assert
+      expect(result).not.toBeNull();
+      expect(result?.email).toBe('admin@example.playaplan.app');
+    });
+
+    it('should accept INITIAL_ADMIN_CODE for first user (PARTICIPANT) who will become admin', async () => {
+      // Arrange - first user, not yet promoted, no verified users
+      const firstUser = {
+        ...mockUser,
+        id: 'first-user-id',
+        email: 'first@example.playaplan.app',
+        role: UserRole.PARTICIPANT,
+        isEmailVerified: false,
+        loginCode: null,
+        loginCodeExpiry: null,
+      } as User;
+
+      mockPrismaService.user.findFirst.mockResolvedValue(null); // Normal code lookup fails
+      mockPrismaService.user.findUnique.mockResolvedValue(firstUser);
+      mockPrismaService.user.count.mockResolvedValue(0); // No verified users — first admin
+      mockPrismaService.user.update.mockResolvedValue({
+        ...firstUser,
+        loginCode: null,
+        loginCodeExpiry: null,
+        isEmailVerified: true,
+        role: UserRole.ADMIN,
+      });
+      mockEmailService.isEmailConfigured.mockResolvedValue(false);
+      mockConfigService.get.mockImplementation((key: string) => {
+        if (key === 'INITIAL_ADMIN_CODE') return '999888';
+        return undefined;
+      });
+
+      // Act
+      const result = await service.validateLoginCode('first@example.playaplan.app', '999888');
+
+      // Assert
+      expect(result).not.toBeNull();
+      expect(result?.role).toBe(UserRole.ADMIN); // Should be promoted to admin
+      expect(mockPrismaService.user.update).toHaveBeenCalledWith({
+        where: { id: 'first-user-id' },
+        data: {
+          loginCode: null,
+          loginCodeExpiry: null,
+          isEmailVerified: true,
+          role: UserRole.ADMIN,
+        },
+      });
+    });
+
+    it('should reject INITIAL_ADMIN_CODE when email IS configured', async () => {
+      // Arrange
+      mockPrismaService.user.findFirst.mockResolvedValue(null);
+      mockPrismaService.user.findUnique.mockResolvedValue(mockAdminUser);
+      mockEmailService.isEmailConfigured.mockResolvedValue(true);
+      mockConfigService.get.mockImplementation((key: string) => {
+        if (key === 'INITIAL_ADMIN_CODE') return '999888';
+        return undefined;
+      });
+
+      // Act
+      const result = await service.validateLoginCode('admin@example.playaplan.app', '999888');
+
+      // Assert
+      expect(result).toBeNull();
+    });
+
+    it('should reject INITIAL_ADMIN_CODE for non-admin users when bootstrap is complete', async () => {
+      // Arrange
+      const mockParticipant = {
+        ...mockUser,
+        role: UserRole.PARTICIPANT,
+      } as User;
+      mockPrismaService.user.findFirst.mockResolvedValue(null);
+      mockPrismaService.user.findUnique.mockResolvedValue(mockParticipant);
+      mockPrismaService.user.count.mockResolvedValue(1); // Already has verified users
+      mockEmailService.isEmailConfigured.mockResolvedValue(false);
+      mockConfigService.get.mockImplementation((key: string) => {
+        if (key === 'INITIAL_ADMIN_CODE') return '999888';
+        return undefined;
+      });
+
+      // Act
+      const result = await service.validateLoginCode('test@example.playaplan.app', '999888');
+
+      // Assert
+      expect(result).toBeNull();
+    });
+
+    it('should reject when INITIAL_ADMIN_CODE env var is not set', async () => {
+      // Arrange
+      mockPrismaService.user.findFirst.mockResolvedValue(null);
+      mockPrismaService.user.findUnique.mockResolvedValue(mockAdminUser);
+      mockEmailService.isEmailConfigured.mockResolvedValue(false);
+      mockConfigService.get.mockImplementation((key: string) => {
+        if (key === 'INITIAL_ADMIN_CODE') return undefined;
+        return undefined;
+      });
+
+      // Act
+      const result = await service.validateLoginCode('admin@example.playaplan.app', '111111');
+
+      // Assert
+      expect(result).toBeNull();
+    });
+
+    it('should reject when code does not match INITIAL_ADMIN_CODE', async () => {
+      // Arrange
+      mockPrismaService.user.findFirst.mockResolvedValue(null);
+      mockPrismaService.user.findUnique.mockResolvedValue(mockAdminUser);
+      mockEmailService.isEmailConfigured.mockResolvedValue(false);
+      mockConfigService.get.mockImplementation((key: string) => {
+        if (key === 'INITIAL_ADMIN_CODE') return '999888';
+        return undefined;
+      });
+
+      // Act
+      const result = await service.validateLoginCode('admin@example.playaplan.app', '000000');
+
+      // Assert
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('generateLoginCode bootstrap console logging', () => {
+    it('should log code to console when email send fails, no env var, and in bootstrap state', async () => {
+      // Arrange
+      mockPrismaService.user.findUnique.mockResolvedValue(mockUser);
+      mockPrismaService.user.count.mockResolvedValue(0); // Bootstrap state (no verified users)
+      mockNotificationsService.sendLoginCodeEmail.mockResolvedValue(false); // Email send fails
+      mockConfigService.get.mockImplementation((key: string) => {
+        if (key === 'INITIAL_ADMIN_CODE') return undefined;
+        if (key === 'nodeEnv') return 'production';
+        return undefined;
+      });
+
+      const loggerWarnSpy = jest.spyOn(service['logger'], 'warn');
+
+      // Act
+      await service.generateLoginCode('test@example.playaplan.app');
+
+      // Assert
+      expect(loggerWarnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[BOOTSTRAP] Login code for test@example.playaplan.app'),
+      );
+    });
+
+    it('should NOT log code to console when INITIAL_ADMIN_CODE is set', async () => {
+      // Arrange
+      mockPrismaService.user.findUnique.mockResolvedValue(mockUser);
+      mockNotificationsService.sendLoginCodeEmail.mockResolvedValue(false); // Email send fails
+      mockConfigService.get.mockImplementation((key: string) => {
+        if (key === 'INITIAL_ADMIN_CODE') return '777666';
+        if (key === 'nodeEnv') return 'production';
+        return undefined;
+      });
+
+      const loggerWarnSpy = jest.spyOn(service['logger'], 'warn');
+
+      // Act
+      await service.generateLoginCode('test@example.playaplan.app');
+
+      // Assert
+      expect(loggerWarnSpy).not.toHaveBeenCalledWith(
+        expect.stringContaining('[BOOTSTRAP]'),
+      );
+    });
+
+    it('should NOT log code to console when email send succeeds', async () => {
+      // Arrange
+      mockPrismaService.user.findUnique.mockResolvedValue(mockUser);
+      mockNotificationsService.sendLoginCodeEmail.mockResolvedValue(true); // Email succeeds
+      mockConfigService.get.mockImplementation((key: string) => {
+        if (key === 'INITIAL_ADMIN_CODE') return undefined;
+        if (key === 'nodeEnv') return 'production';
+        return undefined;
+      });
+
+      const loggerWarnSpy = jest.spyOn(service['logger'], 'warn');
+
+      // Act
+      await service.generateLoginCode('test@example.playaplan.app');
+
+      // Assert
+      expect(loggerWarnSpy).not.toHaveBeenCalledWith(
+        expect.stringContaining('[BOOTSTRAP]'),
+      );
+    });
+
+    it('should NOT log code to console after bootstrap is complete (verified users exist)', async () => {
+      // Arrange
+      mockPrismaService.user.findUnique.mockResolvedValue(mockUser);
+      mockPrismaService.user.count.mockResolvedValue(1); // Not in bootstrap state
+      mockNotificationsService.sendLoginCodeEmail.mockResolvedValue(false); // Email send fails
+      mockConfigService.get.mockImplementation((key: string) => {
+        if (key === 'INITIAL_ADMIN_CODE') return undefined;
+        if (key === 'nodeEnv') return 'production';
+        return undefined;
+      });
+
+      const loggerWarnSpy = jest.spyOn(service['logger'], 'warn');
+
+      // Act
+      await service.generateLoginCode('test@example.playaplan.app');
+
+      // Assert
+      expect(loggerWarnSpy).not.toHaveBeenCalledWith(
+        expect.stringContaining('[BOOTSTRAP]'),
+      );
     });
   });
 });

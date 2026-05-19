@@ -1311,4 +1311,67 @@ describe('EmailService', () => {
       createTransportSpy.mockRestore();
     });
   });
+
+  describe('isEmailConfigured', () => {
+    it('should return true when emailEnabled is true and SMTP credentials are all set', async () => {
+      mockCoreConfigService.getEmailConfiguration.mockResolvedValue(mockEmailConfig);
+
+      const result = await service.isEmailConfigured();
+
+      expect(result).toBe(true);
+    });
+
+    it('should return false when emailEnabled is false even if SMTP fields are set', async () => {
+      mockCoreConfigService.getEmailConfiguration.mockResolvedValue({
+        ...mockEmailConfig,
+        emailEnabled: false,
+      });
+
+      const result = await service.isEmailConfigured();
+
+      expect(result).toBe(false);
+    });
+
+    it('should return false when SMTP fields are missing even if emailEnabled is true', async () => {
+      mockCoreConfigService.getEmailConfiguration.mockResolvedValue({
+        ...mockEmailConfig,
+        smtpHost: null,
+        smtpUsername: null,
+        smtpPassword: null,
+      });
+
+      const result = await service.isEmailConfigured();
+
+      expect(result).toBe(false);
+    });
+
+    it('should return false when configuration is incomplete (e.g., host set but no password)', async () => {
+      mockCoreConfigService.getEmailConfiguration.mockResolvedValue({
+        ...mockEmailConfig,
+        smtpPassword: null,
+      });
+
+      const result = await service.isEmailConfigured();
+
+      expect(result).toBe(false);
+    });
+
+    it('should always fetch fresh configuration bypassing cache', async () => {
+      // First call populates cache via refreshConfiguration
+      mockCoreConfigService.getEmailConfiguration.mockResolvedValue(mockEmailConfig);
+      await service.refreshConfiguration();
+      mockCoreConfigService.getEmailConfiguration.mockClear();
+
+      // Second call via isEmailConfigured should still hit the database (forceRefresh)
+      mockCoreConfigService.getEmailConfiguration.mockResolvedValue({
+        ...mockEmailConfig,
+        emailEnabled: false,
+      });
+
+      const result = await service.isEmailConfigured();
+
+      expect(mockCoreConfigService.getEmailConfiguration).toHaveBeenCalledTimes(1);
+      expect(result).toBe(false);
+    });
+  });
 }); 

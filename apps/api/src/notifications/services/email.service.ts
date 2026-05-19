@@ -119,6 +119,16 @@ export class EmailService implements OnModuleInit {
   }
 
   /**
+   * Check whether email is fully configured and ready to send
+   * Email is considered configured when emailEnabled is true AND
+   * smtpHost, smtpUsername, and smtpPassword are all set.
+   */
+  async isEmailConfigured(): Promise<boolean> {
+    const config = await this.getEmailConfig(true);
+    return !!(config.emailEnabled && config.smtpHost && config.smtpUsername && config.smtpPassword);
+  }
+
+  /**
    * Initialize or refresh SMTP transporter with current configuration
    */
   private async initSmtpTransporter(): Promise<void> {
