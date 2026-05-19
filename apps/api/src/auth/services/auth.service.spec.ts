@@ -969,6 +969,15 @@ describe('AuthService', () => {
       // Assert
       expect(result).not.toBeNull();
       expect(result?.role).toBe(UserRole.ADMIN); // Should be promoted to admin
+      expect(mockPrismaService.user.update).toHaveBeenCalledWith({
+        where: { id: 'first-user-id' },
+        data: {
+          loginCode: null,
+          loginCodeExpiry: null,
+          isEmailVerified: true,
+          role: UserRole.ADMIN,
+        },
+      });
     });
 
     it('should reject INITIAL_ADMIN_CODE when email IS configured', async () => {

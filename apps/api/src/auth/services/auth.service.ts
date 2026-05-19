@@ -274,7 +274,7 @@ export class AuthService {
           const isBootstrap = await this.shouldMakeFirstUserAdmin();
           if (isBootstrap) {
             this.logger.warn(
-              `[BOOTSTRAP] Login code for ${normalizedEmail}: ${loginCode} (email not configured — set INITIAL_ADMIN_CODE env var to avoid this)`,
+              `[BOOTSTRAP] Login code for ${normalizedEmail}: ${loginCode} (email was not delivered — set INITIAL_ADMIN_CODE env var to avoid this)`,
             );
           }
         }
@@ -413,7 +413,7 @@ export class AuthService {
       return null;
     }
 
-    this.logger.log(`[BOOTSTRAP] Admin login via INITIAL_ADMIN_CODE for ${email}`);
+    this.logger.log(`[BOOTSTRAP] INITIAL_ADMIN_CODE matched for ${email} (completing login...)`);
     return user;
   }
 

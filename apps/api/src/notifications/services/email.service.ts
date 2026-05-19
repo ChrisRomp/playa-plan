@@ -124,7 +124,7 @@ export class EmailService implements OnModuleInit {
    * smtpHost, smtpUsername, and smtpPassword are all set.
    */
   async isEmailConfigured(): Promise<boolean> {
-    const config = await this.getEmailConfig();
+    const config = await this.getEmailConfig(true);
     return !!(config.emailEnabled && config.smtpHost && config.smtpUsername && config.smtpPassword);
   }
 
