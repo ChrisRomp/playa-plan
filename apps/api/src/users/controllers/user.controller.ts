@@ -54,7 +54,6 @@ export class UserController {
     'allowEarlyRegistration',
     'allowDeferredDuesPayment',
     'allowNoJob',
-    'isEmailVerified',
   ] as const;
 
   constructor(private readonly userService: UserService) {}
