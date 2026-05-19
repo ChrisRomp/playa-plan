@@ -333,6 +333,80 @@ describe('NotificationsService', () => {
     });
   });
 
+  describe('sendTestEmail', () => {
+    const mockTestEmailDetails = {
+      smtpHost: 'smtp.example.com',
+      smtpPort: 587,
+      smtpSecure: false,
+      senderEmail: 'admin@example.playaplan.app',
+      senderName: 'PlayaPlan',
+      adminUserName: 'Admin User',
+      adminEmail: 'admin@example.playaplan.app',
+      timestamp: new Date('2026-01-01T00:00:00Z'),
+    } as const;
+    const inputUserId = 'user-123';
+
+    it('should throw when recipient is empty string', async () => {
+      const inputEmail = '';
+
+      await expect(
+        service.sendTestEmail(inputEmail, mockTestEmailDetails, inputUserId),
+      ).rejects.toThrow('At least one recipient email address is required.');
+    });
+
+    it('should throw when recipient is only whitespace/commas', async () => {
+      const inputEmail = ' , , ';
+
+      await expect(
+        service.sendTestEmail(inputEmail, mockTestEmailDetails, inputUserId),
+      ).rejects.toThrow('At least one recipient email address is required.');
+    });
+
+    it('should throw when email address is invalid', async () => {
+      const inputEmail = 'not-an-email';
+
+      await expect(
+        service.sendTestEmail(inputEmail, mockTestEmailDetails, inputUserId),
+      ).rejects.toThrow('Invalid email address: not-an-email');
+    });
+
+    it('should send successfully for a single valid recipient', async () => {
+      const inputEmail = 'recipient@example.playaplan.app';
+      jest.spyOn(service, 'sendNotification').mockResolvedValueOnce(true);
+
+      const actualResult = await service.sendTestEmail(inputEmail, mockTestEmailDetails, inputUserId);
+
+      const expectedResult = { success: true, recipients: ['recipient@example.playaplan.app'] };
+      expect(actualResult).toEqual(expectedResult);
+      expect(service.sendNotification).toHaveBeenCalledTimes(1);
+    });
+
+    it('should trim and send to comma-separated recipients individually', async () => {
+      const inputEmail = ' alice@example.playaplan.app , bob@example.playaplan.app ';
+      jest.spyOn(service, 'sendNotification')
+        .mockResolvedValueOnce(true)
+        .mockResolvedValueOnce(true);
+
+      const actualResult = await service.sendTestEmail(inputEmail, mockTestEmailDetails, inputUserId);
+
+      const expectedRecipients = ['alice@example.playaplan.app', 'bob@example.playaplan.app'];
+      expect(actualResult).toEqual({ success: true, recipients: expectedRecipients });
+      expect(service.sendNotification).toHaveBeenCalledTimes(2);
+    });
+
+    it('should return success false on partial failure', async () => {
+      const inputEmail = 'ok@example.playaplan.app, fail@example.playaplan.app';
+      jest.spyOn(service, 'sendNotification')
+        .mockResolvedValueOnce(true)
+        .mockResolvedValueOnce(false);
+
+      const actualResult = await service.sendTestEmail(inputEmail, mockTestEmailDetails, inputUserId);
+
+      expect(actualResult.success).toBe(false);
+      expect(actualResult.recipients).toEqual(['ok@example.playaplan.app', 'fail@example.playaplan.app']);
+    });
+  });
+
   describe('sendNotification', () => {
     it('should handle errors gracefully', async () => {
       mockEmailService.sendEmail.mockRejectedValueOnce(new Error('Test error'));

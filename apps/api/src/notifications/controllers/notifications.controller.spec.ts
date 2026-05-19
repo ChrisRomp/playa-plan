@@ -170,7 +170,7 @@ describe('NotificationsController', () => {
       };
 
       mockCoreConfigService.getEmailConfiguration.mockResolvedValue(mockEmailConfig);
-      mockNotificationsService.sendTestEmail.mockResolvedValue(true);
+      mockNotificationsService.sendTestEmail.mockResolvedValue({ success: true, recipients: ['test@example.playaplan.app'] });
       mockPrismaService.emailAudit.findMany.mockResolvedValue([mockAuditRecord]);
 
       // Act
