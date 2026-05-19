@@ -220,7 +220,7 @@ describe('CampingOptionsService', () => {
   });
 
   describe('getRegistrationCount', () => {
-    it('should return the count of registrations for a camping option', async () => {
+    it('should return the count of registrations for a camping option (all-time when no year)', async () => {
       mockPrismaService.campingOptionRegistration.count.mockResolvedValueOnce(5);
       
       const result = await service.getRegistrationCount('test-id');
@@ -238,6 +238,30 @@ describe('CampingOptionsService', () => {
       const result = await service.getRegistrationCount('test-id');
       
       expect(result).toBe(0);
+    });
+
+    it('should filter by year when year parameter is provided', async () => {
+      mockPrismaService.campingOptionRegistration.count.mockResolvedValueOnce(3);
+
+      const result = await service.getRegistrationCount('test-id', 2026);
+
+      expect(prisma.campingOptionRegistration.count).toHaveBeenCalledWith({
+        where: { campingOptionId: 'test-id', registration: { year: 2026 } },
+      });
+
+      expect(result).toBe(3);
+    });
+
+    it('should not filter by year when year parameter is undefined', async () => {
+      mockPrismaService.campingOptionRegistration.count.mockResolvedValueOnce(7);
+
+      const result = await service.getRegistrationCount('test-id', undefined);
+
+      expect(prisma.campingOptionRegistration.count).toHaveBeenCalledWith({
+        where: { campingOptionId: 'test-id' },
+      });
+
+      expect(result).toBe(7);
     });
   });
 

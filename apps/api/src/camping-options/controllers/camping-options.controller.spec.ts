@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { CampingOptionsController } from './camping-options.controller';
 import { CampingOptionsService } from '../services/camping-options.service';
+import { CoreConfigService } from '../../core-config/services/core-config.service';
 import { 
   CreateCampingOptionDto, 
   UpdateCampingOptionDto, 
@@ -86,6 +87,10 @@ describe('CampingOptionsController', () => {
       findOne: jest.fn(),
     };
 
+    const mockCoreConfigService = {
+      findCurrent: jest.fn().mockResolvedValue({ registrationYear: 2026 }),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       controllers: [CampingOptionsController],
       providers: [
@@ -96,6 +101,10 @@ describe('CampingOptionsController', () => {
         {
           provide: CampingOptionFieldsService,
           useValue: mockCampingOptionFieldsService,
+        },
+        {
+          provide: CoreConfigService,
+          useValue: mockCoreConfigService,
         },
       ],
     }).compile();
@@ -123,10 +132,11 @@ describe('CampingOptionsController', () => {
   });
 
   describe('findAll', () => {
-    it('should return all camping options', async () => {
+    it('should return all camping options with year-scoped registration count', async () => {
       const result = await controller.findAll();
       
       expect(service.findAll).toHaveBeenCalledWith(false);
+      expect(service.getRegistrationCount).toHaveBeenCalledWith('test-id', 2026);
       expect(result).toHaveLength(1);
       expect(result[0]).toEqual(expect.objectContaining(mockResponseDto));
     });
@@ -141,10 +151,11 @@ describe('CampingOptionsController', () => {
   });
 
   describe('findOne', () => {
-    it('should return a single camping option', async () => {
+    it('should return a single camping option with year-scoped registration count', async () => {
       const result = await controller.findOne('test-id');
       
       expect(service.findOne).toHaveBeenCalledWith('test-id');
+      expect(service.getRegistrationCount).toHaveBeenCalledWith('test-id', 2026);
       expect(result).toEqual(expect.objectContaining(mockResponseDto));
     });
 
@@ -156,10 +167,11 @@ describe('CampingOptionsController', () => {
   });
 
   describe('update', () => {
-    it('should update a camping option', async () => {
+    it('should update a camping option with year-scoped registration count', async () => {
       const result = await controller.update('test-id', mockUpdateCampingOptionDto);
       
       expect(service.update).toHaveBeenCalledWith('test-id', mockUpdateCampingOptionDto);
+      expect(service.getRegistrationCount).toHaveBeenCalledWith('test-id', 2026);
       expect(result).toEqual(expect.objectContaining(mockResponseDto));
     });
   });

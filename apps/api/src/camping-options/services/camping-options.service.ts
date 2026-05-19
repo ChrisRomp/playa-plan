@@ -149,12 +149,16 @@ export class CampingOptionsService {
   /**
    * Get the current registration count for a camping option
    * @param id - The ID of the camping option
+   * @param year - Optional year to scope the count to (via registration relation)
    * @returns The number of registrations
    */
-  async getRegistrationCount(id: string): Promise<number> {
-    const count = await this.prisma.campingOptionRegistration.count({
-      where: { campingOptionId: id },
-    });
+  async getRegistrationCount(id: string, year?: number): Promise<number> {
+    const where: Prisma.CampingOptionRegistrationWhereInput = { campingOptionId: id };
+    if (year !== undefined) {
+      where.registration = { year };
+    }
+
+    const count = await this.prisma.campingOptionRegistration.count({ where });
 
     return count;
   }
