@@ -11,6 +11,7 @@ import {
   ClassSerializerInterceptor,
   HttpCode,
   HttpStatus,
+  Logger,
   NotFoundException,
   ForbiddenException,
   Request,
@@ -46,7 +47,31 @@ interface AuthRequest extends Request {
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
 export class UserController {
+  private readonly logger = new Logger(UserController.name);
+
+  private static readonly ADMIN_ONLY_FIELDS = [
+    'allowRegistration',
+    'allowEarlyRegistration',
+    'allowDeferredDuesPayment',
+    'allowNoJob',
+  ] as const;
+
   constructor(private readonly userService: UserService) {}
+
+  /**
+   * Strips admin-only fields from a DTO for non-admin callers.
+   * Returns the sanitized DTO and whether any fields were stripped.
+   */
+  private sanitizeAdminFields<T extends object>(dto: T): { sanitized: T; hadAdminFields: boolean } {
+    const copy = { ...dto } as Record<string, unknown>;
+    const hadAdminFields = UserController.ADMIN_ONLY_FIELDS.some(field => copy[field] !== undefined);
+
+    for (const field of UserController.ADMIN_ONLY_FIELDS) {
+      delete copy[field];
+    }
+
+    return { sanitized: copy as T, hadAdminFields };
+  }
 
   /**
    * Get all users
@@ -134,7 +159,19 @@ export class UserController {
       }
     }
 
-    const user = await this.userService.create(createUserDto);
+    // Strip admin-only permission flags for non-admin callers
+    let dtoForService: CreateUserDto;
+    if (req.user && req.user.role === UserRole.ADMIN) {
+      dtoForService = createUserDto;
+    } else {
+      const { sanitized, hadAdminFields } = this.sanitizeAdminFields(createUserDto);
+      if (hadAdminFields) {
+        this.logger.warn(`Non-admin user ${req.user?.id} attempted to set admin-only fields on user creation`);
+      }
+      dtoForService = sanitized;
+    }
+
+    const user = await this.userService.create(dtoForService);
     return new User(user);
   }
 
@@ -174,11 +211,23 @@ export class UserController {
     }
 
     // Only admins can update user roles
-    if (updateUserDto.role && req.user && req.user.role !== UserRole.ADMIN) {
+    if ('role' in updateUserDto && req.user && req.user.role !== UserRole.ADMIN) {
       throw new ForbiddenException('Only administrators can change user roles');
     }
 
-    const updatedUser = await this.userService.update(id, updateUserDto);
+    // Strip admin-only permission flags for non-admin callers
+    let dtoForService: UpdateUserDto;
+    if (req.user && req.user.role === UserRole.ADMIN) {
+      dtoForService = updateUserDto;
+    } else {
+      const { sanitized, hadAdminFields } = this.sanitizeAdminFields(updateUserDto);
+      if (hadAdminFields) {
+        this.logger.warn(`Non-admin user ${req.user?.id} attempted to set admin-only fields on user ${id}`);
+      }
+      dtoForService = sanitized;
+    }
+
+    const updatedUser = await this.userService.update(id, dtoForService);
     return new User(updatedUser);
   }
 

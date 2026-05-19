@@ -13,8 +13,14 @@ import { normalizeEmail } from '../../common/utils/email.utils';
 @Injectable()
 export class UserService {
   private readonly logger = new Logger(UserService.name);
-  // Protected fields that cannot be updated directly
-  private readonly protectedFields = ['id', 'createdAt', 'updatedAt'];
+  // Fields that cannot be updated via the general update() method.
+  // Auth-internal fields are included as defense-in-depth; they should only
+  // be written by dedicated auth methods, never the general update path.
+  private readonly protectedFields = [
+    'id', 'createdAt', 'updatedAt',
+    'verificationToken', 'resetToken', 'resetTokenExpiry',
+    'loginCode', 'loginCodeExpiry',
+  ];
 
   constructor(
     private readonly prisma: PrismaService,
