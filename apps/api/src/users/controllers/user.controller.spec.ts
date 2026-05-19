@@ -261,6 +261,20 @@ describe('UserController', () => {
       expect(userServiceMock.update).not.toHaveBeenCalled();
     });
 
+    it('should forbid role field even when set to same role by non-admin', async () => {
+      // Arrange - the 'in' check catches any presence of the role key
+      const updateData: UpdateUserDto = {
+        role: UserRole.PARTICIPANT,
+      };
+
+      userServiceMock.findById.mockResolvedValue(mockUser);
+
+      // Act & Assert
+      await expect(controller.update('test-uuid', updateData, mockRequest()))
+        .rejects.toThrow(ForbiddenException);
+      expect(userServiceMock.update).not.toHaveBeenCalled();
+    });
+
     it('should pass through NotFoundException from service', async () => {
       // Arrange
       const updateData = updateDataFirstName;
@@ -331,6 +345,122 @@ describe('UserController', () => {
       // Assert
       expect(result).toEqual(expect.any(User));
       expect(userServiceMock.update).toHaveBeenCalledWith('test-uuid', updateData);
+    });
+
+    it('should strip admin-only fields when participant updates own profile', async () => {
+      // Arrange - participant tries to escalate with admin-only flags
+      const updateData: UpdateUserDto = {
+        firstName: 'Updated',
+        allowRegistration: true,
+        allowEarlyRegistration: true,
+        allowDeferredDuesPayment: true,
+        allowNoJob: true,
+      };
+
+      const updatedUser = { ...mockUser, firstName: 'Updated' };
+      userServiceMock.findById.mockResolvedValue(mockUser);
+      userServiceMock.update.mockResolvedValue(updatedUser);
+
+      // Act
+      await controller.update('test-uuid', updateData, mockRequest());
+
+      // Assert - service should receive DTO WITHOUT admin-only fields
+      expect(userServiceMock.update).toHaveBeenCalledWith('test-uuid', { firstName: 'Updated' });
+    });
+
+    it('should strip admin-only fields when staff updates a participant', async () => {
+      // Arrange - staff tries to set admin-only flags on a participant
+      const updateData: UpdateUserDto = {
+        firstName: 'Updated',
+        allowDeferredDuesPayment: true,
+        allowNoJob: true,
+      };
+
+      const updatedUser = { ...mockUser, firstName: 'Updated' };
+      userServiceMock.findById.mockResolvedValue(mockUser);
+      userServiceMock.update.mockResolvedValue(updatedUser);
+
+      // Act
+      await controller.update('test-uuid', updateData, mockStaffRequest());
+
+      // Assert - service should receive DTO WITHOUT admin-only fields
+      expect(userServiceMock.update).toHaveBeenCalledWith('test-uuid', { firstName: 'Updated' });
+    });
+
+    it('should allow admin to set admin-only fields on update', async () => {
+      // Arrange - admin sets permission flags
+      const updateData: UpdateUserDto = {
+        firstName: 'Updated',
+        allowRegistration: false,
+        allowEarlyRegistration: true,
+        allowDeferredDuesPayment: true,
+        allowNoJob: true,
+      };
+
+      const updatedUser = { ...mockUser, ...updateData };
+      userServiceMock.findById.mockResolvedValue(mockUser);
+      userServiceMock.update.mockResolvedValue(updatedUser);
+
+      // Act
+      await controller.update('test-uuid', updateData, mockAdminRequest());
+
+      // Assert - service should receive the FULL DTO including admin fields
+      expect(userServiceMock.update).toHaveBeenCalledWith('test-uuid', updateData);
+    });
+  });
+
+  describe('create - admin field protection', () => {
+    it('should strip admin-only fields when non-admin creates a user', async () => {
+      // Arrange - participant creates user with admin-only flags
+      const createUserDto: CreateUserDto = {
+        email: 'new@example.playaplan.app',
+        firstName: 'New',
+        lastName: 'User',
+        allowRegistration: false,
+        allowEarlyRegistration: true,
+        allowDeferredDuesPayment: true,
+        allowNoJob: true,
+      };
+
+      const createdUser = {
+        ...mockUser,
+        email: createUserDto.email,
+        firstName: createUserDto.firstName,
+        lastName: createUserDto.lastName,
+      };
+      userServiceMock.create.mockResolvedValue(createdUser);
+
+      // Act
+      await controller.create(createUserDto, mockRequest());
+
+      // Assert - service should receive DTO WITHOUT admin-only fields
+      expect(userServiceMock.create).toHaveBeenCalledWith({
+        email: 'new@example.playaplan.app',
+        firstName: 'New',
+        lastName: 'User',
+      });
+    });
+
+    it('should allow admin to set admin-only fields on create', async () => {
+      // Arrange - admin creates user with permission flags
+      const createUserDto: CreateUserDto = {
+        email: 'new@example.playaplan.app',
+        firstName: 'New',
+        lastName: 'User',
+        allowRegistration: false,
+        allowEarlyRegistration: true,
+        allowDeferredDuesPayment: true,
+        allowNoJob: true,
+      };
+
+      const createdUser = { ...mockUser, ...createUserDto };
+      userServiceMock.create.mockResolvedValue(createdUser);
+
+      // Act
+      await controller.create(createUserDto, mockAdminRequest());
+
+      // Assert - service should receive the FULL DTO including admin fields
+      expect(userServiceMock.create).toHaveBeenCalledWith(createUserDto);
     });
   });
 

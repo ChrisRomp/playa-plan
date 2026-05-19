@@ -43,6 +43,12 @@ export class User {
   @Exclude()
   resetTokenExpiry?: Date | null;
 
+  @Exclude()
+  loginCode?: string | null;
+
+  @Exclude()
+  loginCodeExpiry?: Date | null;
+
   @ApiProperty({ description: 'When the user was created' })
   createdAt: Date = new Date();
 
