@@ -371,6 +371,7 @@ export class RegistrationAdminService {
               adminUserId,
               `Camping options modified: ${editData.notes || 'No notes provided'}`,
               transactionId,
+              currentRegistration.id,
             );
           }
 

@@ -578,7 +578,8 @@ export class RegistrationsService {
     // Pre-flight: active-registration conflict and camping-option existence
     // checks. These are expected 4xx rejections and stay outside the
     // broad try/catch that emits the registration-error email.
-    const currentYear = new Date().getFullYear();
+    const config = await this.coreConfigService.findCurrent();
+    const currentYear = config.registrationYear;
     const existingActiveRegistration = await this.prisma.registration.findFirst({
       where: {
         userId,
@@ -590,7 +591,7 @@ export class RegistrationsService {
       throw new ConflictException(`User already has an active registration for ${currentYear}`);
     }
 
-    const campingOptionIds = createCampRegistrationDto.campingOptions ?? [];
+    const campingOptionIds = [...new Set(createCampRegistrationDto.campingOptions ?? [])];
     // Validate every camping option up front: must exist and the user must
     // not already be registered for it. This catches a stale option id or
     // a duplicate signup before any writes happen, avoiding the

@@ -131,6 +131,7 @@ model CampingOptionRegistration {
 
   @@index([userId])
   @@index([registrationId])
+  @@unique([registrationId, campingOptionId])
   @@map("camping_option_registrations")
 }
 

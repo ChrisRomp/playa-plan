@@ -50,17 +50,10 @@ export class RegistrationCleanupService {
                 job: true,
               },
             },
-            user: {
+            user: true,
+            campingOptionRegistrations: {
               include: {
-                campingOptionRegistrations: {
-                  where: {
-                    // Find camping options for this registration year
-                    // We'll match by user and then filter by registration context
-                  },
-                  include: {
-                    campingOption: true,
-                  },
-                },
+                campingOption: true,
               },
             },
           },
@@ -102,16 +95,8 @@ export class RegistrationCleanupService {
           this.logger.log(`Removed ${workShiftsRemoved} work shifts for registration ${registrationId}`);
         }
 
-        // Clean up camping option registrations
-        // Filter camping options that are related to this registration's year
-        const relevantCampingOptions = registration.user.campingOptionRegistrations.filter(
-          () => {
-            // We need to determine if this camping option registration is related to this registration
-            // For now, we'll use a heuristic based on creation time proximity or other logic
-            // This might need refinement based on your specific business logic
-            return true; // For now, clean up all camping options for the user
-          }
-        );
+        // Clean up camping option registrations linked to this registration
+        const relevantCampingOptions = registration.campingOptionRegistrations;
 
         if (relevantCampingOptions.length > 0) {
           for (const campingOptionReg of relevantCampingOptions) {
@@ -238,18 +223,24 @@ export class RegistrationCleanupService {
     adminUserId: string,
     reason: string,
     transactionId?: string,
+    registrationId?: string,
   ): Promise<number> {
     const txId = transactionId || randomUUID();
 
     try {
       return await this.prisma.$transaction(async (prisma) => {
-        const campingOptionRegs = await prisma.campingOptionRegistration.findMany({
-          where: {
-            userId,
-            campingOptionId: {
-              in: campingOptionIds,
-            },
+        const where: { userId: string; campingOptionId: { in: string[] }; registrationId?: string } = {
+          userId,
+          campingOptionId: {
+            in: campingOptionIds,
           },
+        };
+        if (registrationId) {
+          where.registrationId = registrationId;
+        }
+
+        const campingOptionRegs = await prisma.campingOptionRegistration.findMany({
+          where,
           include: {
             campingOption: true,
           },

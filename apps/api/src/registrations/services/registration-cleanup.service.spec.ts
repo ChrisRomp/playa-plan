@@ -20,29 +20,29 @@ describe('RegistrationCleanupService', () => {
       firstName: 'John',
       lastName: 'Doe',
       role: UserRole.PARTICIPANT,
-      campingOptionRegistrations: [
-        {
-          id: 'camping-reg-1',
-          userId: 'user-123',
-          campingOptionId: 'camping-option-1',
-          campingOption: {
-            id: 'camping-option-1',
-            name: 'RV Spot',
-            description: 'RV parking spot',
-          },
-        },
-        {
-          id: 'camping-reg-2',
-          userId: 'user-123',
-          campingOptionId: 'camping-option-2',
-          campingOption: {
-            id: 'camping-option-2',
-            name: 'Tent Area',
-            description: 'Tent camping area',
-          },
-        },
-      ],
     },
+    campingOptionRegistrations: [
+      {
+        id: 'camping-reg-1',
+        userId: 'user-123',
+        campingOptionId: 'camping-option-1',
+        campingOption: {
+          id: 'camping-option-1',
+          name: 'RV Spot',
+          description: 'RV parking spot',
+        },
+      },
+      {
+        id: 'camping-reg-2',
+        userId: 'user-123',
+        campingOptionId: 'camping-option-2',
+        campingOption: {
+          id: 'camping-option-2',
+          name: 'Tent Area',
+          description: 'Tent camping area',
+        },
+      },
+    ],
     jobs: [
       {
         id: 'reg-job-1',
@@ -181,10 +181,7 @@ describe('RegistrationCleanupService', () => {
       const registrationWithNoRelated = {
         ...mockRegistration,
         jobs: [],
-        user: {
-          ...mockRegistration.user,
-          campingOptionRegistrations: [],
-        },
+        campingOptionRegistrations: [],
       };
 
       prismaService.$transaction.mockImplementation(async (callback) => {
