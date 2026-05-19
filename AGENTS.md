@@ -32,6 +32,8 @@ Monorepo layout:
 - `npm run dev` — start both API and web
 - Dev-mode email auth code is **always `123456`**
 - If local Postgres isn't running, prompt the user to start it
+- If tests fail with "Cannot read properties of undefined" on Prisma enums/types,
+  run `npx prisma generate --schema=apps/api/prisma/schema.prisma` (common in fresh worktrees)
 - See `package.json` workspaces for the full script list
 
 ## Workflow rules

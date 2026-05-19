@@ -5,12 +5,8 @@ import { CreatePaymentDto, CreateStripePaymentDto, CreatePaypalPaymentDto, Creat
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
-import { PaymentStatus, UserRole, User } from '@prisma/client';
-
-// Interface for authenticated request with user
-interface AuthenticatedRequest extends Request {
-  user: Omit<User, 'password'>;
-}
+import { PaymentStatus, UserRole } from '@prisma/client';
+import { AuthenticatedRequest } from '../../auth/types/safe-user';
 
 @ApiTags('payments')
 @Controller('payments')

@@ -13,16 +13,12 @@ import {
   Request,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { Request as ExpressRequest } from 'express';
 import { User } from '@prisma/client';
 import { PasskeysService } from '../services/passkeys.service';
 import { PasskeyResponseDto } from '../dto/passkey-response.dto';
 import { UpdatePasskeyDto } from '../dto/update-passkey.dto';
 import { VerifyRegistrationDto } from '../dto/verify-passkey.dto';
-
-interface RequestWithUser extends ExpressRequest {
-  user: Omit<User, 'password'>;
-}
+import { AuthenticatedRequest } from '../../auth/types/safe-user';
 
 /**
  * REST endpoints for an authenticated user to enroll, list, rename, and
@@ -54,7 +50,7 @@ export class PasskeyController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Generate WebAuthn registration options for the current user' })
   @ApiResponse({ status: HttpStatus.OK, description: 'Registration options issued' })
-  async registrationOptions(@Request() req: RequestWithUser) {
+  async registrationOptions(@Request() req: AuthenticatedRequest) {
     this.assertVerified(req.user);
     return this.passkeysService.createRegistrationOptions(req.user);
   }
@@ -64,7 +60,7 @@ export class PasskeyController {
   @ApiOperation({ summary: 'Verify the browser registration response and persist a passkey' })
   @ApiResponse({ status: HttpStatus.CREATED, description: 'Passkey registered' })
   async verifyRegistration(
-    @Request() req: RequestWithUser,
+    @Request() req: AuthenticatedRequest,
     @Body() body: VerifyRegistrationDto,
   ): Promise<PasskeyResponseDto> {
     this.assertVerified(req.user);
@@ -79,7 +75,7 @@ export class PasskeyController {
   @Get()
   @ApiOperation({ summary: "List the current user's passkeys" })
   @ApiResponse({ status: HttpStatus.OK, type: [PasskeyResponseDto] })
-  async list(@Request() req: RequestWithUser): Promise<PasskeyResponseDto[]> {
+  async list(@Request() req: AuthenticatedRequest): Promise<PasskeyResponseDto[]> {
     const passkeys = await this.passkeysService.listForUser(req.user.id);
     return passkeys.map((p) => PasskeyResponseDto.fromEntity(p));
   }
@@ -88,7 +84,7 @@ export class PasskeyController {
   @ApiOperation({ summary: "Rename one of the current user's passkeys" })
   @ApiResponse({ status: HttpStatus.OK, type: PasskeyResponseDto })
   async update(
-    @Request() req: RequestWithUser,
+    @Request() req: AuthenticatedRequest,
     @Param('id', ParseUUIDPipe) id: string,
     @Body() body: UpdatePasskeyDto,
   ): Promise<PasskeyResponseDto> {
@@ -101,7 +97,7 @@ export class PasskeyController {
   @ApiOperation({ summary: "Delete one of the current user's passkeys" })
   @ApiResponse({ status: HttpStatus.NO_CONTENT, description: 'Passkey deleted' })
   async remove(
-    @Request() req: RequestWithUser,
+    @Request() req: AuthenticatedRequest,
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<void> {
     await this.passkeysService.deleteForUser(req.user.id, id, req.user);

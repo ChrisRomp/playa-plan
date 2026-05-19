@@ -8,16 +8,10 @@ import { LocalAuthGuard } from '../guards/local-auth.guard';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { Public } from '../decorators/public.decorator';
 import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiBearerAuth } from '@nestjs/swagger';
-import { Request as ExpressRequest } from 'express';
-import { User } from '@prisma/client';
 import { RequestLoginCodeDto } from '../dto/request-login-code.dto';
 import { EmailCodeLoginDto } from '../dto/email-code-login.dto';
 import { VerifyAuthenticationDto } from '../../passkeys/dto/verify-passkey.dto';
-
-// Define the user type for request objects
-interface RequestWithUser extends ExpressRequest {
-  user: Omit<User, 'password'>;
-}
+import { AuthenticatedRequest, SafeUser } from '../types/safe-user';
 
 /**
  * Controller for authentication-related endpoints
@@ -78,7 +72,7 @@ export class AuthController {
     status: HttpStatus.UNAUTHORIZED, 
     description: 'Invalid credentials'
   })
-  async login(@Request() req: RequestWithUser): Promise<AuthResponseDto> {
+  async login(@Request() req: AuthenticatedRequest): Promise<AuthResponseDto> {
     return this.authService.login(req.user);
   }
   
@@ -209,7 +203,7 @@ export class AuthController {
   @ApiOperation({ summary: 'Get current user profile' })
   @ApiResponse({ status: HttpStatus.OK, description: 'User profile retrieved successfully' })
   @ApiResponse({ status: HttpStatus.UNAUTHORIZED, description: 'Unauthorized' })
-  async getProfile(@Request() req: RequestWithUser): Promise<Omit<User, 'password'>> {
+  async getProfile(@Request() req: AuthenticatedRequest): Promise<SafeUser> {
     // User is already injected in request by JWT strategy
     return req.user;
   }
@@ -238,7 +232,7 @@ export class AuthController {
   @ApiOperation({ summary: 'Refresh authentication token' })
   @ApiResponse({ status: HttpStatus.OK, description: 'Token refreshed successfully' })
   @ApiResponse({ status: HttpStatus.UNAUTHORIZED, description: 'Unauthorized' })
-  async refreshToken(@Request() req: RequestWithUser): Promise<AuthResponseDto> {
+  async refreshToken(@Request() req: AuthenticatedRequest): Promise<AuthResponseDto> {
     // The user is already validated by the JWT guard
     return this.authService.login(req.user);
   }
