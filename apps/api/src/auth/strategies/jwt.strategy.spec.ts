@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { UnauthorizedException } from '@nestjs/common';
 import { JwtStrategy } from './jwt.strategy';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { SAFE_USER_SELECT } from '../types/safe-user';
 
 describe('JwtStrategy', () => {
   let strategy: JwtStrategy;
@@ -92,35 +93,46 @@ describe('JwtStrategy', () => {
       jest.clearAllMocks();
     });
 
-    it('should return user without password when user exists', async () => {
+    it('should return only safe user fields via Prisma select', async () => {
       // Arrange
       const payload = { sub: 'user-id', email: 'test@example.com' };
-      const mockUser = {
+      const mockSafeUser = {
         id: 'user-id',
         email: 'test@example.com',
-        password: 'hashed-password',
-        name: 'Test User',
+        firstName: 'Test',
+        lastName: 'User',
+        playaName: null,
+        profilePicture: null,
         role: 'USER',
+        isEmailVerified: true,
+        phone: null,
+        city: null,
+        stateProvince: null,
+        country: null,
+        emergencyContact: null,
+        allowDeferredDuesPayment: false,
+        allowEarlyRegistration: false,
+        allowNoJob: false,
+        allowRegistration: true,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
-      mockPrismaService.user.findUnique.mockResolvedValue(mockUser);
+      mockPrismaService.user.findUnique.mockResolvedValue(mockSafeUser);
 
       // Act
       const result = await strategy.validate(payload);
 
       // Assert
-      expect(result).toEqual({
-        id: 'user-id',
-        email: 'test@example.com',
-        name: 'Test User',
-        role: 'USER',
-        createdAt: mockUser.createdAt,
-        updatedAt: mockUser.updatedAt,
-      });
+      expect(result).toEqual(mockSafeUser);
       expect(result).not.toHaveProperty('password');
+      expect(result).not.toHaveProperty('verificationToken');
+      expect(result).not.toHaveProperty('resetToken');
+      expect(result).not.toHaveProperty('resetTokenExpiry');
+      expect(result).not.toHaveProperty('loginCode');
+      expect(result).not.toHaveProperty('loginCodeExpiry');
       expect(mockPrismaService.user.findUnique).toHaveBeenCalledWith({
         where: { id: 'user-id' },
+        select: SAFE_USER_SELECT,
       });
     });
 
@@ -135,6 +147,7 @@ describe('JwtStrategy', () => {
       );
       expect(mockPrismaService.user.findUnique).toHaveBeenCalledWith({
         where: { id: 'non-existent-id' },
+        select: SAFE_USER_SELECT,
       });
     });
   });

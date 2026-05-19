@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { PrismaService } from '../../common/prisma/prisma.service';
-import { User } from '@prisma/client';
+import { SAFE_USER_SELECT, SafeUser } from '../types/safe-user';
 
 /**
  * JWT token payload interface
@@ -40,21 +40,19 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   /**
    * Validates JWT token and retrieves user from database
    * @param payload JWT payload containing user information
-   * @returns User object without password
+   * @returns User object without auth-internal fields
    * @throws UnauthorizedException if user not found
    */
-  async validate(payload: JwtPayload): Promise<Omit<User, 'password'>> {
+  async validate(payload: JwtPayload): Promise<SafeUser> {
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
+      select: SAFE_USER_SELECT,
     });
 
     if (!user) {
       throw new UnauthorizedException('Invalid token');
     }
 
-    // Remove password from the user object for security
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { password: _, ...result } = user;
-    return result;
+    return user;
   }
 }

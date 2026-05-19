@@ -304,6 +304,48 @@ describe('AuthController', () => {
       // Assert
       expect(result).toEqual(mockUser);
     });
+
+    it('should not expose auth-internal fields when req.user is a SafeUser', async () => {
+      // Arrange — simulate what JwtStrategy actually attaches to req.user
+      const safeUser = {
+        id: 'user-id-1',
+        email: 'test@example.playaplan.app',
+        firstName: 'Test',
+        lastName: 'User',
+        playaName: 'TestUser',
+        profilePicture: null,
+        phone: null,
+        city: null,
+        stateProvince: null,
+        country: null,
+        emergencyContact: null,
+        role: UserRole.PARTICIPANT,
+        isEmailVerified: false,
+        allowRegistration: true,
+        allowEarlyRegistration: false,
+        allowDeferredDuesPayment: false,
+        allowNoJob: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      const req = { user: safeUser };
+
+      // Act
+      // @ts-expect-error - For build process only, tests will work correctly
+      const result = await controller.getProfile(req);
+
+      // Assert — auth-internal fields must not leak
+      expect(result).not.toHaveProperty('password');
+      expect(result).not.toHaveProperty('verificationToken');
+      expect(result).not.toHaveProperty('resetToken');
+      expect(result).not.toHaveProperty('resetTokenExpiry');
+      expect(result).not.toHaveProperty('loginCode');
+      expect(result).not.toHaveProperty('loginCodeExpiry');
+      // Verify identity fields are present
+      expect(result.id).toBe('user-id-1');
+      expect(result.email).toBe('test@example.playaplan.app');
+      expect(result.role).toBe(UserRole.PARTICIPANT);
+    });
   });
 
   describe('testAuth', () => {

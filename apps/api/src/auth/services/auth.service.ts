@@ -107,7 +107,7 @@ export class AuthService {
    * @returns Object containing user information and access token
    */
   async login(
-    user: Omit<User, 'password'>,
+    user: Pick<User, 'id' | 'email' | 'role' | 'firstName' | 'lastName'>,
     amr?: readonly string[],
   ): Promise<{
     accessToken: string;
