@@ -4,7 +4,7 @@ import { UserController } from './user.controller';
 import { UserService } from '../services/user.service';
 import { UserRole } from '@prisma/client';
 import { CreateUserDto } from '../dto/create-user.dto';
-import { UpdateUserDto } from '../dto/update-user.dto';
+import { AdminUpdateUserDto } from '../dto/admin-update-user.dto';
 import { User } from '../entities/user.entity';
 
 /**
@@ -50,7 +50,7 @@ const mockStaffRequest = (): AuthRequest => {
 };
 
 // Common test data
-const updateDataFirstName: UpdateUserDto = { firstName: 'Updated' };
+const updateDataFirstName: AdminUpdateUserDto = { firstName: 'Updated' };
 
 describe('UserController', () => {
   let controller: UserController;
@@ -59,7 +59,8 @@ describe('UserController', () => {
     findById: jest.Mock;
     findByEmail: jest.Mock;
     create: jest.Mock;
-    update: jest.Mock;
+    updateProfile: jest.Mock;
+    adminUpdateUser: jest.Mock;
     delete: jest.Mock;
   };
 
@@ -100,7 +101,8 @@ describe('UserController', () => {
       findById: jest.fn(),
       findByEmail: jest.fn(),
       create: jest.fn(),
-      update: jest.fn(),
+      updateProfile: jest.fn(),
+      adminUpdateUser: jest.fn(),
       delete: jest.fn(),
     };
 
@@ -228,28 +230,28 @@ describe('UserController', () => {
   });
 
   describe('update', () => {
-    it('should update and return the user', async () => {
+    it('should update and return the user via updateProfile for non-admin', async () => {
       // Arrange
-      const updateData: UpdateUserDto = { 
+      const updateData: AdminUpdateUserDto = { 
         firstName: 'Updated', 
         lastName: 'Name' 
       };
       
       const updatedUser = { ...mockUser, ...updateData };
       userServiceMock.findById.mockResolvedValue(mockUser);
-      userServiceMock.update.mockResolvedValue(updatedUser);
+      userServiceMock.updateProfile.mockResolvedValue(updatedUser);
 
       // Act
       const result = await controller.update('test-uuid', updateData, mockRequest());
 
       // Assert
       expect(result).toEqual(expect.any(User));
-      expect(userServiceMock.update).toHaveBeenCalledWith('test-uuid', updateData);
+      expect(userServiceMock.updateProfile).toHaveBeenCalledWith('test-uuid', { firstName: 'Updated', lastName: 'Name' });
     });
 
     it('should forbid role updates by non-admins', async () => {
       // Arrange
-      const updateData: UpdateUserDto = { 
+      const updateData: AdminUpdateUserDto = { 
         role: UserRole.ADMIN // Trying to become admin
       };
       
@@ -258,12 +260,13 @@ describe('UserController', () => {
       // Act & Assert
       await expect(controller.update('test-uuid', updateData, mockRequest()))
         .rejects.toThrow(ForbiddenException);
-      expect(userServiceMock.update).not.toHaveBeenCalled();
+      expect(userServiceMock.updateProfile).not.toHaveBeenCalled();
+      expect(userServiceMock.adminUpdateUser).not.toHaveBeenCalled();
     });
 
     it('should forbid role field even when set to same role by non-admin', async () => {
       // Arrange - the 'in' check catches any presence of the role key
-      const updateData: UpdateUserDto = {
+      const updateData: AdminUpdateUserDto = {
         role: UserRole.PARTICIPANT,
       };
 
@@ -272,7 +275,8 @@ describe('UserController', () => {
       // Act & Assert
       await expect(controller.update('test-uuid', updateData, mockRequest()))
         .rejects.toThrow(ForbiddenException);
-      expect(userServiceMock.update).not.toHaveBeenCalled();
+      expect(userServiceMock.updateProfile).not.toHaveBeenCalled();
+      expect(userServiceMock.adminUpdateUser).not.toHaveBeenCalled();
     });
 
     it('should pass through NotFoundException from service', async () => {
@@ -292,14 +296,14 @@ describe('UserController', () => {
       const updatedStaffUser = { ...mockStaffUser, ...updateData };
       
       userServiceMock.findById.mockResolvedValue(mockStaffUser);
-      userServiceMock.update.mockResolvedValue(updatedStaffUser);
+      userServiceMock.updateProfile.mockResolvedValue(updatedStaffUser);
 
       // Act
       const result = await controller.update('staff-uuid', updateData, mockStaffRequest());
 
       // Assert
       expect(result).toEqual(expect.any(User));
-      expect(userServiceMock.update).toHaveBeenCalledWith('staff-uuid', updateData);
+      expect(userServiceMock.updateProfile).toHaveBeenCalledWith('staff-uuid', { firstName: 'Updated' });
     });
 
     it('should forbid staff from updating other staff accounts', async () => {
@@ -316,7 +320,8 @@ describe('UserController', () => {
       // Act & Assert
       await expect(controller.update('other-staff-uuid', updateData, mockStaffRequest()))
         .rejects.toThrow(ForbiddenException);
-      expect(userServiceMock.update).not.toHaveBeenCalled();
+      expect(userServiceMock.updateProfile).not.toHaveBeenCalled();
+      expect(userServiceMock.adminUpdateUser).not.toHaveBeenCalled();
     });
 
     it('should forbid staff from updating admin accounts', async () => {
@@ -328,7 +333,8 @@ describe('UserController', () => {
       // Act & Assert
       await expect(controller.update('admin-uuid', updateData, mockStaffRequest()))
         .rejects.toThrow(ForbiddenException);
-      expect(userServiceMock.update).not.toHaveBeenCalled();
+      expect(userServiceMock.updateProfile).not.toHaveBeenCalled();
+      expect(userServiceMock.adminUpdateUser).not.toHaveBeenCalled();
     });
 
     it('should allow staff to update participant accounts', async () => {
@@ -337,19 +343,19 @@ describe('UserController', () => {
       const updatedUser = { ...mockUser, ...updateData };
       
       userServiceMock.findById.mockResolvedValue(mockUser);
-      userServiceMock.update.mockResolvedValue(updatedUser);
+      userServiceMock.updateProfile.mockResolvedValue(updatedUser);
 
       // Act
       const result = await controller.update('test-uuid', updateData, mockStaffRequest());
 
       // Assert
       expect(result).toEqual(expect.any(User));
-      expect(userServiceMock.update).toHaveBeenCalledWith('test-uuid', updateData);
+      expect(userServiceMock.updateProfile).toHaveBeenCalledWith('test-uuid', { firstName: 'Updated' });
     });
 
     it('should strip admin-only fields when participant updates own profile', async () => {
       // Arrange - participant tries to escalate with admin-only flags
-      const updateData: UpdateUserDto = {
+      const updateData: AdminUpdateUserDto = {
         firstName: 'Updated',
         allowRegistration: true,
         allowEarlyRegistration: true,
@@ -359,18 +365,18 @@ describe('UserController', () => {
 
       const updatedUser = { ...mockUser, firstName: 'Updated' };
       userServiceMock.findById.mockResolvedValue(mockUser);
-      userServiceMock.update.mockResolvedValue(updatedUser);
+      userServiceMock.updateProfile.mockResolvedValue(updatedUser);
 
       // Act
       await controller.update('test-uuid', updateData, mockRequest());
 
       // Assert - service should receive DTO WITHOUT admin-only fields
-      expect(userServiceMock.update).toHaveBeenCalledWith('test-uuid', { firstName: 'Updated' });
+      expect(userServiceMock.updateProfile).toHaveBeenCalledWith('test-uuid', { firstName: 'Updated' });
     });
 
     it('should strip admin-only fields when staff updates a participant', async () => {
       // Arrange - staff tries to set admin-only flags on a participant
-      const updateData: UpdateUserDto = {
+      const updateData: AdminUpdateUserDto = {
         firstName: 'Updated',
         allowDeferredDuesPayment: true,
         allowNoJob: true,
@@ -378,18 +384,18 @@ describe('UserController', () => {
 
       const updatedUser = { ...mockUser, firstName: 'Updated' };
       userServiceMock.findById.mockResolvedValue(mockUser);
-      userServiceMock.update.mockResolvedValue(updatedUser);
+      userServiceMock.updateProfile.mockResolvedValue(updatedUser);
 
       // Act
       await controller.update('test-uuid', updateData, mockStaffRequest());
 
       // Assert - service should receive DTO WITHOUT admin-only fields
-      expect(userServiceMock.update).toHaveBeenCalledWith('test-uuid', { firstName: 'Updated' });
+      expect(userServiceMock.updateProfile).toHaveBeenCalledWith('test-uuid', { firstName: 'Updated' });
     });
 
     it('should allow admin to set admin-only fields on update', async () => {
       // Arrange - admin sets permission flags
-      const updateData: UpdateUserDto = {
+      const updateData: AdminUpdateUserDto = {
         firstName: 'Updated',
         allowRegistration: false,
         allowEarlyRegistration: true,
@@ -399,13 +405,13 @@ describe('UserController', () => {
 
       const updatedUser = { ...mockUser, ...updateData };
       userServiceMock.findById.mockResolvedValue(mockUser);
-      userServiceMock.update.mockResolvedValue(updatedUser);
+      userServiceMock.adminUpdateUser.mockResolvedValue(updatedUser);
 
       // Act
       await controller.update('test-uuid', updateData, mockAdminRequest());
 
-      // Assert - service should receive the FULL DTO including admin fields
-      expect(userServiceMock.update).toHaveBeenCalledWith('test-uuid', updateData);
+      // Assert - service should receive the FULL DTO via adminUpdateUser
+      expect(userServiceMock.adminUpdateUser).toHaveBeenCalledWith('test-uuid', updateData);
     });
   });
 

@@ -18,7 +18,7 @@ import {
 } from '@nestjs/common';
 import { UserService } from '../services/user.service';
 import { CreateUserDto } from '../dto/create-user.dto';
-import { UpdateUserDto } from '../dto/update-user.dto';
+import { AdminUpdateUserDto } from '../dto/admin-update-user.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../guards/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
@@ -57,21 +57,6 @@ export class UserController {
   ] as const;
 
   constructor(private readonly userService: UserService) {}
-
-  /**
-   * Strips admin-only fields from a DTO for non-admin callers.
-   * Returns the sanitized DTO and whether any fields were stripped.
-   */
-  private sanitizeAdminFields<T extends object>(dto: T): { sanitized: T; hadAdminFields: boolean } {
-    const copy = { ...dto } as Record<string, unknown>;
-    const hadAdminFields = UserController.ADMIN_ONLY_FIELDS.some(field => copy[field] !== undefined);
-
-    for (const field of UserController.ADMIN_ONLY_FIELDS) {
-      delete copy[field];
-    }
-
-    return { sanitized: copy as T, hadAdminFields };
-  }
 
   /**
    * Get all users
@@ -164,11 +149,15 @@ export class UserController {
     if (req.user && req.user.role === UserRole.ADMIN) {
       dtoForService = createUserDto;
     } else {
-      const { sanitized, hadAdminFields } = this.sanitizeAdminFields(createUserDto);
+      const copy = { ...createUserDto } as Record<string, unknown>;
+      const hadAdminFields = UserController.ADMIN_ONLY_FIELDS.some(field => copy[field] !== undefined);
+      for (const field of UserController.ADMIN_ONLY_FIELDS) {
+        delete copy[field];
+      }
       if (hadAdminFields) {
         this.logger.warn(`Non-admin user ${req.user?.id} attempted to set admin-only fields on user creation`);
       }
-      dtoForService = sanitized;
+      dtoForService = copy as unknown as CreateUserDto;
     }
 
     const user = await this.userService.create(dtoForService);
@@ -194,7 +183,7 @@ export class UserController {
   @ApiResponse({ status: 403, description: 'Forbidden - Insufficient privileges' })
   async update(
     @Param('id') id: string,
-    @Body() updateUserDto: UpdateUserDto,
+    @Body() updateDto: AdminUpdateUserDto,
     @Request() req: AuthRequest
   ): Promise<User> {
     // First check if the user exists
@@ -211,23 +200,26 @@ export class UserController {
     }
 
     // Only admins can update user roles
-    if ('role' in updateUserDto && req.user && req.user.role !== UserRole.ADMIN) {
+    if ('role' in updateDto && req.user && req.user.role !== UserRole.ADMIN) {
       throw new ForbiddenException('Only administrators can change user roles');
     }
 
-    // Strip admin-only permission flags for non-admin callers
-    let dtoForService: UpdateUserDto;
+    let updatedUser;
     if (req.user && req.user.role === UserRole.ADMIN) {
-      dtoForService = updateUserDto;
+      updatedUser = await this.userService.adminUpdateUser(id, updateDto);
     } else {
-      const { sanitized, hadAdminFields } = this.sanitizeAdminFields(updateUserDto);
+      // Strip admin-only fields and route to the profile-only method
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { role: _role, allowRegistration: _ar, allowEarlyRegistration: _aer, allowDeferredDuesPayment: _addp, allowNoJob: _anj, ...profileFields } = updateDto;
+      const hadAdminFields = UserController.ADMIN_ONLY_FIELDS.some(
+        field => (updateDto as Record<string, unknown>)[field] !== undefined,
+      );
       if (hadAdminFields) {
         this.logger.warn(`Non-admin user ${req.user?.id} attempted to set admin-only fields on user ${id}`);
       }
-      dtoForService = sanitized;
+      updatedUser = await this.userService.updateProfile(id, profileFields);
     }
 
-    const updatedUser = await this.userService.update(id, dtoForService);
     return new User(updatedUser);
   }
 

@@ -209,7 +209,7 @@ describe('Email Case Insensitivity Integration', () => {
         .mockResolvedValueOnce(userB); // findByEmail call - finds conflict
 
       // Act & Assert
-      await expect(userService.update(userA.id, updateDto)).rejects.toThrow(ConflictException);
+      await expect(userService.updateProfile(userA.id, updateDto)).rejects.toThrow(ConflictException);
 
       // Verify normalized email was used for conflict check
       expect(mockPrismaService.user.findUnique).toHaveBeenCalledWith({

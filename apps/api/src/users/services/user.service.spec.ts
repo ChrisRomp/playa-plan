@@ -222,7 +222,7 @@ describe('UserService', () => {
     });
   });
 
-  describe('update', () => {
+  describe('updateProfile', () => {
     it('should update and return the user', async () => {
       // Arrange
       const updateData = { firstName: 'Updated', lastName: 'Name' };
@@ -232,7 +232,7 @@ describe('UserService', () => {
       prismaServiceMock.user.update.mockResolvedValue(updatedUser);
 
       // Act
-      const result = await service.update('test-uuid', updateData);
+      const result = await service.updateProfile('test-uuid', updateData);
 
       // Assert
       expect(result).toEqual(updatedUser);
@@ -254,7 +254,7 @@ describe('UserService', () => {
       prismaServiceMock.user.update.mockResolvedValue(updatedUser);
 
       // Act
-      const result = await service.update('test-uuid', updateData);
+      const result = await service.updateProfile('test-uuid', updateData);
 
       // Assert
       expect(result).toEqual(updatedUser);
@@ -271,7 +271,7 @@ describe('UserService', () => {
       prismaServiceMock.user.findUnique.mockResolvedValue(null);
 
       // Act & Assert
-      await expect(service.update('non-existent-id', { firstName: 'New' })).rejects.toThrow(
+      await expect(service.updateProfile('non-existent-id', { firstName: 'New' })).rejects.toThrow(
         NotFoundException
       );
       expect(prismaServiceMock.user.findUnique).toHaveBeenCalledWith({
@@ -294,13 +294,104 @@ describe('UserService', () => {
       prismaServiceMock.user.update.mockResolvedValue({ ...mockUser, firstName: 'Protected' });
 
       // Act
-      await service.update('test-uuid', updateData);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await service.updateProfile('test-uuid', updateData as any);
 
       // Assert
       expect(prismaServiceMock.user.update).toHaveBeenCalledWith({
         where: { id: 'test-uuid' },
         data: expectedUpdateData,
       });
+    });
+
+    it('should strip admin-only fields even when bypassing TypeScript types', async () => {
+      // Arrange — simulates an internal caller passing admin fields via `as any`
+      const updateData = {
+        firstName: 'Jane',
+        role: 'ADMIN',
+        allowRegistration: true,
+        allowEarlyRegistration: true,
+        allowDeferredDuesPayment: true,
+        allowNoJob: true,
+        isEmailVerified: true,
+      };
+
+      prismaServiceMock.user.findUnique.mockResolvedValue(mockUser);
+      prismaServiceMock.user.update.mockResolvedValue({ ...mockUser, firstName: 'Jane' });
+
+      // Act
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await service.updateProfile('test-uuid', updateData as any);
+
+      // Assert — only profile fields reach Prisma
+      const callData = prismaServiceMock.user.update.mock.calls[0][0].data;
+      expect(callData).toEqual({ firstName: 'Jane' });
+      expect(callData).not.toHaveProperty('role');
+      expect(callData).not.toHaveProperty('allowRegistration');
+      expect(callData).not.toHaveProperty('allowEarlyRegistration');
+      expect(callData).not.toHaveProperty('allowDeferredDuesPayment');
+      expect(callData).not.toHaveProperty('allowNoJob');
+      expect(callData).not.toHaveProperty('isEmailVerified');
+    });
+  });
+
+  describe('adminUpdateUser', () => {
+    it('should update admin-only permission fields', async () => {
+      // Arrange
+      const updateData = {
+        firstName: 'Admin',
+        allowRegistration: true,
+        allowEarlyRegistration: true,
+        allowDeferredDuesPayment: false,
+        allowNoJob: true,
+      };
+      const updatedUser = { ...mockUser, ...updateData };
+      
+      prismaServiceMock.user.findUnique.mockResolvedValue(mockUser);
+      prismaServiceMock.user.update.mockResolvedValue(updatedUser);
+
+      // Act
+      const result = await service.adminUpdateUser('test-uuid', updateData);
+
+      // Assert
+      expect(result).toEqual(updatedUser);
+      expect(prismaServiceMock.user.update).toHaveBeenCalledWith({
+        where: { id: 'test-uuid' },
+        data: updateData,
+      });
+    });
+
+    it('should update user role', async () => {
+      // Arrange
+      const updateData = { role: UserRole.STAFF };
+      const updatedUser = { ...mockUser, role: UserRole.STAFF };
+      
+      prismaServiceMock.user.findUnique.mockResolvedValue(mockUser);
+      prismaServiceMock.user.update.mockResolvedValue(updatedUser);
+
+      // Act
+      const result = await service.adminUpdateUser('test-uuid', updateData);
+
+      // Assert
+      expect(result).toEqual(updatedUser);
+      expect(prismaServiceMock.user.update).toHaveBeenCalledWith({
+        where: { id: 'test-uuid' },
+        data: updateData,
+      });
+    });
+
+    it('should throw NotFoundException if user does not exist', async () => {
+      // Arrange
+      prismaServiceMock.user.findUnique.mockResolvedValue(null);
+
+      // Act & Assert
+      await expect(service.adminUpdateUser('non-existent-id', { firstName: 'New' })).rejects.toThrow(
+        NotFoundException
+      );
+      expect(prismaServiceMock.user.findUnique).toHaveBeenCalledWith({
+        where: { id: 'non-existent-id' },
+      });
+      expect(prismaServiceMock.user.update).not.toHaveBeenCalled();
     });
   });
 
@@ -409,7 +500,7 @@ describe('UserService', () => {
       });
     });
 
-    describe('update', () => {
+    describe('updateProfile', () => {
       it('should normalize email to lowercase when updating user', async () => {
         // Arrange
         const updateUserDto = {
@@ -431,7 +522,7 @@ describe('UserService', () => {
         (notificationsService.sendEmailChangeNotificationToNewEmail as jest.Mock).mockResolvedValue(true);
 
         // Act
-        const result = await service.update('test-uuid', updateUserDto);
+        const result = await service.updateProfile('test-uuid', updateUserDto);
 
         // Assert
         expect(result.email).toBe('updated@example.playaplan.app');
@@ -480,7 +571,7 @@ describe('UserService', () => {
           .mockResolvedValueOnce(existingUser); // findByEmail call for conflict check
 
         // Act & Assert
-        await expect(service.update('test-uuid', updateUserDto)).rejects.toThrow(ConflictException);
+        await expect(service.updateProfile('test-uuid', updateUserDto)).rejects.toThrow(ConflictException);
         expect(prismaServiceMock.user.findUnique).toHaveBeenCalledWith({
           where: { email: 'existing@example.playaplan.app' },
         });
