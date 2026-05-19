@@ -152,12 +152,15 @@ export class NotificationsController {
    * Validate that email sending is enabled and SMTP is configured.
    * @throws Error if configuration is invalid
    */
-  private validateEmailConfiguration(emailConfig: { emailEnabled?: boolean; smtpHost?: string | null; senderEmail?: string | null }): void {
+  private validateEmailConfiguration(emailConfig: { emailEnabled?: boolean; smtpHost?: string | null; senderEmail?: string | null; smtpUsername?: string | null; smtpPassword?: string | null }): void {
     if (!emailConfig.emailEnabled) {
       throw new Error('Email notifications are currently disabled. Please enable email notifications first.');
     }
     if (!emailConfig.smtpHost || !emailConfig.senderEmail) {
       throw new Error('SMTP configuration is incomplete. Please configure SMTP settings before sending test emails.');
+    }
+    if (!emailConfig.smtpUsername || !emailConfig.smtpPassword) {
+      throw new Error('SMTP authentication credentials are not configured. Please set SMTP username and password.');
     }
   }
 
