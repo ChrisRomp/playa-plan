@@ -370,6 +370,16 @@ describe('NotificationsService', () => {
       ).rejects.toThrow('Invalid email address: not-an-email');
     });
 
+    it('should throw before sending when any recipient in the list is invalid', async () => {
+      const inputEmail = 'valid@example.playaplan.app, not-an-email';
+      const sendNotificationSpy = jest.spyOn(service, 'sendNotification');
+
+      await expect(
+        service.sendTestEmail(inputEmail, mockTestEmailDetails, inputUserId),
+      ).rejects.toThrow('Invalid email address: not-an-email');
+      expect(sendNotificationSpy).not.toHaveBeenCalled();
+    });
+
     it('should send successfully for a single valid recipient', async () => {
       const inputEmail = 'recipient@example.playaplan.app';
       jest.spyOn(service, 'sendNotification').mockResolvedValueOnce(true);
