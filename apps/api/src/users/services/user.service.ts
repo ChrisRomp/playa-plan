@@ -2,7 +2,8 @@ import { Injectable, ConflictException, NotFoundException, Logger } from '@nestj
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { NotificationsService } from '../../notifications/services/notifications.service';
 import { CreateUserDto } from '../dto/create-user.dto';
-import { UpdateUserDto } from '../dto/update-user.dto';
+import { UpdateProfileDto } from '../dto/update-profile.dto';
+import { AdminUpdateUserDto } from '../dto/admin-update-user.dto';
 import { User as PrismaUser } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { normalizeEmail } from '../../common/utils/email.utils';
@@ -20,6 +21,14 @@ export class UserService {
     'id', 'createdAt', 'updatedAt',
     'verificationToken', 'resetToken', 'resetTokenExpiry',
     'loginCode', 'loginCodeExpiry',
+    'isEmailVerified',
+  ];
+
+  /** Fields that updateProfile() is allowed to write. */
+  private readonly profileFields = [
+    'email', 'password', 'firstName', 'lastName', 'playaName',
+    'phone', 'city', 'stateProvince', 'country',
+    'emergencyContact', 'profilePicture',
   ];
 
   constructor(
@@ -85,14 +94,44 @@ export class UserService {
   }
 
   /**
-   * Update an existing user
+   * Update a user's profile fields (user-editable fields only).
+   * Safe for any caller — admin-only fields are excluded by type.
    * @param id - ID of the user to update
-   * @param updateUserDto - Data to update
+   * @param updateProfileDto - Profile data to update
    * @returns The updated user
    * @throws NotFoundException if the user is not found
-   * @throws ConflictException if trying to change email to an email that's already registered
+   * @throws ConflictException if trying to change email to one already registered
    */
-  async update(id: string, updateUserDto: UpdateUserDto): Promise<PrismaUser> {
+  async updateProfile(id: string, updateProfileDto: UpdateProfileDto): Promise<PrismaUser> {
+    // Runtime whitelist: only pass profile-safe fields regardless of what the caller provides
+    const safeDto: Partial<UpdateProfileDto> = {};
+    for (const key of this.profileFields) {
+      const value = (updateProfileDto as Record<string, unknown>)[key];
+      if (value !== undefined) {
+        (safeDto as Record<string, unknown>)[key] = value;
+      }
+    }
+    return this.performUpdate(id, safeDto as UpdateProfileDto);
+  }
+
+  /**
+   * Update a user with admin-level fields (role, permission flags, and profile fields).
+   * Only admin callers should invoke this method.
+   * @param id - ID of the user to update
+   * @param adminUpdateDto - Full update data including admin fields
+   * @returns The updated user
+   * @throws NotFoundException if the user is not found
+   * @throws ConflictException if trying to change email to one already registered
+   */
+  async adminUpdateUser(id: string, adminUpdateDto: AdminUpdateUserDto): Promise<PrismaUser> {
+    return this.performUpdate(id, adminUpdateDto);
+  }
+
+  /**
+   * Shared update logic for both profile and admin update paths.
+   * Strips protected fields, normalizes email, hashes password, and sends notifications.
+   */
+  private async performUpdate(id: string, dto: UpdateProfileDto | AdminUpdateUserDto): Promise<PrismaUser> {
     // Verify user exists
     const user = await this.findById(id);
     
@@ -102,7 +141,7 @@ export class UserService {
     
     // Store old email for notifications if email is being changed
     const oldEmail = user.email;
-    const normalizedNewEmail = updateUserDto.email ? normalizeEmail(updateUserDto.email) : null;
+    const normalizedNewEmail = dto.email ? normalizeEmail(dto.email) : null;
     const isEmailChanging = normalizedNewEmail && normalizedNewEmail !== user.email;
     
     // If trying to update email, check if the new email is already in use
@@ -117,11 +156,9 @@ export class UserService {
     const updateData: Partial<PrismaUser> = {};
     
     // Type safe way to iterate through DTO properties
-    Object.keys(updateUserDto).forEach(key => {
+    Object.keys(dto).forEach(key => {
       if (!this.protectedFields.includes(key)) {
-        // Use type assertion to tell TypeScript this is a valid key
-        const typedKey = key as keyof UpdateUserDto;
-        const value = updateUserDto[typedKey];
+        const value = (dto as Record<string, unknown>)[key];
         if (value !== undefined) {
           // Normalize email if it's being updated
           if (key === 'email' && typeof value === 'string') {

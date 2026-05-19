@@ -549,6 +549,157 @@ describe('UsersController (e2e)', () => {
           expect(res.status).toBe(404);
         });
     });
+
+    it('should strip admin-only fields when participant updates own profile', () => {
+      // Arrange
+      const userToken = getAuthToken(mockUser);
+      const updateData = {
+        firstName: 'Updated',
+        allowRegistration: true,
+        allowEarlyRegistration: true,
+        allowDeferredDuesPayment: true,
+        allowNoJob: true,
+      };
+      const updatedUser = { ...mockUser, firstName: 'Updated' };
+
+      prismaMock.user.findUnique.mockResolvedValue(mockUser);
+      prismaMock.user.update.mockResolvedValue(updatedUser);
+
+      // Act & Assert
+      return request(app.getHttpServer())
+        .put(`/users/${mockUser.id}`)
+        .set('Authorization', `Bearer ${userToken}`)
+        .send(updateData)
+        .expect((res: request.Response) => {
+          expect(res.body.firstName).toBe('Updated');
+          // Admin-only fields must be completely absent from Prisma update data
+          const prismaData = prismaMock.user.update.mock.calls[0][0].data;
+          expect(prismaData).not.toHaveProperty('allowRegistration');
+          expect(prismaData).not.toHaveProperty('allowEarlyRegistration');
+          expect(prismaData).not.toHaveProperty('allowDeferredDuesPayment');
+          expect(prismaData).not.toHaveProperty('allowNoJob');
+          expect(prismaData).not.toHaveProperty('role');
+        });
+    });
+
+    it('should strip admin-only fields when staff updates a participant', () => {
+      // Arrange
+      const staffToken = getAuthToken(mockStaff);
+      const updateData = {
+        firstName: 'StaffUpdated',
+        allowNoJob: true,
+        allowDeferredDuesPayment: true,
+      };
+      const updatedUser = { ...mockUser, firstName: 'StaffUpdated' };
+
+      prismaMock.user.findUnique.mockResolvedValue(mockUser);
+      prismaMock.user.update.mockResolvedValue(updatedUser);
+
+      // Act & Assert
+      return request(app.getHttpServer())
+        .put(`/users/${mockUser.id}`)
+        .set('Authorization', `Bearer ${staffToken}`)
+        .send(updateData)
+        .expect((res: request.Response) => {
+          expect(res.body.firstName).toBe('StaffUpdated');
+          // Admin-only fields must be completely absent from Prisma update data
+          const prismaData = prismaMock.user.update.mock.calls[0][0].data;
+          expect(prismaData).not.toHaveProperty('allowNoJob');
+          expect(prismaData).not.toHaveProperty('allowDeferredDuesPayment');
+          expect(prismaData).not.toHaveProperty('allowRegistration');
+          expect(prismaData).not.toHaveProperty('allowEarlyRegistration');
+          expect(prismaData).not.toHaveProperty('role');
+        });
+    });
+
+    it('should allow admin to set admin-only fields', () => {
+      // Arrange
+      const adminToken = getAuthToken(mockAdmin);
+      const updateData = {
+        firstName: 'AdminUpdated',
+        allowRegistration: false,
+        allowEarlyRegistration: true,
+        allowDeferredDuesPayment: true,
+        allowNoJob: true,
+      };
+      const updatedUser = { ...mockUser, ...updateData };
+
+      prismaMock.user.findUnique.mockResolvedValue(mockUser);
+      prismaMock.user.update.mockResolvedValue(updatedUser);
+
+      // Act & Assert
+      return request(app.getHttpServer())
+        .put(`/users/${mockUser.id}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send(updateData)
+        .expect((res: request.Response) => {
+          expect(res.body.firstName).toBe('AdminUpdated');
+          expect(prismaMock.user.update).toHaveBeenCalledWith(
+            expect.objectContaining({
+              data: expect.objectContaining({
+                allowRegistration: false,
+                allowEarlyRegistration: true,
+                allowDeferredDuesPayment: true,
+                allowNoJob: true,
+              }),
+            }),
+          );
+        });
+    });
+
+    it('should deny participant from setting role field', () => {
+      // Arrange
+      const userToken = getAuthToken(mockUser);
+      const updateData = { role: 'ADMIN' };
+
+      prismaMock.user.findUnique.mockResolvedValue(mockUser);
+
+      // Act & Assert
+      return request(app.getHttpServer())
+        .put(`/users/${mockUser.id}`)
+        .set('Authorization', `Bearer ${userToken}`)
+        .send(updateData)
+        .expect((res: request.Response) => {
+          expect(res.status).toBe(403);
+        });
+    });
+
+    it('should allow admin to set all fields including role and permissions', () => {
+      // Arrange
+      const adminToken = getAuthToken(mockAdmin);
+      const updateData = {
+        firstName: 'Full',
+        lastName: 'Update',
+        role: UserRole.STAFF,
+        allowRegistration: true,
+        allowEarlyRegistration: false,
+        allowDeferredDuesPayment: true,
+        allowNoJob: false,
+      };
+      const updatedUser = { ...mockUser, ...updateData };
+
+      prismaMock.user.findUnique.mockResolvedValue(mockUser);
+      prismaMock.user.update.mockResolvedValue(updatedUser);
+
+      // Act & Assert
+      return request(app.getHttpServer())
+        .put(`/users/${mockUser.id}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send(updateData)
+        .expect((res: request.Response) => {
+          expect(res.body.firstName).toBe('Full');
+          expect(res.body.role).toBe(UserRole.STAFF);
+          expect(prismaMock.user.update).toHaveBeenCalledWith(
+            expect.objectContaining({
+              data: expect.objectContaining({
+                role: UserRole.STAFF,
+                allowRegistration: true,
+                allowEarlyRegistration: false,
+              }),
+            }),
+          );
+        });
+    });
   });
 
   describe('/users/:id (DELETE)', () => {
