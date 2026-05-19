@@ -8,6 +8,7 @@ import { UnauthorizedException, BadRequestException, ConflictException } from '@
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { RequestLoginCodeDto } from '../dto/request-login-code.dto';
 import { EmailCodeLoginDto } from '../dto/email-code-login.dto';
+import { AuthenticatedRequest } from '../types/safe-user';
 
 // Setup mock functions for testing
 const setupMockUser = (): User => ({
@@ -328,10 +329,9 @@ describe('AuthController', () => {
         createdAt: new Date(),
         updatedAt: new Date(),
       };
-      const req = { user: safeUser };
+      const req = { user: safeUser } as unknown as AuthenticatedRequest;
 
       // Act
-      // @ts-expect-error - For build process only, tests will work correctly
       const result = await controller.getProfile(req);
 
       // Assert — auth-internal fields must not leak

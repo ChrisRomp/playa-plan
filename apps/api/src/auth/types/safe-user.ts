@@ -2,12 +2,13 @@ import { Prisma } from '@prisma/client';
 import { Request } from 'express';
 
 /**
- * Prisma select object that includes only non-sensitive user fields.
+ * Prisma select object that excludes auth credentials and tokens.
  * Used by JwtStrategy to ensure auth-internal fields (password, tokens, codes)
- * never appear on req.user.
+ * never appear on req.user. Note: this still includes PII (phone, emergency
+ * contact, etc.) which is needed for profile functionality.
  *
- * When adding new non-sensitive fields to the User model, add them here.
- * Do NOT add auth secrets (passwords, tokens, codes, expiries).
+ * When adding new fields to the User model, add them here unless they are
+ * auth secrets (passwords, tokens, codes, expiries).
  */
 export const SAFE_USER_SELECT = {
   id: true,
