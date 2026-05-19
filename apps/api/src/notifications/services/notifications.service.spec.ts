@@ -448,5 +448,75 @@ describe('NotificationsService', () => {
         }),
       );
     });
+
+    it('should escape admin-provided test email values in HTML while preserving plain text', async () => {
+      mockEmailService.sendEmail.mockResolvedValueOnce(true);
+
+      const result = await service.sendNotification(
+        'recipient@example.playaplan.app',
+        NotificationType.EMAIL_TEST,
+        {
+          testEmailDetails: {
+            smtpHost: 'smtp.<example>.com',
+            smtpPort: 587,
+            smtpSecure: false,
+            senderEmail: 'sender+<tag>@example.playaplan.app',
+            senderName: 'Sender <Name>',
+            adminUserName: 'Admin <User>',
+            adminEmail: 'admin+<tag>@example.playaplan.app',
+            timestamp: new Date('2026-01-01T00:00:00Z'),
+            customContent: {
+              subject: 'Test <Subject>',
+              message: 'Hello <img src=x onerror=alert(1)>',
+            },
+          },
+        },
+      );
+
+      expect(result).toBeTruthy();
+      const callArgs = mockEmailService.sendEmail.mock.calls[0][0];
+      expect(callArgs.html).toContain('Test &lt;Subject&gt;');
+      expect(callArgs.html).toContain('Hello &lt;img src=x onerror=alert(1)&gt;');
+      expect(callArgs.html).toContain('smtp.&lt;example&gt;.com');
+      expect(callArgs.html).toContain('Sender &lt;Name&gt;');
+      expect(callArgs.html).toContain('sender+&lt;tag&gt;@example.playaplan.app');
+      expect(callArgs.html).toContain('Admin &lt;User&gt;');
+      expect(callArgs.html).toContain('admin+&lt;tag&gt;@example.playaplan.app');
+      expect(callArgs.html).not.toContain('<img src=x onerror=alert(1)>');
+      expect(callArgs.text).toContain('Hello <img src=x onerror=alert(1)>');
+    });
+
+    it('should escape text-only test email HTML wrapper while preserving plain text', async () => {
+      mockEmailService.sendEmail.mockResolvedValueOnce(true);
+
+      const result = await service.sendNotification(
+        'recipient@example.playaplan.app',
+        NotificationType.EMAIL_TEST,
+        {
+          testEmailDetails: {
+            smtpHost: 'smtp.example.com',
+            smtpPort: 587,
+            smtpSecure: false,
+            senderEmail: 'sender@example.playaplan.app',
+            senderName: 'Sender Name',
+            adminUserName: 'Admin User',
+            adminEmail: 'admin@example.playaplan.app',
+            timestamp: new Date('2026-01-01T00:00:00Z'),
+            customContent: {
+              subject: 'Text <Subject>',
+              message: 'Plain <script>alert(1)</script>',
+              format: 'text',
+            },
+          },
+        },
+      );
+
+      expect(result).toBeTruthy();
+      const callArgs = mockEmailService.sendEmail.mock.calls[0][0];
+      expect(callArgs.html).toContain('<pre>');
+      expect(callArgs.html).toContain('Plain &lt;script&gt;alert(1)&lt;/script&gt;');
+      expect(callArgs.html).not.toContain('<script>alert(1)</script>');
+      expect(callArgs.text).toContain('Plain <script>alert(1)</script>');
+    });
   });
-}); 
+});
