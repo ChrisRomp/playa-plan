@@ -10,6 +10,7 @@ import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
 import { UserRole, NotificationType } from '@prisma/client';
+import { TestEmailDetails, TestEmailCustomContent, TestEmailResponse } from '../interfaces/test-email.interfaces';
 
 /**
  * Type definition for authenticated request
@@ -115,114 +116,29 @@ export class NotificationsController {
   async sendTestEmail(
     @Body() testEmailDto: SendTestEmailDto,
     @Request() req: AuthRequest
-  ): Promise<{
-    success: boolean;
-    message: string;
-    auditRecordId?: string;
-    timestamp: string;
-    recipients?: string[];
-    smtpConfiguration?: {
-      host: string;
-      port: number;
-      secure: boolean;
-      senderEmail: string;
-      senderName: string;
-    };
-    emailPreview?: {
-      subject: string;
-      format: string;
-      includeSmtpDetails: boolean;
-    };
-  }> {
+  ): Promise<TestEmailResponse> {
     try {
-      // Get current email configuration
       const emailConfig = await this.coreConfigService.getEmailConfiguration();
-      
-      // Get camp configuration for dynamic camp name
       const campConfig = await this.coreConfigService.findCurrent(false);
       const campName = campConfig?.campName || 'PlayaPlan';
-      
-      // Check if email is enabled
-      if (!emailConfig.emailEnabled) {
-        throw new Error('Email notifications are currently disabled. Please enable email notifications first.');
-      }
 
-      // Check if SMTP is properly configured
-      if (!emailConfig.smtpHost || !emailConfig.senderEmail) {
-        throw new Error('SMTP configuration is incomplete. Please configure SMTP settings before sending test emails.');
-      }
+      this.validateEmailConfiguration(emailConfig);
 
       const timestamp = new Date();
       const user = req.user;
-      const recipients = testEmailDto.email.split(',').map(e => e.trim()).filter(e => e.length > 0);
-
-      // Send test email using the service
-      const testEmailDetails = {
-        smtpHost: emailConfig.smtpHost,
-        smtpPort: emailConfig.smtpPort || 587,
-        smtpSecure: emailConfig.smtpUseSsl || false,
-        senderEmail: emailConfig.senderEmail,
-        senderName: emailConfig.senderName || campName,
-        adminUserName: `${user.firstName} ${user.lastName}`,
-        adminEmail: user.email,
-        timestamp,
-      };
-
-      const customContent = {
+      const testEmailDetails = this.buildTestEmailDetails(emailConfig, campName, user, timestamp);
+      const customContent: TestEmailCustomContent = {
         subject: testEmailDto.subject || `Test Email from ${campName}`,
         message: testEmailDto.message,
         format: testEmailDto.format,
         includeSmtpDetails: testEmailDto.includeSmtpDetails,
       };
 
-      const success = await this.notificationsService.sendTestEmail(
-        testEmailDto.email,
-        testEmailDetails,
-        user.id,
-        customContent
+      const result = await this.notificationsService.sendTestEmail(
+        testEmailDto.email, testEmailDetails, user.id, customContent
       );
 
-      if (success) {
-        return {
-          success: true,
-          message: `Test email sent successfully to ${recipients.length} recipient${recipients.length > 1 ? 's' : ''}!`,
-          timestamp: timestamp.toISOString(),
-          recipients,
-          smtpConfiguration: {
-            host: emailConfig.smtpHost,
-            port: emailConfig.smtpPort || 587,
-            secure: emailConfig.smtpUseSsl,
-            senderEmail: emailConfig.senderEmail,
-            senderName: emailConfig.senderName || campName,
-          },
-          emailPreview: {
-            subject: testEmailDto.subject || `Test Email from ${campName}`,
-            format: testEmailDto.format || 'html',
-            includeSmtpDetails: testEmailDto.includeSmtpDetails !== false,
-          },
-        };
-      } else {
-        const recipients = testEmailDto.email.split(',').map(e => e.trim()).filter(e => e.length > 0);
-        
-        return {
-          success: false,
-          message: 'Failed to send test email. Please check your SMTP configuration and try again.',
-          timestamp: timestamp.toISOString(),
-          recipients,
-          smtpConfiguration: {
-            host: emailConfig.smtpHost,
-            port: emailConfig.smtpPort || 587,
-            secure: emailConfig.smtpUseSsl,
-            senderEmail: emailConfig.senderEmail,
-            senderName: emailConfig.senderName || campName,
-          },
-          emailPreview: {
-            subject: testEmailDto.subject || `Test Email from ${campName}`,
-            format: testEmailDto.format || 'html',
-            includeSmtpDetails: testEmailDto.includeSmtpDetails !== false,
-          },
-        };
-      }
+      return this.buildTestEmailResponse(result.success, result.recipients, emailConfig, campName, timestamp, testEmailDto);
     } catch (error) {
       return {
         success: false,
@@ -230,6 +146,75 @@ export class NotificationsController {
         timestamp: new Date().toISOString(),
       };
     }
+  }
+
+  /**
+   * Validate that email sending is enabled and SMTP is configured.
+   * @throws Error if configuration is invalid
+   */
+  private validateEmailConfiguration(emailConfig: { emailEnabled?: boolean; smtpHost?: string | null; senderEmail?: string | null }): void {
+    if (!emailConfig.emailEnabled) {
+      throw new Error('Email notifications are currently disabled. Please enable email notifications first.');
+    }
+    if (!emailConfig.smtpHost || !emailConfig.senderEmail) {
+      throw new Error('SMTP configuration is incomplete. Please configure SMTP settings before sending test emails.');
+    }
+  }
+
+  /**
+   * Assemble the TestEmailDetails object from configuration and request context.
+   */
+  private buildTestEmailDetails(
+    emailConfig: { smtpHost?: string | null; smtpPort?: number | null; smtpUseSsl?: boolean; senderEmail?: string | null; senderName?: string | null },
+    campName: string,
+    user: { firstName: string; lastName: string; email: string },
+    timestamp: Date
+  ): TestEmailDetails {
+    return {
+      smtpHost: emailConfig.smtpHost!,
+      smtpPort: emailConfig.smtpPort ?? 587,
+      smtpSecure: emailConfig.smtpUseSsl ?? false,
+      senderEmail: emailConfig.senderEmail!,
+      senderName: emailConfig.senderName || campName,
+      adminUserName: `${user.firstName} ${user.lastName}`,
+      adminEmail: user.email,
+      timestamp,
+    };
+  }
+
+  /**
+   * Build a consistent TestEmailResponse for both success and failure cases.
+   */
+  private buildTestEmailResponse(
+    success: boolean,
+    recipients: string[],
+    emailConfig: { smtpHost?: string | null; smtpPort?: number | null; smtpUseSsl?: boolean; senderEmail?: string | null; senderName?: string | null },
+    campName: string,
+    timestamp: Date,
+    testEmailDto: SendTestEmailDto
+  ): TestEmailResponse {
+    const message = success
+      ? `Test email sent successfully to ${recipients.length} recipient${recipients.length > 1 ? 's' : ''}!`
+      : 'Failed to send test email. Please check your SMTP configuration and try again.';
+
+    return {
+      success,
+      message,
+      timestamp: timestamp.toISOString(),
+      recipients,
+      smtpConfiguration: {
+        host: emailConfig.smtpHost!,
+        port: emailConfig.smtpPort ?? 587,
+        secure: emailConfig.smtpUseSsl ?? false,
+        senderEmail: emailConfig.senderEmail!,
+        senderName: emailConfig.senderName || campName,
+      },
+      emailPreview: {
+        subject: testEmailDto.subject || `Test Email from ${campName}`,
+        format: testEmailDto.format || 'html',
+        includeSmtpDetails: testEmailDto.includeSmtpDetails !== false,
+      },
+    };
   }
 
   /**

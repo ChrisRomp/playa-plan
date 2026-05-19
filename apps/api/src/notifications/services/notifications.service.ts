@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { EmailService, EmailOptions } from './email.service';
 import { CoreConfigService } from '../../core-config/services/core-config.service';
 import { NotificationType } from '@prisma/client';
+import { TestEmailDetails, TestEmailCustomContent, TestEmailResult } from '../interfaces/test-email.interfaces';
 
 export interface NotificationTemplate {
   subject: string;
@@ -352,69 +353,72 @@ export class NotificationsService {
    * @param testEmailDetails SMTP configuration and admin details
    * @param userId User ID for audit trail
    * @param customContent Optional custom subject and message content
-   * @returns Promise resolving to true if email was sent successfully
+   * @returns Promise resolving to result with success status and parsed recipients
    */
   async sendTestEmail(
     email: string,
-    testEmailDetails: {
-      smtpHost: string;
-      smtpPort: number;
-      smtpSecure: boolean;
-      senderEmail: string;
-      senderName: string;
-      adminUserName: string;
-      adminEmail: string;
-      timestamp: Date;
-    },
+    testEmailDetails: TestEmailDetails,
     userId: string,
-    customContent?: {
-      subject?: string;
-      message?: string;
-      format?: 'html' | 'text';
-      includeSmtpDetails?: boolean;
+    customContent?: TestEmailCustomContent
+  ): Promise<TestEmailResult> {
+    const recipients = this.parseRecipients(email);
+    this.validateEmailAddresses(recipients);
+
+    let successful = true;
+    for (const recipient of recipients) {
+      successful = await this.sendTestEmailToRecipient(recipient, testEmailDetails, userId, customContent) && successful;
     }
-  ): Promise<boolean> {
-    // Parse multiple email addresses if comma-separated
+
+    return { success: successful, recipients };
+  }
+
+  /**
+   * Parse a comma-separated email string into trimmed, non-empty addresses.
+   * @throws Error if no valid recipients are found
+   */
+  private parseRecipients(email: string): string[] {
     const recipients = email.split(',').map(e => e.trim()).filter(e => e.length > 0);
-    
-    // Validate all email addresses using a safer regex pattern
+    if (recipients.length === 0) {
+      throw new Error('At least one recipient email address is required.');
+    }
+    return recipients;
+  }
+
+  /**
+   * Validate an array of email addresses against a safe regex pattern.
+   * @throws Error if any address is invalid
+   */
+  private validateEmailAddresses(recipients: string[]): void {
     const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
     for (const recipient of recipients) {
       if (!emailRegex.test(recipient)) {
         throw new Error(`Invalid email address: ${recipient}`);
       }
     }
+  }
 
-    let successful = true;
-
-    // Send to each recipient
-    for (const recipient of recipients) {
-      try {
-        const result = await this.sendNotification(
-          recipient, 
-          NotificationType.EMAIL_TEST, 
-          { 
-            testEmailDetails: {
-              ...testEmailDetails,
-              customContent,
-            }, 
-            userId 
-          }
-        );
-        
-        if (!result) {
-          successful = false;
-        }
-      } catch (error) {
-        successful = false;
-        // Log the error but continue with other recipients
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        const sanitizedRecipient = recipient.replace(/[%\r\n]/g, '');
-        console.error(`Failed to send test email to ${sanitizedRecipient}: ${errorMessage}`);
-      }
+  /**
+   * Attempt to send a test email to a single recipient, logging failures.
+   */
+  private async sendTestEmailToRecipient(
+    recipient: string,
+    testEmailDetails: TestEmailDetails,
+    userId: string,
+    customContent?: TestEmailCustomContent
+  ): Promise<boolean> {
+    try {
+      const result = await this.sendNotification(
+        recipient,
+        NotificationType.EMAIL_TEST,
+        { testEmailDetails: { ...testEmailDetails, customContent }, userId }
+      );
+      return !!result;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const sanitizedRecipient = recipient.replace(/[%\r\n]/g, '');
+      console.error(`Failed to send test email to ${sanitizedRecipient}: ${errorMessage}`);
+      return false;
     }
-
-    return successful;
   }
 
   /**
