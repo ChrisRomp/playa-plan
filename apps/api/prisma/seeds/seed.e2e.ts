@@ -110,7 +110,9 @@ async function main(): Promise<void> {
  * prior-year entry.
  */
 async function seedPriorYearRegistration(): Promise<void> {
-  const currentConfig = await prisma.coreConfig.findFirst();
+  const currentConfig = await prisma.coreConfig.findFirst({
+    orderBy: { createdAt: 'desc' },
+  });
   if (!currentConfig) {
     console.log('⚠️  No coreConfig found, skipping prior-year registration seed');
     return;

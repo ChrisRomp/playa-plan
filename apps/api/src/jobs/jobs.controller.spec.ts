@@ -288,6 +288,32 @@ describe('JobsController', () => {
     });
   });
 
+  describe('register', () => {
+    it('should register the current user for a job using year from config', async () => {
+      const jobId = 'test-job-id';
+      const userId = 'test-user-id';
+      const mockReq = { user: { id: userId, role: UserRole.PARTICIPANT } } as unknown as Parameters<typeof controller.register>[1];
+      const expectedRegistration = {
+        id: 'reg-id',
+        userId,
+        year: new Date().getFullYear(),
+        status: 'PENDING',
+      };
+
+      mockRegistrationsService.create.mockResolvedValue(expectedRegistration);
+
+      const result = await controller.register(jobId, mockReq);
+
+      expect(mockCoreConfigService.findCurrent).toHaveBeenCalled();
+      expect(mockRegistrationsService.create).toHaveBeenCalledWith({
+        userId,
+        year: new Date().getFullYear(),
+        jobIds: [jobId],
+      });
+      expect(result).toEqual(expectedRegistration);
+    });
+  });
+
   describe('remove', () => {
     it('should remove a job', async () => {
       const jobId = 'test-id';

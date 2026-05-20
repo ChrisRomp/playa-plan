@@ -22,7 +22,9 @@ test.describe(
       const prisma = getPrisma();
 
       // Find the job that has the prior-year registration from seed.e2e.ts
-      const config = await prisma.coreConfig.findFirst();
+      const config = await prisma.coreConfig.findFirst({
+        orderBy: { createdAt: 'desc' },
+      });
       expect(config).not.toBeNull();
       const currentYear = config!.registrationYear;
       const priorYear = currentYear - 1;
@@ -44,7 +46,7 @@ test.describe(
       });
       expect(jobWithPriorYearReg).not.toBeNull();
 
-      // Authenticate as a fresh participant and call the jobs endpoint
+      // Authenticate as a staff user and call the jobs endpoint
       const api: ApiClient = await createAuthedApiClient(
         'e2e-staff@test.playaplan.local',
       );
@@ -84,7 +86,9 @@ test.describe(
       freshParticipant,
     }) => {
       const prisma = getPrisma();
-      const config = await prisma.coreConfig.findFirst();
+      const config = await prisma.coreConfig.findFirst({
+        orderBy: { createdAt: 'desc' },
+      });
       expect(config).not.toBeNull();
       const currentYear = config!.registrationYear;
       const priorYear = currentYear - 1;

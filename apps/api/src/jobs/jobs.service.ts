@@ -125,8 +125,8 @@ export class JobsService {
   }
 
   async update(id: string, updateJobDto: UpdateJobDto) {
+    const config = await this.coreConfigService.findCurrent();
     try {
-      const config = await this.coreConfigService.findCurrent();
       // Create update data object with proper typing
       const updateData: Prisma.JobUpdateInput = {};
       
@@ -164,8 +164,8 @@ export class JobsService {
   }
 
   async remove(id: string) {
+    const config = await this.coreConfigService.findCurrent();
     try {
-      const config = await this.coreConfigService.findCurrent();
       const job = await this.prisma.job.delete({
         where: { id },
         include: {
