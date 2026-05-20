@@ -54,7 +54,6 @@ const mockUseConfig = vi.mocked(useConfig);
 // Mock registration utils
 vi.spyOn(registrationUtils, 'canUserRegister');
 vi.spyOn(registrationUtils, 'getActiveRegistrations');
-vi.spyOn(registrationUtils, 'getCancelledRegistrations');
 
 // Helper component to wrap with router
 const DashboardPageWrapper: React.FC = () => (
@@ -826,14 +825,12 @@ describe('DashboardPage - Registration after cancellation', () => {
     // Mock registration utils with default implementations
     vi.mocked(registrationUtils.canUserRegister).mockReturnValue(true);
     vi.mocked(registrationUtils.getActiveRegistrations).mockReturnValue([]);
-    vi.mocked(registrationUtils.getCancelledRegistrations).mockReturnValue([]);
   });
 
   it('should use registration utilities correctly', () => {
     // Test that the registrationUtils functions are available for the dashboard
     expect(registrationUtils.canUserRegister).toBeDefined();
     expect(registrationUtils.getActiveRegistrations).toBeDefined();
-    expect(registrationUtils.getCancelledRegistrations).toBeDefined();
   });
 
   it('should validate registration utilities are properly imported', () => {
@@ -855,7 +852,6 @@ describe('DashboardPage - Registration after cancellation', () => {
 
       // Mock utils to reflect this state
       vi.mocked(registrationUtils.getActiveRegistrations).mockReturnValue([]);
-      vi.mocked(registrationUtils.getCancelledRegistrations).mockReturnValue([mockCancelledRegistration]);
       vi.mocked(registrationUtils.canUserRegister).mockReturnValue(true);
 
       const Wrapper = createWrapper();
@@ -892,7 +888,6 @@ describe('DashboardPage - Registration after cancellation', () => {
 
       // Mock utils to reflect this state  
       vi.mocked(registrationUtils.getActiveRegistrations).mockReturnValue([mockActiveRegistration]);
-      vi.mocked(registrationUtils.getCancelledRegistrations).mockReturnValue([]);
       vi.mocked(registrationUtils.canUserRegister).mockReturnValue(false);
 
       const Wrapper = createWrapper();
@@ -918,7 +913,6 @@ describe('DashboardPage - Registration after cancellation', () => {
 
       // For current year, no active registration exists
       vi.mocked(registrationUtils.getActiveRegistrations).mockReturnValue([]);
-      vi.mocked(registrationUtils.getCancelledRegistrations).mockReturnValue([mockCancelledRegistration]);
       vi.mocked(registrationUtils.canUserRegister).mockReturnValue(true);
 
       const Wrapper = createWrapper();
@@ -931,7 +925,7 @@ describe('DashboardPage - Registration after cancellation', () => {
   });
 
   describe('Registration History section', () => {
-    it('should show registration history section when user has cancelled registrations', async () => {
+    it('should show registration history section when user has past registrations', async () => {
       mockUseUserRegistrations.mockReturnValue({
         registrations: [mockActiveRegistration, mockCancelledRegistration],
         loading: false,
@@ -941,7 +935,6 @@ describe('DashboardPage - Registration after cancellation', () => {
 
       // Mock utils
       vi.mocked(registrationUtils.getActiveRegistrations).mockReturnValue([mockActiveRegistration]);
-      vi.mocked(registrationUtils.getCancelledRegistrations).mockReturnValue([mockCancelledRegistration]);
 
       const Wrapper = createWrapper();
       render(<DashboardPage />, { wrapper: Wrapper });
@@ -959,8 +952,6 @@ describe('DashboardPage - Registration after cancellation', () => {
         refetch: vi.fn(),
       });
 
-      vi.mocked(registrationUtils.getCancelledRegistrations).mockReturnValue([mockCancelledRegistration]);
-
       const Wrapper = createWrapper();
       render(<DashboardPage />, { wrapper: Wrapper });
       
@@ -968,8 +959,9 @@ describe('DashboardPage - Registration after cancellation', () => {
         // Should show status
         expect(screen.getByText('CANCELLED')).toBeInTheDocument();
         
-        // Should show year in date format
-        expect(screen.getByText('Registration from 1/1/2024')).toBeInTheDocument();
+        // Should show year and date in history heading
+        const expectedDate = new Date('2024-01-01T10:00:00.000Z').toLocaleDateString();
+        expect(screen.getByText(new RegExp(`2024 — ${expectedDate.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`))).toBeInTheDocument();
         
         // Should show payment status
         expect(screen.getByText('REFUNDED')).toBeInTheDocument();
@@ -984,19 +976,17 @@ describe('DashboardPage - Registration after cancellation', () => {
         refetch: vi.fn(),
       });
 
-      vi.mocked(registrationUtils.getCancelledRegistrations).mockReturnValue([mockCancelledRegistration]);
-
       const Wrapper = createWrapper();
       render(<DashboardPage />, { wrapper: Wrapper });
       
       await waitFor(() => {
         expect(screen.getByText('CANCELLED')).toBeInTheDocument();
-        // The year appears in a formatted date like "1/1/2024"
-        expect(screen.getByText('Registration from 1/1/2024')).toBeInTheDocument();
+        const expectedDate = new Date('2024-01-01T10:00:00.000Z').toLocaleDateString();
+        expect(screen.getByText(new RegExp(`2024 — ${expectedDate.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`))).toBeInTheDocument();
       });
     });
 
-    it('should not show registration history section when no cancelled registrations exist', async () => {
+    it('should not show registration history section when only current active registration exists', async () => {
       mockUseUserRegistrations.mockReturnValue({
         registrations: [mockActiveRegistration],
         loading: false,
@@ -1005,7 +995,6 @@ describe('DashboardPage - Registration after cancellation', () => {
       });
 
       vi.mocked(registrationUtils.getActiveRegistrations).mockReturnValue([mockActiveRegistration]);
-      vi.mocked(registrationUtils.getCancelledRegistrations).mockReturnValue([]);
 
       const Wrapper = createWrapper();
       render(<DashboardPage />, { wrapper: Wrapper });
@@ -1015,7 +1004,7 @@ describe('DashboardPage - Registration after cancellation', () => {
       });
     });
 
-    it('should handle multiple cancelled registrations in history', async () => {
+    it('should handle multiple registrations from different years in history', async () => {
       const cancelledRegistration2023 = {
         ...mockCancelledRegistration,
         id: 'cancelled-2023',
@@ -1036,10 +1025,7 @@ describe('DashboardPage - Registration after cancellation', () => {
         refetch: vi.fn(),
       });
 
-      vi.mocked(registrationUtils.getCancelledRegistrations).mockReturnValue([
-        mockCancelledRegistration,
-        cancelledRegistration2023
-      ]);
+      vi.mocked(registrationUtils.getActiveRegistrations).mockReturnValue([mockActiveRegistration]);
 
       const Wrapper = createWrapper();
       render(<DashboardPage />, { wrapper: Wrapper });
@@ -1047,14 +1033,82 @@ describe('DashboardPage - Registration after cancellation', () => {
       await waitFor(() => {
         expect(screen.getByText('Registration History')).toBeInTheDocument();
         
-        // Should show both years in date format - match the actual date formatting
-        expect(screen.getByText('Registration from 1/1/2024')).toBeInTheDocument();
-        expect(screen.getByText('Registration from 1/1/2023')).toBeInTheDocument();
-        
         // Should show multiple cancelled statuses
         const cancelledElements = screen.getAllByText('CANCELLED');
         expect(cancelledElements).toHaveLength(2);
       });
+    });
+
+    it('should render registration history sorted by year desc then createdAt desc', async () => {
+      const reg2022 = {
+        ...mockCancelledRegistration,
+        id: 'reg-2022',
+        year: 2022,
+        createdAt: '2022-06-15T10:00:00.000Z',
+        updatedAt: '2022-06-15T10:00:00.000Z',
+      };
+      const reg2024Early = {
+        ...mockCancelledRegistration,
+        id: 'reg-2024-early',
+        year: 2024,
+        createdAt: '2024-02-01T10:00:00.000Z',
+        updatedAt: '2024-02-01T10:00:00.000Z',
+      };
+      const reg2024Late = {
+        ...mockCancelledRegistration,
+        id: 'reg-2024-late',
+        year: 2024,
+        createdAt: '2024-08-01T10:00:00.000Z',
+        updatedAt: '2024-08-01T10:00:00.000Z',
+      };
+      const reg2023 = {
+        ...mockCancelledRegistration,
+        id: 'reg-2023',
+        year: 2023,
+        createdAt: '2023-03-10T10:00:00.000Z',
+        updatedAt: '2023-03-10T10:00:00.000Z',
+      };
+
+      // Current active registration for 2025 to exclude from history
+      const currentReg = {
+        ...mockActiveRegistration,
+        id: 'active-2025',
+        year: 2025,
+        createdAt: '2025-01-01T10:00:00.000Z',
+        updatedAt: '2025-01-01T10:00:00.000Z',
+      };
+
+      // Provide registrations in arbitrary order
+      mockUseUserRegistrations.mockReturnValue({
+        registrations: [reg2022, currentReg, reg2024Early, reg2023, reg2024Late],
+        loading: false,
+        error: null,
+        refetch: vi.fn(),
+      });
+
+      vi.mocked(registrationUtils.getActiveRegistrations).mockReturnValue([currentReg]);
+
+      const Wrapper = createWrapper();
+      render(<DashboardPage />, { wrapper: Wrapper });
+
+      await waitFor(() => {
+        expect(screen.getByText('Registration History')).toBeInTheDocument();
+      });
+
+      // Get all h4 headings that match the "year — date" pattern (history cards only)
+      const allH4s = screen.getAllByRole('heading', { level: 4 });
+      const historyHeadings = allH4s.filter(h => /^\d{4} — /.test(h.textContent || ''));
+
+      // Expected order: 2024 (Aug), 2024 (Feb), 2023, 2022
+      const expectedDates = [
+        `2024 — ${new Date('2024-08-01T10:00:00.000Z').toLocaleDateString()}`,
+        `2024 — ${new Date('2024-02-01T10:00:00.000Z').toLocaleDateString()}`,
+        `2023 — ${new Date('2023-03-10T10:00:00.000Z').toLocaleDateString()}`,
+        `2022 — ${new Date('2022-06-15T10:00:00.000Z').toLocaleDateString()}`,
+      ];
+
+      const headingTexts = historyHeadings.map(h => h.textContent);
+      expect(headingTexts).toEqual(expectedDates);
     });
   });
 
