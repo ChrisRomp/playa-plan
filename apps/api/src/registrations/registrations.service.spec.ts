@@ -404,7 +404,7 @@ describe('RegistrationsService', () => {
 
       await expect(
         service.addJobToRegistration('registration-id', { jobId: 'job-id-1' })
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow('Cannot modify a cancelled registration');
       expect(mockPrismaService.job.findUnique).not.toHaveBeenCalled();
       expect(mockPrismaService.registrationJob.create).not.toHaveBeenCalled();
     });
