@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
+import { CoreConfigService } from '../core-config/services/core-config.service';
 import { CreateJobDto } from './dto/create-job.dto';
 import { UpdateJobDto } from './dto/update-job.dto';
 import { Job, Prisma, UserRole } from '@prisma/client';
@@ -41,9 +42,13 @@ type JobWithRelations = Job & {
 
 @Injectable()
 export class JobsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private coreConfigService: CoreConfigService,
+  ) {}
 
   async create(createJobDto: CreateJobDto) {
+    const config = await this.coreConfigService.findCurrent();
     const job = await this.prisma.job.create({
       data: {
         name: createJobDto.name,
@@ -68,7 +73,7 @@ export class JobsService {
     });
 
     // Add derived properties from category and calculate current registrations
-    return this.addDerivedPropertiesWithRegistrations(job);
+    return this.addDerivedPropertiesWithRegistrations(job, config.registrationYear);
   }
 
   /**
@@ -77,6 +82,7 @@ export class JobsService {
    * @param userRole - Optional role to filter results
    */
   async findAll(userRole?: UserRole) {
+    const config = await this.coreConfigService.findCurrent();
     const jobs = await this.prisma.job.findMany({
       where: {
         ...(userRole === UserRole.PARTICIPANT && { category: { staffOnly: false } }),
@@ -92,10 +98,11 @@ export class JobsService {
       },
     });
 
-    return jobs.map(job => this.addDerivedPropertiesWithRegistrations(job));
+    return jobs.map(job => this.addDerivedPropertiesWithRegistrations(job, config.registrationYear));
   }
 
   async findOne(id: string) {
+    const config = await this.coreConfigService.findCurrent();
     const job = await this.prisma.job.findUnique({
       where: { id },
       include: {
@@ -114,11 +121,12 @@ export class JobsService {
     }
 
     // Add derived properties from category and calculate current registrations
-    return this.addDerivedPropertiesWithRegistrations(job);
+    return this.addDerivedPropertiesWithRegistrations(job, config.registrationYear);
   }
 
   async update(id: string, updateJobDto: UpdateJobDto) {
     try {
+      const config = await this.coreConfigService.findCurrent();
       // Create update data object with proper typing
       const updateData: Prisma.JobUpdateInput = {};
       
@@ -149,7 +157,7 @@ export class JobsService {
       });
 
       // Add derived properties from category and calculate current registrations
-      return this.addDerivedPropertiesWithRegistrations(job);
+      return this.addDerivedPropertiesWithRegistrations(job, config.registrationYear);
     } catch {
       throw new NotFoundException(`Job with ID ${id} not found`);
     }
@@ -157,6 +165,7 @@ export class JobsService {
 
   async remove(id: string) {
     try {
+      const config = await this.coreConfigService.findCurrent();
       const job = await this.prisma.job.delete({
         where: { id },
         include: {
@@ -171,7 +180,7 @@ export class JobsService {
       });
 
       // Add derived properties from category and calculate current registrations
-      return this.addDerivedPropertiesWithRegistrations(job);
+      return this.addDerivedPropertiesWithRegistrations(job, config.registrationYear);
     } catch {
       throw new NotFoundException(`Job with ID ${id} not found`);
     }
@@ -180,14 +189,11 @@ export class JobsService {
   /**
    * Add derived properties from category and calculate current registrations for a job
    */
-  private addDerivedPropertiesWithRegistrations(job: JobWithRelations) {
-    // Get current year
-    const currentYear = new Date().getFullYear();
-    
-    // Count all non-cancelled registrations for the current year
+  private addDerivedPropertiesWithRegistrations(job: JobWithRelations, registrationYear: number) {
+    // Count all non-cancelled registrations for the configured registration year
     // This includes PENDING, CONFIRMED, and WAITLISTED registrations
     const currentRegistrations = job.registrations?.filter(
-      reg => reg.registration.status !== 'CANCELLED' && reg.registration.year === currentYear
+      reg => reg.registration.status !== 'CANCELLED' && reg.registration.year === registrationYear
     ).length || 0;
 
     // Exclude registrations from the returned object

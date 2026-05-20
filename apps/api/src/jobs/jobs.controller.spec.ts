@@ -4,6 +4,7 @@ import { JobsService } from './jobs.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { RegistrationsService } from '../registrations/registrations.service';
+import { CoreConfigService } from '../core-config/services/core-config.service';
 import { UserRole } from '@prisma/client';
 
 describe('JobsController', () => {
@@ -25,6 +26,10 @@ describe('JobsController', () => {
     update: jest.fn(),
   };
 
+  const mockCoreConfigService = {
+    findCurrent: jest.fn().mockResolvedValue({ registrationYear: new Date().getFullYear() }),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [JobsController],
@@ -36,6 +41,10 @@ describe('JobsController', () => {
         {
           provide: RegistrationsService,
           useValue: mockRegistrationsService,
+        },
+        {
+          provide: CoreConfigService,
+          useValue: mockCoreConfigService,
         },
       ],
     })

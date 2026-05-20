@@ -98,6 +98,7 @@ export class RegistrationsService {
 
         const currentRegistrationCount = job.registrations.filter(
           r => r.registration.status !== RegistrationStatus.CANCELLED
+            && r.registration.year === createRegistrationDto.year
         ).length;
 
         return { job, currentRegistrationCount };
@@ -212,6 +213,7 @@ export class RegistrationsService {
     // Check if this affects the registration status
     const currentRegistrationCount = job.registrations.filter(
       r => r.registration.status !== RegistrationStatus.CANCELLED
+        && r.registration.year === registration.year
     ).length;
 
     const shouldBeWaitlisted = currentRegistrationCount >= job.maxRegistrations;
@@ -644,7 +646,8 @@ export class RegistrationsService {
           throw new NotFoundException(`Job with ID ${jobId} not found`);
         }
         const currentRegistrationCount = job.registrations.filter(
-          (r) => r.registration.status !== RegistrationStatus.CANCELLED,
+          (r) => r.registration.status !== RegistrationStatus.CANCELLED
+            && r.registration.year === currentYear,
         ).length;
         return { job, currentRegistrationCount };
       }),

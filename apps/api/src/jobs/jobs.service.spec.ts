@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { JobsService } from './jobs.service';
 import { PrismaService } from '../common/prisma/prisma.service';
+import { CoreConfigService } from '../core-config/services/core-config.service';
 import { NotFoundException } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
 import { CreateJobDto } from './dto/create-job.dto';
@@ -21,6 +22,10 @@ describe('JobsService', () => {
     },
   };
 
+  const mockCoreConfigService = {
+    findCurrent: jest.fn().mockResolvedValue({ registrationYear: new Date().getFullYear() }),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -28,6 +33,10 @@ describe('JobsService', () => {
         {
           provide: PrismaService,
           useValue: mockPrismaService,
+        },
+        {
+          provide: CoreConfigService,
+          useValue: mockCoreConfigService,
         },
       ],
     }).compile();
@@ -644,6 +653,65 @@ describe('JobsService', () => {
 
       expect(result).toEqual(expectedJob);
       expect(result.currentRegistrations).toBe(2);
+    });
+
+    it('should use registrationYear from config, not calendar year', async () => {
+      // Simulate config year being different from Date().getFullYear()
+      const configYear = 2025;
+      mockCoreConfigService.findCurrent.mockResolvedValue({ registrationYear: configYear });
+
+      const mockJob = {
+        id: 'test-id',
+        name: 'Test Job',
+        location: 'Test Location',
+        categoryId: 'test-category-id',
+        shiftId: 'test-shift-id',
+        maxRegistrations: 5,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        category: {
+          id: 'test-category-id',
+          name: 'Test Category',
+          description: 'Test Category Description',
+          staffOnly: false,
+          alwaysRequired: true,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        shift: {
+          id: 'test-shift-id',
+          name: 'Test Shift',
+          description: 'Test Shift Description',
+          startTime: '09:00',
+          endTime: '17:00',
+          dayOfWeek: 'MONDAY',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        registrations: [
+          {
+            id: 'reg-job-1',
+            registrationId: 'reg-1',
+            jobId: 'test-id',
+            createdAt: new Date(),
+            registration: { id: 'reg-1', status: 'CONFIRMED', year: 2025, createdAt: new Date(), updatedAt: new Date(), userId: 'user-1' },
+          },
+          {
+            id: 'reg-job-2',
+            registrationId: 'reg-2',
+            jobId: 'test-id',
+            createdAt: new Date(),
+            registration: { id: 'reg-2', status: 'CONFIRMED', year: 2026, createdAt: new Date(), updatedAt: new Date(), userId: 'user-2' },
+          },
+        ],
+      };
+
+      mockPrismaService.job.findUnique.mockResolvedValue(mockJob);
+
+      const result = await service.findOne('test-id');
+
+      // Only the 2025 registration should count (configYear=2025)
+      expect(result.currentRegistrations).toBe(1);
     });
   });
 }); 

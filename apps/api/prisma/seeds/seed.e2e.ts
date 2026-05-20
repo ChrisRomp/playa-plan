@@ -94,7 +94,70 @@ async function main(): Promise<void> {
     console.log('✅ Enabled allowDeferredDuesPayment on coreConfig');
   }
 
+  // Seed prior-year registration data for testing year-scoped capacity.
+  // This creates a CONFIRMED registration from the previous year for the admin
+  // persona on a low-capacity job (maxRegistrations=1). Tests verify that
+  // current-year registrations are not incorrectly waitlisted due to prior-year data.
+  await seedPriorYearRegistration();
+
   console.log('E2E personas seed complete.');
+}
+
+/**
+ * Create a prior-year CONFIRMED registration for the admin persona on a
+ * 1-capacity job. This exercises the year-scoping logic: current-year
+ * registrants for the same job should NOT be waitlisted because of this
+ * prior-year entry.
+ */
+async function seedPriorYearRegistration(): Promise<void> {
+  const currentConfig = await prisma.coreConfig.findFirst();
+  if (!currentConfig) {
+    console.log('⚠️  No coreConfig found, skipping prior-year registration seed');
+    return;
+  }
+
+  const priorYear = currentConfig.registrationYear - 1;
+  const adminUser = await prisma.user.findUnique({
+    where: { email: 'e2e-admin@test.playaplan.local' },
+  });
+  if (!adminUser) {
+    console.log('⚠️  Admin persona not found, skipping prior-year registration seed');
+    return;
+  }
+
+  // Find a 1-capacity, non-staff-only job to attach the prior-year registration to.
+  const targetJob = await prisma.job.findFirst({
+    where: {
+      maxRegistrations: 1,
+      category: { staffOnly: false },
+    },
+  });
+  if (!targetJob) {
+    console.log('⚠️  No 1-capacity non-staff job found, skipping prior-year registration seed');
+    return;
+  }
+
+  // Idempotent: skip if the admin already has a registration for priorYear.
+  const existing = await prisma.registration.findFirst({
+    where: { userId: adminUser.id, year: priorYear },
+  });
+  if (existing) {
+    console.log(`✅ Prior-year registration already exists (year=${priorYear}), skipping`);
+    return;
+  }
+
+  await prisma.registration.create({
+    data: {
+      status: 'CONFIRMED',
+      year: priorYear,
+      user: { connect: { id: adminUser.id } },
+      jobs: {
+        create: [{ job: { connect: { id: targetJob.id } } }],
+      },
+    },
+  });
+
+  console.log(`✅ Created prior-year (${priorYear}) CONFIRMED registration for admin on job "${targetJob.name}"`);
 }
 
 main()

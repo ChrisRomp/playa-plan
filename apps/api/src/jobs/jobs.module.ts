@@ -4,9 +4,10 @@ import { JobsService } from './jobs.service';
 import { PrismaModule } from '../common/prisma/prisma.module';
 import { CategoriesModule } from './categories/categories.module';
 import { RegistrationsModule } from '../registrations/registrations.module';
+import { CoreConfigModule } from '../core-config/core-config.module';
 
 @Module({
-  imports: [PrismaModule, CategoriesModule, RegistrationsModule],
+  imports: [PrismaModule, CategoriesModule, RegistrationsModule, CoreConfigModule],
   controllers: [JobsController],
   providers: [JobsService],
   exports: [JobsService],
