@@ -227,7 +227,7 @@ describe('RegistrationsService', () => {
       const fullJob = {
         id: 'job-id-1',
         maxRegistrations: 1,
-        registrations: [{ registration: { status: RegistrationStatus.CONFIRMED } }],
+        registrations: [{ registration: { status: RegistrationStatus.CONFIRMED, year: 2024 } }],
       };
       
       mockPrismaService.user.findUnique.mockResolvedValue(mockUser);
@@ -243,6 +243,39 @@ describe('RegistrationsService', () => {
       const result = await service.create(createDto);
       
       expect(result.status).toBe(RegistrationStatus.WAITLISTED);
+      expect(mockPrismaService.registration.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            status: RegistrationStatus.WAITLISTED,
+          }),
+        }),
+      );
+    });
+
+    it('should not count prior-year registrations toward capacity', async () => {
+      const jobWithPriorYearReg = {
+        id: 'job-id-1',
+        maxRegistrations: 1,
+        registrations: [{ registration: { status: RegistrationStatus.CONFIRMED, year: 2023 } }],
+      };
+
+      mockPrismaService.user.findUnique.mockResolvedValue(mockUser);
+      mockPrismaService.registration.findFirst.mockResolvedValue(null);
+      mockPrismaService.job.findUnique
+        .mockResolvedValueOnce(jobWithPriorYearReg)
+        .mockResolvedValueOnce(mockJobs[1]);
+      mockPrismaService.registration.create.mockResolvedValue(mockRegistration);
+
+      const result = await service.create(createDto);
+
+      expect(result.status).toBe(RegistrationStatus.PENDING);
+      expect(mockPrismaService.registration.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            status: RegistrationStatus.PENDING,
+          }),
+        }),
+      );
     });
 
     it('should throw ForbiddenException when participant registers for staffOnly job', async () => {
@@ -859,6 +892,55 @@ describe('RegistrationsService', () => {
       await expect(call).rejects.toThrow(
         'Registration is not available for your account. Please contact an administrator.',
       );
+    });
+
+    it('should not count prior-year registrations toward capacity in createCampRegistration', async () => {
+      // Job has maxRegistrations=1 with one CONFIRMED registration from a prior year.
+      // Current registration year is 2026, but the existing registration is for 2025.
+      mockCoreConfigService.findCurrent.mockResolvedValue({ registrationYear: 2026 });
+      mockPrismaService.job.findUnique.mockResolvedValue({
+        id: 'job-1',
+        maxRegistrations: 1,
+        staffOnly: false,
+        registrations: [{ registration: { status: RegistrationStatus.CONFIRMED, year: 2025 } }],
+      });
+      const created = buildCreatedRegistration({ status: RegistrationStatus.PENDING });
+      mockPrismaService.registration.create.mockResolvedValue(created);
+
+      const result = await service.createCampRegistration(userId, baseDto);
+
+      expect(mockPrismaService.registration.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            status: RegistrationStatus.PENDING,
+          }),
+        }),
+      );
+      expect(result.jobRegistration?.status).toBe(RegistrationStatus.PENDING);
+    });
+
+    it('should count same-year registrations toward capacity in createCampRegistration', async () => {
+      // Job has maxRegistrations=1 with one CONFIRMED registration for the current year.
+      mockCoreConfigService.findCurrent.mockResolvedValue({ registrationYear: 2026 });
+      mockPrismaService.job.findUnique.mockResolvedValue({
+        id: 'job-1',
+        maxRegistrations: 1,
+        staffOnly: false,
+        registrations: [{ registration: { status: RegistrationStatus.CONFIRMED, year: 2026 } }],
+      });
+      const created = buildCreatedRegistration({ status: RegistrationStatus.WAITLISTED });
+      mockPrismaService.registration.create.mockResolvedValue(created);
+
+      const result = await service.createCampRegistration(userId, baseDto);
+
+      expect(mockPrismaService.registration.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            status: RegistrationStatus.WAITLISTED,
+          }),
+        }),
+      );
+      expect(result.jobRegistration?.status).toBe(RegistrationStatus.WAITLISTED);
     });
   });
 

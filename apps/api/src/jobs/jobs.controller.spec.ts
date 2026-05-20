@@ -4,6 +4,7 @@ import { JobsService } from './jobs.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { RegistrationsService } from '../registrations/registrations.service';
+import { CoreConfigService } from '../core-config/services/core-config.service';
 import { UserRole } from '@prisma/client';
 
 describe('JobsController', () => {
@@ -25,6 +26,10 @@ describe('JobsController', () => {
     update: jest.fn(),
   };
 
+  const mockCoreConfigService = {
+    findCurrent: jest.fn().mockResolvedValue({ registrationYear: new Date().getFullYear() }),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [JobsController],
@@ -36,6 +41,10 @@ describe('JobsController', () => {
         {
           provide: RegistrationsService,
           useValue: mockRegistrationsService,
+        },
+        {
+          provide: CoreConfigService,
+          useValue: mockCoreConfigService,
         },
       ],
     })
@@ -276,6 +285,32 @@ describe('JobsController', () => {
 
       expect(result).toEqual(expectedJob);
       expect(mockJobsService.update).toHaveBeenCalledWith(jobId, updateJobDto);
+    });
+  });
+
+  describe('register', () => {
+    it('should register the current user for a job using year from config', async () => {
+      const jobId = 'test-job-id';
+      const userId = 'test-user-id';
+      const mockReq = { user: { id: userId, role: UserRole.PARTICIPANT } } as unknown as Parameters<typeof controller.register>[1];
+      const expectedRegistration = {
+        id: 'reg-id',
+        userId,
+        year: new Date().getFullYear(),
+        status: 'PENDING',
+      };
+
+      mockRegistrationsService.create.mockResolvedValue(expectedRegistration);
+
+      const result = await controller.register(jobId, mockReq);
+
+      expect(mockCoreConfigService.findCurrent).toHaveBeenCalled();
+      expect(mockRegistrationsService.create).toHaveBeenCalledWith({
+        userId,
+        year: new Date().getFullYear(),
+        jobIds: [jobId],
+      });
+      expect(result).toEqual(expectedRegistration);
     });
   });
 

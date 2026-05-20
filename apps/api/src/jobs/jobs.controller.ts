@@ -8,6 +8,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from '@prisma/client';
 import { ApiTags, ApiBearerAuth, ApiCreatedResponse, ApiOkResponse, ApiOperation } from '@nestjs/swagger';
 import { RegistrationsService } from '../registrations/registrations.service';
+import { CoreConfigService } from '../core-config/services/core-config.service';
 import { Request } from 'express';
 
 interface RequestWithUser extends Request {
@@ -27,6 +28,7 @@ export class JobsController {
   constructor(
     private readonly jobsService: JobsService,
     private readonly registrationsService: RegistrationsService,
+    private readonly coreConfigService: CoreConfigService,
   ) {}
 
   @Post()
@@ -72,11 +74,11 @@ export class JobsController {
   @ApiCreatedResponse({ description: 'User has been successfully registered for the job.' })
   async register(@Param('id') jobId: string, @Req() req: RequestWithUser) {
     const userId = req.user.id;
-    const currentYear = new Date().getFullYear(); // You might want to get this from config instead
+    const config = await this.coreConfigService.findCurrent();
     
     return this.registrationsService.create({
       userId,
-      year: currentYear,
+      year: config.registrationYear,
       jobIds: [jobId],
     });
   }
