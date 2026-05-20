@@ -76,6 +76,7 @@ describe('CampingOptionsController', () => {
     update: jest.fn().mockResolvedValue(mockCampingOption),
     remove: jest.fn().mockResolvedValue(mockCampingOption),
     getRegistrationCount: jest.fn().mockResolvedValue(0),
+    getRegistrationCountBatch: jest.fn().mockResolvedValue(new Map([['test-id', 0]])),
   };
 
   beforeEach(async () => {
@@ -136,7 +137,7 @@ describe('CampingOptionsController', () => {
       const result = await controller.findAll();
       
       expect(service.findAll).toHaveBeenCalledWith(false);
-      expect(service.getRegistrationCount).toHaveBeenCalledWith('test-id', 2026);
+      expect(service.getRegistrationCountBatch).toHaveBeenCalledWith(['test-id'], 2026);
       expect(result).toHaveLength(1);
       expect(result[0]).toEqual(expect.objectContaining(mockResponseDto));
     });

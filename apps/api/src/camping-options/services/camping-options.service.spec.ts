@@ -72,6 +72,7 @@ describe('CampingOptionsService', () => {
     },
     campingOptionRegistration: {
       count: jest.fn(),
+      groupBy: jest.fn(),
     },
     campingOptionField: {
       count: jest.fn(),
@@ -262,6 +263,53 @@ describe('CampingOptionsService', () => {
       });
 
       expect(result).toBe(7);
+    });
+  });
+
+  describe('getRegistrationCountBatch', () => {
+    it('should return counts grouped by campingOptionId with year filter', async () => {
+      mockPrismaService.campingOptionRegistration.groupBy.mockResolvedValueOnce([
+        { campingOptionId: 'opt-1', _count: { campingOptionId: 3 } },
+        { campingOptionId: 'opt-2', _count: { campingOptionId: 5 } },
+      ]);
+
+      const result = await service.getRegistrationCountBatch(['opt-1', 'opt-2', 'opt-3'], 2026);
+
+      expect(prisma.campingOptionRegistration.groupBy).toHaveBeenCalledWith({
+        by: ['campingOptionId'],
+        where: {
+          campingOptionId: { in: ['opt-1', 'opt-2', 'opt-3'] },
+          registration: { year: 2026 },
+        },
+        _count: { campingOptionId: true },
+      });
+
+      expect(result.get('opt-1')).toBe(3);
+      expect(result.get('opt-2')).toBe(5);
+      expect(result.get('opt-3')).toBeUndefined();
+    });
+
+    it('should return empty map for empty ids array', async () => {
+      const result = await service.getRegistrationCountBatch([], 2026);
+
+      expect(result.size).toBe(0);
+      expect(prisma.campingOptionRegistration.groupBy).not.toHaveBeenCalled();
+    });
+
+    it('should not filter by year when year is undefined', async () => {
+      mockPrismaService.campingOptionRegistration.groupBy.mockResolvedValueOnce([
+        { campingOptionId: 'opt-1', _count: { campingOptionId: 10 } },
+      ]);
+
+      await service.getRegistrationCountBatch(['opt-1']);
+
+      expect(prisma.campingOptionRegistration.groupBy).toHaveBeenCalledWith({
+        by: ['campingOptionId'],
+        where: {
+          campingOptionId: { in: ['opt-1'] },
+        },
+        _count: { campingOptionId: true },
+      });
     });
   });
 

@@ -85,6 +85,7 @@ describe('RegistrationAdminService', () => {
       campingOptionRegistration: {
         findMany: jest.fn(),
         create: jest.fn(),
+        count: jest.fn(),
       },
       campingOption: {
         findUnique: jest.fn(),
@@ -264,6 +265,7 @@ describe('RegistrationAdminService', () => {
       (prismaService.campingOption.findUnique as jest.Mock).mockResolvedValue(mockCampingOptions[0]);
       (prismaService.campingOption.findMany as jest.Mock).mockResolvedValue(mockCampingOptions);
       (prismaService.campingOptionRegistration.findMany as jest.Mock).mockResolvedValue([]);
+      (prismaService.campingOptionRegistration.count as jest.Mock).mockResolvedValue(0);
 
       const result = await service.editRegistration('reg-123', editData, 'admin-123');
 

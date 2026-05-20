@@ -380,19 +380,23 @@ export class RegistrationAdminService {
             id => !currentCampingOptionIds.includes(id)
           );
           for (const campingOptionId of campingOptionsToAdd) {
-            // Validate camping option exists and has capacity
+            // Validate camping option exists and has capacity (year-scoped)
             const campingOption = await prisma.campingOption.findUnique({
               where: { id: campingOptionId },
-              include: {
-                registrations: true,
-              },
             });
 
             if (!campingOption) {
               throw new BadRequestException(`Camping option ${campingOptionId} not found`);
             }
 
-            if (campingOption.registrations.length >= campingOption.maxSignups) {
+            const yearScopedCount = await prisma.campingOptionRegistration.count({
+              where: {
+                campingOptionId,
+                registration: { year: currentRegistration.year },
+              },
+            });
+
+            if (yearScopedCount >= campingOption.maxSignups) {
               throw new ConflictException(`Camping option ${campingOption.name} is at capacity`);
             }
 

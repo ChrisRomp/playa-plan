@@ -164,6 +164,37 @@ export class CampingOptionsService {
   }
 
   /**
+   * Get registration counts for multiple camping options in a single query
+   * @param ids - The IDs of the camping options
+   * @param year - Optional year to scope counts to (via registration relation)
+   * @returns Map of camping option ID to registration count
+   */
+  async getRegistrationCountBatch(ids: string[], year?: number): Promise<Map<string, number>> {
+    if (ids.length === 0) {
+      return new Map();
+    }
+
+    const where: Prisma.CampingOptionRegistrationWhereInput = {
+      campingOptionId: { in: ids },
+    };
+    if (year !== undefined) {
+      where.registration = { year };
+    }
+
+    const grouped = await this.prisma.campingOptionRegistration.groupBy({
+      by: ['campingOptionId'],
+      where,
+      _count: { campingOptionId: true },
+    });
+
+    const result = new Map<string, number>();
+    for (const row of grouped) {
+      result.set(row.campingOptionId, row._count.campingOptionId);
+    }
+    return result;
+  }
+
+  /**
    * Update a camping option
    * @param id - The ID of the camping option to update
    * @param updateCampingOptionDto - The data to update

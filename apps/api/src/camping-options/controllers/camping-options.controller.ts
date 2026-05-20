@@ -92,11 +92,14 @@ export class CampingOptionsController {
 
     const config = await this.coreConfigService.findCurrent();
     const currentYear = config.registrationYear;
+
+    const optionIds = campingOptions.map(o => o.id);
+    const counts = await this.campingOptionsService.getRegistrationCountBatch(optionIds, currentYear);
     
     const responseDtos: CampingOptionResponseDto[] = [];
     
     for (const option of campingOptions) {
-      const registrationCount = await this.campingOptionsService.getRegistrationCount(option.id, currentYear);
+      const registrationCount = counts.get(option.id) ?? 0;
       const responseDto = new CampingOptionResponseDto();
       
       Object.assign(responseDto, option);

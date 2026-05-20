@@ -484,5 +484,47 @@ describe('RegistrationCleanupService', () => {
         service.cleanupCampingOptions('user-123', ['camping-option-1'], 'admin-123', 'Test error')
       ).rejects.toThrow('Database error');
     });
+
+    it('should scope cleanup by registrationId when provided', async () => {
+      const mockCampingOptionRegs = [
+        {
+          id: 'camping-reg-1',
+          userId: 'user-123',
+          campingOptionId: 'camping-option-1',
+          registrationId: 'reg-123',
+          campingOption: { id: 'camping-option-1', name: 'RV Spot' },
+        },
+      ];
+
+      prismaService.$transaction.mockImplementation(async (callback) => {
+        return await callback(prismaService);
+      });
+
+      (prismaService.campingOptionRegistration.findMany as jest.Mock).mockResolvedValue(mockCampingOptionRegs);
+      (prismaService.campingOptionRegistration.deleteMany as jest.Mock).mockResolvedValue({ count: 1 });
+      adminAuditService.createMultipleAuditRecords.mockResolvedValue([
+        { ...mockAuditRecord, id: 'audit-1' },
+      ]);
+
+      const result = await service.cleanupCampingOptions(
+        'user-123',
+        ['camping-option-1'],
+        'admin-123',
+        'Scoped cleanup',
+        undefined,
+        'reg-123'
+      );
+
+      expect(prismaService.campingOptionRegistration.findMany).toHaveBeenCalledWith({
+        where: {
+          userId: 'user-123',
+          campingOptionId: { in: ['camping-option-1'] },
+          registrationId: 'reg-123',
+        },
+        include: { campingOption: true },
+      });
+
+      expect(result).toBe(1);
+    });
   });
-}); 
+});

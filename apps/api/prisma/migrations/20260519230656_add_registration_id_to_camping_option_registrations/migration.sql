@@ -1,20 +1,20 @@
 -- AlterTable
-ALTER TABLE "camping_option_registrations" ADD COLUMN "registration_id" TEXT;
+ALTER TABLE "camping_option_registrations" ADD COLUMN "registrationId" TEXT;
 
 -- Backfill: link each camping_option_registration to the user's existing
 -- non-cancelled registration (at most one per user in current data).
 UPDATE "camping_option_registrations"
-SET "registration_id" = (
+SET "registrationId" = (
   SELECT "id"
   FROM "registrations"
-  WHERE "registrations"."user_id" = "camping_option_registrations"."user_id"
+  WHERE "registrations"."userId" = "camping_option_registrations"."userId"
     AND "registrations"."status" != 'CANCELLED'
-  ORDER BY "registrations"."created_at" DESC
+  ORDER BY "registrations"."createdAt" DESC
   LIMIT 1
 );
 
 -- CreateIndex
-CREATE INDEX "camping_option_registrations_registration_id_idx" ON "camping_option_registrations"("registration_id");
+CREATE INDEX "camping_option_registrations_registrationId_idx" ON "camping_option_registrations"("registrationId");
 
 -- AddForeignKey
-ALTER TABLE "camping_option_registrations" ADD CONSTRAINT "camping_option_registrations_registration_id_fkey" FOREIGN KEY ("registration_id") REFERENCES "registrations"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "camping_option_registrations" ADD CONSTRAINT "camping_option_registrations_registrationId_fkey" FOREIGN KEY ("registrationId") REFERENCES "registrations"("id") ON DELETE SET NULL ON UPDATE CASCADE;
