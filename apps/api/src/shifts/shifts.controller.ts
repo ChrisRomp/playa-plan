@@ -7,6 +7,7 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from '@prisma/client';
 import { PrismaService } from '../common/prisma/prisma.service';
+import { CoreConfigService } from '../core-config/services/core-config.service';
 
 @ApiTags('shifts')
 @Controller('shifts')
@@ -16,6 +17,7 @@ export class ShiftsController {
   constructor(
     private readonly shiftsService: ShiftsService,
     private readonly prisma: PrismaService,
+    private readonly coreConfigService: CoreConfigService,
   ) {}
 
   @Post()
@@ -38,13 +40,22 @@ export class ShiftsController {
   @ApiOperation({ summary: 'Get all shifts with jobs and registrations' })
   @ApiOkResponse({ description: 'Returns all shifts with jobs and user registrations.' })
   async findAllWithJobsAndRegistrations() {
-    // Get all shifts with their associated jobs and job registrations
+    // Get the configured registration year
+    const config = await this.coreConfigService.findCurrent();
+    const registrationYear = config.registrationYear;
+
+    // Get all shifts with their associated jobs and job registrations for the current year
     const shifts = await this.prisma.shift.findMany({
       include: {
         jobs: {
           include: {
             category: true,
             registrations: {
+              where: {
+                registration: {
+                  year: registrationYear,
+                },
+              },
               include: {
                 registration: {
                   include: {
