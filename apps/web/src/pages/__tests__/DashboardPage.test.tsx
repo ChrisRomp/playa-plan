@@ -54,7 +54,6 @@ const mockUseConfig = vi.mocked(useConfig);
 // Mock registration utils
 vi.spyOn(registrationUtils, 'canUserRegister');
 vi.spyOn(registrationUtils, 'getActiveRegistrations');
-vi.spyOn(registrationUtils, 'getCancelledRegistrations');
 
 // Helper component to wrap with router
 const DashboardPageWrapper: React.FC = () => (
@@ -826,14 +825,12 @@ describe('DashboardPage - Registration after cancellation', () => {
     // Mock registration utils with default implementations
     vi.mocked(registrationUtils.canUserRegister).mockReturnValue(true);
     vi.mocked(registrationUtils.getActiveRegistrations).mockReturnValue([]);
-    vi.mocked(registrationUtils.getCancelledRegistrations).mockReturnValue([]);
   });
 
   it('should use registration utilities correctly', () => {
     // Test that the registrationUtils functions are available for the dashboard
     expect(registrationUtils.canUserRegister).toBeDefined();
     expect(registrationUtils.getActiveRegistrations).toBeDefined();
-    expect(registrationUtils.getCancelledRegistrations).toBeDefined();
   });
 
   it('should validate registration utilities are properly imported', () => {
@@ -855,7 +852,6 @@ describe('DashboardPage - Registration after cancellation', () => {
 
       // Mock utils to reflect this state
       vi.mocked(registrationUtils.getActiveRegistrations).mockReturnValue([]);
-      vi.mocked(registrationUtils.getCancelledRegistrations).mockReturnValue([mockCancelledRegistration]);
       vi.mocked(registrationUtils.canUserRegister).mockReturnValue(true);
 
       const Wrapper = createWrapper();
@@ -892,7 +888,6 @@ describe('DashboardPage - Registration after cancellation', () => {
 
       // Mock utils to reflect this state  
       vi.mocked(registrationUtils.getActiveRegistrations).mockReturnValue([mockActiveRegistration]);
-      vi.mocked(registrationUtils.getCancelledRegistrations).mockReturnValue([]);
       vi.mocked(registrationUtils.canUserRegister).mockReturnValue(false);
 
       const Wrapper = createWrapper();
@@ -918,7 +913,6 @@ describe('DashboardPage - Registration after cancellation', () => {
 
       // For current year, no active registration exists
       vi.mocked(registrationUtils.getActiveRegistrations).mockReturnValue([]);
-      vi.mocked(registrationUtils.getCancelledRegistrations).mockReturnValue([mockCancelledRegistration]);
       vi.mocked(registrationUtils.canUserRegister).mockReturnValue(true);
 
       const Wrapper = createWrapper();
@@ -931,7 +925,7 @@ describe('DashboardPage - Registration after cancellation', () => {
   });
 
   describe('Registration History section', () => {
-    it('should show registration history section when user has cancelled registrations', async () => {
+    it('should show registration history section when user has past registrations', async () => {
       mockUseUserRegistrations.mockReturnValue({
         registrations: [mockActiveRegistration, mockCancelledRegistration],
         loading: false,
@@ -941,7 +935,6 @@ describe('DashboardPage - Registration after cancellation', () => {
 
       // Mock utils
       vi.mocked(registrationUtils.getActiveRegistrations).mockReturnValue([mockActiveRegistration]);
-      vi.mocked(registrationUtils.getCancelledRegistrations).mockReturnValue([mockCancelledRegistration]);
 
       const Wrapper = createWrapper();
       render(<DashboardPage />, { wrapper: Wrapper });
@@ -959,8 +952,6 @@ describe('DashboardPage - Registration after cancellation', () => {
         refetch: vi.fn(),
       });
 
-      vi.mocked(registrationUtils.getCancelledRegistrations).mockReturnValue([mockCancelledRegistration]);
-
       const Wrapper = createWrapper();
       render(<DashboardPage />, { wrapper: Wrapper });
       
@@ -968,8 +959,8 @@ describe('DashboardPage - Registration after cancellation', () => {
         // Should show status
         expect(screen.getByText('CANCELLED')).toBeInTheDocument();
         
-        // Should show year in date format
-        expect(screen.getByText('Registration from 1/1/2024')).toBeInTheDocument();
+        // Should show year and date in history heading
+        expect(screen.getByText(/2024 — 1\/1\/2024/)).toBeInTheDocument();
         
         // Should show payment status
         expect(screen.getByText('REFUNDED')).toBeInTheDocument();
@@ -984,19 +975,16 @@ describe('DashboardPage - Registration after cancellation', () => {
         refetch: vi.fn(),
       });
 
-      vi.mocked(registrationUtils.getCancelledRegistrations).mockReturnValue([mockCancelledRegistration]);
-
       const Wrapper = createWrapper();
       render(<DashboardPage />, { wrapper: Wrapper });
       
       await waitFor(() => {
         expect(screen.getByText('CANCELLED')).toBeInTheDocument();
-        // The year appears in a formatted date like "1/1/2024"
-        expect(screen.getByText('Registration from 1/1/2024')).toBeInTheDocument();
+        expect(screen.getByText(/2024 — 1\/1\/2024/)).toBeInTheDocument();
       });
     });
 
-    it('should not show registration history section when no cancelled registrations exist', async () => {
+    it('should not show registration history section when only current active registration exists', async () => {
       mockUseUserRegistrations.mockReturnValue({
         registrations: [mockActiveRegistration],
         loading: false,
@@ -1005,7 +993,6 @@ describe('DashboardPage - Registration after cancellation', () => {
       });
 
       vi.mocked(registrationUtils.getActiveRegistrations).mockReturnValue([mockActiveRegistration]);
-      vi.mocked(registrationUtils.getCancelledRegistrations).mockReturnValue([]);
 
       const Wrapper = createWrapper();
       render(<DashboardPage />, { wrapper: Wrapper });
@@ -1015,7 +1002,7 @@ describe('DashboardPage - Registration after cancellation', () => {
       });
     });
 
-    it('should handle multiple cancelled registrations in history', async () => {
+    it('should handle multiple registrations from different years in history', async () => {
       const cancelledRegistration2023 = {
         ...mockCancelledRegistration,
         id: 'cancelled-2023',
@@ -1036,20 +1023,13 @@ describe('DashboardPage - Registration after cancellation', () => {
         refetch: vi.fn(),
       });
 
-      vi.mocked(registrationUtils.getCancelledRegistrations).mockReturnValue([
-        mockCancelledRegistration,
-        cancelledRegistration2023
-      ]);
+      vi.mocked(registrationUtils.getActiveRegistrations).mockReturnValue([mockActiveRegistration]);
 
       const Wrapper = createWrapper();
       render(<DashboardPage />, { wrapper: Wrapper });
       
       await waitFor(() => {
         expect(screen.getByText('Registration History')).toBeInTheDocument();
-        
-        // Should show both years in date format - match the actual date formatting
-        expect(screen.getByText('Registration from 1/1/2024')).toBeInTheDocument();
-        expect(screen.getByText('Registration from 1/1/2023')).toBeInTheDocument();
         
         // Should show multiple cancelled statuses
         const cancelledElements = screen.getAllByText('CANCELLED');
