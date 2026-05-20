@@ -13,6 +13,13 @@ vi.mock('../../lib/api', () => {
   };
 });
 
+// Mock the auth module
+vi.mock('../../store/authUtils', () => ({
+  useAuth: vi.fn(),
+}));
+
+import { useAuth } from '../../store/authUtils';
+
 describe('useCampRegistration', () => {
   const mockCampRegistration = {
     campingOptions: [
@@ -102,6 +109,9 @@ describe('useCampRegistration', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    
+    // Mock authenticated user by default
+    (useAuth as Mock).mockReturnValue({ isAuthenticated: true });
     
     // Mock successful API response by default
     (apiModule.registrations.getMyCampRegistration as Mock).mockResolvedValue(mockCampRegistration);
@@ -208,5 +218,17 @@ describe('useCampRegistration', () => {
     
     expect(result.current.error).toBe('Failed to fetch camp registration');
     expect(result.current.loading).toBe(false);
+  });
+
+  it('should not fetch when user is not authenticated', async () => {
+    (useAuth as Mock).mockReturnValue({ isAuthenticated: false });
+
+    const { result } = renderHook(() => useCampRegistration());
+
+    // Should not be loading and should not call the API
+    expect(result.current.loading).toBe(false);
+    expect(result.current.campRegistration).toBeNull();
+    expect(result.current.error).toBeNull();
+    expect(apiModule.registrations.getMyCampRegistration).not.toHaveBeenCalled();
   });
 }) 

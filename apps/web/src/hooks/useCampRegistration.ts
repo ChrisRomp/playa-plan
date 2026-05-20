@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { registrations, CampingOptionRegistration, CampingOptionField } from '../lib/api';
+import { useAuth } from '../store/authUtils';
 
 interface CampRegistrationData {
   campingOptions: CampingOptionRegistration[];
@@ -47,11 +48,15 @@ interface UseCampRegistrationResult {
  * @returns An object containing camp registration data, loading state, error state, and refetch function
  */
 export function useCampRegistration(): UseCampRegistrationResult {
+  const { isAuthenticated } = useAuth();
   const [campRegistration, setCampRegistration] = useState<CampRegistrationData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const fetchCampRegistration = useCallback(async () => {
+    if (!isAuthenticated) {
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
@@ -63,7 +68,7 @@ export function useCampRegistration(): UseCampRegistrationResult {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [isAuthenticated]);
 
   useEffect(() => {
     fetchCampRegistration();

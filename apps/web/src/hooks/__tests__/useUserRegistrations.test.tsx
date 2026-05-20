@@ -13,6 +13,13 @@ vi.mock('../../lib/api', () => {
   };
 });
 
+// Mock the auth module
+vi.mock('../../store/authUtils', () => ({
+  useAuth: vi.fn(),
+}));
+
+import { useAuth } from '../../store/authUtils';
+
 describe('useUserRegistrations', () => {
   const mockRegistrations = [
     {
@@ -69,6 +76,9 @@ describe('useUserRegistrations', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    
+    // Mock authenticated user by default
+    (useAuth as Mock).mockReturnValue({ isAuthenticated: true });
     
     // Mock successful API response by default
     (apiModule.registrations.getMyRegistrations as Mock).mockResolvedValue(mockRegistrations);
