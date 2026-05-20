@@ -10,7 +10,7 @@ import { CoreConfigService } from '../core-config/services/core-config.service';
 describe('ShiftsController', () => {
   let controller: ShiftsController;
   let service: ShiftsService;
-  let mockPrismaService: Record<string, any>;
+  let mockPrismaService: Record<string, Record<string, jest.Mock>>;
   let mockCoreConfigService: Record<string, jest.Mock>;
 
   const mockShift = {
