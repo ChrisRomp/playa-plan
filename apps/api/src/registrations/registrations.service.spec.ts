@@ -404,7 +404,7 @@ describe('RegistrationsService', () => {
 
       await expect(
         service.addJobToRegistration('registration-id', { jobId: 'job-id-1' })
-      ).rejects.toThrow('Cannot modify a cancelled registration');
+      ).rejects.toThrow(BadRequestException);
       expect(mockPrismaService.job.findUnique).not.toHaveBeenCalled();
       expect(mockPrismaService.registrationJob.create).not.toHaveBeenCalled();
     });
@@ -466,6 +466,21 @@ describe('RegistrationsService', () => {
 
       const result = await service.addJobToRegistration('registration-id', { jobId: 'job-id-1' });
       expect(result).toBeDefined();
+    });
+  });
+
+  describe('removeJobFromRegistration', () => {
+    it('should throw BadRequestException when removing job from cancelled registration', async () => {
+      mockPrismaService.registration.findUnique.mockResolvedValue({
+        id: 'registration-id',
+        status: RegistrationStatus.CANCELLED,
+      });
+
+      await expect(
+        service.removeJobFromRegistration('registration-id', 'job-id-1')
+      ).rejects.toThrow(BadRequestException);
+      expect(mockPrismaService.registrationJob.findFirst).not.toHaveBeenCalled();
+      expect(mockPrismaService.registrationJob.delete).not.toHaveBeenCalled();
     });
   });
 
