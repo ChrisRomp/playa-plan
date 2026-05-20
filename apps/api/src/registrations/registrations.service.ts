@@ -171,6 +171,10 @@ export class RegistrationsService {
       throw new NotFoundException(`Registration with ID ${registrationId} not found`);
     }
 
+    if (registration.status === RegistrationStatus.CANCELLED) {
+      throw new BadRequestException('Cannot modify a cancelled registration');
+    }
+
     // Check if job exists
     const job = await this.prisma.job.findUnique({
       where: { id: addJobDto.jobId },

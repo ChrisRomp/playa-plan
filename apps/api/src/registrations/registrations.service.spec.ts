@@ -4,7 +4,7 @@ import { PrismaService } from '../common/prisma/prisma.service';
 import { NotificationsService } from '../notifications/services/notifications.service';
 import { RegistrationPolicyService } from './services/registration-policy.service';
 import { CoreConfigService } from '../core-config/services/core-config.service';
-import { NotFoundException, ConflictException, ForbiddenException } from '@nestjs/common';
+import { NotFoundException, ConflictException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { RegistrationStatus, UserRole } from '@prisma/client';
 import { CreateRegistrationDto } from './dto';
 
@@ -395,6 +395,19 @@ describe('RegistrationsService', () => {
       maxRegistrations: 10,
       registrations: [],
     };
+
+    it('should throw BadRequestException when adding job to cancelled registration', async () => {
+      mockPrismaService.registration.findUnique.mockResolvedValue({
+        ...mockRegistrationWithJobs,
+        status: RegistrationStatus.CANCELLED,
+      });
+
+      await expect(
+        service.addJobToRegistration('registration-id', { jobId: 'job-id-1' })
+      ).rejects.toThrow(BadRequestException);
+      expect(mockPrismaService.job.findUnique).not.toHaveBeenCalled();
+      expect(mockPrismaService.registrationJob.create).not.toHaveBeenCalled();
+    });
 
     it('should throw ForbiddenException when adding staffOnly job for participant', async () => {
       const staffOnlyJob = {
