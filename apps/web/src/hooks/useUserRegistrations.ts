@@ -37,8 +37,13 @@ export function useUserRegistrations(): UseUserRegistrationsResult {
   }, [isAuthenticated]);
 
   useEffect(() => {
+    if (!isAuthenticated) {
+      setUserRegistrations([]);
+      setError(null);
+      return;
+    }
     fetchRegistrations();
-  }, [fetchRegistrations]);
+  }, [isAuthenticated, fetchRegistrations]);
 
   return {
     registrations: userRegistrations,

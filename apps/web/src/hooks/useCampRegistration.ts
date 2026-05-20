@@ -71,8 +71,13 @@ export function useCampRegistration(): UseCampRegistrationResult {
   }, [isAuthenticated]);
 
   useEffect(() => {
+    if (!isAuthenticated) {
+      setCampRegistration(null);
+      setError(null);
+      return;
+    }
     fetchCampRegistration();
-  }, [fetchCampRegistration]);
+  }, [isAuthenticated, fetchCampRegistration]);
 
   return {
     campRegistration,

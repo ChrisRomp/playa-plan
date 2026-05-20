@@ -50,7 +50,6 @@ export class RegistrationCleanupService {
                 job: true,
               },
             },
-            user: true,
             campingOptionRegistrations: {
               include: {
                 campingOption: true,

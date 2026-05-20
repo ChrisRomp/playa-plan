@@ -143,6 +143,18 @@ describe('useUserRegistrations', () => {
     expect(result.current.error).toBeNull();
   });
 
+  it('should not fetch when user is not authenticated', async () => {
+    (useAuth as Mock).mockReturnValue({ isAuthenticated: false });
+
+    const { result } = renderHook(() => useUserRegistrations());
+
+    // Should not be loading and should not call the API
+    expect(result.current.loading).toBe(false);
+    expect(result.current.registrations).toEqual([]);
+    expect(result.current.error).toBeNull();
+    expect(apiModule.registrations.getMyRegistrations).not.toHaveBeenCalled();
+  });
+
   it('should update loading state correctly during refetch', async () => {
     const { result } = renderHook(() => useUserRegistrations());
     
