@@ -3,12 +3,14 @@ import { RegistrationsService } from './registrations.service';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { NotificationsService } from '../notifications/services/notifications.service';
 import { RegistrationPolicyService } from './services/registration-policy.service';
+import { CoreConfigService } from '../core-config/services/core-config.service';
 import { NotFoundException, ConflictException, ForbiddenException } from '@nestjs/common';
 import { RegistrationStatus, UserRole } from '@prisma/client';
 import { CreateRegistrationDto } from './dto';
 
 describe('RegistrationsService', () => {
   let service: RegistrationsService;
+  let mockCoreConfigService: { findCurrent: jest.Mock };
   // PrismaService is mocked and not directly used in tests
 
   type MockPrismaService = {
@@ -93,6 +95,15 @@ describe('RegistrationsService', () => {
         {
           provide: RegistrationPolicyService,
           useValue: mockPolicyService,
+        },
+        {
+          provide: CoreConfigService,
+          useFactory: () => {
+            mockCoreConfigService = {
+              findCurrent: jest.fn().mockResolvedValue({ registrationYear: new Date().getFullYear() }),
+            };
+            return mockCoreConfigService;
+          },
         },
       ],
     }).compile();
@@ -848,6 +859,85 @@ describe('RegistrationsService', () => {
       await expect(call).rejects.toThrow(
         'Registration is not available for your account. Please contact an administrator.',
       );
+    });
+  });
+
+  describe('getMyCampRegistration', () => {
+    const userId = 'user-123';
+
+    beforeEach(() => {
+      mockPrismaService.user.findUnique.mockResolvedValue({ id: userId });
+    });
+
+    it('should return only current-year camping option registrations', async () => {
+      mockCoreConfigService.findCurrent.mockResolvedValue({ registrationYear: 2026 });
+      mockPrismaService.campingOptionRegistration.findMany.mockResolvedValue([
+        { id: 'cor-1', campingOption: { fields: [] }, fieldValues: [] },
+      ]);
+      mockPrismaService.registration.findMany.mockResolvedValue([]);
+
+      const result = await service.getMyCampRegistration(userId);
+
+      expect(mockPrismaService.campingOptionRegistration.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { userId, registration: { year: 2026 } },
+        })
+      );
+      expect(result.campingOptions).toHaveLength(1);
+    });
+
+    it('should return hasRegistration false when user only has prior-year registrations', async () => {
+      mockCoreConfigService.findCurrent.mockResolvedValue({ registrationYear: 2026 });
+      // No camping options for current year
+      mockPrismaService.campingOptionRegistration.findMany.mockResolvedValue([]);
+      // No registrations for current year
+      mockPrismaService.registration.findMany.mockResolvedValue([]);
+
+      const result = await service.getMyCampRegistration(userId);
+
+      expect(result.hasRegistration).toBe(false);
+    });
+
+    it('should return hasRegistration true when user has current-year camping options', async () => {
+      mockCoreConfigService.findCurrent.mockResolvedValue({ registrationYear: 2026 });
+      mockPrismaService.campingOptionRegistration.findMany.mockResolvedValue([
+        { id: 'cor-1', campingOption: { fields: [] }, fieldValues: [] },
+      ]);
+      mockPrismaService.registration.findMany.mockResolvedValue([]);
+
+      const result = await service.getMyCampRegistration(userId);
+
+      expect(result.hasRegistration).toBe(true);
+    });
+
+    it('should return hasRegistration true when user has active current-year registration', async () => {
+      mockCoreConfigService.findCurrent.mockResolvedValue({ registrationYear: 2026 });
+      mockPrismaService.campingOptionRegistration.findMany.mockResolvedValue([]);
+      mockPrismaService.registration.findMany.mockResolvedValue([
+        { id: 'reg-1', status: RegistrationStatus.CONFIRMED, jobs: [], payments: [] },
+      ]);
+
+      const result = await service.getMyCampRegistration(userId);
+
+      expect(result.hasRegistration).toBe(true);
+    });
+
+    it('should return hasRegistration false when only current-year registration is cancelled', async () => {
+      mockCoreConfigService.findCurrent.mockResolvedValue({ registrationYear: 2026 });
+      mockPrismaService.campingOptionRegistration.findMany.mockResolvedValue([]);
+      mockPrismaService.registration.findMany.mockResolvedValue([
+        { id: 'reg-1', status: RegistrationStatus.CANCELLED, jobs: [], payments: [] },
+      ]);
+
+      const result = await service.getMyCampRegistration(userId);
+
+      expect(result.hasRegistration).toBe(false);
+    });
+
+    it('should throw NotFoundException if user does not exist', async () => {
+      mockPrismaService.user.findUnique.mockResolvedValue(null);
+
+      await expect(service.getMyCampRegistration('nonexistent')).rejects.toThrow(NotFoundException);
     });
   });
 });

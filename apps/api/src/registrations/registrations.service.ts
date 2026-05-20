@@ -5,6 +5,7 @@ import { CreateRegistrationDto, AddJobToRegistrationDto, CreateCampRegistrationD
 import { Registration, RegistrationStatus, UserRole } from '@prisma/client';
 import { DayOfWeek } from '../common/enums/day-of-week.enum';
 import { RegistrationPolicyService } from './services/registration-policy.service';
+import { CoreConfigService } from '../core-config/services/core-config.service';
 
 interface JobRegistrationWithJobs extends Registration {
   jobs?: Array<{
@@ -32,6 +33,7 @@ export class RegistrationsService {
     private readonly prisma: PrismaService,
     private readonly notificationsService: NotificationsService,
     private readonly policyService: RegistrationPolicyService,
+    private readonly coreConfigService: CoreConfigService,
   ) {}
 
   /**
@@ -576,7 +578,8 @@ export class RegistrationsService {
     // Pre-flight: active-registration conflict and camping-option existence
     // checks. These are expected 4xx rejections and stay outside the
     // broad try/catch that emits the registration-error email.
-    const currentYear = new Date().getFullYear();
+    const config = await this.coreConfigService.findCurrent();
+    const currentYear = config.registrationYear;
     const existingActiveRegistration = await this.prisma.registration.findFirst({
       where: {
         userId,
@@ -588,7 +591,7 @@ export class RegistrationsService {
       throw new ConflictException(`User already has an active registration for ${currentYear}`);
     }
 
-    const campingOptionIds = createCampRegistrationDto.campingOptions ?? [];
+    const campingOptionIds = [...new Set(createCampRegistrationDto.campingOptions ?? [])];
     // Validate every camping option up front: must exist and the user must
     // not already be registered for it. This catches a stale option id or
     // a duplicate signup before any writes happen, avoiding the
@@ -608,7 +611,7 @@ export class RegistrationsService {
       }
       const existingCampingRegistration =
         await this.prisma.campingOptionRegistration.findFirst({
-          where: { userId, campingOptionId },
+          where: { userId, campingOptionId, registration: { year: currentYear } },
         });
       if (existingCampingRegistration) {
         throw new ConflictException(
@@ -752,7 +755,7 @@ export class RegistrationsService {
           for (const opt of validatedCampingOptions) {
             const campingRegistration =
               await tx.campingOptionRegistration.create({
-                data: { userId, campingOptionId: opt.campingOptionId },
+                data: { userId, campingOptionId: opt.campingOptionId, registrationId: jobRegistration.id },
                 include: { campingOption: { include: { fields: true } } },
               });
 
@@ -995,9 +998,9 @@ export class RegistrationsService {
     }
   ): Promise<void> {
     try {
-      // Get camping option registrations for this user
+      // Get camping option registrations for this registration
       const campingOptionRegistrations = await this.prisma.campingOptionRegistration.findMany({
-        where: { userId: registration.userId },
+        where: { userId: registration.userId, registrationId: registration.id },
         include: {
           campingOption: {
             include: { fields: true },
@@ -1084,7 +1087,7 @@ export class RegistrationsService {
   /**
    * Get user's camp registration
    * @param userId - The ID of the user
-   * @returns The user's camping option registrations and custom field values
+   * @returns The user's camping option registrations and custom field values for the current year
    */
   async getMyCampRegistration(userId: string) {
     // Check if user exists
@@ -1096,9 +1099,16 @@ export class RegistrationsService {
       throw new NotFoundException(`User with ID ${userId} not found`);
     }
 
-    // Get camping option registrations for the user
+    // Get current registration year from config
+    const config = await this.coreConfigService.findCurrent();
+    const currentYear = config.registrationYear;
+
+    // Get camping option registrations for the user, scoped to the current year
     const campingOptionRegistrations = await this.prisma.campingOptionRegistration.findMany({
-      where: { userId },
+      where: {
+        userId,
+        registration: { year: currentYear },
+      },
       include: {
         campingOption: {
           include: {
@@ -1113,9 +1123,9 @@ export class RegistrationsService {
       },
     });
 
-    // Get user's job registrations (all years)
+    // Get user's registrations for the current year
     const jobRegistrations = await this.prisma.registration.findMany({
-      where: { userId },
+      where: { userId, year: currentYear },
       include: {
         jobs: {
           include: {
@@ -1142,7 +1152,7 @@ export class RegistrationsService {
       }))
     );
 
-    // Check if user has any active registrations (non-cancelled)
+    // Check if user has any active registrations for the current year
     const activeJobRegistrations = jobRegistrations.filter(
       reg => reg.status !== RegistrationStatus.CANCELLED
     );

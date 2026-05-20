@@ -159,14 +159,14 @@ export class RegistrationAdminService {
     // If camping options are requested, fetch them separately and merge
     let registrationsWithCampingOptions = registrations;
     if (query.includeCampingOptions) {
-      // Get unique user IDs from registrations
-      const userIds = [...new Set(registrations.map(r => r.userId))];
+      // Get registration IDs to scope camping option lookups
+      const registrationIds = registrations.map(r => r.id);
       
-      if (userIds.length > 0) {
-        // Fetch camping option registrations for these users
+      if (registrationIds.length > 0) {
+        // Fetch camping option registrations linked to these registrations
         const campingOptionRegistrations = await this.prisma.campingOptionRegistration.findMany({
           where: {
-            userId: { in: userIds },
+            registrationId: { in: registrationIds },
             campingOption: {
               enabled: true, // Only include active camping options
             },
@@ -196,19 +196,22 @@ export class RegistrationAdminService {
           },
         });
 
-        // Group camping options by user ID for efficient lookup
-        const campingOptionsByUserId = campingOptionRegistrations.reduce((acc, cor) => {
-          if (!acc[cor.userId]) {
-            acc[cor.userId] = [];
+        // Group camping options by registration ID for efficient lookup
+        const campingOptionsByRegistrationId = campingOptionRegistrations.reduce((acc, cor) => {
+          const regId = cor.registrationId;
+          if (regId) {
+            if (!acc[regId]) {
+              acc[regId] = [];
+            }
+            acc[regId].push(cor);
           }
-          acc[cor.userId].push(cor);
           return acc;
         }, {} as Record<string, typeof campingOptionRegistrations>);
 
         // Add camping options to registrations
         registrationsWithCampingOptions = registrations.map(registration => ({
           ...registration,
-          campingOptions: campingOptionsByUserId[registration.userId] || [],
+          campingOptions: campingOptionsByRegistrationId[registration.id] || [],
         }));
       }
     }
@@ -348,9 +351,9 @@ export class RegistrationAdminService {
 
         // Handle camping option changes
         if (editData.campingOptionIds) {
-          // Get current camping options for this user
+          // Get current camping options linked to this registration
           const currentCampingOptions = await prisma.campingOptionRegistration.findMany({
-            where: { userId: currentRegistration.userId },
+            where: { userId: currentRegistration.userId, registrationId: currentRegistration.id },
             include: { campingOption: true },
           });
 
@@ -368,6 +371,7 @@ export class RegistrationAdminService {
               adminUserId,
               `Camping options modified: ${editData.notes || 'No notes provided'}`,
               transactionId,
+              currentRegistration.id,
             );
           }
 
@@ -376,19 +380,23 @@ export class RegistrationAdminService {
             id => !currentCampingOptionIds.includes(id)
           );
           for (const campingOptionId of campingOptionsToAdd) {
-            // Validate camping option exists and has capacity
+            // Validate camping option exists and has capacity (year-scoped)
             const campingOption = await prisma.campingOption.findUnique({
               where: { id: campingOptionId },
-              include: {
-                registrations: true,
-              },
             });
 
             if (!campingOption) {
               throw new BadRequestException(`Camping option ${campingOptionId} not found`);
             }
 
-            if (campingOption.registrations.length >= campingOption.maxSignups) {
+            const yearScopedCount = await prisma.campingOptionRegistration.count({
+              where: {
+                campingOptionId,
+                registration: { year: currentRegistration.year },
+              },
+            });
+
+            if (yearScopedCount >= campingOption.maxSignups) {
               throw new ConflictException(`Camping option ${campingOption.name} is at capacity`);
             }
 
@@ -397,6 +405,7 @@ export class RegistrationAdminService {
               data: {
                 userId: currentRegistration.userId,
                 campingOptionId,
+                registrationId: currentRegistration.id,
               },
             });
 
@@ -468,9 +477,9 @@ export class RegistrationAdminService {
           });
 
           if (adminUser) {
-            // Get camping options for the user
+            // Get camping options for this registration
             const campingOptions = await this.prisma.campingOptionRegistration.findMany({
-              where: { userId: result.user.id },
+              where: { userId: result.user.id, registrationId: result.id },
               include: { campingOption: true },
             });
 
@@ -801,9 +810,9 @@ export class RegistrationAdminService {
       throw new NotFoundException(`Registration ${registrationId} not found`);
     }
 
-    // Get user's camping option registrations
+    // Get user's camping option registrations for this registration
     const campingOptionRegistrations = await this.prisma.campingOptionRegistration.findMany({
-      where: { userId: registration.userId },
+      where: { userId: registration.userId, registrationId },
       include: {
         campingOption: {
           select: {
@@ -864,15 +873,10 @@ export class RegistrationAdminService {
         };
       }
 
-      // For year filtering, we need to join through user registrations
-      // Since camping option registrations don't have a year field directly
+      // Filter by year via the direct registration FK
       if (filters?.year) {
-        where.user = {
-          registrations: {
-            some: {
-              year: filters.year,
-            },
-          },
+        where.registration = {
+          year: filters.year,
         };
       }
 

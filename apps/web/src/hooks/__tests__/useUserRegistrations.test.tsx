@@ -13,6 +13,13 @@ vi.mock('../../lib/api', () => {
   };
 });
 
+// Mock the auth module
+vi.mock('../../store/authUtils', () => ({
+  useAuth: vi.fn(),
+}));
+
+import { useAuth } from '../../store/authUtils';
+
 describe('useUserRegistrations', () => {
   const mockRegistrations = [
     {
@@ -69,6 +76,9 @@ describe('useUserRegistrations', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    
+    // Mock authenticated user by default
+    (useAuth as Mock).mockReturnValue({ isAuthenticated: true });
     
     // Mock successful API response by default
     (apiModule.registrations.getMyRegistrations as Mock).mockResolvedValue(mockRegistrations);
@@ -131,6 +141,18 @@ describe('useUserRegistrations', () => {
     expect(apiModule.registrations.getMyRegistrations).toHaveBeenCalled();
     expect(result.current.registrations).toHaveLength(1);
     expect(result.current.error).toBeNull();
+  });
+
+  it('should not fetch when user is not authenticated', async () => {
+    (useAuth as Mock).mockReturnValue({ isAuthenticated: false });
+
+    const { result } = renderHook(() => useUserRegistrations());
+
+    // Should not be loading and should not call the API
+    expect(result.current.loading).toBe(false);
+    expect(result.current.registrations).toEqual([]);
+    expect(result.current.error).toBeNull();
+    expect(apiModule.registrations.getMyRegistrations).not.toHaveBeenCalled();
   });
 
   it('should update loading state correctly during refetch', async () => {

@@ -18,6 +18,7 @@ import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { CampingOptionsService } from '../services/camping-options.service';
 import { CampingOptionFieldsService } from '../services/camping-option-fields.service';
+import { CoreConfigService } from '../../core-config/services/core-config.service';
 import { 
   CreateCampingOptionDto, 
   UpdateCampingOptionDto,
@@ -39,7 +40,8 @@ import { UserRole } from '@prisma/client';
 export class CampingOptionsController {
   constructor(
     private readonly campingOptionsService: CampingOptionsService,
-    private readonly campingOptionFieldsService: CampingOptionFieldsService
+    private readonly campingOptionFieldsService: CampingOptionFieldsService,
+    private readonly coreConfigService: CoreConfigService,
   ) {}
 
   /**
@@ -87,11 +89,17 @@ export class CampingOptionsController {
     const campingOptions = await this.campingOptionsService.findAll(
       includeDisabled === true || includeDisabled === 'true'
     );
+
+    const config = await this.coreConfigService.findCurrent();
+    const currentYear = config.registrationYear;
+
+    const optionIds = campingOptions.map(o => o.id);
+    const counts = await this.campingOptionsService.getRegistrationCountBatch(optionIds, currentYear);
     
     const responseDtos: CampingOptionResponseDto[] = [];
     
     for (const option of campingOptions) {
-      const registrationCount = await this.campingOptionsService.getRegistrationCount(option.id);
+      const registrationCount = counts.get(option.id) ?? 0;
       const responseDto = new CampingOptionResponseDto();
       
       Object.assign(responseDto, option);
@@ -121,7 +129,8 @@ export class CampingOptionsController {
   async findOne(@Param('id') id: string): Promise<CampingOptionResponseDto> {
     try {
       const campingOption = await this.campingOptionsService.findOne(id);
-      const registrationCount = await this.campingOptionsService.getRegistrationCount(id);
+      const config = await this.coreConfigService.findCurrent();
+      const registrationCount = await this.campingOptionsService.getRegistrationCount(id, config.registrationYear);
       const responseDto = new CampingOptionResponseDto();
       
       Object.assign(responseDto, campingOption);
@@ -160,7 +169,8 @@ export class CampingOptionsController {
     @Body() updateCampingOptionDto: UpdateCampingOptionDto
   ): Promise<CampingOptionResponseDto> {
     const campingOption = await this.campingOptionsService.update(id, updateCampingOptionDto);
-    const registrationCount = await this.campingOptionsService.getRegistrationCount(id);
+    const config = await this.coreConfigService.findCurrent();
+    const registrationCount = await this.campingOptionsService.getRegistrationCount(id, config.registrationYear);
     const responseDto = new CampingOptionResponseDto();
     
     Object.assign(responseDto, campingOption);

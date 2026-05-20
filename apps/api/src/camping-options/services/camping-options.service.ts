@@ -149,14 +149,49 @@ export class CampingOptionsService {
   /**
    * Get the current registration count for a camping option
    * @param id - The ID of the camping option
+   * @param year - Optional year to scope the count to (via registration relation)
    * @returns The number of registrations
    */
-  async getRegistrationCount(id: string): Promise<number> {
-    const count = await this.prisma.campingOptionRegistration.count({
-      where: { campingOptionId: id },
-    });
+  async getRegistrationCount(id: string, year?: number): Promise<number> {
+    const where: Prisma.CampingOptionRegistrationWhereInput = { campingOptionId: id };
+    if (year !== undefined) {
+      where.registration = { year };
+    }
+
+    const count = await this.prisma.campingOptionRegistration.count({ where });
 
     return count;
+  }
+
+  /**
+   * Get registration counts for multiple camping options in a single query
+   * @param ids - The IDs of the camping options
+   * @param year - Optional year to scope counts to (via registration relation)
+   * @returns Map of camping option ID to registration count
+   */
+  async getRegistrationCountBatch(ids: string[], year?: number): Promise<Map<string, number>> {
+    if (ids.length === 0) {
+      return new Map();
+    }
+
+    const where: Prisma.CampingOptionRegistrationWhereInput = {
+      campingOptionId: { in: ids },
+    };
+    if (year !== undefined) {
+      where.registration = { year };
+    }
+
+    const grouped = await this.prisma.campingOptionRegistration.groupBy({
+      by: ['campingOptionId'],
+      where,
+      _count: { campingOptionId: true },
+    });
+
+    const result = new Map<string, number>();
+    for (const row of grouped) {
+      result.set(row.campingOptionId, row._count.campingOptionId);
+    }
+    return result;
   }
 
   /**
