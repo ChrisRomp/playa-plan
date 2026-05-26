@@ -1,6 +1,6 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Query, Request } from '@nestjs/common';
 import { RegistrationsService } from './registrations.service';
-import { CreateRegistrationDto, AddJobToRegistrationDto, CreateCampRegistrationDto, UpdateRegistrationDto } from './dto';
+import { CreateRegistrationDto, AddJobToRegistrationDto, CreateCampRegistrationDto, SubmitApplicationDto, UpdateRegistrationDto } from './dto';
 import { ApiBearerAuth, ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiQuery, ApiTags, ApiParam } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -123,6 +123,16 @@ export class RegistrationsController {
     @Request() req: AuthRequest
   ) {
     return this.registrationsService.createCampRegistration(req.user.id, createCampRegistrationDto);
+  }
+
+  @Post('apply')
+  @ApiOperation({ summary: 'Submit a registration application (when approval mode is enabled)' })
+  @ApiCreatedResponse({ description: 'The application has been submitted successfully.' })
+  async submitApplication(
+    @Body() submitApplicationDto: SubmitApplicationDto,
+    @Request() req: AuthRequest
+  ) {
+    return this.registrationsService.submitApplication(req.user.id, submitApplicationDto);
   }
 
   @Get('camp/me')

@@ -1,8 +1,19 @@
 import { BadRequestException, ForbiddenException, HttpException, Injectable, NotFoundException, ConflictException, Logger } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { NotificationsService } from '../notifications/services/notifications.service';
-import { CreateRegistrationDto, AddJobToRegistrationDto, CreateCampRegistrationDto, UpdateRegistrationDto } from './dto';
-import { Registration, RegistrationStatus, UserRole } from '@prisma/client';
+import {
+  CreateRegistrationDto,
+  AddJobToRegistrationDto,
+  CreateCampRegistrationDto,
+  SubmitApplicationDto,
+  UpdateRegistrationDto,
+} from './dto';
+import {
+  NotificationType,
+  Registration,
+  RegistrationStatus,
+  UserRole,
+} from '@prisma/client';
 import { DayOfWeek } from '../common/enums/day-of-week.enum';
 import { RegistrationPolicyService } from './services/registration-policy.service';
 import { CoreConfigService } from '../core-config/services/core-config.service';
@@ -542,6 +553,246 @@ export class RegistrationsService {
   }
 
   /**
+   * Submit an application when approval mode is enabled.
+   *
+   * Captures camping options and custom fields only. Jobs, terms acceptance,
+   * and payment are deferred until after approval.
+   */
+  async submitApplication(
+    userId: string,
+    submitApplicationDto: SubmitApplicationDto,
+  ): Promise<{
+    registration: Registration;
+    campingOptionRegistrations: Array<{
+      id: string;
+      userId: string;
+      campingOptionId: string;
+      createdAt: Date;
+      updatedAt: Date;
+      campingOption: {
+        id: string;
+        name: string;
+        description: string | null;
+        enabled: boolean;
+        workShiftsRequired: number;
+        participantDues: number;
+        staffDues: number;
+        maxSignups: number;
+        createdAt: Date;
+        updatedAt: Date;
+        fields: Array<{
+          id: string;
+          displayName: string;
+          description: string | null;
+          dataType: string;
+          required: boolean;
+          maxLength: number | null;
+          minValue: number | null;
+          maxValue: number | null;
+          createdAt: Date;
+          updatedAt: Date;
+          campingOptionId: string;
+        }>;
+      };
+    }>;
+    message: string;
+  }> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+    if (!user) {
+      throw new NotFoundException(`User with ID ${userId} not found`);
+    }
+
+    const config = await this.coreConfigService.findCurrent();
+    if (!config.applicationApprovalRequired) {
+      throw new BadRequestException('Application mode is not enabled');
+    }
+
+    await this.policyService.assertCanSubmitApplication(user);
+
+    const existingActiveRegistration = await this.prisma.registration.findFirst({
+      where: {
+        userId,
+        year: config.registrationYear,
+        status: { notIn: [RegistrationStatus.CANCELLED] },
+      },
+    });
+    if (existingActiveRegistration) {
+      throw new ConflictException(
+        `User already has an active registration for ${config.registrationYear}`,
+      );
+    }
+
+    const isAutoApproved = this.policyService.shouldAutoApprove(user);
+
+    const campingOptionIds = submitApplicationDto.campingOptions ?? [];
+    const uniqueCampingOptionIds = [...new Set(campingOptionIds)];
+    if (uniqueCampingOptionIds.length !== campingOptionIds.length) {
+      throw new BadRequestException('Duplicate camping options are not allowed');
+    }
+
+    const validatedCampingOptions: Array<{
+      campingOptionId: string;
+      fields: Array<{ id: string }>;
+      name: string;
+    }> = [];
+    for (const campingOptionId of uniqueCampingOptionIds) {
+      const campingOption = await this.prisma.campingOption.findUnique({
+        where: { id: campingOptionId },
+        include: { fields: true },
+      });
+      if (!campingOption) {
+        throw new NotFoundException(`Camping option with ID ${campingOptionId} not found`);
+      }
+
+      const existingCampingRegistration =
+        await this.prisma.campingOptionRegistration.findFirst({
+          where: {
+            userId,
+            campingOptionId,
+            registration: { year: config.registrationYear },
+          },
+        });
+      if (existingCampingRegistration) {
+        throw new ConflictException(
+          `User already registered for camping option: ${campingOption.name}`,
+        );
+      }
+
+      validatedCampingOptions.push({
+        campingOptionId,
+        fields: campingOption.fields,
+        name: campingOption.name,
+      });
+    }
+
+    const status = isAutoApproved
+      ? RegistrationStatus.APPLICATION_APPROVED
+      : RegistrationStatus.APPLICATION_SUBMITTED;
+
+    const { registration, campingOptionRegistrations } =
+      await this.prisma.$transaction(async (tx) => {
+        const registration = await tx.registration.create({
+          data: {
+            status,
+            paymentDeferred: false,
+            year: config.registrationYear,
+            user: { connect: { id: userId } },
+          },
+          include: {
+            user: true,
+            jobs: {
+              include: {
+                job: {
+                  include: {
+                    category: true,
+                    shift: true,
+                  },
+                },
+              },
+            },
+            payments: true,
+          },
+        });
+
+        const created: Array<{
+          id: string;
+          userId: string;
+          campingOptionId: string;
+          createdAt: Date;
+          updatedAt: Date;
+          campingOption: {
+            id: string;
+            name: string;
+            description: string | null;
+            enabled: boolean;
+            workShiftsRequired: number;
+            participantDues: number;
+            staffDues: number;
+            maxSignups: number;
+            createdAt: Date;
+            updatedAt: Date;
+            fields: Array<{
+              id: string;
+              displayName: string;
+              description: string | null;
+              dataType: string;
+              required: boolean;
+              maxLength: number | null;
+              minValue: number | null;
+              maxValue: number | null;
+              createdAt: Date;
+              updatedAt: Date;
+              campingOptionId: string;
+            }>;
+          };
+        }> = [];
+
+        for (const campingOption of validatedCampingOptions) {
+          const campingOptionRegistration =
+            await tx.campingOptionRegistration.create({
+              data: {
+                userId,
+                campingOptionId: campingOption.campingOptionId,
+                registrationId: registration.id,
+              },
+              include: { campingOption: { include: { fields: true } } },
+            });
+
+          if (submitApplicationDto.customFields && campingOption.fields.length > 0) {
+            for (const field of campingOption.fields) {
+              const fieldValue = submitApplicationDto.customFields[field.id];
+              if (fieldValue !== undefined) {
+                await tx.campingOptionFieldValue.create({
+                  data: {
+                    fieldId: field.id,
+                    registrationId: campingOptionRegistration.id,
+                    value: String(fieldValue),
+                  },
+                });
+              }
+            }
+          }
+
+          created.push(campingOptionRegistration);
+        }
+
+        return { registration, campingOptionRegistrations: created };
+      });
+
+    const notificationType = isAutoApproved
+      ? NotificationType.APPLICATION_APPROVED
+      : NotificationType.APPLICATION_RECEIVED;
+    this.sendApplicationNotification(
+      {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        playaName: user.playaName,
+      },
+      notificationType,
+      registration.id,
+      config.registrationYear,
+      campingOptionRegistrations,
+    ).catch((emailError: unknown) => {
+      const message = emailError instanceof Error ? emailError.message : String(emailError);
+      this.logger.warn(
+        `Failed to send ${notificationType} notification email to ${user.email}: ${message}`,
+      );
+    });
+
+    return {
+      registration,
+      campingOptionRegistrations,
+      message: isAutoApproved
+        ? 'Application approved automatically. Please complete your registration.'
+        : 'Application submitted successfully',
+    };
+  }
+
+  /**
    * Create a comprehensive camp registration
    *
    * Runs the participant-side policy gates (`RegistrationPolicyService`)
@@ -866,6 +1117,53 @@ export class RegistrationsService {
       // Re-throw the original error
       throw error;
     }
+  }
+
+  private async sendApplicationNotification(
+    user: {
+      id: string;
+      email: string;
+      firstName?: string | null;
+      lastName?: string | null;
+      playaName?: string | null;
+    },
+    notificationType: NotificationType,
+    registrationId: string,
+    year: number,
+    campingOptionRegistrations: Array<{
+      campingOption: {
+        name: string;
+      };
+    }>,
+  ): Promise<void> {
+    const userName = user.firstName && user.lastName
+      ? `${user.firstName} ${user.lastName}`
+      : undefined;
+    const wasSent = await this.notificationsService.sendNotification(
+      user.email,
+      notificationType,
+      {
+        userId: user.id,
+        name: userName,
+        playaName: user.playaName || undefined,
+        registrationId,
+        applicationDetails: {
+          year,
+          campingOptions: campingOptionRegistrations.map((registration) => ({
+            name: registration.campingOption.name,
+          })),
+        },
+      },
+    );
+
+    if (!wasSent) {
+      this.logger.warn(
+        `Application notification ${notificationType} was not sent to ${user.email}`,
+      );
+      return;
+    }
+
+    this.logger.log(`Application notification ${notificationType} sent to ${user.email}`);
   }
 
   /**

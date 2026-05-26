@@ -5,8 +5,8 @@ import { NotificationsService } from '../notifications/services/notifications.se
 import { RegistrationPolicyService } from './services/registration-policy.service';
 import { CoreConfigService } from '../core-config/services/core-config.service';
 import { NotFoundException, ConflictException, ForbiddenException, BadRequestException } from '@nestjs/common';
-import { RegistrationStatus, UserRole } from '@prisma/client';
-import { CreateRegistrationDto } from './dto';
+import { NotificationType, RegistrationStatus, UserRole } from '@prisma/client';
+import { CreateRegistrationDto, SubmitApplicationDto } from './dto';
 
 describe('RegistrationsService', () => {
   let service: RegistrationsService;
@@ -75,6 +75,14 @@ describe('RegistrationsService', () => {
     // wiring per-test stubs. Tests of createCampRegistration explicitly
     // set this mock to reject when they want to assert policy failures.
     assertCanCreateCampRegistration: jest.fn().mockResolvedValue(undefined),
+    assertCanSubmitApplication: jest.fn().mockResolvedValue(undefined),
+    shouldAutoApprove: jest.fn().mockReturnValue(false),
+  };
+
+  const mockNotificationsService = {
+    sendNotification: jest.fn().mockResolvedValue(true),
+    sendRegistrationConfirmationEmail: jest.fn().mockResolvedValue(true),
+    sendRegistrationErrorEmail: jest.fn().mockResolvedValue(true),
   };
 
   beforeEach(async () => {
@@ -87,10 +95,7 @@ describe('RegistrationsService', () => {
         },
         {
           provide: NotificationsService,
-          useValue: {
-            sendRegistrationConfirmationEmail: jest.fn().mockResolvedValue(true),
-            sendRegistrationErrorEmail: jest.fn().mockResolvedValue(true),
-          },
+          useValue: mockNotificationsService,
         },
         {
           provide: RegistrationPolicyService,
@@ -705,6 +710,175 @@ describe('RegistrationsService', () => {
       mockPrismaService.registration.findUnique.mockResolvedValue(null);
 
       await expect(service.remove(registrationId)).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('submitApplication', () => {
+    const userId = 'user-id-application';
+    const applicationYear = 2026;
+    const baseUser = {
+      id: userId,
+      email: 'test@example.playaplan.app',
+      firstName: 'Test',
+      lastName: 'User',
+      playaName: 'Dusty',
+      role: UserRole.PARTICIPANT,
+      allowRegistration: true,
+      allowEarlyRegistration: false,
+      autoApproveRegistration: false,
+    };
+    const baseDto: SubmitApplicationDto = {
+      campingOptions: ['opt-1'],
+      customFields: {
+        'field-1': 'Tent setup',
+      },
+    };
+    const baseCampingOption = {
+      id: 'opt-1',
+      name: 'Tent Camping',
+      description: null,
+      enabled: true,
+      workShiftsRequired: 0,
+      participantDues: 100,
+      staffDues: 100,
+      maxSignups: 50,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      fields: [
+        {
+          id: 'field-1',
+          displayName: 'Setup Notes',
+          description: null,
+          dataType: 'TEXT',
+          required: false,
+          maxLength: null,
+          minValue: null,
+          maxValue: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          campingOptionId: 'opt-1',
+        },
+      ],
+    };
+
+    beforeEach(() => {
+      mockCoreConfigService.findCurrent.mockResolvedValue({
+        registrationYear: applicationYear,
+        applicationApprovalRequired: true,
+      });
+      mockPrismaService.user.findUnique.mockResolvedValue(baseUser);
+      mockPolicyService.assertCanSubmitApplication.mockResolvedValue(undefined);
+      mockPolicyService.shouldAutoApprove.mockReturnValue(false);
+      mockPrismaService.registration.findFirst.mockResolvedValue(null);
+      mockPrismaService.campingOption.findUnique.mockResolvedValue(baseCampingOption);
+      mockPrismaService.campingOptionRegistration.findFirst.mockResolvedValue(null);
+      mockPrismaService.registration.create.mockImplementation(async ({ data }: { data: { status: RegistrationStatus; paymentDeferred: boolean; year: number; user: { connect: { id: string } } } }) => ({
+        id: 'application-registration-id',
+        status: data.status,
+        paymentDeferred: data.paymentDeferred,
+        year: data.year,
+        userId: data.user.connect.id,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        jobs: [],
+        payments: [],
+        user: baseUser,
+      }));
+      mockPrismaService.campingOptionRegistration.create.mockResolvedValue({
+        id: 'camping-registration-id',
+        userId,
+        campingOptionId: 'opt-1',
+        registrationId: 'application-registration-id',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        campingOption: baseCampingOption,
+      });
+      mockPrismaService.campingOptionFieldValue.create.mockResolvedValue({
+        id: 'field-value-id',
+      });
+      mockNotificationsService.sendNotification.mockResolvedValue(true);
+    });
+
+    it('should create an application with APPLICATION_SUBMITTED status and send the received notification', async () => {
+      const result = await service.submitApplication(userId, baseDto);
+
+      expect(mockPolicyService.assertCanSubmitApplication).toHaveBeenCalledWith(baseUser);
+      expect(mockPolicyService.shouldAutoApprove).toHaveBeenCalledWith(baseUser);
+      expect(mockPrismaService.registration.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            status: RegistrationStatus.APPLICATION_SUBMITTED,
+            paymentDeferred: false,
+            year: applicationYear,
+            user: { connect: { id: userId } },
+          }),
+        }),
+      );
+      expect(mockPrismaService.campingOptionFieldValue.create).toHaveBeenCalledWith({
+        data: {
+          fieldId: 'field-1',
+          registrationId: 'camping-registration-id',
+          value: 'Tent setup',
+        },
+      });
+      expect(mockNotificationsService.sendNotification).toHaveBeenCalledWith(
+        baseUser.email,
+        NotificationType.APPLICATION_RECEIVED,
+        expect.objectContaining({
+          userId,
+          registrationId: 'application-registration-id',
+          applicationDetails: {
+            year: applicationYear,
+            campingOptions: [{ name: 'Tent Camping' }],
+          },
+        }),
+      );
+      expect(result.message).toBe('Application submitted successfully');
+      expect(result.registration.status).toBe(RegistrationStatus.APPLICATION_SUBMITTED);
+    });
+
+    it('should auto-approve eligible users and send the approved notification', async () => {
+      mockPolicyService.shouldAutoApprove.mockReturnValue(true);
+
+      const result = await service.submitApplication(userId, baseDto);
+
+      expect(mockNotificationsService.sendNotification).toHaveBeenCalledWith(
+        baseUser.email,
+        NotificationType.APPLICATION_APPROVED,
+        expect.objectContaining({
+          userId,
+          registrationId: 'application-registration-id',
+        }),
+      );
+      expect(result.message).toBe(
+        'Application approved automatically. Please complete your registration.',
+      );
+      expect(result.registration.status).toBe(RegistrationStatus.APPLICATION_APPROVED);
+    });
+
+    it('should throw when application mode is disabled', async () => {
+      mockCoreConfigService.findCurrent.mockResolvedValue({
+        registrationYear: applicationYear,
+        applicationApprovalRequired: false,
+      });
+
+      await expect(service.submitApplication(userId, baseDto)).rejects.toThrow(
+        new BadRequestException('Application mode is not enabled'),
+      );
+
+      expect(mockPolicyService.assertCanSubmitApplication).not.toHaveBeenCalled();
+    });
+
+    it('should reject duplicate camping options before any writes', async () => {
+      const duplicateCampingOptionsDto: SubmitApplicationDto = {
+        campingOptions: ['opt-1', 'opt-1'],
+      };
+
+      await expect(
+        service.submitApplication(userId, duplicateCampingOptionsDto),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(mockPrismaService.registration.create).not.toHaveBeenCalled();
     });
   });
 

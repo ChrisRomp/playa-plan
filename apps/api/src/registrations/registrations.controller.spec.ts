@@ -1,8 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { RegistrationsController } from './registrations.controller';
 import { RegistrationsService } from './registrations.service';
-import { CreateRegistrationDto, UpdateRegistrationDto } from './dto';
-import { RegistrationStatus } from '@prisma/client';
+import { CreateRegistrationDto, SubmitApplicationDto, UpdateRegistrationDto } from './dto';
+import { RegistrationStatus, UserRole } from '@prisma/client';
 
 describe('RegistrationsController', () => {
   let controller: RegistrationsController;
@@ -10,6 +10,7 @@ describe('RegistrationsController', () => {
 
   const mockRegistrationsService = {
     create: jest.fn(),
+    submitApplication: jest.fn(),
     findAll: jest.fn(),
     findByUser: jest.fn(),
     findByJob: jest.fn(),
@@ -62,6 +63,40 @@ describe('RegistrationsController', () => {
       const result = await controller.create(createDto);
       
       expect(mockRegistrationsService.create).toHaveBeenCalledWith(createDto);
+      expect(result).toEqual(expectedResult);
+    });
+  });
+
+  describe('submitApplication', () => {
+    it('should submit an application for the authenticated user', async () => {
+      const submitApplicationDto: SubmitApplicationDto = {
+        campingOptions: ['camping-option-id'],
+        customFields: { 'field-id': 'value' },
+      };
+      const mockRequest = {
+        user: {
+          id: 'user-id',
+          email: 'user@example.com',
+          role: UserRole.PARTICIPANT,
+        },
+      } as any;
+      const expectedResult = {
+        registration: {
+          id: 'registration-id',
+          status: RegistrationStatus.APPLICATION_SUBMITTED,
+        },
+        campingOptionRegistrations: [],
+        message: 'Application submitted successfully',
+      };
+
+      mockRegistrationsService.submitApplication.mockResolvedValue(expectedResult);
+
+      const result = await controller.submitApplication(submitApplicationDto, mockRequest);
+
+      expect(mockRegistrationsService.submitApplication).toHaveBeenCalledWith(
+        mockRequest.user.id,
+        submitApplicationDto,
+      );
       expect(result).toEqual(expectedResult);
     });
   });
