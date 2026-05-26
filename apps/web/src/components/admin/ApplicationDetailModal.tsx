@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { ChangeEvent, FormEvent } from 'react';
+import { useEffect, useState } from 'react';
+import type { ChangeEvent } from 'react';
 import { X } from 'lucide-react';
 import { api } from '../../lib/api';
 import { LoadingSpinner } from '../common/LoadingSpinner';
+import { UserNotesPanel } from './user-notes/UserNotesPanel';
 
 interface ApplicationUser {
   id: string;
@@ -33,18 +34,6 @@ interface ApplicationCampingOptionRegistration {
     description?: string | null;
   };
   fieldValues?: ApplicationFieldValue[];
-}
-
-interface UserNote {
-  id: string;
-  content: string;
-  createdAt: string;
-  author: {
-    id: string;
-    email: string;
-    firstName: string;
-    lastName: string;
-  };
 }
 
 interface ApplicationDetail {
@@ -124,11 +113,6 @@ function getApplicantName(user?: ApplicationUser | null): string {
   return fullName || user.email;
 }
 
-function getAuthorName(author: UserNote['author']): string {
-  const fullName = [author.firstName, author.lastName].filter(Boolean).join(' ').trim();
-  return fullName || author.email;
-}
-
 export default function ApplicationDetailModal({
   applicationId,
   isOpen,
@@ -142,23 +126,6 @@ export default function ApplicationDetailModal({
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submittingAction, setSubmittingAction] = useState<'approve' | 'decline' | null>(null);
 
-  const [notes, setNotes] = useState<UserNote[]>([]);
-  const [notesLoading, setNotesLoading] = useState(false);
-  const [newNoteContent, setNewNoteContent] = useState('');
-  const [addingNote, setAddingNote] = useState(false);
-
-  const fetchNotes = useCallback(async (userId: string) => {
-    setNotesLoading(true);
-    try {
-      const response = await api.get<UserNote[]>(`/users/${userId}/notes`);
-      setNotes(response.data);
-    } catch {
-      setNotes([]);
-    } finally {
-      setNotesLoading(false);
-    }
-  }, []);
-
   useEffect(() => {
     if (!isOpen || !applicationId) {
       setApplication(null);
@@ -166,8 +133,6 @@ export default function ApplicationDetailModal({
       setDecisionMessage('');
       setSubmitError(null);
       setSubmittingAction(null);
-      setNotes([]);
-      setNewNoteContent('');
       return;
     }
 
@@ -179,7 +144,6 @@ export default function ApplicationDetailModal({
       try {
         const response = await api.get<ApplicationDetail>(`/admin/applications/${applicationId}`);
         setApplication(response.data);
-        void fetchNotes(response.data.userId);
       } catch (fetchError) {
         setError(fetchError instanceof Error ? fetchError.message : 'Failed to load application detail.');
         setApplication(null);
@@ -189,18 +153,7 @@ export default function ApplicationDetailModal({
     };
 
     void fetchApplicationDetail();
-  }, [applicationId, isOpen, fetchNotes]);
-
-  const customFieldCount = useMemo(() => {
-    if (!application?.campingOptionRegistrations) {
-      return 0;
-    }
-
-    return application.campingOptionRegistrations.reduce(
-      (count, registration) => count + (registration.fieldValues?.length ?? 0),
-      0,
-    );
-  }, [application]);
+  }, [applicationId, isOpen]);
 
   if (!isOpen || !applicationId) {
     return null;
@@ -258,25 +211,6 @@ export default function ApplicationDetailModal({
       setSubmitError(actionError instanceof Error ? actionError.message : 'Failed to decline application.');
     } finally {
       setSubmittingAction(null);
-    }
-  };
-
-  const handleAddNote = async (event: FormEvent) => {
-    event.preventDefault();
-    const trimmedContent = newNoteContent.trim();
-    if (!trimmedContent || !application) {
-      return;
-    }
-
-    setAddingNote(true);
-    try {
-      await api.post(`/users/${application.userId}/notes`, { content: trimmedContent });
-      setNewNoteContent('');
-      void fetchNotes(application.userId);
-    } catch {
-      // Silently fail — notes are supplementary and the user can retry
-    } finally {
-      setAddingNote(false);
     }
   };
 
@@ -361,10 +295,6 @@ export default function ApplicationDetailModal({
                       <dt className="font-medium text-gray-900">Year</dt>
                       <dd>{application.year}</dd>
                     </div>
-                    <div>
-                      <dt className="font-medium text-gray-900">Custom Field Responses</dt>
-                      <dd>{customFieldCount}</dd>
-                    </div>
                   </dl>
                 </div>
               </section>
@@ -411,45 +341,7 @@ export default function ApplicationDetailModal({
 
               {/* Staff Notes */}
               <section className="rounded-lg border border-gray-200 p-4">
-                <h3 className="text-lg font-semibold text-gray-900">Staff Notes</h3>
-                <p className="mt-1 text-sm text-gray-500">Internal notes about this applicant (not visible to the user).</p>
-
-                <div className="mt-4 space-y-3">
-                  {notesLoading ? (
-                    <div className="flex items-center justify-center py-4">
-                      <LoadingSpinner />
-                    </div>
-                  ) : notes.length > 0 ? (
-                    notes.map((note) => (
-                      <div key={note.id} className="rounded-md border border-gray-100 bg-gray-50 p-3 text-sm">
-                        <p className="whitespace-pre-wrap text-gray-700">{note.content}</p>
-                        <p className="mt-2 text-xs text-gray-400">
-                          {getAuthorName(note.author)} — {formatDateTime(note.createdAt)}
-                        </p>
-                      </div>
-                    ))
-                  ) : (
-                    <p className="text-sm text-gray-400">No staff notes for this user.</p>
-                  )}
-                </div>
-
-                <form onSubmit={(e) => void handleAddNote(e)} className="mt-4 flex gap-2">
-                  <input
-                    type="text"
-                    value={newNoteContent}
-                    onChange={(e) => setNewNoteContent(e.target.value)}
-                    disabled={addingNote}
-                    placeholder="Add a staff note..."
-                    className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  />
-                  <button
-                    type="submit"
-                    disabled={addingNote || !newNoteContent.trim()}
-                    className="rounded-md bg-gray-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {addingNote ? 'Adding...' : 'Add Note'}
-                  </button>
-                </form>
+                <UserNotesPanel userId={application.userId} />
               </section>
 
               {(application.reviewedAt || application.reviewedBy || application.decisionMessage) && (

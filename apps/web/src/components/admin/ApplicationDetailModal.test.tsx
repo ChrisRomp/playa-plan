@@ -15,6 +15,12 @@ vi.mock('../common/LoadingSpinner', () => ({
   LoadingSpinner: () => <div data-testid="loading-spinner">Loading...</div>,
 }));
 
+vi.mock('./user-notes/UserNotesPanel', () => ({
+  UserNotesPanel: ({ userId }: { userId: string }) => (
+    <div data-testid="user-notes-panel" data-user-id={userId}>Staff Notes Panel</div>
+  ),
+}));
+
 describe('ApplicationDetailModal', () => {
   const mockSubmittedApplication = {
     id: 'application-1',
@@ -67,15 +73,6 @@ describe('ApplicationDetailModal', () => {
     },
   };
 
-  const mockNotes = [
-    {
-      id: 'note-1',
-      content: 'Returning camper from 2023',
-      createdAt: '2025-01-15T08:00:00.000Z',
-      author: { id: 'staff-1', email: 'staff@example.com', firstName: 'Sam', lastName: 'Staff' },
-    },
-  ];
-
   const defaultProps = {
     applicationId: 'application-1',
     isOpen: true,
@@ -88,9 +85,7 @@ describe('ApplicationDetailModal', () => {
   });
 
   it('fetches and renders application detail when opened', async () => {
-    vi.mocked(api.get)
-      .mockResolvedValueOnce({ data: mockSubmittedApplication })
-      .mockResolvedValueOnce({ data: mockNotes });
+    vi.mocked(api.get).mockResolvedValueOnce({ data: mockSubmittedApplication });
 
     render(<ApplicationDetailModal {...defaultProps} />);
 
@@ -109,10 +104,18 @@ describe('ApplicationDetailModal', () => {
     expect(screen.getByText('Decline')).toBeInTheDocument();
   });
 
+  it('does not show custom field count in the application summary', async () => {
+    vi.mocked(api.get).mockResolvedValueOnce({ data: mockSubmittedApplication });
+
+    render(<ApplicationDetailModal {...defaultProps} />);
+
+    await screen.findByText('Alex Applicant');
+
+    expect(screen.queryByText('Custom Field Responses')).not.toBeInTheDocument();
+  });
+
   it('shows review summary and hides actions for reviewed applications', async () => {
-    vi.mocked(api.get)
-      .mockResolvedValueOnce({ data: mockReviewedApplication })
-      .mockResolvedValueOnce({ data: [] });
+    vi.mocked(api.get).mockResolvedValueOnce({ data: mockReviewedApplication });
 
     render(<ApplicationDetailModal {...defaultProps} />);
 
@@ -124,9 +127,7 @@ describe('ApplicationDetailModal', () => {
   });
 
   it('approves an application with an optional message', async () => {
-    vi.mocked(api.get)
-      .mockResolvedValueOnce({ data: mockSubmittedApplication })
-      .mockResolvedValueOnce({ data: [] });
+    vi.mocked(api.get).mockResolvedValueOnce({ data: mockSubmittedApplication });
     vi.mocked(api.patch).mockResolvedValueOnce({ data: {} });
 
     render(<ApplicationDetailModal {...defaultProps} />);
@@ -149,9 +150,7 @@ describe('ApplicationDetailModal', () => {
   });
 
   it('requires a message before declining an application', async () => {
-    vi.mocked(api.get)
-      .mockResolvedValueOnce({ data: mockSubmittedApplication })
-      .mockResolvedValueOnce({ data: [] });
+    vi.mocked(api.get).mockResolvedValueOnce({ data: mockSubmittedApplication });
 
     render(<ApplicationDetailModal {...defaultProps} />);
 
@@ -164,9 +163,7 @@ describe('ApplicationDetailModal', () => {
   });
 
   it('declines an application when a message is provided', async () => {
-    vi.mocked(api.get)
-      .mockResolvedValueOnce({ data: mockSubmittedApplication })
-      .mockResolvedValueOnce({ data: [] });
+    vi.mocked(api.get).mockResolvedValueOnce({ data: mockSubmittedApplication });
     vi.mocked(api.patch).mockResolvedValueOnce({ data: {} });
 
     render(<ApplicationDetailModal {...defaultProps} />);
@@ -188,47 +185,15 @@ describe('ApplicationDetailModal', () => {
     expect(defaultProps.onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('displays staff notes for the applicant', async () => {
-    vi.mocked(api.get)
-      .mockResolvedValueOnce({ data: mockSubmittedApplication })
-      .mockResolvedValueOnce({ data: mockNotes });
-
-    render(<ApplicationDetailModal {...defaultProps} />);
-
-    expect(await screen.findByText('Staff Notes')).toBeInTheDocument();
-    expect(await screen.findByText('Returning camper from 2023')).toBeInTheDocument();
-    expect(screen.getByText(/Sam Staff/)).toBeInTheDocument();
-  });
-
-  it('fetches notes from the user notes endpoint', async () => {
-    vi.mocked(api.get)
-      .mockResolvedValueOnce({ data: mockSubmittedApplication })
-      .mockResolvedValueOnce({ data: [] });
-
-    render(<ApplicationDetailModal {...defaultProps} />);
-
-    await waitFor(() => {
-      expect(api.get).toHaveBeenCalledWith('/users/user-1/notes');
-    });
-  });
-
-  it('adds a new staff note', async () => {
-    vi.mocked(api.get)
-      .mockResolvedValueOnce({ data: mockSubmittedApplication })
-      .mockResolvedValueOnce({ data: [] })
-      .mockResolvedValueOnce({ data: mockNotes });
-    vi.mocked(api.post).mockResolvedValueOnce({ data: mockNotes[0] });
+  it('renders UserNotesPanel with the applicant userId', async () => {
+    vi.mocked(api.get).mockResolvedValueOnce({ data: mockSubmittedApplication });
 
     render(<ApplicationDetailModal {...defaultProps} />);
 
     await screen.findByText('Alex Applicant');
 
-    const noteInput = screen.getByPlaceholderText('Add a staff note...');
-    fireEvent.change(noteInput, { target: { value: 'New note about this person' } });
-    fireEvent.click(screen.getByText('Add Note'));
-
-    await waitFor(() => {
-      expect(api.post).toHaveBeenCalledWith('/users/user-1/notes', { content: 'New note about this person' });
-    });
+    const notesPanel = screen.getByTestId('user-notes-panel');
+    expect(notesPanel).toBeInTheDocument();
+    expect(notesPanel).toHaveAttribute('data-user-id', 'user-1');
   });
 });
