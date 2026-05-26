@@ -7,6 +7,7 @@ vi.mock('../../lib/api', () => ({
   api: {
     get: vi.fn(),
     patch: vi.fn(),
+    post: vi.fn(),
   },
 }));
 
@@ -66,6 +67,15 @@ describe('ApplicationDetailModal', () => {
     },
   };
 
+  const mockNotes = [
+    {
+      id: 'note-1',
+      content: 'Returning camper from 2023',
+      createdAt: '2025-01-15T08:00:00.000Z',
+      author: { id: 'staff-1', email: 'staff@example.com', firstName: 'Sam', lastName: 'Staff' },
+    },
+  ];
+
   const defaultProps = {
     applicationId: 'application-1',
     isOpen: true,
@@ -78,7 +88,9 @@ describe('ApplicationDetailModal', () => {
   });
 
   it('fetches and renders application detail when opened', async () => {
-    vi.mocked(api.get).mockResolvedValueOnce({ data: mockSubmittedApplication });
+    vi.mocked(api.get)
+      .mockResolvedValueOnce({ data: mockSubmittedApplication })
+      .mockResolvedValueOnce({ data: mockNotes });
 
     render(<ApplicationDetailModal {...defaultProps} />);
 
@@ -93,34 +105,38 @@ describe('ApplicationDetailModal', () => {
     expect(screen.getByText('Tent Camping')).toBeInTheDocument();
     expect(screen.getByText('Shade Structure')).toBeInTheDocument();
     expect(screen.getByText('Blue shade structure')).toBeInTheDocument();
-    expect(screen.getByText('Approve Application')).toBeInTheDocument();
-    expect(screen.getByText('Decline Application')).toBeInTheDocument();
+    expect(screen.getByText('Approve')).toBeInTheDocument();
+    expect(screen.getByText('Decline')).toBeInTheDocument();
   });
 
   it('shows review summary and hides actions for reviewed applications', async () => {
-    vi.mocked(api.get).mockResolvedValueOnce({ data: mockReviewedApplication });
+    vi.mocked(api.get)
+      .mockResolvedValueOnce({ data: mockReviewedApplication })
+      .mockResolvedValueOnce({ data: [] });
 
     render(<ApplicationDetailModal {...defaultProps} />);
 
     expect(await screen.findByText('Review Summary')).toBeInTheDocument();
     expect(screen.getByText('Avery Admin')).toBeInTheDocument();
     expect(screen.getByText('Welcome to camp.')).toBeInTheDocument();
-    expect(screen.queryByText('Approve Application')).not.toBeInTheDocument();
-    expect(screen.queryByText('Decline Application')).not.toBeInTheDocument();
+    expect(screen.queryByText('Approve')).not.toBeInTheDocument();
+    expect(screen.queryByText('Decline')).not.toBeInTheDocument();
   });
 
   it('approves an application with an optional message', async () => {
-    vi.mocked(api.get).mockResolvedValueOnce({ data: mockSubmittedApplication });
+    vi.mocked(api.get)
+      .mockResolvedValueOnce({ data: mockSubmittedApplication })
+      .mockResolvedValueOnce({ data: [] });
     vi.mocked(api.patch).mockResolvedValueOnce({ data: {} });
 
     render(<ApplicationDetailModal {...defaultProps} />);
 
     await screen.findByText('Alex Applicant');
 
-    fireEvent.change(screen.getByLabelText('Approval Message (optional)'), {
+    fireEvent.change(screen.getByLabelText(/Decision Message/), {
       target: { value: 'See you at build week.' },
     });
-    fireEvent.click(screen.getByText('Approve Application'));
+    fireEvent.click(screen.getByText('Approve'));
 
     await waitFor(() => {
       expect(api.patch).toHaveBeenCalledWith('/admin/applications/application-1/approve', {
@@ -133,30 +149,34 @@ describe('ApplicationDetailModal', () => {
   });
 
   it('requires a message before declining an application', async () => {
-    vi.mocked(api.get).mockResolvedValueOnce({ data: mockSubmittedApplication });
+    vi.mocked(api.get)
+      .mockResolvedValueOnce({ data: mockSubmittedApplication })
+      .mockResolvedValueOnce({ data: [] });
 
     render(<ApplicationDetailModal {...defaultProps} />);
 
     await screen.findByText('Alex Applicant');
 
-    fireEvent.click(screen.getByText('Decline Application'));
+    fireEvent.click(screen.getByText('Decline'));
 
-    expect(await screen.findByText('A decline message is required.')).toBeInTheDocument();
+    expect(await screen.findByText('A message is required when declining an application.')).toBeInTheDocument();
     expect(api.patch).not.toHaveBeenCalled();
   });
 
   it('declines an application when a message is provided', async () => {
-    vi.mocked(api.get).mockResolvedValueOnce({ data: mockSubmittedApplication });
+    vi.mocked(api.get)
+      .mockResolvedValueOnce({ data: mockSubmittedApplication })
+      .mockResolvedValueOnce({ data: [] });
     vi.mocked(api.patch).mockResolvedValueOnce({ data: {} });
 
     render(<ApplicationDetailModal {...defaultProps} />);
 
     await screen.findByText('Alex Applicant');
 
-    fireEvent.change(screen.getByLabelText('Decline Message (required)'), {
+    fireEvent.change(screen.getByLabelText(/Decision Message/), {
       target: { value: 'We need more information before approving this application.' },
     });
-    fireEvent.click(screen.getByText('Decline Application'));
+    fireEvent.click(screen.getByText('Decline'));
 
     await waitFor(() => {
       expect(api.patch).toHaveBeenCalledWith('/admin/applications/application-1/decline', {
@@ -166,5 +186,49 @@ describe('ApplicationDetailModal', () => {
 
     expect(defaultProps.onActionComplete).toHaveBeenCalledTimes(1);
     expect(defaultProps.onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('displays staff notes for the applicant', async () => {
+    vi.mocked(api.get)
+      .mockResolvedValueOnce({ data: mockSubmittedApplication })
+      .mockResolvedValueOnce({ data: mockNotes });
+
+    render(<ApplicationDetailModal {...defaultProps} />);
+
+    expect(await screen.findByText('Staff Notes')).toBeInTheDocument();
+    expect(await screen.findByText('Returning camper from 2023')).toBeInTheDocument();
+    expect(screen.getByText(/Sam Staff/)).toBeInTheDocument();
+  });
+
+  it('fetches notes from the user notes endpoint', async () => {
+    vi.mocked(api.get)
+      .mockResolvedValueOnce({ data: mockSubmittedApplication })
+      .mockResolvedValueOnce({ data: [] });
+
+    render(<ApplicationDetailModal {...defaultProps} />);
+
+    await waitFor(() => {
+      expect(api.get).toHaveBeenCalledWith('/users/user-1/notes');
+    });
+  });
+
+  it('adds a new staff note', async () => {
+    vi.mocked(api.get)
+      .mockResolvedValueOnce({ data: mockSubmittedApplication })
+      .mockResolvedValueOnce({ data: [] })
+      .mockResolvedValueOnce({ data: mockNotes });
+    vi.mocked(api.post).mockResolvedValueOnce({ data: mockNotes[0] });
+
+    render(<ApplicationDetailModal {...defaultProps} />);
+
+    await screen.findByText('Alex Applicant');
+
+    const noteInput = screen.getByPlaceholderText('Add a staff note...');
+    fireEvent.change(noteInput, { target: { value: 'New note about this person' } });
+    fireEvent.click(screen.getByText('Add Note'));
+
+    await waitFor(() => {
+      expect(api.post).toHaveBeenCalledWith('/users/user-1/notes', { content: 'New note about this person' });
+    });
   });
 });

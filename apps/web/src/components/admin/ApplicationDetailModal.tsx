@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import type { ChangeEvent } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import type { ChangeEvent, FormEvent } from 'react';
 import { X } from 'lucide-react';
 import { api } from '../../lib/api';
 import { LoadingSpinner } from '../common/LoadingSpinner';
@@ -33,6 +33,18 @@ interface ApplicationCampingOptionRegistration {
     description?: string | null;
   };
   fieldValues?: ApplicationFieldValue[];
+}
+
+interface UserNote {
+  id: string;
+  content: string;
+  createdAt: string;
+  author: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+  };
 }
 
 interface ApplicationDetail {
@@ -112,6 +124,11 @@ function getApplicantName(user?: ApplicationUser | null): string {
   return fullName || user.email;
 }
 
+function getAuthorName(author: UserNote['author']): string {
+  const fullName = [author.firstName, author.lastName].filter(Boolean).join(' ').trim();
+  return fullName || author.email;
+}
+
 export default function ApplicationDetailModal({
   applicationId,
   isOpen,
@@ -121,19 +138,36 @@ export default function ApplicationDetailModal({
   const [application, setApplication] = useState<ApplicationDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [approveMessage, setApproveMessage] = useState('');
-  const [declineMessage, setDeclineMessage] = useState('');
+  const [decisionMessage, setDecisionMessage] = useState('');
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submittingAction, setSubmittingAction] = useState<'approve' | 'decline' | null>(null);
+
+  const [notes, setNotes] = useState<UserNote[]>([]);
+  const [notesLoading, setNotesLoading] = useState(false);
+  const [newNoteContent, setNewNoteContent] = useState('');
+  const [addingNote, setAddingNote] = useState(false);
+
+  const fetchNotes = useCallback(async (userId: string) => {
+    setNotesLoading(true);
+    try {
+      const response = await api.get<UserNote[]>(`/users/${userId}/notes`);
+      setNotes(response.data);
+    } catch {
+      setNotes([]);
+    } finally {
+      setNotesLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     if (!isOpen || !applicationId) {
       setApplication(null);
       setError(null);
-      setApproveMessage('');
-      setDeclineMessage('');
+      setDecisionMessage('');
       setSubmitError(null);
       setSubmittingAction(null);
+      setNotes([]);
+      setNewNoteContent('');
       return;
     }
 
@@ -145,6 +179,7 @@ export default function ApplicationDetailModal({
       try {
         const response = await api.get<ApplicationDetail>(`/admin/applications/${applicationId}`);
         setApplication(response.data);
+        void fetchNotes(response.data.userId);
       } catch (fetchError) {
         setError(fetchError instanceof Error ? fetchError.message : 'Failed to load application detail.');
         setApplication(null);
@@ -154,7 +189,7 @@ export default function ApplicationDetailModal({
     };
 
     void fetchApplicationDetail();
-  }, [applicationId, isOpen]);
+  }, [applicationId, isOpen, fetchNotes]);
 
   const customFieldCount = useMemo(() => {
     if (!application?.campingOptionRegistrations) {
@@ -171,12 +206,8 @@ export default function ApplicationDetailModal({
     return null;
   }
 
-  const handleApproveMessageChange = (event: ChangeEvent<HTMLTextAreaElement>) => {
-    setApproveMessage(event.target.value);
-  };
-
-  const handleDeclineMessageChange = (event: ChangeEvent<HTMLTextAreaElement>) => {
-    setDeclineMessage(event.target.value);
+  const handleDecisionMessageChange = (event: ChangeEvent<HTMLTextAreaElement>) => {
+    setDecisionMessage(event.target.value);
     if (submitError) {
       setSubmitError(null);
     }
@@ -192,7 +223,7 @@ export default function ApplicationDetailModal({
 
     try {
       await api.patch(`/admin/applications/${applicationId}/approve`, {
-        message: approveMessage.trim() || undefined,
+        message: decisionMessage.trim() || undefined,
       });
       onActionComplete();
       onClose();
@@ -208,9 +239,9 @@ export default function ApplicationDetailModal({
       return;
     }
 
-    const trimmedMessage = declineMessage.trim();
+    const trimmedMessage = decisionMessage.trim();
     if (!trimmedMessage) {
-      setSubmitError('A decline message is required.');
+      setSubmitError('A message is required when declining an application.');
       return;
     }
 
@@ -227,6 +258,25 @@ export default function ApplicationDetailModal({
       setSubmitError(actionError instanceof Error ? actionError.message : 'Failed to decline application.');
     } finally {
       setSubmittingAction(null);
+    }
+  };
+
+  const handleAddNote = async (event: FormEvent) => {
+    event.preventDefault();
+    const trimmedContent = newNoteContent.trim();
+    if (!trimmedContent || !application) {
+      return;
+    }
+
+    setAddingNote(true);
+    try {
+      await api.post(`/users/${application.userId}/notes`, { content: trimmedContent });
+      setNewNoteContent('');
+      void fetchNotes(application.userId);
+    } catch {
+      // Silently fail — notes are supplementary and the user can retry
+    } finally {
+      setAddingNote(false);
     }
   };
 
@@ -359,6 +409,49 @@ export default function ApplicationDetailModal({
                 </div>
               </section>
 
+              {/* Staff Notes */}
+              <section className="rounded-lg border border-gray-200 p-4">
+                <h3 className="text-lg font-semibold text-gray-900">Staff Notes</h3>
+                <p className="mt-1 text-sm text-gray-500">Internal notes about this applicant (not visible to the user).</p>
+
+                <div className="mt-4 space-y-3">
+                  {notesLoading ? (
+                    <div className="flex items-center justify-center py-4">
+                      <LoadingSpinner />
+                    </div>
+                  ) : notes.length > 0 ? (
+                    notes.map((note) => (
+                      <div key={note.id} className="rounded-md border border-gray-100 bg-gray-50 p-3 text-sm">
+                        <p className="whitespace-pre-wrap text-gray-700">{note.content}</p>
+                        <p className="mt-2 text-xs text-gray-400">
+                          {getAuthorName(note.author)} — {formatDateTime(note.createdAt)}
+                        </p>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-sm text-gray-400">No staff notes for this user.</p>
+                  )}
+                </div>
+
+                <form onSubmit={(e) => void handleAddNote(e)} className="mt-4 flex gap-2">
+                  <input
+                    type="text"
+                    value={newNoteContent}
+                    onChange={(e) => setNewNoteContent(e.target.value)}
+                    disabled={addingNote}
+                    placeholder="Add a staff note..."
+                    className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                  <button
+                    type="submit"
+                    disabled={addingNote || !newNoteContent.trim()}
+                    className="rounded-md bg-gray-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {addingNote ? 'Adding...' : 'Add Note'}
+                  </button>
+                </form>
+              </section>
+
               {(application.reviewedAt || application.reviewedBy || application.decisionMessage) && (
                 <section className="rounded-lg border border-gray-200 p-4">
                   <h3 className="text-lg font-semibold text-gray-900">Review Summary</h3>
@@ -384,9 +477,10 @@ export default function ApplicationDetailModal({
               {application.status === 'APPLICATION_SUBMITTED' && (
                 <section className="space-y-4 rounded-lg border border-amber-200 bg-amber-50 p-4">
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900">Review Actions</h3>
+                    <h3 className="text-lg font-semibold text-gray-900">Review Decision</h3>
                     <p className="mt-1 text-sm text-gray-600">
-                      Add an optional approval note or include a required decline explanation.
+                      Include an optional message for approvals or a required explanation for declines.
+                      This message is sent to the applicant by email.
                     </p>
                   </div>
 
@@ -396,52 +490,38 @@ export default function ApplicationDetailModal({
                     </div>
                   ) : null}
 
-                  <div className="grid gap-4 lg:grid-cols-2">
-                    <div className="rounded-lg border border-green-200 bg-white p-4">
-                      <label htmlFor="application-approve-message" className="block text-sm font-medium text-gray-700">
-                        Approval Message (optional)
-                      </label>
-                      <textarea
-                        id="application-approve-message"
-                        rows={4}
-                        value={approveMessage}
-                        onChange={handleApproveMessageChange}
-                        disabled={submittingAction !== null}
-                        placeholder="Share any follow-up details for the applicant..."
-                        className="mt-2 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => void handleApprove()}
-                        disabled={submittingAction !== null}
-                        className="mt-3 inline-flex items-center rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        {submittingAction === 'approve' ? 'Approving...' : 'Approve Application'}
-                      </button>
-                    </div>
+                  <div>
+                    <label htmlFor="application-decision-message" className="block text-sm font-medium text-gray-700">
+                      Decision Message <span className="text-gray-400">(required for decline)</span>
+                    </label>
+                    <textarea
+                      id="application-decision-message"
+                      rows={4}
+                      value={decisionMessage}
+                      onChange={handleDecisionMessageChange}
+                      disabled={submittingAction !== null}
+                      placeholder="Message to include in the notification to the applicant..."
+                      className="mt-2 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
 
-                    <div className="rounded-lg border border-red-200 bg-white p-4">
-                      <label htmlFor="application-decline-message" className="block text-sm font-medium text-gray-700">
-                        Decline Message (required)
-                      </label>
-                      <textarea
-                        id="application-decline-message"
-                        rows={4}
-                        value={declineMessage}
-                        onChange={handleDeclineMessageChange}
-                        disabled={submittingAction !== null}
-                        placeholder="Explain why this application cannot be approved right now..."
-                        className="mt-2 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => void handleDecline()}
-                        disabled={submittingAction !== null}
-                        className="mt-3 inline-flex items-center rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        {submittingAction === 'decline' ? 'Declining...' : 'Decline Application'}
-                      </button>
-                    </div>
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => void handleApprove()}
+                      disabled={submittingAction !== null}
+                      className="inline-flex items-center rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {submittingAction === 'approve' ? 'Approving...' : 'Approve'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleDecline()}
+                      disabled={submittingAction !== null}
+                      className="inline-flex items-center rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {submittingAction === 'decline' ? 'Declining...' : 'Decline'}
+                    </button>
                   </div>
                 </section>
               )}
