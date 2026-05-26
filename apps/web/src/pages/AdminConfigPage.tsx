@@ -77,6 +77,7 @@ const AdminConfigPage: React.FC = () => {
     registrationYear: new Date().getFullYear(),
     earlyRegistrationOpen: false,
     registrationOpen: true,
+    applicationApprovalRequired: config?.applicationApprovalRequired ?? false,
     registrationTerms: '',
     allowDeferredDuesPayment: false,
     stripeEnabled: false,
@@ -124,6 +125,7 @@ const AdminConfigPage: React.FC = () => {
             registrationYear: response.data.registrationYear || new Date().getFullYear(),
             earlyRegistrationOpen: response.data.earlyRegistrationOpen || false,
             registrationOpen: response.data.registrationOpen || false,
+            applicationApprovalRequired: response.data.applicationApprovalRequired ?? false,
             registrationTerms: response.data.registrationTerms || '',
             allowDeferredDuesPayment: response.data.allowDeferredDuesPayment || false,
             stripeEnabled: response.data.stripeEnabled || false,
@@ -421,6 +423,7 @@ const AdminConfigPage: React.FC = () => {
       registrationYear: formData.registrationYear,
       earlyRegistrationOpen: formData.earlyRegistrationOpen,
       registrationOpen: formData.registrationOpen,
+      applicationApprovalRequired: formData.applicationApprovalRequired,
       registrationTerms: formData.registrationTerms,
       allowDeferredDuesPayment: formData.allowDeferredDuesPayment,
       stripeEnabled: formData.stripeEnabled,
@@ -765,6 +768,27 @@ const AdminConfigPage: React.FC = () => {
                 <label htmlFor="allowDeferredDuesPayment" className="ml-2 block text-gray-700">
                   Allow Deferred Dues Payment
                 </label>
+              </div>
+            </div>
+
+            <div className="mb-4 rounded-md border border-gray-200 p-4">
+              <div className="flex items-start">
+                <input
+                  type="checkbox"
+                  id="applicationApprovalRequired"
+                  name="applicationApprovalRequired"
+                  checked={formData.applicationApprovalRequired}
+                  onChange={handleInputChange}
+                  className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                />
+                <div className="ml-3">
+                  <label htmlFor="applicationApprovalRequired" className="block text-gray-700 font-medium">
+                    Require Application Approval
+                  </label>
+                  <p className="text-sm text-gray-500">
+                    When enabled, new registrations require staff approval before participants can select jobs and pay.
+                  </p>
+                </div>
               </div>
             </div>
             

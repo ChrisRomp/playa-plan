@@ -453,13 +453,22 @@ export interface Registration {
   id: string;
   userId: string;
   year: number;
-  status: 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'WAITLISTED';
+  status:
+    | 'PENDING'
+    | 'CONFIRMED'
+    | 'CANCELLED'
+    | 'WAITLISTED'
+    | 'APPLICATION_SUBMITTED'
+    | 'APPLICATION_APPROVED'
+    | 'APPLICATION_DECLINED';
   /**
    * When true, the participant opted to defer dues payment. The registration
    * is CONFIRMED (no payment required up front); the dashboard should still
    * surface a "Pay Now" CTA and a "Payment Deferred" indicator.
    */
   paymentDeferred?: boolean;
+  reviewedAt?: string | null;
+  decisionMessage?: string | null;
   createdAt: string;
   updatedAt: string;
   user?: User;

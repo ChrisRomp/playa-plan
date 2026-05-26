@@ -98,9 +98,17 @@ export interface CampConfig {
   paypalClientId?: string;
   paypalMode?: 'sandbox' | 'live';
   allowDeferredDuesPayment?: boolean;
+  applicationApprovalRequired?: boolean;
 }
 
-export type RegistrationStatus = 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'WAITLISTED';
+export type RegistrationStatus =
+  | 'PENDING'
+  | 'CONFIRMED'
+  | 'CANCELLED'
+  | 'WAITLISTED'
+  | 'APPLICATION_SUBMITTED'
+  | 'APPLICATION_APPROVED'
+  | 'APPLICATION_DECLINED';
 
 export interface Registration {
   id: string;
@@ -113,6 +121,9 @@ export interface Registration {
    * surface a "Pay Now" CTA and a "Payment Deferred" indicator.
    */
   paymentDeferred?: boolean;
+  reviewedById?: string | null;
+  reviewedAt?: string | null;
+  decisionMessage?: string | null;
   createdAt: string;
   updatedAt: string;
   user?: User;

@@ -9,6 +9,15 @@ export enum RegistrationStatus {
   CONFIRMED = 'CONFIRMED',
   CANCELLED = 'CANCELLED',
   WAITLISTED = 'WAITLISTED',
+  APPLICATION_SUBMITTED = 'APPLICATION_SUBMITTED',
+  APPLICATION_APPROVED = 'APPLICATION_APPROVED',
+  APPLICATION_DECLINED = 'APPLICATION_DECLINED',
+}
+
+export function isApplicationStatus(status?: string | null): boolean {
+  return status === RegistrationStatus.APPLICATION_SUBMITTED
+    || status === RegistrationStatus.APPLICATION_APPROVED
+    || status === RegistrationStatus.APPLICATION_DECLINED;
 }
 
 /**
@@ -71,14 +80,15 @@ export function isRegistrationAccessible(config: ConfigType, user: UserType | nu
  * @returns True if user can start registration, false otherwise
  */
 export function canUserRegister(
-  config: ConfigType, 
-  user: UserType | null, 
-  hasActiveRegistration: boolean
+  config: ConfigType,
+  user: UserType | null,
+  hasActiveRegistration: boolean,
+  registrationStatus?: string | null,
 ): boolean {
-  // If user already has an active registration, they can't register again
-  if (hasActiveRegistration) return false;
-  
-  // Otherwise, check if registration is accessible
+  if (hasActiveRegistration) {
+    return isApplicationStatus(registrationStatus);
+  }
+
   return isRegistrationAccessible(config, user);
 }
 
@@ -92,7 +102,8 @@ export function canUserRegister(
 export function getRegistrationStatusMessage(
   config: ConfigType,
   user: UserType | null,
-  hasActiveRegistration: boolean
+  hasActiveRegistration: boolean,
+  registrationStatus?: string | null,
 ): string {
   if (!config) {
     return 'Configuration not available. Please try again later.';
@@ -104,6 +115,18 @@ export function getRegistrationStatusMessage(
                new Date().getFullYear();
   
   if (hasActiveRegistration) {
+    if (registrationStatus === RegistrationStatus.APPLICATION_SUBMITTED) {
+      return `Your application for ${year} is pending review.`;
+    }
+
+    if (registrationStatus === RegistrationStatus.APPLICATION_APPROVED) {
+      return `Your application for ${year} has been approved. Continue to complete your registration.`;
+    }
+
+    if (registrationStatus === RegistrationStatus.APPLICATION_DECLINED) {
+      return `Your application for ${year} was not approved.`;
+    }
+
     return `You are already registered for ${year}. You can view your registration details on the dashboard.`;
   }
 
