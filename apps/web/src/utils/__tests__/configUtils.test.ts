@@ -19,6 +19,7 @@ describe('configUtils', () => {
         registrationOpen: true,
         registrationTerms: 'Test terms',
         allowDeferredDuesPayment: false,
+        applicationApprovalRequired: false,
         stripeEnabled: true,
         stripePublicKey: 'pk_test_123',
         paypalEnabled: false,
@@ -45,6 +46,37 @@ describe('configUtils', () => {
       expect(frontendConfig.paypalClientId).toBe('');
       expect(frontendConfig.paypalMode).toBe('sandbox');
       expect(frontendConfig.allowDeferredDuesPayment).toBe(false);
+      expect(frontendConfig.applicationApprovalRequired).toBe(false);
+    });
+
+    it('should map applicationApprovalRequired when enabled', () => {
+      const apiConfig: CoreConfig = {
+        id: 'test-id',
+        campName: 'Test Camp',
+        campDescription: 'A test camp',
+        homePageBlurb: 'Welcome',
+        campBannerUrl: null,
+        campBannerAltText: null,
+        campIconUrl: null,
+        campIconAltText: null,
+        registrationYear: 2024,
+        earlyRegistrationOpen: false,
+        registrationOpen: true,
+        registrationTerms: null,
+        allowDeferredDuesPayment: false,
+        applicationApprovalRequired: true,
+        stripeEnabled: false,
+        stripePublicKey: null,
+        paypalEnabled: false,
+        paypalClientId: null,
+        paypalMode: 'sandbox',
+        createdAt: '2024-01-01T00:00:00Z',
+        updatedAt: '2024-01-01T00:00:00Z'
+      };
+
+      const frontendConfig = mapApiConfigToFrontend(apiConfig);
+
+      expect(frontendConfig.applicationApprovalRequired).toBe(true);
     });
 
     it('should handle null/undefined payment fields gracefully', () => {
@@ -62,6 +94,7 @@ describe('configUtils', () => {
         registrationOpen: false,
         registrationTerms: null,
         allowDeferredDuesPayment: false,
+        applicationApprovalRequired: false,
         stripeEnabled: false,
         stripePublicKey: null,
         paypalEnabled: false,

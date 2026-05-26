@@ -288,6 +288,7 @@ export const CoreConfigSchema = z.object({
   // Fix for "Expected string, received null" error
   registrationTerms: z.string().nullable().optional(),
   allowDeferredDuesPayment: z.boolean(),
+  applicationApprovalRequired: z.boolean().optional().default(false),
   stripeEnabled: z.boolean(),
   // Fix for "Expected string, received null" error
   stripePublicKey: z.string().nullable().optional(),

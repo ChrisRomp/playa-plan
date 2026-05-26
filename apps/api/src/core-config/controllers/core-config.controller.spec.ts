@@ -23,6 +23,7 @@ describe('CoreConfigController', () => {
     registrationOpen: true,
     registrationTerms: 'Test Terms',
     allowDeferredDuesPayment: false,
+    applicationApprovalRequired: false,
     stripeEnabled: true,
     stripePublicKey: 'pk_test_123',
     stripeApiKey: 'sk_test_123',
@@ -333,6 +334,38 @@ describe('CoreConfigController', () => {
       const result = controller.adminTest();
       expect(service.adminTest).toHaveBeenCalled();
       expect(result).toEqual({ message: 'Core Config module is working!' });
+    });
+  });
+
+  describe('getPublicConfig', () => {
+    it('should include applicationApprovalRequired in public config response', async () => {
+      const configWithApproval = {
+        ...mockCoreConfig,
+        applicationApprovalRequired: true,
+      };
+      mockCoreConfigService.findCurrent.mockResolvedValueOnce(configWithApproval);
+
+      const result = await controller.getPublicConfig();
+
+      expect(result.applicationApprovalRequired).toBe(true);
+    });
+
+    it('should return applicationApprovalRequired as false when disabled', async () => {
+      const configWithoutApproval = {
+        ...mockCoreConfig,
+        applicationApprovalRequired: false,
+      };
+      mockCoreConfigService.findCurrent.mockResolvedValueOnce(configWithoutApproval);
+
+      const result = await controller.getPublicConfig();
+
+      expect(result.applicationApprovalRequired).toBe(false);
+    });
+
+    it('should throw NotFoundException when config not found', async () => {
+      mockCoreConfigService.findCurrent.mockRejectedValueOnce(new NotFoundException('Config not found'));
+
+      await expect(controller.getPublicConfig()).rejects.toThrow(NotFoundException);
     });
   });
 });
