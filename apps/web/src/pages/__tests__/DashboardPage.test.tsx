@@ -1206,6 +1206,106 @@ describe('DashboardPage - Registration after cancellation', () => {
     });
   });
 
+  describe('Complete Registration CTA for approved applications', () => {
+    it('should show Complete Registration button when status is APPLICATION_APPROVED', async () => {
+      const approvedRegistration = {
+        id: 'approved-reg-id',
+        userId: '1',
+        year: 2024,
+        status: 'APPLICATION_APPROVED' as const,
+        decisionMessage: null,
+        createdAt: '2024-01-10T10:00:00.000Z',
+        updatedAt: '2024-01-12T10:00:00.000Z',
+        jobs: [],
+        payments: [],
+      };
+
+      mockUseConfig.mockReturnValue({
+        config: {
+          name: 'Test Camp',
+          description: 'Test',
+          homePageBlurb: 'Test',
+          registrationOpen: true,
+          earlyRegistrationOpen: false,
+          currentYear: 2024,
+        },
+        isLoading: false,
+        error: null,
+        refreshConfig: vi.fn(),
+        isConnecting: false,
+        isConnected: true,
+        connectionError: null,
+      });
+
+      mockUseUserRegistrations.mockReturnValue({
+        registrations: [approvedRegistration],
+        loading: false,
+        error: null,
+        refetch: vi.fn(),
+      });
+
+      vi.mocked(registrationUtils.getActiveRegistrations).mockReturnValue([approvedRegistration]);
+
+      const Wrapper = createWrapper();
+      render(<DashboardPage />, { wrapper: Wrapper });
+
+      await waitFor(() => {
+        const link = screen.getByRole('link', { name: 'Complete Registration' });
+        expect(link).toBeInTheDocument();
+        expect(link).toHaveAttribute('href', '/registration');
+      });
+    });
+
+    it('should not show Complete Registration button for non-approved statuses', async () => {
+      const submittedRegistration = {
+        id: 'submitted-reg-id',
+        userId: '1',
+        year: 2024,
+        status: 'APPLICATION_SUBMITTED' as const,
+        decisionMessage: null,
+        createdAt: '2024-01-10T10:00:00.000Z',
+        updatedAt: '2024-01-10T10:00:00.000Z',
+        jobs: [],
+        payments: [],
+      };
+
+      mockUseConfig.mockReturnValue({
+        config: {
+          name: 'Test Camp',
+          description: 'Test',
+          homePageBlurb: 'Test',
+          registrationOpen: true,
+          earlyRegistrationOpen: false,
+          currentYear: 2024,
+        },
+        isLoading: false,
+        error: null,
+        refreshConfig: vi.fn(),
+        isConnecting: false,
+        isConnected: true,
+        connectionError: null,
+      });
+
+      mockUseUserRegistrations.mockReturnValue({
+        registrations: [submittedRegistration],
+        loading: false,
+        error: null,
+        refetch: vi.fn(),
+      });
+
+      vi.mocked(registrationUtils.getActiveRegistrations).mockReturnValue([submittedRegistration]);
+
+      const Wrapper = createWrapper();
+      render(<DashboardPage />, { wrapper: Wrapper });
+
+      await waitFor(() => {
+        expect(screen.getByText('Application Submitted')).toBeInTheDocument();
+      });
+
+      expect(screen.queryByRole('link', { name: 'Complete Registration' })).not.toBeInTheDocument();
+    });
+  });
+
   describe('Declined application decision message', () => {
     it('should display the decision message when application is declined', async () => {
       const declinedRegistration = {
