@@ -957,14 +957,14 @@ describe('DashboardPage - Registration after cancellation', () => {
       
       await waitFor(() => {
         // Should show status
-        expect(screen.getByText('CANCELLED')).toBeInTheDocument();
+        expect(screen.getByText('Cancelled')).toBeInTheDocument();
         
         // Should show year and date in history heading
         const expectedDate = new Date('2024-01-01T10:00:00.000Z').toLocaleDateString();
         expect(screen.getByText(new RegExp(`2024 — ${expectedDate.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`))).toBeInTheDocument();
         
         // Should show payment status
-        expect(screen.getByText('REFUNDED')).toBeInTheDocument();
+        expect(screen.getByText('Refunded')).toBeInTheDocument();
       });
     });
 
@@ -980,7 +980,7 @@ describe('DashboardPage - Registration after cancellation', () => {
       render(<DashboardPage />, { wrapper: Wrapper });
       
       await waitFor(() => {
-        expect(screen.getByText('CANCELLED')).toBeInTheDocument();
+        expect(screen.getByText('Cancelled')).toBeInTheDocument();
         const expectedDate = new Date('2024-01-01T10:00:00.000Z').toLocaleDateString();
         expect(screen.getByText(new RegExp(`2024 — ${expectedDate.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`))).toBeInTheDocument();
       });
@@ -1034,7 +1034,7 @@ describe('DashboardPage - Registration after cancellation', () => {
         expect(screen.getByText('Registration History')).toBeInTheDocument();
         
         // Should show multiple cancelled statuses
-        const cancelledElements = screen.getAllByText('CANCELLED');
+        const cancelledElements = screen.getAllByText('Cancelled');
         expect(cancelledElements).toHaveLength(2);
       });
     });

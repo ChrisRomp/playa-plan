@@ -6,6 +6,7 @@ import {
   getActiveRegistrations,
   getCancelledRegistrations,
   isApplicationStatus,
+  formatRegistrationStatus,
 } from '../registrationUtils';
 import { User, CampConfig } from '../../types';
 
@@ -232,6 +233,25 @@ describe('registrationUtils', () => {
       
       expect(cancelledRegistrations).toHaveLength(2);
       expect(cancelledRegistrations).toEqual(registrations);
+    });
+  });
+
+  describe('formatRegistrationStatus', () => {
+    it('should format standard registration statuses', () => {
+      expect(formatRegistrationStatus('PENDING')).toBe('Pending');
+      expect(formatRegistrationStatus('CONFIRMED')).toBe('Confirmed');
+      expect(formatRegistrationStatus('CANCELLED')).toBe('Cancelled');
+      expect(formatRegistrationStatus('WAITLISTED')).toBe('Waitlisted');
+    });
+
+    it('should format application statuses', () => {
+      expect(formatRegistrationStatus('APPLICATION_SUBMITTED')).toBe('Application Submitted');
+      expect(formatRegistrationStatus('APPLICATION_APPROVED')).toBe('Application Approved');
+      expect(formatRegistrationStatus('APPLICATION_DECLINED')).toBe('Application Not Approved');
+    });
+
+    it('should return the raw value for unknown statuses', () => {
+      expect(formatRegistrationStatus('UNKNOWN_STATUS')).toBe('UNKNOWN_STATUS');
     });
   });
 }); 

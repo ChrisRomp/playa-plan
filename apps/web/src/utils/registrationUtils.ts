@@ -20,6 +20,23 @@ export function isApplicationStatus(status?: string | null): boolean {
     || status === RegistrationStatus.APPLICATION_DECLINED;
 }
 
+const REGISTRATION_STATUS_LABELS: Record<string, string> = {
+  PENDING: 'Pending',
+  CONFIRMED: 'Confirmed',
+  CANCELLED: 'Cancelled',
+  WAITLISTED: 'Waitlisted',
+  APPLICATION_SUBMITTED: 'Application Submitted',
+  APPLICATION_APPROVED: 'Application Approved',
+  APPLICATION_DECLINED: 'Application Not Approved',
+};
+
+/**
+ * Convert a registration status enum value to a human-readable label.
+ */
+export function formatRegistrationStatus(status: string): string {
+  return REGISTRATION_STATUS_LABELS[status] ?? status;
+}
+
 /**
  * Type union for configuration that includes both CoreConfig and CampConfig
  */
