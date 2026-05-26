@@ -1,9 +1,11 @@
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../store/authUtils';
 import { useProfile } from '../hooks/useProfile';
 import { useUserRegistrations } from '../hooks/useUserRegistrations';
 import { useCampRegistration } from '../hooks/useCampRegistration';
 import { useConfig } from '../hooks/useConfig';
+import { useApplications } from '../hooks/useApplications';
 import { getFriendlyDayName, formatTime } from '../utils/shiftUtils';
 import { isRegistrationAccessible, getRegistrationStatusMessage, getActiveRegistrations, formatRegistrationStatus } from '../utils/registrationUtils';
 import { PATHS } from '../routes';
@@ -19,6 +21,18 @@ const DashboardPage: React.FC = () => {
   const { config, isLoading: configLoading } = useConfig();
   const { registrations, loading: registrationsLoading, error: registrationsError } = useUserRegistrations();
   const { campRegistration, loading: campLoading, error: campError } = useCampRegistration();
+  const { fetchApplications, total: pendingApplicationsCount } = useApplications();
+  const [pendingCountLoaded, setPendingCountLoaded] = useState(false);
+
+  const isStaffOrAdmin = user?.role === 'staff' || user?.role === 'admin';
+
+  useEffect(() => {
+    if (isStaffOrAdmin && config?.applicationApprovalRequired) {
+      fetchApplications({ status: 'APPLICATION_SUBMITTED', year: config.currentYear, limit: 1 }).then(() => {
+        setPendingCountLoaded(true);
+      });
+    }
+  }, [isStaffOrAdmin, config?.applicationApprovalRequired, config?.currentYear, fetchApplications]);
   
   // Show loading state while config is loading
   if (configLoading || !config) {
@@ -67,6 +81,24 @@ const DashboardPage: React.FC = () => {
                 {' '}to access all features.
               </p>
             </div>
+          </div>
+        </div>
+      )}
+
+      {isStaffOrAdmin && pendingCountLoaded && pendingApplicationsCount > 0 && (
+        <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-blue-800">
+              There {pendingApplicationsCount === 1 ? 'is' : 'are'}{' '}
+              <span className="font-semibold">{pendingApplicationsCount}</span>{' '}
+              pending application{pendingApplicationsCount !== 1 ? 's' : ''} awaiting review.
+            </p>
+            <Link
+              to={PATHS.ADMIN_APPLICATIONS}
+              className="inline-flex items-center px-3 py-1.5 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors"
+            >
+              Review Applications
+            </Link>
           </div>
         </div>
       )}
