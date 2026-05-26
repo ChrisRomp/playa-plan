@@ -514,6 +514,56 @@ describe('RegistrationPage', () => {
     expect(screen.queryByText('Application pending review')).not.toBeInTheDocument();
   });
 
+  it('shows application entry flow when user has a cancelled registration and approval mode is enabled', async () => {
+    vi.spyOn(useConfigModule, 'useConfig').mockReturnValue({
+      config: {
+        name: 'Test Camp',
+        description: 'Test Description',
+        homePageBlurb: 'Welcome!',
+        registrationOpen: true,
+        earlyRegistrationOpen: false,
+        currentYear: 2025,
+        registrationTerms: '<p>Terms.</p>',
+        applicationApprovalRequired: true,
+      },
+      isLoading: false,
+      error: null,
+      refreshConfig: vi.fn(),
+      isConnecting: false,
+      isConnected: true,
+      connectionError: null,
+    });
+    vi.spyOn(useCampRegistrationModule, 'useCampRegistration').mockReturnValue({
+      campRegistration: {
+        campingOptions: [],
+        customFieldValues: [],
+        jobRegistrations: [],
+        hasRegistration: false,
+      },
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    vi.spyOn(useMyRegistrationModule, 'useMyRegistration').mockReturnValue({
+      registration: {
+        id: 'registration-cancelled',
+        status: 'CANCELLED',
+        year: 2025,
+        createdAt: '2025-05-01T00:00:00Z',
+      },
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    renderWithAuth();
+
+    // Should show the profile step (application entry flow steps 1-3)
+    expect(screen.getByText('Your Profile Information')).toBeInTheDocument();
+    // Should NOT show any completion steps (shifts, payment)
+    expect(screen.queryByText('Select Work Shifts')).not.toBeInTheDocument();
+  });
+
   it('allows navigating to camping options step after filling profile form', async () => {
     renderWithAuth();
     

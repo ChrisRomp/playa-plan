@@ -78,12 +78,14 @@ export default function RegistrationPage() {
 
   const isApplicationMode = config?.applicationApprovalRequired ?? false;
   const registrationStatus = myRegistration?.status ?? null;
+  const isCancelledRegistration = registrationStatus === 'CANCELLED';
   const isApplicationSubmitted = registrationStatus === 'APPLICATION_SUBMITTED';
   const isApplicationApproved = registrationStatus === 'APPLICATION_APPROVED';
   const isApplicationDeclined = registrationStatus === 'APPLICATION_DECLINED';
   // User can complete if explicitly approved OR if approval mode was disabled while they had a pending application
   const canCompleteApplication = isApplicationApproved || (!isApplicationMode && isApplicationSubmitted);
-  const isApplicationEntryFlow = isApplicationMode && myRegistration === null;
+  // Treat cancelled registrations as no registration for application entry purposes
+  const isApplicationEntryFlow = isApplicationMode && (myRegistration === null || isCancelledRegistration);
   const visibleSteps = canCompleteApplication
     ? [4, 5, 6]
     : isApplicationMode
@@ -212,7 +214,7 @@ export default function RegistrationPage() {
       setRegistrationId(myRegistration.id);
     }
 
-    if (myRegistration && !isApplicationStatus(myRegistration.status)) {
+    if (myRegistration && !isApplicationStatus(myRegistration.status) && myRegistration.status !== 'CANCELLED') {
       setApprovedRegistrationCompleted(true);
     }
   }, [myRegistration]);
