@@ -6,6 +6,7 @@ import { Registration, RegistrationStatus, UserRole } from '@prisma/client';
 import { DayOfWeek } from '../common/enums/day-of-week.enum';
 import { RegistrationPolicyService } from './services/registration-policy.service';
 import { CoreConfigService } from '../core-config/services/core-config.service';
+import { isCapacityReservingStatus } from './constants/registration-status.constants';
 
 interface JobRegistrationWithJobs extends Registration {
   jobs?: Array<{
@@ -97,7 +98,7 @@ export class RegistrationsService {
         }
 
         const currentRegistrationCount = job.registrations.filter(
-          r => r.registration.status !== RegistrationStatus.CANCELLED
+          r => isCapacityReservingStatus(r.registration.status)
             && r.registration.year === createRegistrationDto.year
         ).length;
 
@@ -216,7 +217,7 @@ export class RegistrationsService {
 
     // Check if this affects the registration status
     const currentRegistrationCount = job.registrations.filter(
-      r => r.registration.status !== RegistrationStatus.CANCELLED
+      r => isCapacityReservingStatus(r.registration.status)
         && r.registration.year === registration.year
     ).length;
 
@@ -654,7 +655,7 @@ export class RegistrationsService {
           throw new NotFoundException(`Job with ID ${jobId} not found`);
         }
         const currentRegistrationCount = job.registrations.filter(
-          (r) => r.registration.status !== RegistrationStatus.CANCELLED
+          (r) => isCapacityReservingStatus(r.registration.status)
             && r.registration.year === currentYear,
         ).length;
         return { job, currentRegistrationCount };

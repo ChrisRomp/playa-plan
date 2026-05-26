@@ -124,6 +124,15 @@ export class PublicCoreConfigDto {
   allowDeferredDuesPayment!: boolean;
 
   /**
+   * Whether application approval is required before completing registration
+   */
+  @ApiProperty({
+    description: 'Whether application approval is required before completing registration',
+    example: false
+  })
+  applicationApprovalRequired!: boolean;
+
+  /**
    * Whether Stripe is enabled
    */
   @ApiProperty({

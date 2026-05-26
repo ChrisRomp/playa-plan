@@ -241,6 +241,15 @@ export class CoreConfigResponseDto {
   senderName!: string | null;
 
   /**
+   * Whether application approval is required before completing registration
+   */
+  @ApiProperty({
+    description: 'Whether application approval is required before completing registration',
+    example: false
+  })
+  applicationApprovalRequired!: boolean;
+
+  /**
    * Date when the configuration was created
    */
   @ApiProperty({

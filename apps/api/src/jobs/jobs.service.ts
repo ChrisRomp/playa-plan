@@ -4,6 +4,7 @@ import { CoreConfigService } from '../core-config/services/core-config.service';
 import { CreateJobDto } from './dto/create-job.dto';
 import { UpdateJobDto } from './dto/update-job.dto';
 import { Job, Prisma, UserRole } from '@prisma/client';
+import { isCapacityReservingStatus } from '../registrations/constants/registration-status.constants';
 
 /**
  * Type definition for job with included relations
@@ -190,10 +191,10 @@ export class JobsService {
    * Add derived properties from category and calculate current registrations for a job
    */
   private addDerivedPropertiesWithRegistrations(job: JobWithRelations, registrationYear: number) {
-    // Count all non-cancelled registrations for the configured registration year
-    // This includes PENDING, CONFIRMED, and WAITLISTED registrations
+    // Count only capacity-reserving registrations (PENDING, CONFIRMED, WAITLISTED)
+    // for the configured registration year
     const currentRegistrations = job.registrations?.filter(
-      reg => reg.registration.status !== 'CANCELLED' && reg.registration.year === registrationYear
+      reg => isCapacityReservingStatus(reg.registration.status) && reg.registration.year === registrationYear
     ).length || 0;
 
     // Exclude registrations from the returned object

@@ -80,6 +80,12 @@ export class PaymentsService {
       if (registration.userId !== createPaymentDto.userId) {
         throw new BadRequestException('Registration does not belong to the specified user');
       }
+
+      // Prevent payments for registrations still in application phase
+      const applicationStatuses = ['APPLICATION_SUBMITTED', 'APPLICATION_APPROVED', 'APPLICATION_DECLINED'];
+      if (applicationStatuses.includes(registration.status)) {
+        throw new BadRequestException('Cannot process payment for a registration that has not completed the application process');
+      }
     }
     
     try {
@@ -253,6 +259,12 @@ export class PaymentsService {
       throw new NotFoundException(`Registration with ID ${registrationId} not found`);
     }
     
+    // Prevent linking payments to registrations in application phase
+    const applicationStatuses = ['APPLICATION_SUBMITTED', 'APPLICATION_APPROVED', 'APPLICATION_DECLINED'];
+    if (applicationStatuses.includes(registration.status)) {
+      throw new BadRequestException('Cannot link payment to a registration that has not completed the application process');
+    }
+
     // Check if registration belongs to the same user as the payment
     if (registration.userId !== payment.userId) {
       throw new BadRequestException('Registration does not belong to the same user as the payment');

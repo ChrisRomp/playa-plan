@@ -77,6 +77,8 @@ export class AdminAudit {
       [AdminAuditActionType.CAMPING_OPTION_ADD]: 'added camping option',
       [AdminAuditActionType.CAMPING_OPTION_REMOVE]: 'removed camping option',
       [AdminAuditActionType.CAMPING_OPTION_MODIFY]: 'modified camping option',
+      [AdminAuditActionType.APPLICATION_APPROVE]: 'approved application',
+      [AdminAuditActionType.APPLICATION_DECLINE]: 'declined application',
     };
 
     return actionMap[this.actionType] || 'performed unknown action';

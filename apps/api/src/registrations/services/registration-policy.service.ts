@@ -4,7 +4,7 @@ import {
   Injectable,
   Logger,
 } from '@nestjs/common';
-import { User } from '@prisma/client';
+import { User, UserRole } from '@prisma/client';
 import { CoreConfigService } from '../../core-config/services/core-config.service';
 import { CreateCampRegistrationDto } from '../dto/create-camp-registration.dto';
 
@@ -16,10 +16,12 @@ import { CreateCampRegistrationDto } from '../dto/create-camp-registration.dto';
  * intentionally bypasses these checks so admins can create or modify
  * registrations as an override path.
  *
- * The public API is a single `assertCanCreateCampRegistration(user, dto)`
- * method that loads the current `coreConfig` once and runs every applicable
- * check in a defined order. This makes it impossible for a caller to forget
- * one of the gates.
+ * The public API exposes two assertion methods:
+ * - `assertCanCreateCampRegistration(user, dto)` — full registration (no approval mode)
+ * - `assertCanSubmitApplication(user)` — application-only submission (approval mode)
+ *
+ * Plus a helper:
+ * - `shouldAutoApprove(user)` — whether the user bypasses the approval queue
  */
 @Injectable()
 export class RegistrationPolicyService {
@@ -42,10 +44,12 @@ export class RegistrationPolicyService {
     user: Pick<
       User,
       | 'id'
+      | 'role'
       | 'allowRegistration'
       | 'allowEarlyRegistration'
       | 'allowNoJob'
       | 'allowDeferredDuesPayment'
+      | 'autoApproveRegistration'
     >,
     dto: Pick<CreateCampRegistrationDto, 'jobs' | 'deferPayment'>,
   ): Promise<void> {
@@ -61,6 +65,45 @@ export class RegistrationPolicyService {
       { allowDeferredDuesPayment: config.allowDeferredDuesPayment },
       dto.deferPayment ?? false,
     );
+  }
+
+  /**
+   * Assert that the user can submit an application (approval mode).
+   * Only validates registration window + user eligibility.
+   * Does NOT check jobs/terms/payment since those are deferred until after approval.
+   */
+  async assertCanSubmitApplication(
+    user: Pick<User, 'id' | 'allowRegistration' | 'allowEarlyRegistration'>,
+  ): Promise<void> {
+    const config = await this.coreConfigService.findCurrent();
+
+    this.assertRegistrationOpen(user, {
+      registrationOpen: config.registrationOpen,
+      earlyRegistrationOpen: config.earlyRegistrationOpen,
+    });
+  }
+
+  /**
+   * Determine whether the user should be auto-approved when submitting
+   * an application. Staff/Admin roles are always auto-approved, as are
+   * users with the `autoApproveRegistration` flag.
+   */
+  shouldAutoApprove(
+    user: Pick<User, 'role' | 'autoApproveRegistration'>,
+  ): boolean {
+    if (user.role === UserRole.ADMIN || user.role === UserRole.STAFF) {
+      return true;
+    }
+    return user.autoApproveRegistration;
+  }
+
+  /**
+   * Check whether application approval is currently required.
+   * Returns the current config setting.
+   */
+  async isApprovalRequired(): Promise<boolean> {
+    const config = await this.coreConfigService.findCurrent();
+    return config.applicationApprovalRequired;
   }
 
   /**
