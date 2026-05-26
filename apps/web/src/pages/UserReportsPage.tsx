@@ -2,10 +2,11 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { ArrowLeft, Download, Filter, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { DataTable, DataTableColumn } from '../components/common/DataTable/DataTable';
-import { reports, User } from '../lib/api';
+import { reports, User, Registration } from '../lib/api';
 import { PATHS } from '../routes';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import { downloadCsv } from '../utils/csv';
+import { useConfig } from '../hooks/useConfig';
 
 interface UserReportFilters {
   year?: number;
@@ -19,18 +20,33 @@ interface UserReportFilters {
  */
 export function UserReportsPage() {
   const [users, setUsers] = useState<User[]>([]);
+  const [registrations, setRegistrations] = useState<Registration[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filters, setFilters] = useState<UserReportFilters>({});
   const [showFilters, setShowFilters] = useState(false);
+  const { config } = useConfig();
+  const [defaultYearApplied, setDefaultYearApplied] = useState(false);
 
-  // Fetch users data
-  const fetchUsers = useCallback(async () => {
+  // Set default year filter to registrationYear from config once config is loaded
+  useEffect(() => {
+    if (config?.currentYear && !defaultYearApplied) {
+      setFilters(prev => ({ ...prev, year: config.currentYear }));
+      setDefaultYearApplied(true);
+    }
+  }, [config?.currentYear, defaultYearApplied]);
+
+  // Fetch users and registrations data
+  const fetchData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await reports.getUsers();
-      setUsers(data);
+      const [usersData, registrationsData] = await Promise.all([
+        reports.getUsers(),
+        reports.getRegistrations(),
+      ]);
+      setUsers(usersData);
+      setRegistrations(registrationsData);
     } catch (err) {
       setError('Failed to fetch users data');
       console.error('Error fetching users:', err);
@@ -40,8 +56,8 @@ export function UserReportsPage() {
   }, []);
 
   useEffect(() => {
-    fetchUsers();
-  }, [fetchUsers]);
+    fetchData();
+  }, [fetchData]);
 
   // Apply client-side filtering
   const filteredUsers = useMemo(() => {
@@ -61,21 +77,25 @@ export function UserReportsPage() {
         }
       }
       
-      // Year filter would need user registration data - skip for now as users don't have year field
+      // Year filter - filter by users who have a registration for the selected year
+      if (filters.year) {
+        const hasRegistrationForYear = registrations.some(
+          reg => reg.userId === user.id && reg.year === filters.year
+        );
+        if (!hasRegistrationForYear) {
+          return false;
+        }
+      }
       
       return true;
     });
-  }, [users, filters]);
+  }, [users, registrations, filters]);
 
-  // Get unique years for filter dropdown (assuming users have a registration year)
+  // Get unique years for filter dropdown from actual registration data
   const availableYears = useMemo(() => {
-    const currentYear = new Date().getFullYear();
-    const years = [];
-    for (let i = currentYear - 5; i <= currentYear + 1; i++) {
-      years.push(i);
-    }
-    return years.sort((a, b) => b - a);
-  }, []);
+    const years = [...new Set(registrations.map(reg => reg.year))].sort((a, b) => b - a);
+    return years;
+  }, [registrations]);
 
   // Calculate summary statistics based on filtered data
   const summaryStats = useMemo(() => {
