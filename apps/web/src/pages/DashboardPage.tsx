@@ -134,6 +134,11 @@ const DashboardPage: React.FC = () => {
                       )}
                     </div>
                   </div>
+                  {currentRegistration.status === 'APPLICATION_DECLINED' && currentRegistration.decisionMessage && (
+                    <p className="mt-3 text-sm text-gray-700">
+                      {currentRegistration.decisionMessage}
+                    </p>
+                  )}
                 </div>
 
                 {/* Deferred Payment CTA — surfaces a Pay Now button for

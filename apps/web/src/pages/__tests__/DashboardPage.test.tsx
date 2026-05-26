@@ -1205,4 +1205,102 @@ describe('DashboardPage - Registration after cancellation', () => {
       });
     });
   });
+
+  describe('Declined application decision message', () => {
+    it('should display the decision message when application is declined', async () => {
+      const declinedRegistration = {
+        id: 'declined-reg-id',
+        userId: '1',
+        year: 2024,
+        status: 'APPLICATION_DECLINED' as const,
+        decisionMessage: 'We were unable to accommodate your request this year.',
+        createdAt: '2024-01-10T10:00:00.000Z',
+        updatedAt: '2024-01-12T10:00:00.000Z',
+        jobs: [],
+        payments: [],
+      };
+
+      mockUseConfig.mockReturnValue({
+        config: {
+          name: 'Test Camp',
+          description: 'Test',
+          homePageBlurb: 'Test',
+          registrationOpen: true,
+          earlyRegistrationOpen: false,
+          currentYear: 2024,
+        },
+        isLoading: false,
+        error: null,
+        refreshConfig: vi.fn(),
+        isConnecting: false,
+        isConnected: true,
+        connectionError: null,
+      });
+
+      mockUseUserRegistrations.mockReturnValue({
+        registrations: [declinedRegistration],
+        loading: false,
+        error: null,
+        refetch: vi.fn(),
+      });
+
+      vi.mocked(registrationUtils.getActiveRegistrations).mockReturnValue([declinedRegistration]);
+
+      const Wrapper = createWrapper();
+      render(<DashboardPage />, { wrapper: Wrapper });
+
+      await waitFor(() => {
+        expect(screen.getByText('We were unable to accommodate your request this year.')).toBeInTheDocument();
+      });
+    });
+
+    it('should not display decision message for non-declined statuses', async () => {
+      const submittedRegistration = {
+        id: 'submitted-reg-id',
+        userId: '1',
+        year: 2024,
+        status: 'APPLICATION_SUBMITTED' as const,
+        decisionMessage: null,
+        createdAt: '2024-01-10T10:00:00.000Z',
+        updatedAt: '2024-01-10T10:00:00.000Z',
+        jobs: [],
+        payments: [],
+      };
+
+      mockUseConfig.mockReturnValue({
+        config: {
+          name: 'Test Camp',
+          description: 'Test',
+          homePageBlurb: 'Test',
+          registrationOpen: true,
+          earlyRegistrationOpen: false,
+          currentYear: 2024,
+        },
+        isLoading: false,
+        error: null,
+        refreshConfig: vi.fn(),
+        isConnecting: false,
+        isConnected: true,
+        connectionError: null,
+      });
+
+      mockUseUserRegistrations.mockReturnValue({
+        registrations: [submittedRegistration],
+        loading: false,
+        error: null,
+        refetch: vi.fn(),
+      });
+
+      vi.mocked(registrationUtils.getActiveRegistrations).mockReturnValue([submittedRegistration]);
+
+      const Wrapper = createWrapper();
+      render(<DashboardPage />, { wrapper: Wrapper });
+
+      await waitFor(() => {
+        expect(screen.getByText('Application Submitted')).toBeInTheDocument();
+      });
+
+      expect(screen.queryByText('We were unable to accommodate your request this year.')).not.toBeInTheDocument();
+    });
+  });
 });
