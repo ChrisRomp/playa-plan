@@ -1,7 +1,12 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { RegistrationsController } from './registrations.controller';
 import { RegistrationsService } from './registrations.service';
-import { CreateRegistrationDto, SubmitApplicationDto, UpdateRegistrationDto } from './dto';
+import {
+  CompleteRegistrationDto,
+  CreateRegistrationDto,
+  SubmitApplicationDto,
+  UpdateRegistrationDto,
+} from './dto';
 import { RegistrationStatus, UserRole } from '@prisma/client';
 
 describe('RegistrationsController', () => {
@@ -11,6 +16,7 @@ describe('RegistrationsController', () => {
   const mockRegistrationsService = {
     create: jest.fn(),
     submitApplication: jest.fn(),
+    completeRegistration: jest.fn(),
     findAll: jest.fn(),
     findByUser: jest.fn(),
     findByJob: jest.fn(),
@@ -96,6 +102,41 @@ describe('RegistrationsController', () => {
       expect(mockRegistrationsService.submitApplication).toHaveBeenCalledWith(
         mockRequest.user.id,
         submitApplicationDto,
+      );
+      expect(result).toEqual(expectedResult);
+    });
+  });
+
+  describe('completeRegistration', () => {
+    it('should complete a registration for the authenticated user', async () => {
+      const completeRegistrationDto: CompleteRegistrationDto = {
+        jobs: ['job-id-1'],
+        acceptedTerms: true,
+        deferPayment: true,
+      };
+      const mockRequest = {
+        user: {
+          id: 'user-id',
+          email: 'user@example.com',
+          role: UserRole.PARTICIPANT,
+        },
+      } as any;
+      const expectedResult = {
+        registration: {
+          id: 'registration-id',
+          status: RegistrationStatus.CONFIRMED,
+          paymentDeferred: true,
+        },
+        message: 'Registration completed successfully',
+      };
+
+      mockRegistrationsService.completeRegistration.mockResolvedValue(expectedResult);
+
+      const result = await controller.completeRegistration(completeRegistrationDto, mockRequest);
+
+      expect(mockRegistrationsService.completeRegistration).toHaveBeenCalledWith(
+        mockRequest.user.id,
+        completeRegistrationDto,
       );
       expect(result).toEqual(expectedResult);
     });

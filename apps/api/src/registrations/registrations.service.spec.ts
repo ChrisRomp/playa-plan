@@ -6,7 +6,7 @@ import { RegistrationPolicyService } from './services/registration-policy.servic
 import { CoreConfigService } from '../core-config/services/core-config.service';
 import { NotFoundException, ConflictException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { NotificationType, RegistrationStatus, UserRole } from '@prisma/client';
-import { CreateRegistrationDto, SubmitApplicationDto } from './dto';
+import { CompleteRegistrationDto, CreateRegistrationDto, SubmitApplicationDto } from './dto';
 
 describe('RegistrationsService', () => {
   let service: RegistrationsService;
@@ -15,7 +15,7 @@ describe('RegistrationsService', () => {
 
   type MockPrismaService = {
     registration: { create: jest.Mock; findMany: jest.Mock; findUnique: jest.Mock; findFirst: jest.Mock; update: jest.Mock; delete: jest.Mock };
-    registrationJob: { create: jest.Mock; findMany: jest.Mock; findFirst: jest.Mock; delete: jest.Mock };
+    registrationJob: { create: jest.Mock; createMany: jest.Mock; findMany: jest.Mock; findFirst: jest.Mock; delete: jest.Mock };
     job: { findUnique: jest.Mock; findMany: jest.Mock };
     user: { findUnique: jest.Mock };
     payment: { findUnique: jest.Mock };
@@ -36,6 +36,7 @@ describe('RegistrationsService', () => {
     },
     registrationJob: {
       create: jest.fn(),
+      createMany: jest.fn(),
       findMany: jest.fn(),
       findFirst: jest.fn(),
       delete: jest.fn(),
@@ -879,6 +880,198 @@ describe('RegistrationsService', () => {
       ).rejects.toThrow(BadRequestException);
 
       expect(mockPrismaService.registration.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('completeRegistration', () => {
+    const userId = 'user-id-complete';
+    const registrationYear = 2026;
+    const completeDto: CompleteRegistrationDto = {
+      jobs: ['job-1'],
+      acceptedTerms: true,
+      deferPayment: false,
+    };
+    const baseUser = {
+      id: userId,
+      email: 'complete@example.playaplan.app',
+      firstName: 'Complete',
+      lastName: 'User',
+      playaName: 'Dusty',
+      role: UserRole.PARTICIPANT,
+      allowNoJob: false,
+      allowDeferredDuesPayment: true,
+    };
+    const approvedRegistration = {
+      id: 'approved-registration-id',
+      userId,
+      year: registrationYear,
+      status: RegistrationStatus.APPLICATION_APPROVED,
+      campingOptionRegistrations: [
+        {
+          id: 'camp-reg-1',
+          userId,
+          campingOptionId: 'camp-option-1',
+          registrationId: 'approved-registration-id',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          campingOption: {
+            id: 'camp-option-1',
+            name: 'Tent Camping',
+            description: null,
+            enabled: true,
+            workShiftsRequired: 0,
+            participantDues: 100,
+            staffDues: 100,
+            maxSignups: 50,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            fields: [],
+          },
+        },
+      ],
+    };
+    const updatedRegistration = {
+      id: 'approved-registration-id',
+      userId,
+      year: registrationYear,
+      status: RegistrationStatus.PENDING,
+      paymentDeferred: false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      user: baseUser,
+      jobs: [],
+      campingOptionRegistrations: approvedRegistration.campingOptionRegistrations,
+      payments: [],
+    };
+
+    beforeEach(() => {
+      mockCoreConfigService.findCurrent.mockResolvedValue({
+        registrationYear,
+        applicationApprovalRequired: true,
+        allowDeferredDuesPayment: true,
+      });
+      mockPrismaService.user.findUnique.mockResolvedValue(baseUser);
+      mockPrismaService.registration.findFirst.mockResolvedValue(approvedRegistration);
+      mockPrismaService.job.findMany.mockResolvedValue([]);
+      mockPrismaService.job.findUnique.mockImplementation(({ where }: { where: { id: string } }) => ({
+        id: where.id,
+        maxRegistrations: 10,
+        registrations: [],
+      }));
+      mockPrismaService.registrationJob.createMany.mockResolvedValue({ count: 1 });
+      mockPrismaService.registration.update.mockResolvedValue(updatedRegistration);
+      mockNotificationsService.sendRegistrationConfirmationEmail.mockResolvedValue(true);
+    });
+
+    it('should complete an approved application as PENDING when payment is not deferred', async () => {
+      const result = await service.completeRegistration(userId, completeDto);
+
+      expect(mockPrismaService.registration.findFirst).toHaveBeenCalledWith({
+        where: {
+          userId,
+          year: registrationYear,
+          status: { in: [RegistrationStatus.APPLICATION_APPROVED] },
+        },
+        include: {
+          campingOptionRegistrations: {
+            include: {
+              campingOption: {
+                include: {
+                  fields: true,
+                },
+              },
+            },
+          },
+        },
+      });
+      expect(mockPrismaService.registrationJob.createMany).toHaveBeenCalledWith({
+        data: [{ registrationId: approvedRegistration.id, jobId: 'job-1' }],
+      });
+      expect(mockPrismaService.registration.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: approvedRegistration.id },
+          data: {
+            status: RegistrationStatus.PENDING,
+            paymentDeferred: false,
+          },
+        }),
+      );
+      expect(result).toEqual({
+        registration: updatedRegistration,
+        message: 'Registration completed successfully',
+      });
+    });
+
+    it('should bypass the approval gate for submitted applications when approval mode is disabled', async () => {
+      mockCoreConfigService.findCurrent.mockResolvedValue({
+        registrationYear,
+        applicationApprovalRequired: false,
+        allowDeferredDuesPayment: true,
+      });
+
+      await service.completeRegistration(userId, completeDto);
+
+      expect(mockPrismaService.registration.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            status: {
+              in: [
+                RegistrationStatus.APPLICATION_APPROVED,
+                RegistrationStatus.APPLICATION_SUBMITTED,
+              ],
+            },
+          }),
+        }),
+      );
+    });
+
+    it('should confirm deferred registrations and send the confirmation email', async () => {
+      const deferredDto: CompleteRegistrationDto = {
+        ...completeDto,
+        deferPayment: true,
+      };
+      mockPrismaService.registration.update.mockResolvedValue({
+        ...updatedRegistration,
+        status: RegistrationStatus.CONFIRMED,
+        paymentDeferred: true,
+      });
+
+      const result = await service.completeRegistration(userId, deferredDto);
+
+      expect(result.registration.status).toBe(RegistrationStatus.CONFIRMED);
+      expect(result.registration.paymentDeferred).toBe(true);
+      expect(mockNotificationsService.sendRegistrationConfirmationEmail).toHaveBeenCalledWith(
+        baseUser.email,
+        expect.objectContaining({
+          id: updatedRegistration.id,
+          status: RegistrationStatus.CONFIRMED,
+          paymentDeferred: true,
+        }),
+        userId,
+        'Complete User',
+        baseUser.playaName,
+      );
+    });
+
+    it('should reject completion without an eligible approved application', async () => {
+      mockPrismaService.registration.findFirst.mockResolvedValue(null);
+
+      await expect(service.completeRegistration(userId, completeDto)).rejects.toThrow(
+        new NotFoundException('No approved application found for completion'),
+      );
+    });
+
+    it('should reject completion with no jobs when the user is not allowNoJob', async () => {
+      const noJobsDto: CompleteRegistrationDto = {
+        jobs: [],
+        acceptedTerms: true,
+      };
+
+      await expect(service.completeRegistration(userId, noJobsDto)).rejects.toThrow(
+        new BadRequestException('You must select at least one work shift to register.'),
+      );
+
+      expect(mockPrismaService.registration.update).not.toHaveBeenCalled();
     });
   });
 

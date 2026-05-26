@@ -5,6 +5,7 @@ import {
   CreateRegistrationDto,
   AddJobToRegistrationDto,
   CreateCampRegistrationDto,
+  CompleteRegistrationDto,
   SubmitApplicationDto,
   UpdateRegistrationDto,
 } from './dto';
@@ -789,6 +790,172 @@ export class RegistrationsService {
       message: isAutoApproved
         ? 'Application approved automatically. Please complete your registration.'
         : 'Application submitted successfully',
+    };
+  }
+
+  /**
+   * Complete a previously approved application by attaching jobs and
+   * finalizing payment state for the current registration year.
+   */
+  async completeRegistration(
+    userId: string,
+    completeRegistrationDto: CompleteRegistrationDto,
+  ) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+    if (!user) {
+      throw new NotFoundException(`User with ID ${userId} not found`);
+    }
+
+    const config = await this.coreConfigService.findCurrent();
+    const validStatuses: RegistrationStatus[] = [RegistrationStatus.APPLICATION_APPROVED];
+    if (!config.applicationApprovalRequired) {
+      validStatuses.push(RegistrationStatus.APPLICATION_SUBMITTED);
+    }
+
+    const registration = await this.prisma.registration.findFirst({
+      where: {
+        userId,
+        year: config.registrationYear,
+        status: { in: validStatuses },
+      },
+      include: {
+        campingOptionRegistrations: {
+          include: {
+            campingOption: {
+              include: {
+                fields: true,
+              },
+            },
+          },
+        },
+      },
+    });
+    if (!registration) {
+      throw new NotFoundException('No approved application found for completion');
+    }
+
+    if (!completeRegistrationDto.acceptedTerms) {
+      throw new BadRequestException('Terms and conditions must be accepted');
+    }
+
+    const deferPayment = completeRegistrationDto.deferPayment ?? false;
+    if (deferPayment) {
+      if (!config.allowDeferredDuesPayment) {
+        throw new ForbiddenException('Deferred payment is not enabled for this camp.');
+      }
+      if (!user.allowDeferredDuesPayment) {
+        throw new ForbiddenException('Your account is not eligible to defer payment.');
+      }
+    }
+
+    const jobIds = completeRegistrationDto.jobs ?? [];
+    await this.validateNoStaffOnlyJobsForParticipant(user.role, jobIds);
+
+    if (jobIds.length === 0 && !user.allowNoJob) {
+      throw new BadRequestException('You must select at least one work shift to register.');
+    }
+
+    const jobsWithCounts = await Promise.all(
+      jobIds.map(async (jobId) => {
+        const job = await this.prisma.job.findUnique({
+          where: { id: jobId },
+          include: {
+            registrations: { include: { registration: true } },
+          },
+        });
+        if (!job) {
+          throw new NotFoundException(`Job with ID ${jobId} not found`);
+        }
+
+        const currentRegistrationCount = job.registrations.filter(
+          (currentJobRegistration) => isCapacityReservingStatus(currentJobRegistration.registration.status)
+            && currentJobRegistration.registration.year === config.registrationYear,
+        ).length;
+
+        return { job, currentRegistrationCount };
+      }),
+    );
+
+    const hasWaitlistedJob = jobsWithCounts.some(
+      ({ job, currentRegistrationCount }) => currentRegistrationCount >= job.maxRegistrations,
+    );
+
+    let status: RegistrationStatus;
+    if (hasWaitlistedJob) {
+      status = RegistrationStatus.WAITLISTED;
+    } else if (deferPayment) {
+      status = RegistrationStatus.CONFIRMED;
+    } else {
+      status = RegistrationStatus.PENDING;
+    }
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      if (jobIds.length > 0) {
+        await tx.registrationJob.createMany({
+          data: jobIds.map((jobId) => ({
+            registrationId: registration.id,
+            jobId,
+          })),
+        });
+      }
+
+      return tx.registration.update({
+        where: { id: registration.id },
+        data: {
+          status,
+          paymentDeferred: deferPayment,
+        },
+        include: {
+          user: true,
+          jobs: {
+            include: {
+              job: {
+                include: {
+                  category: true,
+                  shift: true,
+                },
+              },
+            },
+          },
+          campingOptionRegistrations: {
+            include: {
+              campingOption: {
+                include: {
+                  fields: true,
+                },
+              },
+            },
+          },
+          payments: true,
+        },
+      });
+    });
+
+    if (updated.paymentDeferred && updated.status === RegistrationStatus.CONFIRMED) {
+      this.sendRegistrationConfirmationEmail(
+        {
+          email: user.email,
+          firstName: user.firstName ?? undefined,
+          lastName: user.lastName ?? undefined,
+          playaName: user.playaName,
+        },
+        updated,
+        updated.campingOptionRegistrations,
+        config.registrationYear,
+        { paymentDeferred: true },
+      ).catch((emailErr: unknown) => {
+        const message = emailErr instanceof Error ? emailErr.message : String(emailErr);
+        this.logger.warn(
+          `Failed to send deferred-registration confirmation email to ${user.email}: ${message}`,
+        );
+      });
+    }
+
+    return {
+      registration: updated,
+      message: 'Registration completed successfully',
     };
   }
 
