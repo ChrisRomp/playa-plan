@@ -48,7 +48,7 @@ export function UserReportsPage() {
       setUsers(usersData);
       setRegistrations(registrationsData);
     } catch (err) {
-      setError('Failed to fetch users data');
+      setError('Failed to fetch user and registration data');
       console.error('Error fetching users:', err);
     } finally {
       setLoading(false);
@@ -61,6 +61,15 @@ export function UserReportsPage() {
 
   // Apply client-side filtering
   const filteredUsers = useMemo(() => {
+    // Pre-compute set of user IDs with registrations for the selected year
+    const userIdsWithRegistration = filters.year
+      ? new Set(
+          registrations
+            .filter(reg => reg.year === filters.year)
+            .map(reg => reg.userId)
+        )
+      : null;
+
     return users.filter(user => {
       // Role filter
       if (filters.role && user.role !== filters.role) {
@@ -78,13 +87,8 @@ export function UserReportsPage() {
       }
       
       // Year filter - filter by users who have a registration for the selected year
-      if (filters.year) {
-        const hasRegistrationForYear = registrations.some(
-          reg => reg.userId === user.id && reg.year === filters.year
-        );
-        if (!hasRegistrationForYear) {
-          return false;
-        }
+      if (userIdsWithRegistration && !userIdsWithRegistration.has(user.id)) {
+        return false;
       }
       
       return true;
