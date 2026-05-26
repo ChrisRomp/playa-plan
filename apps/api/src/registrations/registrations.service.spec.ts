@@ -952,6 +952,9 @@ describe('RegistrationsService', () => {
       });
       mockPrismaService.user.findUnique.mockResolvedValue(baseUser);
       mockPrismaService.registration.findFirst.mockResolvedValue(approvedRegistration);
+      mockPrismaService.registration.findUnique.mockResolvedValue({
+        status: RegistrationStatus.APPLICATION_APPROVED,
+      });
       mockPrismaService.job.findMany.mockResolvedValue([]);
       mockPrismaService.job.findUnique.mockImplementation(({ where }: { where: { id: string } }) => ({
         id: where.id,
@@ -1069,6 +1072,19 @@ describe('RegistrationsService', () => {
 
       await expect(service.completeRegistration(userId, noJobsDto)).rejects.toThrow(
         new BadRequestException('You must select at least one work shift to register.'),
+      );
+
+      expect(mockPrismaService.registration.update).not.toHaveBeenCalled();
+    });
+
+    it('should reject concurrent completion when registration status has already changed', async () => {
+      // Simulate race condition: registration was already completed by another request
+      mockPrismaService.registration.findUnique.mockResolvedValue({
+        status: RegistrationStatus.PENDING, // Already transitioned out of APPLICATION_APPROVED
+      });
+
+      await expect(service.completeRegistration(userId, completeDto)).rejects.toThrow(
+        ConflictException,
       );
 
       expect(mockPrismaService.registration.update).not.toHaveBeenCalled();

@@ -892,6 +892,15 @@ export class RegistrationsService {
     }
 
     const updated = await this.prisma.$transaction(async (tx) => {
+      // Optimistic lock: verify registration is still in a completable status
+      const currentReg = await tx.registration.findUnique({
+        where: { id: registration.id },
+        select: { status: true },
+      });
+      if (!currentReg || !validStatuses.includes(currentReg.status)) {
+        throw new ConflictException('Registration has already been completed or is no longer in a valid state');
+      }
+
       if (jobIds.length > 0) {
         await tx.registrationJob.createMany({
           data: jobIds.map((jobId) => ({
