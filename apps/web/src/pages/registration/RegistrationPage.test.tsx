@@ -462,6 +462,58 @@ describe('RegistrationPage', () => {
     expect(screen.queryByText('Your Profile Information')).not.toBeInTheDocument();
   });
 
+  it('allows APPLICATION_SUBMITTED users to complete when approval mode is disabled', async () => {
+    // Scenario: admin disables approval mode while user has APPLICATION_SUBMITTED status
+    vi.spyOn(useConfigModule, 'useConfig').mockReturnValue({
+      config: {
+        name: 'Test Camp',
+        description: 'Test Description',
+        homePageBlurb: 'Welcome!',
+        registrationOpen: true,
+        earlyRegistrationOpen: false,
+        currentYear: 2025,
+        registrationTerms: '<p>Terms.</p>',
+        applicationApprovalRequired: false, // Approval mode disabled
+      },
+      isLoading: false,
+      error: null,
+      refreshConfig: vi.fn(),
+      isConnecting: false,
+      isConnected: true,
+      connectionError: null,
+    });
+    vi.spyOn(useCampRegistrationModule, 'useCampRegistration').mockReturnValue({
+      campRegistration: {
+        campingOptions: [{ campingOptionId: 'option1' }],
+        customFieldValues: [],
+        jobRegistrations: [],
+        hasRegistration: true,
+      },
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    vi.spyOn(useMyRegistrationModule, 'useMyRegistration').mockReturnValue({
+      registration: {
+        id: 'registration-1',
+        status: 'APPLICATION_SUBMITTED', // User has pending application
+        year: 2025,
+        createdAt: '2025-05-01T00:00:00Z',
+      },
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    renderWithAuth();
+
+    // Should show the completion flow (shifts step), not the pending banner
+    await waitFor(() => {
+      expect(screen.getByText('Select Work Shifts')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('Application pending review')).not.toBeInTheDocument();
+  });
+
   it('allows navigating to camping options step after filling profile form', async () => {
     renderWithAuth();
     

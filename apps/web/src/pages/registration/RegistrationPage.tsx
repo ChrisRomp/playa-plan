@@ -81,8 +81,10 @@ export default function RegistrationPage() {
   const isApplicationSubmitted = registrationStatus === 'APPLICATION_SUBMITTED';
   const isApplicationApproved = registrationStatus === 'APPLICATION_APPROVED';
   const isApplicationDeclined = registrationStatus === 'APPLICATION_DECLINED';
+  // User can complete if explicitly approved OR if approval mode was disabled while they had a pending application
+  const canCompleteApplication = isApplicationApproved || (!isApplicationMode && isApplicationSubmitted);
   const isApplicationEntryFlow = isApplicationMode && myRegistration === null;
-  const visibleSteps = isApplicationApproved
+  const visibleSteps = canCompleteApplication
     ? [4, 5, 6]
     : isApplicationMode
       ? [1, 2, 3]
@@ -216,10 +218,10 @@ export default function RegistrationPage() {
   }, [myRegistration]);
 
   useEffect(() => {
-    if (isApplicationApproved && currentStep < 4) {
+    if (canCompleteApplication && currentStep < 4) {
       setCurrentStep(4);
     }
-  }, [currentStep, isApplicationApproved]);
+  }, [currentStep, canCompleteApplication]);
 
   // Check if user can register and redirect if not
   useEffect(() => {
@@ -1404,7 +1406,7 @@ export default function RegistrationPage() {
               description={`${config?.name || 'Camp'} Dues Payment ${config?.currentYear || new Date().getFullYear()}`}
               onPaymentStart={async () => {
                 try {
-                  if (isApplicationApproved) {
+                  if (canCompleteApplication) {
                     const completedRegistrationId = await completeApprovedRegistration(false);
                     return { registrationId: completedRegistrationId };
                   }
@@ -1454,7 +1456,7 @@ export default function RegistrationPage() {
               type="button"
               onClick={async () => {
                 try {
-                  if (isApplicationApproved) {
+                  if (canCompleteApplication) {
                     await completeApprovedRegistration(totalCost > 0);
                     navigate('/dashboard');
                     return;
@@ -1630,7 +1632,7 @@ export default function RegistrationPage() {
     );
   }
 
-  if (isApplicationApproved && currentStep < 4) {
+  if (canCompleteApplication && currentStep < 4) {
     return (
       <div className="max-w-4xl mx-auto p-6">
         <div className="flex items-center justify-center py-12">
@@ -1647,7 +1649,7 @@ export default function RegistrationPage() {
         {isApplicationEntryFlow ? 'Camp Application' : 'Camp Registration'}
       </h1>
 
-      {isApplicationStatus(registrationStatus) && (
+      {isApplicationApproved && (
         <ApplicationStatusBanner
           status={registrationStatus ?? 'APPLICATION_SUBMITTED'}
           decisionMessage={myRegistration?.decisionMessage}
