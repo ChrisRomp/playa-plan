@@ -655,6 +655,10 @@ export default function RegistrationPage() {
     }));
   };
 
+  const handleNumberInputWheel = (event: React.WheelEvent<HTMLInputElement>) => {
+    event.currentTarget.blur();
+  };
+
   const handleProfileFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setProfileFormData(prev => ({
@@ -1018,6 +1022,7 @@ export default function RegistrationPage() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     min={field.minValue !== null ? field.minValue : undefined}
                     max={field.maxValue !== null ? field.maxValue : undefined}
+                    onWheel={handleNumberInputWheel}
                   />
                 )}
                 
@@ -1038,6 +1043,7 @@ export default function RegistrationPage() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     min={field.minValue !== null ? field.minValue : undefined}
                     max={field.maxValue !== null ? field.maxValue : undefined}
+                    onWheel={handleNumberInputWheel}
                   />
                 )}
                 
