@@ -6,6 +6,7 @@ import { reports, User } from '../lib/api';
 import { PATHS } from '../routes';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import { downloadCsv } from '../utils/csv';
+import { useConfig } from '../hooks/useConfig';
 
 interface UserReportFilters {
   year?: number;
@@ -19,20 +20,35 @@ interface UserReportFilters {
  */
 export function UserReportsPage() {
   const [users, setUsers] = useState<User[]>([]);
+  const [registrationYearUsers, setRegistrationYearUsers] = useState<{ year: number; userId: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filters, setFilters] = useState<UserReportFilters>({});
   const [showFilters, setShowFilters] = useState(false);
+  const { config } = useConfig();
+  const [defaultYearApplied, setDefaultYearApplied] = useState(false);
 
-  // Fetch users data
-  const fetchUsers = useCallback(async () => {
+  // Set default year filter to registrationYear from config once config is loaded
+  useEffect(() => {
+    if (config?.currentYear && !defaultYearApplied) {
+      setFilters(prev => ({ ...prev, year: config.currentYear }));
+      setDefaultYearApplied(true);
+    }
+  }, [config?.currentYear, defaultYearApplied]);
+
+  // Fetch users and registrations data
+  const fetchData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await reports.getUsers();
-      setUsers(data);
+      const [usersData, yearUsersData] = await Promise.all([
+        reports.getUsers(),
+        reports.getRegistrationYearUsers(),
+      ]);
+      setUsers(usersData);
+      setRegistrationYearUsers(yearUsersData);
     } catch (err) {
-      setError('Failed to fetch users data');
+      setError('Failed to fetch user and registration data');
       console.error('Error fetching users:', err);
     } finally {
       setLoading(false);
@@ -40,11 +56,20 @@ export function UserReportsPage() {
   }, []);
 
   useEffect(() => {
-    fetchUsers();
-  }, [fetchUsers]);
+    fetchData();
+  }, [fetchData]);
 
   // Apply client-side filtering
   const filteredUsers = useMemo(() => {
+    // Pre-compute set of user IDs with registrations for the selected year
+    const userIdsWithRegistration = filters.year
+      ? new Set(
+          registrationYearUsers
+            .filter(reg => reg.year === filters.year)
+            .map(reg => reg.userId)
+        )
+      : null;
+
     return users.filter(user => {
       // Role filter
       if (filters.role && user.role !== filters.role) {
@@ -61,21 +86,20 @@ export function UserReportsPage() {
         }
       }
       
-      // Year filter would need user registration data - skip for now as users don't have year field
+      // Year filter - filter by users who have a registration for the selected year
+      if (userIdsWithRegistration && !userIdsWithRegistration.has(user.id)) {
+        return false;
+      }
       
       return true;
     });
-  }, [users, filters]);
+  }, [users, registrationYearUsers, filters]);
 
-  // Get unique years for filter dropdown (assuming users have a registration year)
+  // Get unique years for filter dropdown from actual registration data
   const availableYears = useMemo(() => {
-    const currentYear = new Date().getFullYear();
-    const years = [];
-    for (let i = currentYear - 5; i <= currentYear + 1; i++) {
-      years.push(i);
-    }
-    return years.sort((a, b) => b - a);
-  }, []);
+    const years = [...new Set(registrationYearUsers.map(reg => reg.year))].sort((a, b) => b - a);
+    return years;
+  }, [registrationYearUsers]);
 
   // Calculate summary statistics based on filtered data
   const summaryStats = useMemo(() => {
@@ -374,7 +398,7 @@ export function UserReportsPage() {
                 {error}
               </div>
               <button
-                onClick={fetchUsers}
+                onClick={fetchData}
                 className="ml-auto inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-red-700 bg-red-100 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
               >
                 Try again
