@@ -30,6 +30,8 @@ Monorepo layout:
 
 - Node.js **22 or higher**
 - `npm run dev` — start both API and web
+- If `npm`/`node` is "not found" in agent shells, run commands via login shell
+  (for example: `zsh -lic 'npm -v'`) so user PATH tools (e.g., Volta) are loaded
 - Dev-mode email auth code is **always `123456`**
 - If local Postgres isn't running, prompt the user to start it
 - If tests fail with "Cannot read properties of undefined" on Prisma enums/types,

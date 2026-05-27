@@ -131,6 +131,7 @@ describe('AdminApplicationsPage', () => {
     fireEvent.click(screen.getByText('Decline'));
 
     expect(screen.getByRole('dialog', { name: 'Decline Application' })).toBeInTheDocument();
+    expect(screen.getByText(/This message is sent to the applicant by email\./i)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Decline Application' }));
     expect(await screen.findByText('A decline message is required.')).toBeInTheDocument();
