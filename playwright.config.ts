@@ -67,9 +67,31 @@ export default defineConfig({
     {
       name: 'chromium',
       dependencies: ['setup'],
+      // Exclude tests that modify global config to avoid cross-test interference
+      testIgnore: /application-approval\.spec\.ts/,
       use: {
         ...devices['Desktop Chrome'],
         // Additional CI-friendly Chrome options
+        launchOptions: process.env.CI
+          ? {
+              args: [
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage',
+                '--disable-gpu',
+              ],
+            }
+          : {},
+      },
+    },
+    {
+      // Application approval tests toggle global config and must run in
+      // isolation after all other tests complete.
+      name: 'chromium-approval',
+      dependencies: ['chromium'],
+      testMatch: /application-approval\.spec\.ts/,
+      use: {
+        ...devices['Desktop Chrome'],
         launchOptions: process.env.CI
           ? {
               args: [
