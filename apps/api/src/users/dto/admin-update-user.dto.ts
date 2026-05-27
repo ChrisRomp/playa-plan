@@ -42,6 +42,14 @@ export class AdminUpdateUserDto extends UpdateProfileDto {
   readonly allowNoJob?: boolean;
 
   @ApiPropertyOptional({
+    description: 'Whether the user registration applications are auto-approved',
+    example: false,
+  })
+  @IsBoolean()
+  @IsOptional()
+  readonly autoApproveRegistration?: boolean;
+
+  @ApiPropertyOptional({
     description: 'User role',
     enum: UserRole,
   })

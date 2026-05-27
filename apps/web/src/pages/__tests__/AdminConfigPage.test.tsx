@@ -56,6 +56,7 @@ const mockConfig: Record<string, unknown> = {
   senderEmail: '',
   senderName: '',
   smtpUseSsl: false,
+  applicationApprovalRequired: false,
   // Note: Sensitive fields are excluded from API responses
   // stripeApiKey, paypalClientSecret, smtpPassword are not included
 };
@@ -74,6 +75,7 @@ const renderWithProviders = (component: React.ReactElement) => {
       paypalEnabled: mockConfig.paypalEnabled,
       paypalClientId: mockConfig.paypalClientId,
       allowDeferredDuesPayment: false,
+      applicationApprovalRequired: false,
     } as CampConfig,
     isLoading: false,
     error: null,
@@ -127,6 +129,26 @@ describe('AdminConfigPage - Secure Field Preservation', () => {
     expect(smtpPasswordInput).toHaveAttribute('placeholder', 'Leave blank to keep existing password');
   });
 
+  it('should show the application approval toggle when enabled in config', async () => {
+    mockApiGet.mockResolvedValue({
+      data: {
+        ...mockConfig,
+        applicationApprovalRequired: true,
+      },
+    });
+
+    renderWithProviders(<AdminConfigPage />);
+
+    await waitFor(() => {
+      expect(mockApiGet).toHaveBeenCalledWith('/core-config/current');
+    });
+
+    expect(screen.getByLabelText('Require Application Approval')).toBeChecked();
+    expect(
+      screen.getByText('When enabled, new registrations require staff approval before participants can select jobs and pay.')
+    ).toBeInTheDocument();
+  });
+
   it('should exclude empty sensitive fields from API payload when saving', async () => {
     mockApiGet.mockResolvedValue({ data: mockConfig });
     mockApiPatch.mockResolvedValue({ status: 200, data: mockConfig });
@@ -163,6 +185,7 @@ describe('AdminConfigPage - Secure Field Preservation', () => {
     // Verify non-sensitive fields are included
     expect(payload).toHaveProperty('campName', 'Updated Camp Name');
     expect(payload).toHaveProperty('stripePublicKey', 'pk_test_123');
+    expect(payload).toHaveProperty('applicationApprovalRequired', false);
 
     // Verify debug log shows no sensitive fields included
     expect(mockConsoleLog).toHaveBeenCalledWith(

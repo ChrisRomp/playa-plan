@@ -1,22 +1,27 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
+import { UserRole } from '@prisma/client';
 import { RegistrationPolicyService } from './registration-policy.service';
 import { CoreConfigService } from '../../core-config/services/core-config.service';
 
 type PolicyUser = {
   id: string;
+  role: UserRole;
   allowRegistration: boolean;
   allowEarlyRegistration: boolean;
   allowNoJob: boolean;
   allowDeferredDuesPayment: boolean;
+  autoApproveRegistration: boolean;
 };
 
 const buildUser = (overrides: Partial<PolicyUser> = {}): PolicyUser => ({
   id: 'user-1',
+  role: UserRole.PARTICIPANT,
   allowRegistration: true,
   allowEarlyRegistration: false,
   allowNoJob: false,
   allowDeferredDuesPayment: false,
+  autoApproveRegistration: false,
   ...overrides,
 });
 
@@ -24,10 +29,12 @@ const buildConfig = (overrides: {
   registrationOpen?: boolean;
   earlyRegistrationOpen?: boolean;
   allowDeferredDuesPayment?: boolean;
+  applicationApprovalRequired?: boolean;
 } = {}) => ({
   registrationOpen: false,
   earlyRegistrationOpen: false,
   allowDeferredDuesPayment: false,
+  applicationApprovalRequired: false,
   ...overrides,
 });
 

@@ -16,6 +16,7 @@ import AdminJobCategoriesPage from '../pages/AdminJobCategoriesPage.tsx';
 import AdminJobsPage from '../pages/AdminJobsPage.tsx';
 import AdminShiftsPage from '../pages/AdminShiftsPage.tsx';
 import ManageRegistrationsPage from '../pages/ManageRegistrationsPage.tsx';
+import AdminApplicationsPage from '../pages/AdminApplicationsPage.tsx';
 import ShiftsPage from '../pages/ShiftsPage.tsx';
 import RegistrationPage from '../pages/registration/RegistrationPage.tsx';
 import RegistrationProtectedRoute from './RegistrationProtectedRoute.tsx';
@@ -64,6 +65,7 @@ const AppRouter: React.FC = () => {
         <Route path={ROUTES.REPORTS_REGISTRATIONS.path} element={<RegistrationReportsPage />} />
         <Route path={ROUTES.REPORTS_USERS.path} element={<UserReportsPage />} />
         <Route path={ROUTES.REPORTS_WORK_SCHEDULE.path} element={<WorkScheduleReportPage />} />
+        <Route path={ROUTES.ADMIN_APPLICATIONS.path} element={<AdminApplicationsPage />} />
       </Route>
       
       {/* Admin-only reports */}

@@ -212,9 +212,9 @@ describe('RegistrationSearchTable', () => {
       render(<RegistrationSearchTable {...defaultProps} />);
 
       // Status badges should be present
-      const confirmedStatus = screen.getByText('CONFIRMED');
-      const pendingStatus = screen.getByText('PENDING');
-      const cancelledStatus = screen.getByText('CANCELLED');
+      const confirmedStatus = screen.getByText('Confirmed');
+      const pendingStatus = screen.getByText('Pending');
+      const cancelledStatus = screen.getByText('Cancelled');
 
       expect(confirmedStatus).toBeInTheDocument();
       expect(pendingStatus).toBeInTheDocument();
@@ -470,10 +470,10 @@ describe('RegistrationSearchTable', () => {
 
       render(<RegistrationSearchTable {...defaultProps} registrations={registrationsWithAllStatuses} />);
 
-      expect(screen.getByText('CONFIRMED')).toBeInTheDocument();
-      expect(screen.getByText('PENDING')).toBeInTheDocument();
-      expect(screen.getByText('CANCELLED')).toBeInTheDocument();
-      expect(screen.getByText('WAITLISTED')).toBeInTheDocument();
+      expect(screen.getByText('Confirmed')).toBeInTheDocument();
+      expect(screen.getByText('Pending')).toBeInTheDocument();
+      expect(screen.getByText('Cancelled')).toBeInTheDocument();
+      expect(screen.getByText('Waitlisted')).toBeInTheDocument();
     });
 
     it('should properly calculate payment totals', () => {

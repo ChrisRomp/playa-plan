@@ -41,6 +41,7 @@ describe('AdminUserPage', () => {
       allowEarlyRegistration: true,
       allowDeferredDuesPayment: true,
       allowNoJob: true,
+      autoApproveRegistration: true,
     },
     {
       id: '2',
@@ -57,6 +58,7 @@ describe('AdminUserPage', () => {
       allowEarlyRegistration: false,
       allowDeferredDuesPayment: false,
       allowNoJob: false,
+      autoApproveRegistration: false,
     }
   ] as User[];
 
@@ -140,6 +142,11 @@ describe('AdminUserPage', () => {
     await waitFor(() => {
       expect(screen.getByText('Edit User')).toBeInTheDocument();
     });
+
+    expect(screen.getByLabelText('Auto-approve Registration')).toBeChecked();
+    expect(
+      screen.getByText("Automatically approve this user's registration applications.")
+    ).toBeInTheDocument();
   });
 
   it('displays an error message when there is an error', () => {

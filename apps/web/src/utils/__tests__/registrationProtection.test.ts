@@ -51,8 +51,14 @@ describe('Registration Protection', () => {
       const config = { ...mockConfig, registrationOpen: true };
       const user = { ...mockUser, isEarlyRegistrationEnabled: true };
       const hasExistingRegistration = false;
-      
+
       const result = canUserRegister(config, user, hasExistingRegistration);
+      expect(result).toBe(true);
+    });
+
+    it('should allow application workflow registrations to access the page', () => {
+      const config = { ...mockConfig, registrationOpen: true };
+      const result = canUserRegister(config, mockUser, true, 'APPLICATION_DECLINED');
       expect(result).toBe(true);
     });
   });
@@ -68,6 +74,11 @@ describe('Registration Protection', () => {
     it('should return configuration unavailable message when config is null', () => {
       const message = getRegistrationStatusMessage(null, mockUser, false);
       expect(message).toContain('Configuration not available');
+    });
+
+    it('should return application messaging for declined applications', () => {
+      const message = getRegistrationStatusMessage(mockConfig, mockUser, true, 'APPLICATION_DECLINED');
+      expect(message).toContain('was not approved');
     });
   });
 }); 

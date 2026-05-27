@@ -30,6 +30,7 @@ const setupMockUser = (): User => ({
   allowEarlyRegistration: false,
   allowDeferredDuesPayment: false,
   allowNoJob: false,
+  autoApproveRegistration: false,
   verificationToken: 'verification-token',
   resetToken: null,
   resetTokenExpiry: null,

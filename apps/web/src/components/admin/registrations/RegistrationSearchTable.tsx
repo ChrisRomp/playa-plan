@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { Edit, Trash2, Eye } from 'lucide-react';
 import { DataTable, DataTableColumn } from '../../common/DataTable/DataTable';
+import { formatRegistrationStatus } from '../../../utils/registrationUtils';
 
 // TODO: Replace with actual API types when implemented
 interface Registration {
@@ -121,7 +122,7 @@ export function RegistrationSearchTable({
                   : 'bg-red-100 text-red-800'
               }`}
             >
-              {row.status}
+              {formatRegistrationStatus(row.status)}
             </span>
             {row.paymentDeferred && (
               <span

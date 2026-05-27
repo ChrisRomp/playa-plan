@@ -33,6 +33,7 @@ const AdminUserPage: React.FC = () => {
     lastName: '',
     role: 'PARTICIPANT',
     allowRegistration: true,
+    autoApproveRegistration: false,
   });
 
   // Filter and sort users by first name
@@ -60,6 +61,7 @@ const AdminUserPage: React.FC = () => {
       lastName: '',
       role: 'PARTICIPANT',
       allowRegistration: true,
+      autoApproveRegistration: false,
     });
     setIsCreating(false);
     setIsEditing(false);
@@ -85,6 +87,7 @@ const AdminUserPage: React.FC = () => {
       allowEarlyRegistration: user.allowEarlyRegistration || false,
       allowDeferredDuesPayment: user.allowDeferredDuesPayment || false,
       allowNoJob: user.allowNoJob || false,
+      autoApproveRegistration: user.autoApproveRegistration ?? false,
     });
     setIsEditing(true);
     setIsCreating(false);
@@ -413,6 +416,24 @@ const AdminUserPage: React.FC = () => {
                         <label htmlFor="allowNoJob" className="ml-2 block text-sm text-gray-700">
                           Allow no job requirement
                         </label>
+                      </div>
+                      <div className="flex items-start">
+                        <input
+                          type="checkbox"
+                          name="autoApproveRegistration"
+                          id="autoApproveRegistration"
+                          checked={!!formData.autoApproveRegistration}
+                          onChange={handleInputChange}
+                          className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded mt-1"
+                        />
+                        <div className="ml-2">
+                          <label htmlFor="autoApproveRegistration" className="block text-sm text-gray-700">
+                            Auto-approve Registration
+                          </label>
+                          <p className="text-xs text-gray-500">
+                            Automatically approve this user's registration applications.
+                          </p>
+                        </div>
                       </div>
                     </div>
                   </div>

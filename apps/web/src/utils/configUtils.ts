@@ -33,7 +33,8 @@ export const mapApiConfigToFrontend = (apiConfig: CoreConfig): CampConfig => {
     paypalEnabled: apiConfig.paypalEnabled,
     paypalClientId: apiConfig.paypalClientId ?? undefined,
     paypalMode: apiConfig.paypalMode ?? undefined,
-    allowDeferredDuesPayment: apiConfig.allowDeferredDuesPayment
+    allowDeferredDuesPayment: apiConfig.allowDeferredDuesPayment,
+    applicationApprovalRequired: apiConfig.applicationApprovalRequired,
   };
 };
 

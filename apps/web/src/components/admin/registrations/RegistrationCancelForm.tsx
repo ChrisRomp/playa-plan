@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { X, AlertTriangle, Trash2, DollarSign } from 'lucide-react';
 import { LoadingSpinner } from '../../common/LoadingSpinner';
+import { formatRegistrationStatus } from '../../../utils/registrationUtils';
 
 // TODO: Replace with actual API types when implemented
 interface Registration {
@@ -191,7 +192,7 @@ export function RegistrationCancelForm({
               <h4 className="text-sm font-medium text-gray-900 mb-2">Registration Details</h4>
               <div className="text-sm text-gray-600 space-y-1">
                 <div>Year: {registration.year}</div>
-                <div>Status: <span className="font-medium">{registration.status}</span></div>
+                <div>Status: <span className="font-medium">{formatRegistrationStatus(registration.status)}</span></div>
                 <div>Registered: {new Date(registration.createdAt).toLocaleDateString()}</div>
                 {hasPayments && (
                   <div className="flex items-center text-green-600 font-medium">

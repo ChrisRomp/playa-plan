@@ -35,6 +35,7 @@ export class CoreConfigService {
       registrationOpen: config.registrationOpen,
       registrationTerms: config.registrationTerms,
       allowDeferredDuesPayment: config.allowDeferredDuesPayment,
+      applicationApprovalRequired: config.applicationApprovalRequired,
       stripeEnabled: config.stripeEnabled,
       stripePublicKey: config.stripePublicKey,
       stripeApiKey: config.stripeApiKey,
@@ -84,6 +85,7 @@ export class CoreConfigService {
           registrationOpen: createCoreConfigDto.registrationOpen ?? false,
           registrationTerms: createCoreConfigDto.registrationTerms ?? null,
           allowDeferredDuesPayment: createCoreConfigDto.allowDeferredDuesPayment ?? false,
+          applicationApprovalRequired: createCoreConfigDto.applicationApprovalRequired ?? false,
           stripeEnabled: createCoreConfigDto.stripeEnabled ?? false,
           stripePublicKey: createCoreConfigDto.stripePublicKey ?? null,
           stripeApiKey: createCoreConfigDto.stripeApiKey ?? null,
@@ -242,6 +244,7 @@ export class CoreConfigService {
       if (updateCoreConfigDto.registrationOpen !== undefined) data.registrationOpen = updateCoreConfigDto.registrationOpen;
       if (updateCoreConfigDto.registrationTerms !== undefined) data.registrationTerms = updateCoreConfigDto.registrationTerms;
       if (updateCoreConfigDto.allowDeferredDuesPayment !== undefined) data.allowDeferredDuesPayment = updateCoreConfigDto.allowDeferredDuesPayment;
+      if (updateCoreConfigDto.applicationApprovalRequired !== undefined) data.applicationApprovalRequired = updateCoreConfigDto.applicationApprovalRequired;
       if (updateCoreConfigDto.stripeEnabled !== undefined) data.stripeEnabled = updateCoreConfigDto.stripeEnabled;
       if (updateCoreConfigDto.stripePublicKey !== undefined) data.stripePublicKey = updateCoreConfigDto.stripePublicKey;
       if (updateCoreConfigDto.stripeApiKey !== undefined) data.stripeApiKey = updateCoreConfigDto.stripeApiKey;

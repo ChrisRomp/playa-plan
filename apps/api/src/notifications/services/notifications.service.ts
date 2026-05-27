@@ -89,6 +89,12 @@ export interface TemplateData {
     email: string;
     reason: string;
   };
+  applicationDetails?: {
+    year: number;
+    campingOptions?: Array<{ name: string }>;
+    decisionMessage?: string;
+    registrationUrl?: string;
+  };
   userId?: string;
   [key: string]: unknown;
 }
@@ -485,6 +491,12 @@ export class NotificationsService {
           throw new Error('Passkey details are required for passkey removed template');
         }
         return this.getPasskeyChangeTemplate('removed', data.passkeyDetails, data.campName || '');
+      case NotificationType.APPLICATION_RECEIVED:
+        return this.getApplicationReceivedTemplate(data, data.campName || '');
+      case NotificationType.APPLICATION_APPROVED:
+        return this.getApplicationApprovedTemplate(data, data.campName || '');
+      case NotificationType.APPLICATION_DECLINED:
+        return this.getApplicationDeclinedTemplate(data, data.campName || '');
       default:
         throw new Error(`Unknown notification type: ${type}`);
     }
@@ -704,6 +716,12 @@ export class NotificationsService {
         return 'Cancelled';
       case 'REJECTED':
         return 'Rejected';
+      case 'APPLICATION_SUBMITTED':
+        return 'Application Submitted';
+      case 'APPLICATION_APPROVED':
+        return 'Application Approved';
+      case 'APPLICATION_DECLINED':
+        return 'Not Approved';
       default:
         return status;
     }
@@ -781,6 +799,12 @@ export class NotificationsService {
         return 'Your registration has been cancelled.';
       case 'REJECTED':
         return 'Your registration has been reviewed and unfortunately was not approved.';
+      case 'APPLICATION_SUBMITTED':
+        return 'Your application has been received and is pending review.';
+      case 'APPLICATION_APPROVED':
+        return 'Your application has been approved. Please complete your registration.';
+      case 'APPLICATION_DECLINED':
+        return 'Your application was not approved.';
       default:
         return 'Your registration has been received.';
     }
@@ -1185,6 +1209,118 @@ This is an automated test email from ${campName}. If you received this unexpecte
       '',
       `This is an automated security notification from ${campName || 'PlayaPlan'}.`,
     ].join('\n');
+    return { subject, text, html };
+  }
+
+  /**
+   * Get application received email template
+   */
+  private getApplicationReceivedTemplate(data: TemplateData, campName: string): NotificationTemplate {
+    const name = data.name || data.playaName || 'there';
+    const year = data.applicationDetails?.year || new Date().getFullYear();
+    const subject = `${campName} - Application Received`;
+    const text = [
+      `Hi ${name},`,
+      '',
+      `Your application for ${campName} ${year} has been received.`,
+      '',
+      'Our team will review your application and you will be notified once a decision has been made.',
+      '',
+      `Thank you for your interest in joining ${campName}!`,
+      '',
+      `Best regards,`,
+      `The ${campName} Team`,
+    ].join('\n');
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2>${campName} - Application Received</h2>
+        <p>Hi ${this.escapeHtml(name)},</p>
+        <p>Your application for <strong>${this.escapeHtml(campName)} ${year}</strong> has been received.</p>
+        <p>Our team will review your application and you will be notified once a decision has been made.</p>
+        <p>Thank you for your interest in joining ${this.escapeHtml(campName)}!</p>
+        <p>Best regards,<br>The ${this.escapeHtml(campName)} Team</p>
+      </div>
+    `;
+    return { subject, text, html };
+  }
+
+  /**
+   * Get application approved email template
+   */
+  private getApplicationApprovedTemplate(data: TemplateData, campName: string): NotificationTemplate {
+    const name = data.name || data.playaName || 'there';
+    const year = data.applicationDetails?.year || new Date().getFullYear();
+    const registrationUrl = data.applicationDetails?.registrationUrl || `${this.baseUrl}/#/registration`;
+    const decisionMessage = data.applicationDetails?.decisionMessage;
+    const subject = `${campName} - Application Approved!`;
+    const messageParagraph = decisionMessage
+      ? `\nMessage from the team: ${decisionMessage}\n`
+      : '';
+    const text = [
+      `Hi ${name},`,
+      '',
+      `Great news! Your application for ${campName} ${year} has been approved.`,
+      messageParagraph,
+      'Please return to the site to complete your registration and pay camp dues:',
+      registrationUrl,
+      '',
+      `Best regards,`,
+      `The ${campName} Team`,
+    ].join('\n');
+    const messageHtml = decisionMessage
+      ? `<p><strong>Message from the team:</strong> ${this.escapeHtml(decisionMessage)}</p>`
+      : '';
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2>${campName} - Application Approved!</h2>
+        <p>Hi ${this.escapeHtml(name)},</p>
+        <p>Great news! Your application for <strong>${this.escapeHtml(campName)} ${year}</strong> has been approved.</p>
+        ${messageHtml}
+        <p>Please return to the site to complete your registration and pay camp dues:</p>
+        <p><a href="${this.escapeHtml(registrationUrl)}" style="display: inline-block; padding: 10px 20px; background-color: #4CAF50; color: white; text-decoration: none; border-radius: 5px;">Complete Registration</a></p>
+        <p>Best regards,<br>The ${this.escapeHtml(campName)} Team</p>
+      </div>
+    `;
+    return { subject, text, html };
+  }
+
+  /**
+   * Get application declined email template.
+   * Uses "not approved" language in user-facing content.
+   */
+  private getApplicationDeclinedTemplate(data: TemplateData, campName: string): NotificationTemplate {
+    const name = data.name || data.playaName || 'there';
+    const year = data.applicationDetails?.year || new Date().getFullYear();
+    const decisionMessage = data.applicationDetails?.decisionMessage || '';
+    const subject = `${campName} - Application Update`;
+    const text = [
+      `Hi ${name},`,
+      '',
+      `Thank you for your interest in ${campName} ${year}.`,
+      '',
+      'After reviewing your application, we are unable to approve it at this time.',
+      '',
+      decisionMessage ? `Message from the team: ${decisionMessage}` : '',
+      '',
+      'If you have questions, please reach out to the camp organizers.',
+      '',
+      `Best regards,`,
+      `The ${campName} Team`,
+    ].filter(line => line !== undefined).join('\n');
+    const messageHtml = decisionMessage
+      ? `<p><strong>Message from the team:</strong> ${this.escapeHtml(decisionMessage)}</p>`
+      : '';
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2>${campName} - Application Update</h2>
+        <p>Hi ${this.escapeHtml(name)},</p>
+        <p>Thank you for your interest in <strong>${this.escapeHtml(campName)} ${year}</strong>.</p>
+        <p>After reviewing your application, we are unable to approve it at this time.</p>
+        ${messageHtml}
+        <p>If you have questions, please reach out to the camp organizers.</p>
+        <p>Best regards,<br>The ${this.escapeHtml(campName)} Team</p>
+      </div>
+    `;
     return { subject, text, html };
   }
 

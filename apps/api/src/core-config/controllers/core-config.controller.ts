@@ -329,7 +329,8 @@ export class CoreConfigController {
         campIconAltText: config.campIconAltText,
         registrationYear: config.registrationYear,
         earlyRegistrationOpen: config.earlyRegistrationOpen,
-        registrationOpen: config.registrationOpen
+        registrationOpen: config.registrationOpen,
+        applicationApprovalRequired: config.applicationApprovalRequired,
       });
     } catch (error) {
       if (error instanceof NotFoundException) {

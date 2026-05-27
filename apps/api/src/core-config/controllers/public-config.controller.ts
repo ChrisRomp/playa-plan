@@ -55,6 +55,7 @@ export class PublicConfigController {
         registrationTerms: config.registrationTerms,
         // Additional fields required by the frontend Zod schema
         allowDeferredDuesPayment: config.allowDeferredDuesPayment,
+        applicationApprovalRequired: config.applicationApprovalRequired,
         stripeEnabled: config.stripeEnabled,
         stripePublicKey: config.stripePublicKey,
         paypalEnabled: config.paypalEnabled,
