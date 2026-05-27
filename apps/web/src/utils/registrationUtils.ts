@@ -9,6 +9,32 @@ export enum RegistrationStatus {
   CONFIRMED = 'CONFIRMED',
   CANCELLED = 'CANCELLED',
   WAITLISTED = 'WAITLISTED',
+  APPLICATION_SUBMITTED = 'APPLICATION_SUBMITTED',
+  APPLICATION_APPROVED = 'APPLICATION_APPROVED',
+  APPLICATION_DECLINED = 'APPLICATION_DECLINED',
+}
+
+export function isApplicationStatus(status?: string | null): boolean {
+  return status === RegistrationStatus.APPLICATION_SUBMITTED
+    || status === RegistrationStatus.APPLICATION_APPROVED
+    || status === RegistrationStatus.APPLICATION_DECLINED;
+}
+
+const REGISTRATION_STATUS_LABELS: Record<string, string> = {
+  PENDING: 'Pending',
+  CONFIRMED: 'Confirmed',
+  CANCELLED: 'Cancelled',
+  WAITLISTED: 'Waitlisted',
+  APPLICATION_SUBMITTED: 'Application Submitted',
+  APPLICATION_APPROVED: 'Application Approved',
+  APPLICATION_DECLINED: 'Application Not Approved',
+};
+
+/**
+ * Convert a registration status enum value to a human-readable label.
+ */
+export function formatRegistrationStatus(status: string): string {
+  return REGISTRATION_STATUS_LABELS[status] ?? status;
 }
 
 /**
@@ -63,22 +89,27 @@ export function isRegistrationAccessible(config: ConfigType, user: UserType | nu
 }
 
 /**
- * Check if user should be allowed to start a new registration
- * This checks both if registration is open AND if the user doesn't have an active registration
+ * Check if user should be allowed to access the registration flow.
+ * Returns true when registration is open and the user has no active registration,
+ * OR when the user has an active registration in an application-phase status
+ * (APPLICATION_SUBMITTED, APPLICATION_APPROVED, or APPLICATION_DECLINED) so they
+ * can view their status or continue the flow.
  * @param config - The core configuration or camp configuration
  * @param user - The current user (optional)
  * @param hasActiveRegistration - Whether the user already has an active (non-cancelled) registration
- * @returns True if user can start registration, false otherwise
+ * @param registrationStatus - Current registration status (used for application-phase checks)
+ * @returns True if user can access the registration flow, false otherwise
  */
 export function canUserRegister(
-  config: ConfigType, 
-  user: UserType | null, 
-  hasActiveRegistration: boolean
+  config: ConfigType,
+  user: UserType | null,
+  hasActiveRegistration: boolean,
+  registrationStatus?: string | null,
 ): boolean {
-  // If user already has an active registration, they can't register again
-  if (hasActiveRegistration) return false;
-  
-  // Otherwise, check if registration is accessible
+  if (hasActiveRegistration) {
+    return isApplicationStatus(registrationStatus);
+  }
+
   return isRegistrationAccessible(config, user);
 }
 
@@ -92,7 +123,8 @@ export function canUserRegister(
 export function getRegistrationStatusMessage(
   config: ConfigType,
   user: UserType | null,
-  hasActiveRegistration: boolean
+  hasActiveRegistration: boolean,
+  registrationStatus?: string | null,
 ): string {
   if (!config) {
     return 'Configuration not available. Please try again later.';
@@ -104,6 +136,18 @@ export function getRegistrationStatusMessage(
                new Date().getFullYear();
   
   if (hasActiveRegistration) {
+    if (registrationStatus === RegistrationStatus.APPLICATION_SUBMITTED) {
+      return `Your application for ${year} is pending review.`;
+    }
+
+    if (registrationStatus === RegistrationStatus.APPLICATION_APPROVED) {
+      return `Your application for ${year} has been approved. Continue to complete your registration.`;
+    }
+
+    if (registrationStatus === RegistrationStatus.APPLICATION_DECLINED) {
+      return `Your application for ${year} was not approved.`;
+    }
+
     return `You are already registered for ${year}. You can view your registration details on the dashboard.`;
   }
 

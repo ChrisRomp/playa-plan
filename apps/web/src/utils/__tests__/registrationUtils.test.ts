@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import { isRegistrationAccessible, getRegistrationStatusMessage, canUserRegister, getActiveRegistrations, getCancelledRegistrations } from '../registrationUtils';
+import {
+  isRegistrationAccessible,
+  getRegistrationStatusMessage,
+  canUserRegister,
+  getActiveRegistrations,
+  getCancelledRegistrations,
+  isApplicationStatus,
+  formatRegistrationStatus,
+} from '../registrationUtils';
 import { User, CampConfig } from '../../types';
 
 describe('registrationUtils', () => {
@@ -66,6 +74,15 @@ describe('registrationUtils', () => {
     });
   });
 
+  describe('isApplicationStatus', () => {
+    it('should identify application workflow statuses', () => {
+      expect(isApplicationStatus('APPLICATION_SUBMITTED')).toBe(true);
+      expect(isApplicationStatus('APPLICATION_APPROVED')).toBe(true);
+      expect(isApplicationStatus('APPLICATION_DECLINED')).toBe(true);
+      expect(isApplicationStatus('CONFIRMED')).toBe(false);
+    });
+  });
+
   describe('getRegistrationStatusMessage', () => {
     it('should return config unavailable message when config is null', () => {
       const message = getRegistrationStatusMessage(null, mockUser, false);
@@ -76,6 +93,12 @@ describe('registrationUtils', () => {
       const config = { ...mockConfig, registrationOpen: true };
       const message = getRegistrationStatusMessage(config, mockUser, true);
       expect(message).toBe('You are already registered for 2025. You can view your registration details on the dashboard.');
+    });
+
+    it('should return application-specific message when application is pending review', () => {
+      const config = { ...mockConfig, registrationOpen: true };
+      const message = getRegistrationStatusMessage(config, mockUser, true, 'APPLICATION_SUBMITTED');
+      expect(message).toBe('Your application for 2025 is pending review.');
     });
 
     it('should return registration not available when neither is open', () => {
@@ -102,9 +125,17 @@ describe('registrationUtils', () => {
     it('should prevent registration when user already has active registration', () => {
       const config = { ...mockConfig, registrationOpen: true };
       const hasActiveRegistration = true;
-      
+
       const result = canUserRegister(config, mockUser, hasActiveRegistration);
       expect(result).toBe(false);
+    });
+
+    it('should allow access when the active registration is an application workflow status', () => {
+      const config = { ...mockConfig, registrationOpen: true };
+      const hasActiveRegistration = true;
+
+      const result = canUserRegister(config, mockUser, hasActiveRegistration, 'APPLICATION_APPROVED');
+      expect(result).toBe(true);
     });
 
     it('should allow registration when registration is open and user has no active registration', () => {
@@ -202,6 +233,25 @@ describe('registrationUtils', () => {
       
       expect(cancelledRegistrations).toHaveLength(2);
       expect(cancelledRegistrations).toEqual(registrations);
+    });
+  });
+
+  describe('formatRegistrationStatus', () => {
+    it('should format standard registration statuses', () => {
+      expect(formatRegistrationStatus('PENDING')).toBe('Pending');
+      expect(formatRegistrationStatus('CONFIRMED')).toBe('Confirmed');
+      expect(formatRegistrationStatus('CANCELLED')).toBe('Cancelled');
+      expect(formatRegistrationStatus('WAITLISTED')).toBe('Waitlisted');
+    });
+
+    it('should format application statuses', () => {
+      expect(formatRegistrationStatus('APPLICATION_SUBMITTED')).toBe('Application Submitted');
+      expect(formatRegistrationStatus('APPLICATION_APPROVED')).toBe('Application Approved');
+      expect(formatRegistrationStatus('APPLICATION_DECLINED')).toBe('Application Not Approved');
+    });
+
+    it('should return the raw value for unknown statuses', () => {
+      expect(formatRegistrationStatus('UNKNOWN_STATUS')).toBe('UNKNOWN_STATUS');
     });
   });
 }); 

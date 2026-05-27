@@ -21,6 +21,7 @@ describe('CoreConfigService', () => {
     registrationOpen: true,
     registrationTerms: 'Test Terms',
     allowDeferredDuesPayment: false,
+    applicationApprovalRequired: false,
     stripeEnabled: true,
     stripePublicKey: 'pk_test_123',
     stripeApiKey: 'sk_test_123',
@@ -108,6 +109,44 @@ describe('CoreConfigService', () => {
       expect(result).toBeInstanceOf(CoreConfig);
     });
 
+    it('should persist applicationApprovalRequired when creating config', async () => {
+      const createWithApproval: CreateCoreConfigDto = {
+        ...createDto,
+        applicationApprovalRequired: true,
+      };
+
+      const mockCreatedWithApproval = {
+        ...mockCoreConfig,
+        applicationApprovalRequired: true,
+      };
+
+      mockPrismaService.coreConfig.findMany.mockResolvedValueOnce([]);
+      mockPrismaService.coreConfig.create.mockResolvedValueOnce(mockCreatedWithApproval);
+
+      const result = await service.create(createWithApproval);
+
+      expect(mockPrismaService.coreConfig.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          applicationApprovalRequired: true,
+        }),
+      });
+      expect(result).toBeInstanceOf(CoreConfig);
+      expect(result.applicationApprovalRequired).toBe(true);
+    });
+
+    it('should default applicationApprovalRequired to false when not provided', async () => {
+      mockPrismaService.coreConfig.findMany.mockResolvedValueOnce([]);
+      mockPrismaService.coreConfig.create.mockResolvedValueOnce(mockCoreConfig);
+
+      await service.create(createDto);
+
+      expect(mockPrismaService.coreConfig.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          applicationApprovalRequired: false,
+        }),
+      });
+    });
+
     it('should throw BadRequestException if configs already exist', async () => {
       mockPrismaService.coreConfig.findMany.mockResolvedValueOnce([mockCoreConfig]);
       
@@ -154,6 +193,18 @@ describe('CoreConfigService', () => {
       
       expect(mockPrismaService.coreConfig.findMany).toHaveBeenCalled();
       expect(result).toBeInstanceOf(CoreConfig);
+    });
+
+    it('should include applicationApprovalRequired in the returned entity', async () => {
+      const configWithApproval = {
+        ...mockCoreConfig,
+        applicationApprovalRequired: true,
+      };
+      mockPrismaService.coreConfig.findMany.mockResolvedValueOnce([configWithApproval]);
+
+      const result = await service.findCurrent();
+
+      expect(result.applicationApprovalRequired).toBe(true);
     });
 
     it('should return a default configuration if no configs found', async () => {
@@ -256,6 +307,52 @@ describe('CoreConfigService', () => {
       await expect(service.update(mockCoreConfig.id as string, updateDto)).rejects.toThrow(BadRequestException);
       expect(mockPrismaService.coreConfig.findUnique).toHaveBeenCalled();
       expect(mockPrismaService.coreConfig.update).toHaveBeenCalled();
+    });
+
+    it('should persist applicationApprovalRequired when updating config', async () => {
+      const approvalDto: UpdateCoreConfigDto = {
+        applicationApprovalRequired: true,
+      };
+
+      const mockUpdatedWithApproval = {
+        ...mockCoreConfig,
+        applicationApprovalRequired: true,
+        updatedAt: new Date(),
+      };
+
+      mockPrismaService.coreConfig.findUnique.mockResolvedValueOnce(mockCoreConfig);
+      mockPrismaService.coreConfig.update.mockResolvedValueOnce(mockUpdatedWithApproval);
+
+      const result = await service.update(mockCoreConfig.id as string, approvalDto);
+
+      expect(mockPrismaService.coreConfig.update).toHaveBeenCalledWith({
+        where: { id: mockCoreConfig.id },
+        data: expect.objectContaining({
+          applicationApprovalRequired: true,
+        }),
+      });
+      expect(result).toBeInstanceOf(CoreConfig);
+      expect(result.applicationApprovalRequired).toBe(true);
+    });
+
+    it('should not modify applicationApprovalRequired when not in update DTO', async () => {
+      const otherDto: UpdateCoreConfigDto = {
+        campName: 'Other Update',
+      };
+
+      const mockUpdatedOther = {
+        ...mockCoreConfig,
+        campName: 'Other Update',
+        updatedAt: new Date(),
+      };
+
+      mockPrismaService.coreConfig.findUnique.mockResolvedValueOnce(mockCoreConfig);
+      mockPrismaService.coreConfig.update.mockResolvedValueOnce(mockUpdatedOther);
+
+      await service.update(mockCoreConfig.id as string, otherDto);
+
+      const updateCallData = mockPrismaService.coreConfig.update.mock.calls[0][0].data;
+      expect(updateCallData).not.toHaveProperty('applicationApprovalRequired');
     });
   });
 

@@ -18,6 +18,7 @@ export const UserSchema = z.object({
   allowEarlyRegistration: z.boolean().optional(),
   allowDeferredDuesPayment: z.boolean().optional(),
   allowNoJob: z.boolean().optional(),
+  autoApproveRegistration: z.boolean().optional(),
   phone: z.string().optional().nullable(),
   city: z.string().optional().nullable(),
   stateProvince: z.string().optional().nullable(),
@@ -51,6 +52,7 @@ export const CreateUserSchema = z.object({
   allowEarlyRegistration: z.boolean().optional(),
   allowDeferredDuesPayment: z.boolean().optional(),
   allowNoJob: z.boolean().optional(),
+  autoApproveRegistration: z.boolean().optional(),
 });
 
 /**
@@ -78,6 +80,7 @@ export const UpdateUserSchema = z.object({
   allowEarlyRegistration: z.boolean().optional(),
   allowDeferredDuesPayment: z.boolean().optional(),
   allowNoJob: z.boolean().optional(),
+  autoApproveRegistration: z.boolean().optional(),
 });
 
 /**

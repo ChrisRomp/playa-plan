@@ -26,6 +26,10 @@ vi.mock('../../hooks/useConfig', () => ({
   useConfig: vi.fn(),
 }));
 
+vi.mock('../../hooks/useApplications', () => ({
+  useApplications: vi.fn(),
+}));
+
 vi.mock('../../components/payment/PaymentButton', () => ({
   default: vi.fn(({ children, amount, onPaymentStart }) => (
     <button 
@@ -44,12 +48,14 @@ import { useProfile } from '../../hooks/useProfile';
 import { useUserRegistrations } from '../../hooks/useUserRegistrations';
 import { useCampRegistration } from '../../hooks/useCampRegistration';
 import { useConfig } from '../../hooks/useConfig';
+import { useApplications } from '../../hooks/useApplications';
 
 const mockUseAuth = vi.mocked(useAuth);
 const mockUseProfile = vi.mocked(useProfile);
 const mockUseUserRegistrations = vi.mocked(useUserRegistrations);
 const mockUseCampRegistration = vi.mocked(useCampRegistration);
 const mockUseConfig = vi.mocked(useConfig);
+const mockUseApplications = vi.mocked(useApplications);
 
 // Mock registration utils
 vi.spyOn(registrationUtils, 'canUserRegister');
@@ -144,6 +150,18 @@ describe('DashboardPage Registration Status', () => {
       loading: false,
       error: null,
       refetch: vi.fn(),
+    });
+
+    mockUseApplications.mockReturnValue({
+      applications: [],
+      total: 0,
+      loading: false,
+      error: null,
+      fetchApplications: vi.fn().mockResolvedValue(undefined),
+      approveApplication: vi.fn(),
+      declineApplication: vi.fn(),
+      bulkProcess: vi.fn(),
+      getApplicationDetail: vi.fn(),
     });
   });
 
@@ -957,14 +975,14 @@ describe('DashboardPage - Registration after cancellation', () => {
       
       await waitFor(() => {
         // Should show status
-        expect(screen.getByText('CANCELLED')).toBeInTheDocument();
+        expect(screen.getByText('Cancelled')).toBeInTheDocument();
         
         // Should show year and date in history heading
         const expectedDate = new Date('2024-01-01T10:00:00.000Z').toLocaleDateString();
         expect(screen.getByText(new RegExp(`2024 — ${expectedDate.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`))).toBeInTheDocument();
         
         // Should show payment status
-        expect(screen.getByText('REFUNDED')).toBeInTheDocument();
+        expect(screen.getByText('Refunded')).toBeInTheDocument();
       });
     });
 
@@ -980,7 +998,7 @@ describe('DashboardPage - Registration after cancellation', () => {
       render(<DashboardPage />, { wrapper: Wrapper });
       
       await waitFor(() => {
-        expect(screen.getByText('CANCELLED')).toBeInTheDocument();
+        expect(screen.getByText('Cancelled')).toBeInTheDocument();
         const expectedDate = new Date('2024-01-01T10:00:00.000Z').toLocaleDateString();
         expect(screen.getByText(new RegExp(`2024 — ${expectedDate.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`))).toBeInTheDocument();
       });
@@ -1034,7 +1052,7 @@ describe('DashboardPage - Registration after cancellation', () => {
         expect(screen.getByText('Registration History')).toBeInTheDocument();
         
         // Should show multiple cancelled statuses
-        const cancelledElements = screen.getAllByText('CANCELLED');
+        const cancelledElements = screen.getAllByText('Cancelled');
         expect(cancelledElements).toHaveLength(2);
       });
     });
@@ -1203,6 +1221,398 @@ describe('DashboardPage - Registration after cancellation', () => {
         // Should show current registration section
         expect(screen.getByText('Current Registration 2024')).toBeInTheDocument();
       });
+    });
+  });
+
+  describe('Complete Registration CTA for approved applications', () => {
+    it('should show Complete Registration button when status is APPLICATION_APPROVED', async () => {
+      const approvedRegistration = {
+        id: 'approved-reg-id',
+        userId: '1',
+        year: 2024,
+        status: 'APPLICATION_APPROVED' as const,
+        decisionMessage: null,
+        createdAt: '2024-01-10T10:00:00.000Z',
+        updatedAt: '2024-01-12T10:00:00.000Z',
+        jobs: [],
+        payments: [],
+      };
+
+      mockUseConfig.mockReturnValue({
+        config: {
+          name: 'Test Camp',
+          description: 'Test',
+          homePageBlurb: 'Test',
+          registrationOpen: true,
+          earlyRegistrationOpen: false,
+          currentYear: 2024,
+        },
+        isLoading: false,
+        error: null,
+        refreshConfig: vi.fn(),
+        isConnecting: false,
+        isConnected: true,
+        connectionError: null,
+      });
+
+      mockUseUserRegistrations.mockReturnValue({
+        registrations: [approvedRegistration],
+        loading: false,
+        error: null,
+        refetch: vi.fn(),
+      });
+
+      vi.mocked(registrationUtils.getActiveRegistrations).mockReturnValue([approvedRegistration]);
+
+      const Wrapper = createWrapper();
+      render(<DashboardPage />, { wrapper: Wrapper });
+
+      await waitFor(() => {
+        const link = screen.getByRole('link', { name: 'Complete Registration' });
+        expect(link).toBeInTheDocument();
+        expect(link).toHaveAttribute('href', '/registration');
+      });
+    });
+
+    it('should not show Complete Registration button for non-approved statuses', async () => {
+      const submittedRegistration = {
+        id: 'submitted-reg-id',
+        userId: '1',
+        year: 2024,
+        status: 'APPLICATION_SUBMITTED' as const,
+        decisionMessage: null,
+        createdAt: '2024-01-10T10:00:00.000Z',
+        updatedAt: '2024-01-10T10:00:00.000Z',
+        jobs: [],
+        payments: [],
+      };
+
+      mockUseConfig.mockReturnValue({
+        config: {
+          name: 'Test Camp',
+          description: 'Test',
+          homePageBlurb: 'Test',
+          registrationOpen: true,
+          earlyRegistrationOpen: false,
+          currentYear: 2024,
+        },
+        isLoading: false,
+        error: null,
+        refreshConfig: vi.fn(),
+        isConnecting: false,
+        isConnected: true,
+        connectionError: null,
+      });
+
+      mockUseUserRegistrations.mockReturnValue({
+        registrations: [submittedRegistration],
+        loading: false,
+        error: null,
+        refetch: vi.fn(),
+      });
+
+      vi.mocked(registrationUtils.getActiveRegistrations).mockReturnValue([submittedRegistration]);
+
+      const Wrapper = createWrapper();
+      render(<DashboardPage />, { wrapper: Wrapper });
+
+      await waitFor(() => {
+        expect(screen.getByText('Application Submitted')).toBeInTheDocument();
+      });
+
+      expect(screen.queryByRole('link', { name: 'Complete Registration' })).not.toBeInTheDocument();
+    });
+  });
+
+  describe('Declined application decision message', () => {
+    it('should display the decision message when application is declined', async () => {
+      const declinedRegistration = {
+        id: 'declined-reg-id',
+        userId: '1',
+        year: 2024,
+        status: 'APPLICATION_DECLINED' as const,
+        decisionMessage: 'We were unable to accommodate your request this year.',
+        createdAt: '2024-01-10T10:00:00.000Z',
+        updatedAt: '2024-01-12T10:00:00.000Z',
+        jobs: [],
+        payments: [],
+      };
+
+      mockUseConfig.mockReturnValue({
+        config: {
+          name: 'Test Camp',
+          description: 'Test',
+          homePageBlurb: 'Test',
+          registrationOpen: true,
+          earlyRegistrationOpen: false,
+          currentYear: 2024,
+        },
+        isLoading: false,
+        error: null,
+        refreshConfig: vi.fn(),
+        isConnecting: false,
+        isConnected: true,
+        connectionError: null,
+      });
+
+      mockUseUserRegistrations.mockReturnValue({
+        registrations: [declinedRegistration],
+        loading: false,
+        error: null,
+        refetch: vi.fn(),
+      });
+
+      vi.mocked(registrationUtils.getActiveRegistrations).mockReturnValue([declinedRegistration]);
+
+      const Wrapper = createWrapper();
+      render(<DashboardPage />, { wrapper: Wrapper });
+
+      await waitFor(() => {
+        expect(screen.getByText('We were unable to accommodate your request this year.')).toBeInTheDocument();
+      });
+    });
+
+    it('should not display decision message for non-declined statuses', async () => {
+      const submittedRegistration = {
+        id: 'submitted-reg-id',
+        userId: '1',
+        year: 2024,
+        status: 'APPLICATION_SUBMITTED' as const,
+        decisionMessage: null,
+        createdAt: '2024-01-10T10:00:00.000Z',
+        updatedAt: '2024-01-10T10:00:00.000Z',
+        jobs: [],
+        payments: [],
+      };
+
+      mockUseConfig.mockReturnValue({
+        config: {
+          name: 'Test Camp',
+          description: 'Test',
+          homePageBlurb: 'Test',
+          registrationOpen: true,
+          earlyRegistrationOpen: false,
+          currentYear: 2024,
+        },
+        isLoading: false,
+        error: null,
+        refreshConfig: vi.fn(),
+        isConnecting: false,
+        isConnected: true,
+        connectionError: null,
+      });
+
+      mockUseUserRegistrations.mockReturnValue({
+        registrations: [submittedRegistration],
+        loading: false,
+        error: null,
+        refetch: vi.fn(),
+      });
+
+      vi.mocked(registrationUtils.getActiveRegistrations).mockReturnValue([submittedRegistration]);
+
+      const Wrapper = createWrapper();
+      render(<DashboardPage />, { wrapper: Wrapper });
+
+      await waitFor(() => {
+        expect(screen.getByText('Application Submitted')).toBeInTheDocument();
+      });
+
+      expect(screen.queryByText('We were unable to accommodate your request this year.')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('Pending applications notice for staff/admin', () => {
+    it('should show pending applications notice for admin when applications are pending', async () => {
+      mockUseAuth.mockReturnValue({
+        user: { ...mockUser, role: 'admin' as const },
+        isAuthenticated: true,
+        isLoading: false,
+        error: null,
+        requestVerificationCode: vi.fn(),
+        verifyCode: vi.fn(),
+        logout: vi.fn(),
+        isConnecting: false,
+        isConnected: true,
+        connectionError: null,
+      });
+
+      mockUseConfig.mockReturnValue({
+        config: {
+          name: 'Test Camp',
+          description: 'Test',
+          homePageBlurb: 'Test',
+          registrationOpen: true,
+          earlyRegistrationOpen: false,
+          currentYear: 2024,
+          applicationApprovalRequired: true,
+        },
+        isLoading: false,
+        error: null,
+        refreshConfig: vi.fn(),
+        isConnecting: false,
+        isConnected: true,
+        connectionError: null,
+      });
+
+      mockUseApplications.mockReturnValue({
+        applications: [],
+        total: 3,
+        loading: false,
+        error: null,
+        fetchApplications: vi.fn().mockResolvedValue(undefined),
+        approveApplication: vi.fn(),
+        declineApplication: vi.fn(),
+        bulkProcess: vi.fn(),
+        getApplicationDetail: vi.fn(),
+      });
+
+      const Wrapper = createWrapper();
+      render(<DashboardPage />, { wrapper: Wrapper });
+
+      await waitFor(() => {
+        expect(screen.getByText(/3/)).toBeInTheDocument();
+        expect(screen.getByText(/pending applications awaiting review/)).toBeInTheDocument();
+        const link = screen.getByRole('link', { name: 'Review Applications' });
+        expect(link).toHaveAttribute('href', '/admin/applications');
+      });
+    });
+
+    it('should not show pending applications notice for regular users', async () => {
+      mockUseConfig.mockReturnValue({
+        config: {
+          name: 'Test Camp',
+          description: 'Test',
+          homePageBlurb: 'Test',
+          registrationOpen: true,
+          earlyRegistrationOpen: false,
+          currentYear: 2024,
+          applicationApprovalRequired: true,
+        },
+        isLoading: false,
+        error: null,
+        refreshConfig: vi.fn(),
+        isConnecting: false,
+        isConnected: true,
+        connectionError: null,
+      });
+
+      const Wrapper = createWrapper();
+      render(<DashboardPage />, { wrapper: Wrapper });
+
+      await waitFor(() => {
+        expect(screen.getByText(/Welcome/)).toBeInTheDocument();
+      });
+
+      expect(screen.queryByText(/pending application/)).not.toBeInTheDocument();
+    });
+
+    it('should not show notice when no applications are pending', async () => {
+      mockUseAuth.mockReturnValue({
+        user: { ...mockUser, role: 'staff' as const },
+        isAuthenticated: true,
+        isLoading: false,
+        error: null,
+        requestVerificationCode: vi.fn(),
+        verifyCode: vi.fn(),
+        logout: vi.fn(),
+        isConnecting: false,
+        isConnected: true,
+        connectionError: null,
+      });
+
+      mockUseConfig.mockReturnValue({
+        config: {
+          name: 'Test Camp',
+          description: 'Test',
+          homePageBlurb: 'Test',
+          registrationOpen: true,
+          earlyRegistrationOpen: false,
+          currentYear: 2024,
+          applicationApprovalRequired: true,
+        },
+        isLoading: false,
+        error: null,
+        refreshConfig: vi.fn(),
+        isConnecting: false,
+        isConnected: true,
+        connectionError: null,
+      });
+
+      mockUseApplications.mockReturnValue({
+        applications: [],
+        total: 0,
+        loading: false,
+        error: null,
+        fetchApplications: vi.fn().mockResolvedValue(undefined),
+        approveApplication: vi.fn(),
+        declineApplication: vi.fn(),
+        bulkProcess: vi.fn(),
+        getApplicationDetail: vi.fn(),
+      });
+
+      const Wrapper = createWrapper();
+      render(<DashboardPage />, { wrapper: Wrapper });
+
+      await waitFor(() => {
+        expect(screen.getByText(/Welcome/)).toBeInTheDocument();
+      });
+
+      expect(screen.queryByText(/pending application/)).not.toBeInTheDocument();
+    });
+
+    it('should not show notice when application approval is disabled', async () => {
+      mockUseAuth.mockReturnValue({
+        user: { ...mockUser, role: 'admin' as const },
+        isAuthenticated: true,
+        isLoading: false,
+        error: null,
+        requestVerificationCode: vi.fn(),
+        verifyCode: vi.fn(),
+        logout: vi.fn(),
+        isConnecting: false,
+        isConnected: true,
+        connectionError: null,
+      });
+
+      mockUseConfig.mockReturnValue({
+        config: {
+          name: 'Test Camp',
+          description: 'Test',
+          homePageBlurb: 'Test',
+          registrationOpen: true,
+          earlyRegistrationOpen: false,
+          currentYear: 2024,
+          applicationApprovalRequired: false,
+        },
+        isLoading: false,
+        error: null,
+        refreshConfig: vi.fn(),
+        isConnecting: false,
+        isConnected: true,
+        connectionError: null,
+      });
+
+      mockUseApplications.mockReturnValue({
+        applications: [],
+        total: 3,
+        loading: false,
+        error: null,
+        fetchApplications: vi.fn().mockResolvedValue(undefined),
+        approveApplication: vi.fn(),
+        declineApplication: vi.fn(),
+        bulkProcess: vi.fn(),
+        getApplicationDetail: vi.fn(),
+      });
+
+      const Wrapper = createWrapper();
+      render(<DashboardPage />, { wrapper: Wrapper });
+
+      await waitFor(() => {
+        expect(screen.getByText(/Welcome/)).toBeInTheDocument();
+      });
+
+      expect(screen.queryByText(/pending application/)).not.toBeInTheDocument();
     });
   });
 });

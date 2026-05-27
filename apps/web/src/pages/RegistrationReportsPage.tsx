@@ -6,6 +6,7 @@ import { reports, Registration, RegistrationReportFilters, CampingOptionRegistra
 import { PATHS } from '../routes';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import { downloadCsv } from '../utils/csv';
+import { formatRegistrationStatus } from '../utils/registrationUtils';
 
 // Extended user type for registration reports that includes profile fields
 interface UserWithProfile {
@@ -287,7 +288,7 @@ export function RegistrationReportsPage() {
               : 'bg-red-100 text-red-800'
           }`}
         >
-          {row.status}
+          {formatRegistrationStatus(row.status)}
         </span>
       ),
       sortable: true,

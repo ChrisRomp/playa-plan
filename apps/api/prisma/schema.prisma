@@ -26,6 +26,7 @@ model User {
   allowEarlyRegistration     Boolean                     @default(false)
   allowNoJob                 Boolean                     @default(false)
   allowRegistration          Boolean                     @default(true)
+  autoApproveRegistration    Boolean                     @default(false)
   city                       String?
   country                    String?
   emergencyContact           String?
@@ -42,6 +43,7 @@ model User {
   webAuthnChallenges         WebAuthnChallenge[]
   notes                      UserNote[]                  @relation("UserNoteSubject")
   authoredNotes              UserNote[]                  @relation("UserNoteAuthor")
+  reviewedRegistrations      Registration[]              @relation("RegistrationReviewedBy")
 
   @@map("users")
 }
@@ -202,11 +204,16 @@ model Registration {
   createdAt                 DateTime                    @default(now())
   updatedAt                 DateTime                    @updatedAt
   userId                    String
+  reviewedById              String?
+  reviewedAt                DateTime?
+  decisionMessage           String?
   user                      User                        @relation(fields: [userId], references: [id])
+  reviewedBy                User?                       @relation("RegistrationReviewedBy", fields: [reviewedById], references: [id])
   jobs                      RegistrationJob[]
   payments                  Payment[]
   campingOptionRegistrations CampingOptionRegistration[]
 
+  @@index([reviewedById])
   @@map("registrations")
 }
 
@@ -314,6 +321,7 @@ model CoreConfig {
   senderName               String?
   replyToEmail             String?
   emailEnabled             Boolean    @default(false)
+  applicationApprovalRequired Boolean @default(false)
   createdAt                DateTime   @default(now())
   updatedAt                DateTime   @updatedAt
 
@@ -353,6 +361,9 @@ enum RegistrationStatus {
   CONFIRMED
   CANCELLED
   WAITLISTED
+  APPLICATION_SUBMITTED
+  APPLICATION_APPROVED
+  APPLICATION_DECLINED
 }
 
 enum PaymentStatus {
@@ -380,6 +391,9 @@ enum NotificationType {
   EMAIL_TEST
   PASSKEY_ADDED
   PASSKEY_REMOVED
+  APPLICATION_RECEIVED
+  APPLICATION_APPROVED
+  APPLICATION_DECLINED
 }
 
 enum NotificationStatus {
@@ -409,6 +423,8 @@ enum AdminAuditActionType {
   CAMPING_OPTION_ADD
   CAMPING_OPTION_REMOVE
   CAMPING_OPTION_MODIFY
+  APPLICATION_APPROVE
+  APPLICATION_DECLINE
 }
 
 enum AdminAuditTargetType {

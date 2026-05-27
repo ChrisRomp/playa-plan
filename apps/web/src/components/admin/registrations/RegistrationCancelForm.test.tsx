@@ -105,7 +105,7 @@ describe('RegistrationCancelForm', () => {
       expect(screen.getByText('Registration Details')).toBeInTheDocument();
       expect(screen.getByText('Year: 2024')).toBeInTheDocument();
       expect(screen.getByText('Status:')).toBeInTheDocument();
-      expect(screen.getByText('CONFIRMED')).toBeInTheDocument();
+      expect(screen.getByText('Confirmed')).toBeInTheDocument();
       expect(screen.getByText(/^Registered:/)).toBeInTheDocument();
     });
 

@@ -5,6 +5,7 @@ import { CreatePaymentDto, UpdatePaymentDto, CreateRefundDto, RecordManualPaymen
 import { Payment, PaymentProvider, PaymentStatus, Registration, UserRole } from '@prisma/client';
 import { StripeService } from './stripe.service';
 import { PaypalService } from './paypal.service';
+import { isApplicationStatus } from '../../registrations/constants/registration-status.constants';
 
 // Create an extended Payment type that includes registration relationship
 type PaymentWithRelations = Payment & {
@@ -79,6 +80,11 @@ export class PaymentsService {
       
       if (registration.userId !== createPaymentDto.userId) {
         throw new BadRequestException('Registration does not belong to the specified user');
+      }
+
+      // Prevent payments for registrations still in application phase
+      if (isApplicationStatus(registration.status)) {
+        throw new BadRequestException('Cannot process payment for a registration that has not completed the application process');
       }
     }
     
@@ -253,6 +259,11 @@ export class PaymentsService {
       throw new NotFoundException(`Registration with ID ${registrationId} not found`);
     }
     
+    // Prevent linking payments to registrations in application phase
+    if (isApplicationStatus(registration.status)) {
+      throw new BadRequestException('Cannot link payment to a registration that has not completed the application process');
+    }
+
     // Check if registration belongs to the same user as the payment
     if (registration.userId !== payment.userId) {
       throw new BadRequestException('Registration does not belong to the same user as the payment');

@@ -8,12 +8,14 @@ import * as useCampingOptionsModule from '../../../hooks/useCampingOptions';
 import * as useProfileModule from '../../../hooks/useProfile';
 import * as useCampRegistrationModule from '../../../hooks/useCampRegistration';
 import * as useConfigModule from '../../../hooks/useConfig';
+import * as useMyRegistrationModule from '../../../hooks/useMyRegistration';
 
 // Mock modules
 vi.mock('../../../hooks/useRegistration');
 vi.mock('../../../hooks/useCampingOptions');
 vi.mock('../../../hooks/useProfile');
 vi.mock('../../../hooks/useCampRegistration');
+vi.mock('../../../hooks/useMyRegistration');
 vi.mock('../../../store/ConfigContext');
 
 describe('Boolean Fields Step', () => {
@@ -173,6 +175,14 @@ describe('Boolean Fields Step', () => {
       isConnecting: false,
       isConnected: true,
       connectionError: null,
+    });
+
+    // Mock useMyRegistration hook
+    vi.spyOn(useMyRegistrationModule, 'useMyRegistration').mockReturnValue({
+      registration: null,
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
     });
   });
 

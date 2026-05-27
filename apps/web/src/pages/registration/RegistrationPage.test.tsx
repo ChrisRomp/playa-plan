@@ -8,12 +8,14 @@ import * as useCampingOptionsModule from '../../hooks/useCampingOptions';
 import * as useProfileModule from '../../hooks/useProfile';
 import * as useCampRegistrationModule from '../../hooks/useCampRegistration';
 import * as useConfigModule from '../../hooks/useConfig';
+import * as useMyRegistrationModule from '../../hooks/useMyRegistration';
 
 // Mock modules
 vi.mock('../../hooks/useRegistration');
 vi.mock('../../hooks/useCampingOptions');
 vi.mock('../../hooks/useProfile');
 vi.mock('../../hooks/useCampRegistration');
+vi.mock('../../hooks/useMyRegistration');
 vi.mock('../../store/ConfigContext');
 
 describe('RegistrationPage', () => {
@@ -247,6 +249,13 @@ describe('RegistrationPage', () => {
       refetch: vi.fn(),
     });
 
+    vi.spyOn(useMyRegistrationModule, 'useMyRegistration').mockReturnValue({
+      registration: null,
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
     // Mock useConfig hook
     vi.spyOn(useConfigModule, 'useConfig').mockReturnValue({
       config: {
@@ -347,9 +356,212 @@ describe('RegistrationPage', () => {
 
   it('shows login message when not authenticated', () => {
     renderWithAuth(false);
-    
+
     expect(screen.getByText('You must be logged in to register.')).toBeInTheDocument();
     expect(screen.getByText('Go to Login')).toBeInTheDocument();
+  });
+
+  it('shows the pending approval state when an application is under review', () => {
+    vi.spyOn(useConfigModule, 'useConfig').mockReturnValue({
+      config: {
+        name: 'Test Camp',
+        description: 'Test Description',
+        homePageBlurb: 'Welcome!',
+        registrationOpen: true,
+        earlyRegistrationOpen: false,
+        currentYear: 2025,
+        registrationTerms: '<p>These are the test terms and conditions.</p>',
+        applicationApprovalRequired: true,
+      },
+      isLoading: false,
+      error: null,
+      refreshConfig: vi.fn(),
+      isConnecting: false,
+      isConnected: true,
+      connectionError: null,
+    });
+    vi.spyOn(useCampRegistrationModule, 'useCampRegistration').mockReturnValue({
+      campRegistration: {
+        campingOptions: [],
+        customFieldValues: [],
+        jobRegistrations: [],
+        hasRegistration: true,
+      },
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    vi.spyOn(useMyRegistrationModule, 'useMyRegistration').mockReturnValue({
+      registration: {
+        id: 'registration-1',
+        status: 'APPLICATION_SUBMITTED',
+        year: 2025,
+        createdAt: '2025-05-01T00:00:00Z',
+      },
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    renderWithAuth();
+
+    expect(screen.getByText('Application pending review')).toBeInTheDocument();
+    expect(screen.getByText(/nothing else to do right now/i)).toBeInTheDocument();
+    expect(screen.queryByText('Your Profile Information')).not.toBeInTheDocument();
+  });
+
+  it('starts approved applications on the shifts step', async () => {
+    vi.spyOn(useConfigModule, 'useConfig').mockReturnValue({
+      config: {
+        name: 'Test Camp',
+        description: 'Test Description',
+        homePageBlurb: 'Welcome!',
+        registrationOpen: true,
+        earlyRegistrationOpen: false,
+        currentYear: 2025,
+        registrationTerms: '<p>These are the test terms and conditions.</p>',
+        applicationApprovalRequired: true,
+      },
+      isLoading: false,
+      error: null,
+      refreshConfig: vi.fn(),
+      isConnecting: false,
+      isConnected: true,
+      connectionError: null,
+    });
+    vi.spyOn(useCampRegistrationModule, 'useCampRegistration').mockReturnValue({
+      campRegistration: {
+        campingOptions: [{ campingOptionId: 'option1' }],
+        customFieldValues: [],
+        jobRegistrations: [],
+        hasRegistration: true,
+      },
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    vi.spyOn(useMyRegistrationModule, 'useMyRegistration').mockReturnValue({
+      registration: {
+        id: 'registration-1',
+        status: 'APPLICATION_APPROVED',
+        year: 2025,
+        createdAt: '2025-05-01T00:00:00Z',
+      },
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    renderWithAuth();
+
+    await waitFor(() => {
+      expect(screen.getByText('Select Work Shifts')).toBeInTheDocument();
+    });
+
+    expect(screen.getByText('Application approved')).toBeInTheDocument();
+    expect(screen.queryByText('Your Profile Information')).not.toBeInTheDocument();
+  });
+
+  it('allows APPLICATION_SUBMITTED users to complete when approval mode is disabled', async () => {
+    // Scenario: admin disables approval mode while user has APPLICATION_SUBMITTED status
+    vi.spyOn(useConfigModule, 'useConfig').mockReturnValue({
+      config: {
+        name: 'Test Camp',
+        description: 'Test Description',
+        homePageBlurb: 'Welcome!',
+        registrationOpen: true,
+        earlyRegistrationOpen: false,
+        currentYear: 2025,
+        registrationTerms: '<p>Terms.</p>',
+        applicationApprovalRequired: false, // Approval mode disabled
+      },
+      isLoading: false,
+      error: null,
+      refreshConfig: vi.fn(),
+      isConnecting: false,
+      isConnected: true,
+      connectionError: null,
+    });
+    vi.spyOn(useCampRegistrationModule, 'useCampRegistration').mockReturnValue({
+      campRegistration: {
+        campingOptions: [{ campingOptionId: 'option1' }],
+        customFieldValues: [],
+        jobRegistrations: [],
+        hasRegistration: true,
+      },
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    vi.spyOn(useMyRegistrationModule, 'useMyRegistration').mockReturnValue({
+      registration: {
+        id: 'registration-1',
+        status: 'APPLICATION_SUBMITTED', // User has pending application
+        year: 2025,
+        createdAt: '2025-05-01T00:00:00Z',
+      },
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    renderWithAuth();
+
+    // Should show the completion flow (shifts step), not the pending banner
+    await waitFor(() => {
+      expect(screen.getByText('Select Work Shifts')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('Application pending review')).not.toBeInTheDocument();
+  });
+
+  it('shows application entry flow when user has a cancelled registration and approval mode is enabled', async () => {
+    vi.spyOn(useConfigModule, 'useConfig').mockReturnValue({
+      config: {
+        name: 'Test Camp',
+        description: 'Test Description',
+        homePageBlurb: 'Welcome!',
+        registrationOpen: true,
+        earlyRegistrationOpen: false,
+        currentYear: 2025,
+        registrationTerms: '<p>Terms.</p>',
+        applicationApprovalRequired: true,
+      },
+      isLoading: false,
+      error: null,
+      refreshConfig: vi.fn(),
+      isConnecting: false,
+      isConnected: true,
+      connectionError: null,
+    });
+    vi.spyOn(useCampRegistrationModule, 'useCampRegistration').mockReturnValue({
+      campRegistration: {
+        campingOptions: [],
+        customFieldValues: [],
+        jobRegistrations: [],
+        hasRegistration: false,
+      },
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    vi.spyOn(useMyRegistrationModule, 'useMyRegistration').mockReturnValue({
+      registration: {
+        id: 'registration-cancelled',
+        status: 'CANCELLED',
+        year: 2025,
+        createdAt: '2025-05-01T00:00:00Z',
+      },
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    renderWithAuth();
+
+    // Should show the profile step (application entry flow steps 1-3)
+    expect(screen.getByText('Your Profile Information')).toBeInTheDocument();
+    // Should NOT show any completion steps (shifts, payment)
+    expect(screen.queryByText('Select Work Shifts')).not.toBeInTheDocument();
   });
 
   it('allows navigating to camping options step after filling profile form', async () => {

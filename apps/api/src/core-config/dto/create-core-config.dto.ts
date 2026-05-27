@@ -372,4 +372,17 @@ export class CreateCoreConfigDto {
   @IsOptional()
   @Type(() => Boolean)
   emailEnabled?: boolean = false;
+
+  /**
+   * Whether application approval is required before completing registration
+   */
+  @ApiProperty({
+    description: 'Whether application approval is required before completing registration',
+    example: false,
+    default: false
+  })
+  @IsBoolean()
+  @IsOptional()
+  @Type(() => Boolean)
+  applicationApprovalRequired?: boolean = false;
 } 

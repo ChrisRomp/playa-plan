@@ -33,6 +33,9 @@ describe('RegistrationAdminService', () => {
     year: 2024,
     status: RegistrationStatus.CONFIRMED,
     paymentDeferred: false,
+    reviewedById: null,
+    reviewedAt: null,
+    decisionMessage: null,
     createdAt: new Date('2024-01-01'),
     updatedAt: new Date('2024-01-01'),
     user: {

@@ -5,13 +5,19 @@ import { useCampingOptions } from '../../hooks/useCampingOptions';
 import { useProfile } from '../../hooks/useProfile';
 import { useCampRegistration } from '../../hooks/useCampRegistration';
 import { useConfig } from '../../hooks/useConfig';
+import { useMyRegistration } from '../../hooks/useMyRegistration';
 import { AuthContext } from '../../store/authUtils';
-import { JobCategory, Job, CampingOptionField } from '../../lib/api';
+import { JobCategory, Job, CampingOptionField, api } from '../../lib/api';
 import { getFriendlyDayName, formatTime } from '../../utils/shiftUtils';
-import { canUserRegister, getRegistrationStatusMessage } from '../../utils/registrationUtils';
+import {
+  canUserRegister,
+  getRegistrationStatusMessage,
+  isApplicationStatus,
+} from '../../utils/registrationUtils';
 import { isStaffOrAdmin } from '../../utils/userUtils';
 import { PATHS } from '../../routes';
 import PaymentButton from '../../components/payment/PaymentButton';
+import { ApplicationStatusBanner } from '../../components/registration/ApplicationStatusBanner';
 
 /**
  * RegistrationPage component for user camp registration
@@ -28,7 +34,16 @@ export default function RegistrationPage() {
   const { user, isLoading: authLoading } = useContext(AuthContext);
   const { config } = useConfig();
   const { profile, updateProfile, error: profileError } = useProfile();
-  const { campRegistration, loading: campRegistrationLoading } = useCampRegistration();
+  const {
+    campRegistration,
+    loading: campRegistrationLoading,
+    refetch: refetchCampRegistration,
+  } = useCampRegistration();
+  const {
+    registration: myRegistration,
+    loading: myRegistrationLoading,
+    refetch: refetchMyRegistration,
+  } = useMyRegistration();
   const {
     campingOptions,
     jobCategories,
@@ -59,7 +74,25 @@ export default function RegistrationPage() {
   const [currentStep, setCurrentStep] = useState(1);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [registrationId, setRegistrationId] = useState<string | null>(null);
-  
+  const [approvedRegistrationCompleted, setApprovedRegistrationCompleted] = useState(false);
+
+  const isApplicationMode = config?.applicationApprovalRequired ?? false;
+  const registrationStatus = myRegistration?.status ?? null;
+  const isCancelledRegistration = registrationStatus === 'CANCELLED';
+  const isApplicationSubmitted = registrationStatus === 'APPLICATION_SUBMITTED';
+  const isApplicationApproved = registrationStatus === 'APPLICATION_APPROVED';
+  const isApplicationDeclined = registrationStatus === 'APPLICATION_DECLINED';
+  // User can complete if explicitly approved OR if approval mode was disabled while they had a pending application
+  const canCompleteApplication = isApplicationApproved || (!isApplicationMode && isApplicationSubmitted);
+  // Treat cancelled registrations as no registration for application entry purposes
+  const isApplicationEntryFlow = isApplicationMode && (myRegistration === null || isCancelledRegistration);
+  const visibleSteps = canCompleteApplication
+    ? [4, 5, 6]
+    : isApplicationMode
+      ? [1, 2, 3]
+      : [1, 2, 3, 4, 5, 6];
+  const firstVisibleStep = visibleSteps[0] ?? 1;
+
   // Collapsible categories state for shifts step
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   
@@ -142,18 +175,75 @@ export default function RegistrationPage() {
   // Track loaded custom fields for selected camping options
   const [customFieldsByOption, setCustomFieldsByOption] = useState<Record<string, CampingOptionField[]>>({});
 
+  const parseCustomFieldValue = useCallback((value: string, dataType: CampingOptionField['dataType']): unknown => {
+    if (dataType === 'BOOLEAN') {
+      return value === 'true';
+    }
+
+    if (dataType === 'INTEGER' || dataType === 'NUMBER') {
+      const parsedValue = Number(value);
+      return Number.isNaN(parsedValue) ? value : parsedValue;
+    }
+
+    return value;
+  }, []);
+
+  useEffect(() => {
+    if (!campRegistration?.hasRegistration) {
+      return;
+    }
+
+    setFormData(prev => ({
+      ...prev,
+      campingOptions:
+        prev.campingOptions.length > 0
+          ? prev.campingOptions
+          : campRegistration.campingOptions.map(option => option.campingOptionId),
+      customFields:
+        Object.keys(prev.customFields).length > 0
+          ? prev.customFields
+          : campRegistration.customFieldValues.reduce<Record<string, unknown>>((values, fieldValue) => {
+              values[fieldValue.fieldId] = parseCustomFieldValue(fieldValue.value, fieldValue.field.dataType);
+              return values;
+            }, {}),
+    }));
+  }, [campRegistration, parseCustomFieldValue]);
+
+  useEffect(() => {
+    if (myRegistration?.id) {
+      setRegistrationId(myRegistration.id);
+    }
+
+    if (myRegistration && !isApplicationStatus(myRegistration.status) && myRegistration.status !== 'CANCELLED') {
+      setApprovedRegistrationCompleted(true);
+    }
+  }, [myRegistration]);
+
+  useEffect(() => {
+    if (canCompleteApplication && currentStep < 4) {
+      setCurrentStep(4);
+    }
+  }, [currentStep, canCompleteApplication]);
+
   // Check if user can register and redirect if not
   useEffect(() => {
-    if (!authLoading && !campRegistrationLoading && config && user) {
+    if (!authLoading && !campRegistrationLoading && !myRegistrationLoading && config && user) {
       const hasActiveRegistration = campRegistration?.hasRegistration || false;
-      
-      if (!canUserRegister(config, user, hasActiveRegistration)) {
-        // User can't register, redirect to dashboard
+
+      if (!canUserRegister(config, user, hasActiveRegistration, registrationStatus)) {
         navigate(PATHS.DASHBOARD);
-        return;
       }
     }
-  }, [authLoading, campRegistrationLoading, config, user, campRegistration, navigate]);
+  }, [
+    authLoading,
+    campRegistration,
+    campRegistrationLoading,
+    config,
+    myRegistrationLoading,
+    navigate,
+    registrationStatus,
+    user,
+  ]);
 
   // Fetch initial data on component mount
   useEffect(() => {
@@ -448,25 +538,80 @@ export default function RegistrationPage() {
     return Object.keys(errors).length === 0;
   };
 
+  const submitApplicationRequest = async (): Promise<void> => {
+    try {
+      const response = await api.post('/registrations/apply', {
+        campingOptions: formData.campingOptions,
+        customFields: formData.customFields,
+      });
+
+      const nextRegistrationId = response.data?.registration?.id;
+      const nextStatus = response.data?.registration?.status;
+
+      if (nextRegistrationId) {
+        setRegistrationId(nextRegistrationId);
+      }
+
+      await Promise.all([refetchMyRegistration(), refetchCampRegistration()]);
+
+      if (nextStatus === 'APPLICATION_APPROVED') {
+        setCurrentStep(4);
+      }
+    } catch (err) {
+      console.error('Application submission failed:', err);
+      setFormErrors(prev => ({
+        ...prev,
+        submit: 'Failed to submit application. Please try again.',
+      }));
+    }
+  };
+
+  const completeApprovedRegistration = async (deferPayment: boolean): Promise<string | undefined> => {
+    if (approvedRegistrationCompleted) {
+      return registrationId ?? myRegistration?.id;
+    }
+
+    const response = await api.post('/registrations/complete', {
+      jobs: formData.jobs,
+      acceptedTerms: formData.acceptedTerms,
+      deferPayment,
+    });
+
+    const completedRegistrationId = response.data?.registration?.id ?? registrationId ?? myRegistration?.id;
+
+    if (completedRegistrationId) {
+      setRegistrationId(completedRegistrationId);
+    }
+
+    setApprovedRegistrationCompleted(true);
+    await Promise.all([refetchMyRegistration(), refetchCampRegistration()]);
+
+    return completedRegistrationId;
+  };
+
   // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!validateStep()) {
       return;
     }
-    
-    if (currentStep < 5) {
-      // Save profile data if we're on step 1
-      if (currentStep === 1) {
-        const profileSaved = await handleProfileFormSubmit();
-        if (!profileSaved) {
-          return; // Don't proceed if profile save failed
-        }
+
+    if (currentStep === 1) {
+      const profileSaved = await handleProfileFormSubmit();
+      if (!profileSaved) {
+        return;
       }
+    }
+
+    if (isApplicationEntryFlow && currentStep === 3) {
+      await submitApplicationRequest();
+      return;
+    }
+
+    if (currentStep < 5) {
       setCurrentStep(currentStep + 1);
     } else if (currentStep === 5) {
-      // Terms step - just move to payment step without creating registration yet
       setCurrentStep(6);
     }
   };
@@ -1262,23 +1407,27 @@ export default function RegistrationPage() {
               registrationId={registrationId === null ? undefined : registrationId}
               description={`${config?.name || 'Camp'} Dues Payment ${config?.currentYear || new Date().getFullYear()}`}
               onPaymentStart={async () => {
-                // Create registration if it doesn't exist yet
-                let actualRegistrationId: string | undefined = registrationId === null ? undefined : registrationId;
-                if (!actualRegistrationId) {
-                  try {
+                try {
+                  if (canCompleteApplication) {
+                    const completedRegistrationId = await completeApprovedRegistration(false);
+                    return { registrationId: completedRegistrationId };
+                  }
+
+                  let actualRegistrationId: string | undefined = registrationId === null ? undefined : registrationId;
+                  if (!actualRegistrationId) {
                     const result = await submitRegistration(formData);
                     if (result?.jobRegistration?.id) {
                       actualRegistrationId = result.jobRegistration.id;
-                      setRegistrationId(result.jobRegistration.id); // Update state for future reference
+                      setRegistrationId(result.jobRegistration.id);
                     }
-                  } catch (err) {
-                    console.error('Registration creation failed:', err);
-                    setFormErrors(prev => ({ ...prev, payment: 'Failed to create registration. Please try again.' }));
-                    throw err; // Prevent payment from proceeding
                   }
+
+                  return { registrationId: actualRegistrationId };
+                } catch (err) {
+                  console.error('Registration creation failed:', err);
+                  setFormErrors(prev => ({ ...prev, payment: 'Failed to create registration. Please try again.' }));
+                  throw err;
                 }
-                // Return the registrationId for PaymentButton to use
-                return { registrationId: actualRegistrationId };
               }}
               onPaymentError={(error) => {
                 setFormErrors(prev => ({ ...prev, payment: error }));
@@ -1308,18 +1457,14 @@ export default function RegistrationPage() {
             <button
               type="button"
               onClick={async () => {
-                // Complete registration without payment
                 try {
-                  // Create registration if it doesn't exist yet
+                  if (canCompleteApplication) {
+                    await completeApprovedRegistration(totalCost > 0);
+                    navigate('/dashboard');
+                    return;
+                  }
+
                   if (!registrationId) {
-                    // When totalCost > 0, this branch corresponds to the
-                    // "Pay Dues Later" CTA — flag the submission so the
-                    // server creates the registration as CONFIRMED with
-                    // paymentDeferred=true and skips the payment step.
-                    // For totalCost === 0 ("free") there's nothing to
-                    // defer, so we omit the flag and the registration
-                    // lands PENDING per the current free-registration
-                    // semantics.
                     const submission =
                       totalCost > 0
                         ? { ...formData, deferPayment: true }
@@ -1343,6 +1488,25 @@ export default function RegistrationPage() {
         )}
       </div>
     );
+  };
+
+  const getStepLabel = (step: number): string => {
+    switch (step) {
+      case 1:
+        return 'Profile';
+      case 2:
+        return 'Options';
+      case 3:
+        return 'Details';
+      case 4:
+        return 'Shifts';
+      case 5:
+        return 'Review';
+      case 6:
+        return 'Payment';
+      default:
+        return '';
+    }
   };
 
   // Render the current step
@@ -1388,7 +1552,12 @@ export default function RegistrationPage() {
   };
 
   // Show loading state while checking registration status
-  if (authLoading || campRegistrationLoading || (registrationLoading && !jobs.length && !campingOptions.length)) {
+  if (
+    authLoading
+    || campRegistrationLoading
+    || myRegistrationLoading
+    || (registrationLoading && !jobs.length && !campingOptions.length)
+  ) {
     return (
       <div className="max-w-4xl mx-auto p-6">
         <div className="flex items-center justify-center py-12">
@@ -1407,7 +1576,7 @@ export default function RegistrationPage() {
     return (
       <div className="p-6">
         <p className="text-red-600">You must be logged in to register.</p>
-        <button 
+        <button
           onClick={() => navigate(PATHS.LOGIN)}
           className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
         >
@@ -1417,60 +1586,98 @@ export default function RegistrationPage() {
     );
   }
 
-  // Show message if user can't register
-  if (config && user && campRegistration !== null) {
-    const hasActiveRegistration = campRegistration?.hasRegistration || false;
-    
-    if (!canUserRegister(config, user, hasActiveRegistration)) {
-      return (
-        <div className="max-w-4xl mx-auto p-6">
-          <div className="bg-yellow-50 border border-yellow-400 rounded-lg p-6 text-center">
-            <h2 className="text-xl font-semibold text-yellow-800 mb-2">Registration Not Available</h2>
-            <p className="text-yellow-700 mb-4">{getRegistrationStatusMessage(config, user, hasActiveRegistration)}</p>
-            <button 
-              onClick={() => navigate(PATHS.DASHBOARD)}
-              className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
-            >
-              Go to Dashboard
-            </button>
-          </div>
+  const hasActiveRegistration = campRegistration?.hasRegistration || false;
+
+  if (config && !canUserRegister(config, user, hasActiveRegistration, registrationStatus)) {
+    return (
+      <div className="max-w-4xl mx-auto p-6">
+        <div className="bg-yellow-50 border border-yellow-400 rounded-lg p-6 text-center">
+          <h2 className="text-xl font-semibold text-yellow-800 mb-2">Registration Not Available</h2>
+          <p className="text-yellow-700 mb-4">
+            {getRegistrationStatusMessage(config, user, hasActiveRegistration, registrationStatus)}
+          </p>
+          <button
+            onClick={() => navigate(PATHS.DASHBOARD)}
+            className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
+          >
+            Go to Dashboard
+          </button>
         </div>
-      );
-    }
+      </div>
+    );
+  }
+
+  if (isApplicationMode && (isApplicationSubmitted || isApplicationDeclined)) {
+    return (
+      <div className="max-w-3xl mx-auto p-6">
+        <h1 className="text-2xl font-bold mb-6">Camp Registration</h1>
+        <ApplicationStatusBanner
+          status={registrationStatus ?? 'APPLICATION_SUBMITTED'}
+          decisionMessage={myRegistration?.decisionMessage}
+          submittedAt={myRegistration?.createdAt}
+        />
+        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          <p className="text-gray-700">
+            {isApplicationSubmitted
+              ? 'Your application is currently under review. There is nothing else to do right now.'
+              : 'If you have questions about this decision, please contact camp leadership.'}
+          </p>
+          <button
+            type="button"
+            onClick={() => navigate(PATHS.DASHBOARD)}
+            className="mt-4 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
+          >
+            Go to Dashboard
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (canCompleteApplication && currentStep < 4) {
+    return (
+      <div className="max-w-4xl mx-auto p-6">
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          <span className="ml-3 text-lg text-gray-600">Preparing approved registration...</span>
+        </div>
+      </div>
+    );
   }
 
   return (
     <div className="max-w-3xl mx-auto p-6">
-      <h1 className="text-2xl font-bold mb-6">Camp Registration</h1>
-      
-      {/* Step Progress Indicator */}
+      <h1 className="text-2xl font-bold mb-6">
+        {isApplicationEntryFlow ? 'Camp Application' : 'Camp Registration'}
+      </h1>
+
+      {isApplicationApproved && (
+        <ApplicationStatusBanner
+          status={registrationStatus ?? 'APPLICATION_SUBMITTED'}
+          decisionMessage={myRegistration?.decisionMessage}
+          submittedAt={myRegistration?.createdAt}
+        />
+      )}
+
       <div className="flex mb-8">
-        {[1, 2, 3, 4, 5, 6].map(step => (
+        {visibleSteps.map(step => (
           <div key={step} className="flex-1">
             <div className={`h-2 ${step <= currentStep ? 'bg-blue-500' : 'bg-gray-200'}`} />
-            <div className="mt-2 text-center text-sm">
-              {step === 1 && 'Profile'}
-              {step === 2 && 'Options'}
-              {step === 3 && 'Details'}
-              {step === 4 && 'Shifts'}
-              {step === 5 && 'Review'}
-              {step === 6 && 'Payment'}
-            </div>
+            <div className="mt-2 text-center text-sm">{getStepLabel(step)}</div>
           </div>
         ))}
       </div>
-      
+
       <form onSubmit={handleSubmit}>
         {renderCurrentStep()}
-        
+
         {formErrors.submit && (
           <div className="text-red-600 mt-4 p-2 bg-red-50 border border-red-200 rounded">
             {formErrors.submit}
           </div>
         )}
-        
-        {/* Show job validation errors at bottom for step 4 (jobs step) */}
-        {currentStep === 4 && Object.keys(formErrors).some(key => 
+
+        {currentStep === 4 && Object.keys(formErrors).some(key =>
           key === 'jobs' || key === 'campingJobs' || key.startsWith('category_')
         ) && (
           <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded">
@@ -1486,35 +1693,38 @@ export default function RegistrationPage() {
                 .filter(([key]) => key.startsWith('category_'))
                 .map(([key, error]) => (
                   <div key={key} className="text-red-600">{error}</div>
-                ))
-              }
+                ))}
             </div>
           </div>
         )}
-        
+
         <div className="mt-8 flex justify-between">
-          {currentStep > 1 && (
+          {currentStep > firstVisibleStep && (
             <button
               type="button"
               className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
-              onClick={() => setCurrentStep(currentStep - 1)}
+              onClick={() => setCurrentStep(Math.max(firstVisibleStep, currentStep - 1))}
             >
               Back
             </button>
           )}
-          
-          {/* Only show form submit button if not on payment step, or if on payment step but no payment needed */}
+
           {currentStep !== 6 && (
             <button
               type="submit"
               className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
             >
-              {currentStep < 5 ? 'Continue' : currentStep === 5 ? 'Review & Pay' : 'Complete Registration'}
+              {isApplicationEntryFlow && currentStep === 3
+                ? 'Submit Application'
+                : currentStep < 5
+                  ? 'Continue'
+                  : currentStep === 5
+                    ? 'Review & Pay'
+                    : 'Complete Registration'}
             </button>
           )}
         </div>
-        
-        {/* Payment amount display */}
+
         {currentStep === 5 && (
           <div className="mt-4 text-right">
             <div className="font-bold">Total: ${calculateTotalCost().toFixed(2)}</div>
