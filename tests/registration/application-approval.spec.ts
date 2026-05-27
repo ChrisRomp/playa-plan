@@ -245,12 +245,16 @@ test.describe(
         timeout: 15_000,
       });
       await expect(page.getByText('Application approved')).toBeVisible();
-      await expect(page.getByText('Profile', { exact: true })).toHaveCount(0);
-      await expect(page.getByText('Options', { exact: true })).toHaveCount(0);
-      await expect(page.getByText('Details', { exact: true })).toHaveCount(0);
-      await expect(page.getByText('Shifts', { exact: true })).toBeVisible();
-      await expect(page.getByText('Review', { exact: true })).toBeVisible();
-      await expect(page.getByText('Payment', { exact: true })).toBeVisible();
+
+      // Verify step indicator only shows completion steps (not application steps).
+      // Scope to the main content area to avoid matching nav links.
+      const main = page.locator('main, .max-w-3xl').first();
+      await expect(main.getByText('Profile', { exact: true })).toHaveCount(0);
+      await expect(main.getByText('Options', { exact: true })).toHaveCount(0);
+      await expect(main.getByText('Details', { exact: true })).toHaveCount(0);
+      await expect(main.getByText('Shifts', { exact: true })).toBeVisible();
+      await expect(main.getByText('Review', { exact: true })).toBeVisible();
+      await expect(main.getByText('Payment', { exact: true })).toBeVisible();
 
       await advanceApprovedRegistrationToPayment(page);
       await page.getByRole('button', { name: /Complete Registration/ }).click();
