@@ -188,6 +188,33 @@ describe('RegistrationPage', () => {
     },
   ];
 
+  const mockNumericFields = [
+    {
+      id: 'integer-field',
+      displayName: 'Number of Bikes',
+      description: 'How many bikes are you bringing?',
+      dataType: 'INTEGER' as const,
+      required: false,
+      campingOptionId: 'option1',
+      createdAt: '2025-05-01T00:00:00Z',
+      updatedAt: '2025-05-01T00:00:00Z',
+      minValue: 0,
+      maxValue: 10,
+    },
+    {
+      id: 'number-field',
+      displayName: 'Generator Hours',
+      description: 'Estimated generator usage hours',
+      dataType: 'NUMBER' as const,
+      required: false,
+      campingOptionId: 'option1',
+      createdAt: '2025-05-01T00:00:00Z',
+      updatedAt: '2025-05-01T00:00:00Z',
+      minValue: 0,
+      maxValue: 100,
+    },
+  ];
+
   // Setup mocks before each test
   beforeEach(() => {
     // Clear all mocks to ensure test isolation
@@ -604,6 +631,65 @@ describe('RegistrationPage', () => {
     expect(screen.getByLabelText('Last Name*')).toBeInTheDocument();
     expect(screen.getByLabelText('Phone Number*')).toBeInTheDocument();
     expect(screen.getByLabelText('Emergency Contact(s)*')).toBeInTheDocument();
+  });
+
+  it('blurs INTEGER and NUMBER custom-field inputs on mouse wheel', async () => {
+    vi.spyOn(useCampingOptionsModule, 'useCampingOptions').mockReturnValue({
+      options: [],
+      selectedOption: null,
+      fields: mockNumericFields,
+      loading: false,
+      error: null,
+      loadCampingOptions: vi.fn(),
+      loadCampingOption: vi.fn(),
+      createCampingOption: vi.fn(),
+      updateCampingOption: vi.fn(),
+      deleteCampingOption: vi.fn(),
+      loadCampingOptionFields: vi.fn().mockResolvedValue(mockNumericFields),
+      createCampingOptionField: vi.fn(),
+      updateCampingOptionField: vi.fn(),
+      deleteCampingOptionField: vi.fn(),
+    });
+
+    renderWithAuth();
+
+    fireEvent.change(screen.getByLabelText('First Name*'), { target: { value: 'Test' } });
+    fireEvent.change(screen.getByLabelText('Last Name*'), { target: { value: 'User' } });
+    fireEvent.change(screen.getByLabelText('Phone Number*'), { target: { value: '555-1234' } });
+    fireEvent.change(screen.getByLabelText('Emergency Contact(s)*'), { target: { value: 'Emergency Contact' } });
+    fireEvent.click(screen.getByText('Continue'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Select Camping Options')).toBeInTheDocument();
+    });
+
+    const campingCheckboxes = screen.getAllByRole('checkbox');
+    fireEvent.click(campingCheckboxes[0]);
+    fireEvent.click(screen.getByText('Continue'));
+
+    const integerFieldContainer = await screen.findByText('Number of Bikes');
+    const numberFieldContainer = await screen.findByText('Generator Hours');
+    const integerInput = integerFieldContainer.parentElement?.querySelector('input[type="number"]');
+    const numberInput = numberFieldContainer.parentElement?.querySelector('input[type="number"]');
+
+    expect(integerInput).not.toBeNull();
+    expect(numberInput).not.toBeNull();
+
+    const integerNumberInput = integerInput as HTMLInputElement;
+    const decimalNumberInput = numberInput as HTMLInputElement;
+
+    fireEvent.change(integerNumberInput, { target: { value: '3' } });
+    fireEvent.change(decimalNumberInput, { target: { value: '12.5' } });
+
+    integerNumberInput.focus();
+    fireEvent.wheel(integerNumberInput, { deltaY: 100 });
+    expect(integerNumberInput).not.toHaveFocus();
+    expect(integerNumberInput).toHaveValue(3);
+
+    decimalNumberInput.focus();
+    fireEvent.wheel(decimalNumberInput, { deltaY: 100 });
+    expect(decimalNumberInput).not.toHaveFocus();
+    expect(decimalNumberInput).toHaveValue(12.5);
   });
 
   // Add more tests as needed for other steps in the registration flow
