@@ -652,7 +652,10 @@ export class RegistrationsService {
           where: {
             userId,
             campingOptionId,
-            registration: { year: config.registrationYear },
+            registration: {
+              year: config.registrationYear,
+              status: { not: RegistrationStatus.CANCELLED },
+            },
           },
         });
       if (existingCampingRegistration) {
@@ -1056,7 +1059,14 @@ export class RegistrationsService {
       }
       const existingCampingRegistration =
         await this.prisma.campingOptionRegistration.findFirst({
-          where: { userId, campingOptionId, registration: { year: currentYear } },
+          where: {
+            userId,
+            campingOptionId,
+            registration: {
+              year: currentYear,
+              status: { not: RegistrationStatus.CANCELLED },
+            },
+          },
         });
       if (existingCampingRegistration) {
         throw new ConflictException(
