@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { api } from '../lib/api';
 import { User, UserSchema, UsersArraySchema, CreateUserDTO, UpdateUserDTO } from '../types/users';
 
@@ -11,20 +11,31 @@ export function useUsers() {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const latestFetchRequestId = useRef(0);
 
   // Fetch all users
   const fetchUsers = useCallback(async (): Promise<void> => {
+    const requestId = latestFetchRequestId.current + 1;
+    latestFetchRequestId.current = requestId;
+
     setLoading(true);
     setError(null);
     try {
       const response = await api.get('/users');
       const parsedUsers = UsersArraySchema.parse(response.data);
-      setUsers(parsedUsers);
+
+      if (requestId === latestFetchRequestId.current) {
+        setUsers(parsedUsers);
+      }
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'An error occurred fetching users';
-      setError(errorMessage);
+      if (requestId === latestFetchRequestId.current) {
+        const errorMessage = err instanceof Error ? err.message : 'An error occurred fetching users';
+        setError(errorMessage);
+      }
     } finally {
-      setLoading(false);
+      if (requestId === latestFetchRequestId.current) {
+        setLoading(false);
+      }
     }
   }, []);
 
@@ -52,6 +63,7 @@ export function useUsers() {
       const response = await api.post('/users', userData);
       const newUser = UserSchema.parse(response.data);
       setUsers(prev => [...prev, newUser]);
+      await fetchUsers();
       return newUser;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'An error occurred creating the user';
@@ -60,7 +72,7 @@ export function useUsers() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [fetchUsers]);
 
   // Update an existing user
   const updateUser = useCallback(async (id: string, userData: UpdateUserDTO): Promise<User | null> => {
@@ -75,6 +87,8 @@ export function useUsers() {
       if (selectedUser && selectedUser.id === id) {
         setSelectedUser(updatedUser);
       }
+
+      await fetchUsers();
       
       return updatedUser;
     } catch (err) {
@@ -84,7 +98,7 @@ export function useUsers() {
     } finally {
       setLoading(false);
     }
-  }, [selectedUser]);
+  }, [fetchUsers, selectedUser]);
 
   // Delete a user
   const deleteUser = useCallback(async (id: string): Promise<boolean> => {
@@ -98,6 +112,8 @@ export function useUsers() {
       if (selectedUser && selectedUser.id === id) {
         setSelectedUser(null);
       }
+
+      await fetchUsers();
       
       return true;
     } catch (err) {
@@ -107,7 +123,7 @@ export function useUsers() {
     } finally {
       setLoading(false);
     }
-  }, [selectedUser]);
+  }, [fetchUsers, selectedUser]);
 
   // Load users on initial mount
   useEffect(() => {

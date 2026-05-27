@@ -31,6 +31,51 @@ async function findLatestRegistration(userId: string): Promise<RegistrationSnaps
   });
 }
 
+async function snapshotCoreConfig(): Promise<CoreConfigSnapshot[]> {
+  const coreConfigSnapshots = await getPrisma().coreConfig.findMany({
+    select: {
+      id: true,
+      applicationApprovalRequired: true,
+    },
+  });
+
+  if (coreConfigSnapshots.length === 0) {
+    throw new Error('Expected at least one coreConfig row for application approval tests.');
+  }
+
+  return coreConfigSnapshots;
+}
+
+async function setApplicationApprovalRequired(value: boolean): Promise<void> {
+  await getPrisma().coreConfig.updateMany({
+    data: { applicationApprovalRequired: value },
+  });
+}
+
+async function restoreCoreConfigSnapshots(coreConfigSnapshots: CoreConfigSnapshot[]): Promise<void> {
+  await Promise.all(
+    coreConfigSnapshots.map(async (coreConfigSnapshot) =>
+      getPrisma().coreConfig.update({
+        where: { id: coreConfigSnapshot.id },
+        data: {
+          applicationApprovalRequired: coreConfigSnapshot.applicationApprovalRequired,
+        },
+      }),
+    ),
+  );
+}
+
+async function withApplicationApprovalEnabled<T>(action: () => Promise<T>): Promise<T> {
+  const coreConfigSnapshots = await snapshotCoreConfig();
+  await setApplicationApprovalRequired(true);
+
+  try {
+    return await action();
+  } finally {
+    await restoreCoreConfigSnapshots(coreConfigSnapshots);
+  }
+}
+
 async function submitApplication(page: Page): Promise<void> {
   await page.goto(webUrl('/registration'));
   await expect(page.getByRole('heading', { name: 'Camp Application' })).toBeVisible({
@@ -164,69 +209,37 @@ test.describe(
     test.describe.configure({ mode: 'serial' });
     test.use({ storageState: { cookies: [], origins: [] } });
 
-    let coreConfigSnapshots: CoreConfigSnapshot[] = [];
-
-    test.beforeAll(async () => {
-      const prisma = getPrisma();
-      coreConfigSnapshots = await prisma.coreConfig.findMany({
-        select: {
-          id: true,
-          applicationApprovalRequired: true,
-        },
-      });
-
-      if (coreConfigSnapshots.length === 0) {
-        throw new Error('Expected at least one coreConfig row for application approval tests.');
-      }
-
-      await prisma.coreConfig.updateMany({
-        data: { applicationApprovalRequired: true },
-      });
-    });
-
-    test.afterAll(async () => {
-      const prisma = getPrisma();
-
-      await Promise.all(
-        coreConfigSnapshots.map(async (coreConfigSnapshot) =>
-          prisma.coreConfig.update({
-            where: { id: coreConfigSnapshot.id },
-            data: {
-              applicationApprovalRequired:
-                coreConfigSnapshot.applicationApprovalRequired,
-            },
-          }),
-        ),
-      );
-    });
-
     test('participant submits application and sees pending status', async ({
       page,
       freshParticipant,
     }) => {
       test.setTimeout(60_000);
 
-      await submitApplication(page);
+      await withApplicationApprovalEnabled(async () => {
+        await submitApplication(page);
 
-      await expect(page.getByRole('heading', { name: /application pending review/i })).toBeVisible({
-        timeout: 10_000,
+        await expect(page.getByRole('heading', { name: /application pending review/i })).toBeVisible({
+          timeout: 10_000,
+        });
+        await expect(page.getByText(/there is nothing else to do right now/i)).toBeVisible();
+
+        await expect.poll(async () => (await findLatestRegistration(freshParticipant.id))?.status ?? null).toBe(
+          RegistrationStatus.APPLICATION_SUBMITTED,
+        );
       });
-      await expect(page.getByText(/there is nothing else to do right now/i)).toBeVisible();
-
-      await expect.poll(async () => (await findLatestRegistration(freshParticipant.id))?.status ?? null).toBe(
-        RegistrationStatus.APPLICATION_SUBMITTED,
-      );
     });
 
     test('admin approves a submitted application', async ({ page, freshParticipant }) => {
       test.setTimeout(90_000);
 
-      await submitApplication(page);
-      await expect.poll(async () => (await findLatestRegistration(freshParticipant.id))?.status ?? null).toBe(
-        RegistrationStatus.APPLICATION_SUBMITTED,
-      );
+      await withApplicationApprovalEnabled(async () => {
+        await submitApplication(page);
+        await expect.poll(async () => (await findLatestRegistration(freshParticipant.id))?.status ?? null).toBe(
+          RegistrationStatus.APPLICATION_SUBMITTED,
+        );
 
-      await approveApplicationAsAdmin(page, freshParticipant.email);
+        await approveApplicationAsAdmin(page, freshParticipant.email);
+      });
 
       await expect.poll(async () => (await findLatestRegistration(freshParticipant.id))?.status ?? null).toBe(
         RegistrationStatus.APPLICATION_APPROVED,
@@ -236,15 +249,17 @@ test.describe(
     test('participant completes registration after approval', async ({ page, freshParticipant }) => {
       test.setTimeout(120_000);
 
-      await submitApplication(page);
-      await approveApplicationAsAdmin(page, freshParticipant.email);
-      await loginAsParticipant(page, freshParticipant.email);
-      await page.goto(webUrl('/registration'));
+      await withApplicationApprovalEnabled(async () => {
+        await submitApplication(page);
+        await approveApplicationAsAdmin(page, freshParticipant.email);
+        await loginAsParticipant(page, freshParticipant.email);
+        await page.goto(webUrl('/registration'));
 
-      await expect(page.getByRole('heading', { name: 'Select Work Shifts' })).toBeVisible({
-        timeout: 15_000,
+        await expect(page.getByRole('heading', { name: 'Select Work Shifts' })).toBeVisible({
+          timeout: 15_000,
+        });
+        await expect(page.getByText('Application approved')).toBeVisible();
       });
-      await expect(page.getByText('Application approved')).toBeVisible();
 
       // Verify step indicator only shows completion steps (not application steps).
       // Scope to the main content area to avoid matching nav links.
@@ -285,26 +300,28 @@ test.describe(
     }) => {
       test.setTimeout(90_000);
 
-      await submitApplication(page);
+      await withApplicationApprovalEnabled(async () => {
+        await submitApplication(page);
 
-      const declineMessage = 'We do not have capacity to approve this application right now.';
-      await declineApplicationAsAdmin(page, freshParticipant.email, declineMessage);
+        const declineMessage = 'We do not have capacity to approve this application right now.';
+        await declineApplicationAsAdmin(page, freshParticipant.email, declineMessage);
 
-      await expect.poll(async () => (await findLatestRegistration(freshParticipant.id))?.status ?? null).toBe(
-        RegistrationStatus.APPLICATION_DECLINED,
-      );
+        await expect.poll(async () => (await findLatestRegistration(freshParticipant.id))?.status ?? null).toBe(
+          RegistrationStatus.APPLICATION_DECLINED,
+        );
 
-      const registration = await findLatestRegistration(freshParticipant.id);
-      expect(registration?.decisionMessage).toBe(declineMessage);
+        const registration = await findLatestRegistration(freshParticipant.id);
+        expect(registration?.decisionMessage).toBe(declineMessage);
 
-      await loginAsParticipant(page, freshParticipant.email);
-      await page.goto(webUrl('/registration'));
+        await loginAsParticipant(page, freshParticipant.email);
+        await page.goto(webUrl('/registration'));
 
-      await expect(page.getByRole('heading', { name: /application not approved/i })).toBeVisible({
-        timeout: 10_000,
+        await expect(page.getByRole('heading', { name: /application not approved/i })).toBeVisible({
+          timeout: 10_000,
+        });
+        await expect(page.getByText(/your application was not approved/i)).toBeVisible();
+        await expect(page.getByText(declineMessage)).toBeVisible();
       });
-      await expect(page.getByText(/your application was not approved/i)).toBeVisible();
-      await expect(page.getByText(declineMessage)).toBeVisible();
     });
 
     test('auto-approved participant skips the pending review wait', async ({
@@ -318,16 +335,18 @@ test.describe(
         data: { autoApproveRegistration: true },
       });
 
-      await submitApplication(page);
+      await withApplicationApprovalEnabled(async () => {
+        await submitApplication(page);
 
-      await expect(page.getByRole('heading', { name: 'Select Work Shifts' })).toBeVisible({
-        timeout: 15_000,
+        await expect(page.getByRole('heading', { name: 'Select Work Shifts' })).toBeVisible({
+          timeout: 15_000,
+        });
+        await expect(page.getByText('Application approved')).toBeVisible();
+        await expect(page.getByText(/complete your registration below/i)).toBeVisible();
+        await expect.poll(async () => (await findLatestRegistration(freshParticipant.id))?.status ?? null).toBe(
+          RegistrationStatus.APPLICATION_APPROVED,
+        );
       });
-      await expect(page.getByText('Application approved')).toBeVisible();
-      await expect(page.getByText(/complete your registration below/i)).toBeVisible();
-      await expect.poll(async () => (await findLatestRegistration(freshParticipant.id))?.status ?? null).toBe(
-        RegistrationStatus.APPLICATION_APPROVED,
-      );
 
       await advanceApprovedRegistrationToPayment(page);
       await page.getByRole('button', { name: /Complete Registration/ }).click();

@@ -9,6 +9,14 @@ import {
 } from './dto';
 import { RegistrationStatus, UserRole } from '@prisma/client';
 
+interface MockAuthenticatedRequest {
+  user: {
+    id: string;
+    email: string;
+    role: UserRole;
+  };
+}
+
 describe('RegistrationsController', () => {
   let controller: RegistrationsController;
   // Service is mocked and accessed through the controller
@@ -79,13 +87,13 @@ describe('RegistrationsController', () => {
         campingOptions: ['camping-option-id'],
         customFields: { 'field-id': 'value' },
       };
-      const mockRequest = {
+      const mockRequest: MockAuthenticatedRequest = {
         user: {
           id: 'user-id',
           email: 'user@example.com',
           role: UserRole.PARTICIPANT,
         },
-      } as any;
+      };
       const expectedResult = {
         registration: {
           id: 'registration-id',
@@ -114,13 +122,13 @@ describe('RegistrationsController', () => {
         acceptedTerms: true,
         deferPayment: true,
       };
-      const mockRequest = {
+      const mockRequest: MockAuthenticatedRequest = {
         user: {
           id: 'user-id',
           email: 'user@example.com',
           role: UserRole.PARTICIPANT,
         },
-      } as any;
+      };
       const expectedResult = {
         registration: {
           id: 'registration-id',
