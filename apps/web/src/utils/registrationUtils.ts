@@ -92,8 +92,8 @@ export function isRegistrationAccessible(config: ConfigType, user: UserType | nu
  * Check if user should be allowed to access the registration flow.
  * Returns true when registration is open and the user has no active registration,
  * OR when the user has an active registration in an application-phase status
- * (APPLICATION_SUBMITTED or APPLICATION_APPROVED) so they can continue or
- * complete the flow.
+ * (APPLICATION_SUBMITTED, APPLICATION_APPROVED, or APPLICATION_DECLINED) so they
+ * can view their status or continue the flow.
  * @param config - The core configuration or camp configuration
  * @param user - The current user (optional)
  * @param hasActiveRegistration - Whether the user already has an active (non-cancelled) registration

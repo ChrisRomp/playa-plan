@@ -11,6 +11,7 @@ import {
 } from './dto';
 import {
   NotificationType,
+  Prisma,
   Registration,
   RegistrationStatus,
   UserRole,
@@ -675,95 +676,110 @@ export class RegistrationsService {
       ? RegistrationStatus.APPLICATION_APPROVED
       : RegistrationStatus.APPLICATION_SUBMITTED;
 
-    const { registration, campingOptionRegistrations } =
-      await this.prisma.$transaction(async (tx) => {
-        const registration = await tx.registration.create({
-          data: {
-            status,
-            paymentDeferred: false,
-            year: config.registrationYear,
-            user: { connect: { id: userId } },
-          },
-          include: {
-            user: true,
-            jobs: {
-              include: {
-                job: {
-                  include: {
-                    category: true,
-                    shift: true,
+    let registration: Registration;
+    let campingOptionRegistrations: Array<{
+      id: string;
+      userId: string;
+      campingOptionId: string;
+      createdAt: Date;
+      updatedAt: Date;
+      campingOption: {
+        id: string;
+        name: string;
+        description: string | null;
+        enabled: boolean;
+        workShiftsRequired: number;
+        participantDues: number;
+        staffDues: number;
+        maxSignups: number;
+        createdAt: Date;
+        updatedAt: Date;
+        fields: Array<{
+          id: string;
+          displayName: string;
+          description: string | null;
+          dataType: string;
+          required: boolean;
+          maxLength: number | null;
+          minValue: number | null;
+          maxValue: number | null;
+          createdAt: Date;
+          updatedAt: Date;
+          campingOptionId: string;
+        }>;
+      };
+    }>;
+
+    try {
+      ({ registration, campingOptionRegistrations } =
+        await this.prisma.$transaction(async (tx) => {
+          const reg = await tx.registration.create({
+            data: {
+              status,
+              paymentDeferred: false,
+              year: config.registrationYear,
+              user: { connect: { id: userId } },
+            },
+            include: {
+              user: true,
+              jobs: {
+                include: {
+                  job: {
+                    include: {
+                      category: true,
+                      shift: true,
+                    },
                   },
                 },
               },
+              payments: true,
             },
-            payments: true,
-          },
-        });
+          });
 
-        const created: Array<{
-          id: string;
-          userId: string;
-          campingOptionId: string;
-          createdAt: Date;
-          updatedAt: Date;
-          campingOption: {
-            id: string;
-            name: string;
-            description: string | null;
-            enabled: boolean;
-            workShiftsRequired: number;
-            participantDues: number;
-            staffDues: number;
-            maxSignups: number;
-            createdAt: Date;
-            updatedAt: Date;
-            fields: Array<{
-              id: string;
-              displayName: string;
-              description: string | null;
-              dataType: string;
-              required: boolean;
-              maxLength: number | null;
-              minValue: number | null;
-              maxValue: number | null;
-              createdAt: Date;
-              updatedAt: Date;
-              campingOptionId: string;
-            }>;
-          };
-        }> = [];
+          const created: typeof campingOptionRegistrations = [];
 
-        for (const campingOption of validatedCampingOptions) {
-          const campingOptionRegistration =
-            await tx.campingOptionRegistration.create({
-              data: {
-                userId,
-                campingOptionId: campingOption.campingOptionId,
-                registrationId: registration.id,
-              },
-              include: { campingOption: { include: { fields: true } } },
-            });
+          for (const campingOption of validatedCampingOptions) {
+            const campingOptionRegistration =
+              await tx.campingOptionRegistration.create({
+                data: {
+                  userId,
+                  campingOptionId: campingOption.campingOptionId,
+                  registrationId: reg.id,
+                },
+                include: { campingOption: { include: { fields: true } } },
+              });
 
-          if (submitApplicationDto.customFields && campingOption.fields.length > 0) {
-            for (const field of campingOption.fields) {
-              const fieldValue = submitApplicationDto.customFields[field.id];
-              if (fieldValue !== undefined) {
-                await tx.campingOptionFieldValue.create({
-                  data: {
-                    fieldId: field.id,
-                    registrationId: campingOptionRegistration.id,
-                    value: String(fieldValue),
-                  },
-                });
+            if (submitApplicationDto.customFields && campingOption.fields.length > 0) {
+              for (const field of campingOption.fields) {
+                const fieldValue = submitApplicationDto.customFields[field.id];
+                if (fieldValue !== undefined) {
+                  await tx.campingOptionFieldValue.create({
+                    data: {
+                      fieldId: field.id,
+                      registrationId: campingOptionRegistration.id,
+                      value: String(fieldValue),
+                    },
+                  });
+                }
               }
             }
+
+            created.push(campingOptionRegistration);
           }
 
-          created.push(campingOptionRegistration);
-        }
-
-        return { registration, campingOptionRegistrations: created };
-      });
+          return { registration: reg, campingOptionRegistrations: created };
+        }));
+    } catch (err) {
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2002'
+      ) {
+        throw new ConflictException(
+          `User already has an active registration for ${config.registrationYear}`,
+        );
+      }
+      throw err;
+    }
 
     const notificationType = isAutoApproved
       ? NotificationType.APPLICATION_APPROVED
