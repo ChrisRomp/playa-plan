@@ -619,6 +619,7 @@ export default function AdminApplicationsPage() {
               </h2>
               <p className="mt-1 text-sm text-gray-600">
                 Provide a message for {declineDialog.label}.
+                {' '}This message is sent to the applicant by email.
               </p>
             </div>
             <div className="space-y-4 px-6 py-5">
