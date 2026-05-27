@@ -1,0 +1,32 @@
+---
+trigger: run-e2e
+title: Run E2E tests
+description: Run Playwright E2E tests for this pull request.
+surfaces:
+  - pull_request
+steps:
+  - type: form
+    style: modal
+    body:
+      - type: dropdown
+        attributes:
+          label: Scope
+          description: Choose a common Playwright tag filter.
+          options:
+            - label: All tests
+              value: all
+            - label: Smoke tests
+              value: smoke
+            - label: Auth tests
+              value: auth
+            - label: Registration tests
+              value: registration
+            - label: Admin tests
+              value: admin
+      - type: input
+        attributes:
+          label: Grep filter
+          description: Optional custom Playwright --grep filter. Overrides scope when set.
+          format: text
+  - type: repository_dispatch
+    eventType: run_e2e

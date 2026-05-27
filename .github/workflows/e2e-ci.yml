@@ -2,8 +2,9 @@ name: E2E Tests
 
 permissions:
   contents: read
-  checks: write
-  pull-requests: write
+  statuses: write
+  issues: write
+  pull-requests: read
 
 on:
   workflow_dispatch:
@@ -13,13 +14,15 @@ on:
         required: false
         default: ''
       pr_number:
-        description: 'PR number — when set, post results as a sticky PR comment. (Set automatically by the /run-e2e slash-command dispatcher.)'
+        description: 'PR number. Set automatically by /run-e2e; optional for manual runs.'
         required: false
         default: ''
       head_sha:
-        description: 'PR head commit SHA — when set, create a check run on that commit so the PR shows the result. (Set automatically by the /run-e2e dispatcher.)'
+        description: 'PR head commit SHA. Set automatically by /run-e2e; optional for manual runs.'
         required: false
         default: ''
+  repository_dispatch:
+    types: [run_e2e]
   # NOTE: PR/push triggers intentionally disabled until E2E timings are stable.
   # When re-enabled, consider gating per-tag via path filters
   # (dorny/paths-filter or scripts/select-e2e-tags.sh) so admin-only changes only run @admin.
@@ -43,15 +46,104 @@ on:
   #     - 'package-lock.json'
 
 jobs:
+  resolve-context:
+    name: Resolve E2E Context
+    runs-on: ubuntu-latest
+    outputs:
+      tags: ${{ steps.e2e_context.outputs.tags }}
+      pr_number: ${{ steps.e2e_context.outputs.pr_number }}
+      head_sha: ${{ steps.e2e_context.outputs.head_sha }}
+      head_ref: ${{ steps.e2e_context.outputs.head_ref }}
+      checkout_ref: ${{ steps.e2e_context.outputs.checkout_ref }}
+      trigger_actor: ${{ steps.e2e_context.outputs.trigger_actor }}
+    steps:
+    - name: Resolve E2E context
+      id: e2e_context
+      uses: actions/github-script@v7
+      env:
+        WORKFLOW_TAGS: ${{ inputs.tags }}
+        WORKFLOW_PR_NUMBER: ${{ inputs.pr_number }}
+        WORKFLOW_HEAD_SHA: ${{ inputs.head_sha }}
+      with:
+        script: |
+          const getString = (value) => value == null ? '' : String(value).trim();
+          const payload = context.payload;
+          const clientPayload = payload.client_payload ?? {};
+          const data = clientPayload.data ?? {};
+          const command = clientPayload.command ?? {};
+          const resource = command.resource ?? command.pull_request ?? clientPayload.pull_request ?? {};
+
+          let tags = getString(process.env.WORKFLOW_TAGS);
+          let prNumber = getString(process.env.WORKFLOW_PR_NUMBER);
+          let headSha = getString(process.env.WORKFLOW_HEAD_SHA);
+          let headRef = '';
+          let triggerActor = context.actor;
+
+          if (context.eventName === 'repository_dispatch') {
+            const scope = getString(data.Scope ?? data.scope);
+            const grep = getString(data['Grep filter'] ?? data.grep ?? data.tags);
+            const scopeTags = {
+              all: '',
+              smoke: '@smoke',
+              auth: '@auth',
+              registration: '@registration',
+              admin: '@admin',
+            };
+            tags = grep || scopeTags[scope] || '';
+            prNumber = getString(
+              resource.number ??
+              resource.pull_request?.number ??
+              command.resource_number ??
+              command.issue?.number ??
+              command.pull_request?.number ??
+              clientPayload.issue?.number ??
+              clientPayload.number
+            );
+            triggerActor = getString(command.user?.login ?? clientPayload.sender?.login) || context.actor;
+
+            if (!prNumber) {
+              core.setFailed('repository_dispatch run_e2e payload did not include a pull request number.');
+              core.info(JSON.stringify({ data, command, clientPayload }, null, 2));
+              return;
+            }
+          }
+
+          if (prNumber) {
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: Number(prNumber),
+            });
+
+            const baseRepo = `${context.repo.owner}/${context.repo.repo}`.toLowerCase();
+            const headRepo = (pr.head.repo?.full_name || '').toLowerCase();
+            if (headRepo !== baseRepo) {
+              core.setFailed(`E2E is only supported for PR branches in ${baseRepo}; got ${headRepo || 'unknown'}.`);
+              return;
+            }
+
+            headSha ||= pr.head.sha;
+            headRef = pr.head.ref;
+          }
+
+          const checkoutRef = headSha || context.sha;
+          core.setOutput('tags', tags);
+          core.setOutput('pr_number', prNumber);
+          core.setOutput('head_sha', headSha);
+          core.setOutput('head_ref', headRef);
+          core.setOutput('checkout_ref', checkoutRef);
+          core.setOutput('trigger_actor', triggerActor);
+
   e2e-tests:
     name: End-to-End Tests
+    needs: resolve-context
     runs-on: ubuntu-latest
     timeout-minutes: 30
     # Cancel any older run for the same PR (or for the same triggering ref on
-    # manual dispatch) so the sticky comment + check always reflect the
-    # latest invocation, not whichever happens to finish last.
+    # manual dispatch) so the PR status reflects the latest invocation, not
+    # whichever happens to finish last.
     concurrency:
-      group: e2e-ci-${{ inputs.pr_number != '' && format('pr-{0}', inputs.pr_number) || github.ref }}
+      group: e2e-ci-${{ needs.resolve-context.outputs.pr_number != '' && format('pr-{0}', needs.resolve-context.outputs.pr_number) || github.ref }}
       cancel-in-progress: true
 
     services:
@@ -71,6 +163,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+      with:
+        ref: ${{ needs.resolve-context.outputs.checkout_ref }}
 
     # Fail fast on missing CI secret BEFORE we spend minutes on installs.
     - name: Validate E2E_SEED_LOCAL secret and stage seed.local.ts
@@ -84,31 +178,29 @@ jobs:
         printf '%s' "$E2E_SEED_LOCAL" > apps/api/prisma/seeds/seed.local.ts
         echo "Wrote apps/api/prisma/seeds/seed.local.ts ($(wc -c < apps/api/prisma/seeds/seed.local.ts) bytes)"
 
-    - name: Create PR check (in-progress)
-      id: pr_check
-      if: inputs.pr_number != '' && inputs.head_sha != ''
+    - name: Create pending E2E status
+      if: needs.resolve-context.outputs.head_sha != ''
       uses: actions/github-script@v7
       env:
-        PR_NUMBER: ${{ inputs.pr_number }}
-        HEAD_SHA: ${{ inputs.head_sha }}
+        PR_NUMBER: ${{ needs.resolve-context.outputs.pr_number }}
+        HEAD_SHA: ${{ needs.resolve-context.outputs.head_sha }}
+        TRIGGER_ACTOR: ${{ needs.resolve-context.outputs.trigger_actor }}
       with:
         script: |
-          const { PR_NUMBER, HEAD_SHA } = process.env;
+          const { PR_NUMBER, HEAD_SHA, TRIGGER_ACTOR } = process.env;
           const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
-          const { data: check } = await github.rest.checks.create({
+          const description = PR_NUMBER
+            ? `Triggered by ${TRIGGER_ACTOR} on PR #${PR_NUMBER}`
+            : `Triggered by ${TRIGGER_ACTOR}`;
+          await github.rest.repos.createCommitStatus({
             owner: context.repo.owner,
             repo: context.repo.repo,
-            name: 'E2E Tests',
-            head_sha: HEAD_SHA,
-            status: 'in_progress',
-            started_at: new Date().toISOString(),
-            details_url: runUrl,
-            output: {
-              title: 'E2E Tests running',
-              summary: `Triggered by /run-e2e on PR #${PR_NUMBER}.\n\n[View run](${runUrl})`,
-            },
+            sha: HEAD_SHA,
+            state: 'pending',
+            context: 'E2E Tests',
+            description: description.slice(0, 140),
+            target_url: runUrl,
           });
-          core.setOutput('id', check.id);
 
     - name: Use Node.js 22.x
       uses: actions/setup-node@v4
@@ -199,7 +291,7 @@ jobs:
         DATABASE_URL: postgresql://postgres:postgres@localhost:5432/playaplan_test
         JWT_SECRET: test-secret-key-for-ci
         NODE_ENV: development
-        E2E_TAGS: ${{ inputs.tags }}
+        E2E_TAGS: ${{ needs.resolve-context.outputs.tags }}
       run: |
         if [ -n "$E2E_TAGS" ]; then
           echo "Running with --grep \"$E2E_TAGS\""
@@ -215,15 +307,18 @@ jobs:
         node scripts/playwright-summary.mjs playwright-report/results.json > /tmp/e2e/summary.md
         cat /tmp/e2e/summary.md >> "$GITHUB_STEP_SUMMARY"
 
-    - name: Post or update PR comment with results
-      if: always() && inputs.pr_number != ''
+    - name: Post PR comment with results
+      if: always() && !cancelled() && needs.resolve-context.outputs.pr_number != ''
       uses: actions/github-script@v7
       env:
-        PR_NUMBER: ${{ inputs.pr_number }}
+        PR_NUMBER: ${{ needs.resolve-context.outputs.pr_number }}
+        HEAD_SHA: ${{ needs.resolve-context.outputs.head_sha }}
+        HEAD_REF: ${{ needs.resolve-context.outputs.head_ref }}
+        E2E_TAGS: ${{ needs.resolve-context.outputs.tags }}
+        TRIGGER_ACTOR: ${{ needs.resolve-context.outputs.trigger_actor }}
       with:
         script: |
           const fs = require('fs');
-          const marker = '<!-- e2e-ci-summary -->';
           let summary;
           try {
             summary = fs.readFileSync('/tmp/e2e/summary.md', 'utf8');
@@ -231,43 +326,23 @@ jobs:
             summary = '_E2E summary unavailable — the test step may have failed before producing a report._\n';
           }
           const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
-          const body = `${marker}\n${summary}\n[View full run](${runUrl})\n`;
+          const tags = process.env.E2E_TAGS || 'all tests';
+          const shortSha = (process.env.HEAD_SHA || '').slice(0, 7);
+          const metadata = [
+            `Triggered by: @${process.env.TRIGGER_ACTOR}`,
+            `Scope: \`${tags}\``,
+            process.env.HEAD_REF ? `Branch: \`${process.env.HEAD_REF}\`` : '',
+            shortSha ? `Commit: \`${shortSha}\`` : '',
+            `[View full run](${runUrl})`,
+          ].filter(Boolean).join(' | ');
+          const body = `${summary}\n${metadata}\n`;
           const prNumber = parseInt(process.env.PR_NUMBER, 10);
-          // Paginate so PRs with >100 comments still find the sticky comment.
-          const comments = await github.paginate(github.rest.issues.listComments, {
+          await github.rest.issues.createComment({
             owner: context.repo.owner,
             repo: context.repo.repo,
             issue_number: prNumber,
-            per_page: 100,
+            body,
           });
-          // Only consider our own bot's comments to avoid hijacking human ones.
-          const ours = comments.filter(c =>
-            c.user?.login === 'github-actions[bot]' && c.body?.includes(marker)
-          );
-          const existing = ours[0];
-          if (existing) {
-            await github.rest.issues.updateComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              comment_id: existing.id,
-              body,
-            });
-            // Clean up any duplicates left by older bugs.
-            for (const dup of ours.slice(1)) {
-              await github.rest.issues.deleteComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                comment_id: dup.id,
-              });
-            }
-          } else {
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: prNumber,
-              body,
-            });
-          }
 
     - name: Upload Playwright Report
       uses: actions/upload-artifact@v4
@@ -319,36 +394,25 @@ jobs:
 
     # Must be the last step so job.status reflects the outcome of EVERY
     # preceding step (test run, uploads, cleanup).
-    - name: Complete PR check
-      if: always() && steps.pr_check.outputs.id != ''
+    - name: Complete E2E status
+      if: always() && !cancelled() && needs.resolve-context.outputs.head_sha != ''
       uses: actions/github-script@v7
       env:
         JOB_STATUS: ${{ job.status }}
-        CHECK_RUN_ID: ${{ steps.pr_check.outputs.id }}
+        HEAD_SHA: ${{ needs.resolve-context.outputs.head_sha }}
       with:
         script: |
-          const fs = require('fs');
           const jobStatus = process.env.JOB_STATUS;
-          const conclusion = jobStatus === 'success'
+          const state = jobStatus === 'success'
             ? 'success'
-            : jobStatus === 'cancelled' ? 'cancelled' : 'failure';
-          let summary = '';
-          try {
-            summary = fs.readFileSync('/tmp/e2e/summary.md', 'utf8');
-          } catch {
-            summary = '_Test summary unavailable._';
-          }
-          // Check Run output.summary has a 65535-char limit; truncate defensively.
-          if (summary.length > 60000) summary = summary.slice(0, 60000) + '\n\n_…truncated…_';
-          await github.rest.checks.update({
+            : jobStatus === 'cancelled' ? 'error' : 'failure';
+          const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+          await github.rest.repos.createCommitStatus({
             owner: context.repo.owner,
             repo: context.repo.repo,
-            check_run_id: parseInt(process.env.CHECK_RUN_ID, 10),
-            status: 'completed',
-            conclusion,
-            completed_at: new Date().toISOString(),
-            output: {
-              title: `E2E ${conclusion}`,
-              summary,
-            },
+            sha: process.env.HEAD_SHA,
+            state,
+            context: 'E2E Tests',
+            description: `E2E ${state}`.slice(0, 140),
+            target_url: runUrl,
           });
