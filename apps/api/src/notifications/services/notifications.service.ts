@@ -107,6 +107,7 @@ export interface TemplateData {
 export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
   private readonly baseUrl: string;
+  private readonly frontendUrl: string;
   private readonly isDebugMode: boolean;
   
   constructor(
@@ -115,8 +116,18 @@ export class NotificationsService {
     private readonly coreConfigService: CoreConfigService,
   ) {
     this.baseUrl = this.configService.get<string>('app.baseUrl', 'http://localhost:3000');
+    this.frontendUrl = this.configService.get<string>('frontend.url', 'http://localhost:5173');
     this.isDebugMode = this.configService.get<string>('nodeEnv') === 'development' || 
                         process.argv.includes('--debug');
+  }
+
+  private getRegistrationCompletionUrl(registrationUrl?: string): string {
+    if (registrationUrl) {
+      return registrationUrl;
+    }
+
+    const normalizedFrontendUrl = this.frontendUrl.replace(/\/$/, '');
+    return `${normalizedFrontendUrl}/#/registration`;
   }
 
   /**
@@ -1250,7 +1261,7 @@ This is an automated test email from ${campName}. If you received this unexpecte
   private getApplicationApprovedTemplate(data: TemplateData, campName: string): NotificationTemplate {
     const name = data.name || data.playaName || 'there';
     const year = data.applicationDetails?.year || new Date().getFullYear();
-    const registrationUrl = data.applicationDetails?.registrationUrl || `${this.baseUrl}/#/registration`;
+    const registrationUrl = this.getRegistrationCompletionUrl(data.applicationDetails?.registrationUrl);
     const decisionMessage = data.applicationDetails?.decisionMessage;
     const subject = `${campName} - Application Approved!`;
     const messageParagraph = decisionMessage
