@@ -892,12 +892,17 @@ export class RegistrationsService {
     }
 
     const updated = await this.prisma.$transaction(async (tx) => {
-      // Optimistic lock: verify registration is still in a completable status
-      const currentReg = await tx.registration.findUnique({
-        where: { id: registration.id },
-        select: { status: true },
+      const updateResult = await tx.registration.updateMany({
+        where: {
+          id: registration.id,
+          status: { in: validStatuses },
+        },
+        data: {
+          status,
+          paymentDeferred: deferPayment,
+        },
       });
-      if (!currentReg || !validStatuses.includes(currentReg.status)) {
+      if (updateResult.count === 0) {
         throw new ConflictException('Registration has already been completed or is no longer in a valid state');
       }
 
@@ -907,15 +912,12 @@ export class RegistrationsService {
             registrationId: registration.id,
             jobId,
           })),
+          skipDuplicates: true,
         });
       }
 
-      return tx.registration.update({
+      const updatedRegistration = await tx.registration.findUnique({
         where: { id: registration.id },
-        data: {
-          status,
-          paymentDeferred: deferPayment,
-        },
         include: {
           user: true,
           jobs: {
@@ -940,6 +942,11 @@ export class RegistrationsService {
           payments: true,
         },
       });
+      if (!updatedRegistration) {
+        throw new NotFoundException(`Registration with ID ${registration.id} not found`);
+      }
+
+      return updatedRegistration;
     });
 
     if (updated.paymentDeferred && updated.status === RegistrationStatus.CONFIRMED) {

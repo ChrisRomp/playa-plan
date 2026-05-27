@@ -31,6 +31,7 @@ export function useMyRegistration(): UseMyRegistrationResult {
     if (!isAuthenticated || !config?.currentYear) {
       setRegistration(null);
       setError(null);
+      setLoading(false);
       return;
     }
 

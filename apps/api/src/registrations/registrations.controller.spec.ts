@@ -105,7 +105,10 @@ describe('RegistrationsController', () => {
 
       mockRegistrationsService.submitApplication.mockResolvedValue(expectedResult);
 
-      const result = await controller.submitApplication(submitApplicationDto, mockRequest);
+      const result = await controller.submitApplication(
+        submitApplicationDto,
+        mockRequest as Parameters<RegistrationsController['submitApplication']>[1],
+      );
 
       expect(mockRegistrationsService.submitApplication).toHaveBeenCalledWith(
         mockRequest.user.id,
@@ -140,7 +143,10 @@ describe('RegistrationsController', () => {
 
       mockRegistrationsService.completeRegistration.mockResolvedValue(expectedResult);
 
-      const result = await controller.completeRegistration(completeRegistrationDto, mockRequest);
+      const result = await controller.completeRegistration(
+        completeRegistrationDto,
+        mockRequest as Parameters<RegistrationsController['completeRegistration']>[1],
+      );
 
       expect(mockRegistrationsService.completeRegistration).toHaveBeenCalledWith(
         mockRequest.user.id,

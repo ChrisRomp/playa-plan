@@ -5,6 +5,7 @@ import { CreatePaymentDto, UpdatePaymentDto, CreateRefundDto, RecordManualPaymen
 import { Payment, PaymentProvider, PaymentStatus, Registration, UserRole } from '@prisma/client';
 import { StripeService } from './stripe.service';
 import { PaypalService } from './paypal.service';
+import { isApplicationStatus } from '../../registrations/constants/registration-status.constants';
 
 // Create an extended Payment type that includes registration relationship
 type PaymentWithRelations = Payment & {
@@ -82,8 +83,7 @@ export class PaymentsService {
       }
 
       // Prevent payments for registrations still in application phase
-      const applicationStatuses = ['APPLICATION_SUBMITTED', 'APPLICATION_APPROVED', 'APPLICATION_DECLINED'];
-      if (applicationStatuses.includes(registration.status)) {
+      if (isApplicationStatus(registration.status)) {
         throw new BadRequestException('Cannot process payment for a registration that has not completed the application process');
       }
     }
@@ -260,8 +260,7 @@ export class PaymentsService {
     }
     
     // Prevent linking payments to registrations in application phase
-    const applicationStatuses = ['APPLICATION_SUBMITTED', 'APPLICATION_APPROVED', 'APPLICATION_DECLINED'];
-    if (applicationStatuses.includes(registration.status)) {
+    if (isApplicationStatus(registration.status)) {
       throw new BadRequestException('Cannot link payment to a registration that has not completed the application process');
     }
 

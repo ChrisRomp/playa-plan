@@ -14,7 +14,15 @@ describe('RegistrationsService', () => {
   // PrismaService is mocked and not directly used in tests
 
   type MockPrismaService = {
-    registration: { create: jest.Mock; findMany: jest.Mock; findUnique: jest.Mock; findFirst: jest.Mock; update: jest.Mock; delete: jest.Mock };
+    registration: {
+      create: jest.Mock;
+      findMany: jest.Mock;
+      findUnique: jest.Mock;
+      findFirst: jest.Mock;
+      update: jest.Mock;
+      updateMany: jest.Mock;
+      delete: jest.Mock;
+    };
     registrationJob: { create: jest.Mock; createMany: jest.Mock; findMany: jest.Mock; findFirst: jest.Mock; delete: jest.Mock };
     job: { findUnique: jest.Mock; findMany: jest.Mock };
     user: { findUnique: jest.Mock };
@@ -32,6 +40,7 @@ describe('RegistrationsService', () => {
       findUnique: jest.fn(),
       findFirst: jest.fn(),
       update: jest.fn(),
+      updateMany: jest.fn(),
       delete: jest.fn(),
     },
     registrationJob: {
@@ -952,9 +961,8 @@ describe('RegistrationsService', () => {
       });
       mockPrismaService.user.findUnique.mockResolvedValue(baseUser);
       mockPrismaService.registration.findFirst.mockResolvedValue(approvedRegistration);
-      mockPrismaService.registration.findUnique.mockResolvedValue({
-        status: RegistrationStatus.APPLICATION_APPROVED,
-      });
+      mockPrismaService.registration.findUnique.mockResolvedValue(updatedRegistration);
+      mockPrismaService.registration.updateMany.mockResolvedValue({ count: 1 });
       mockPrismaService.job.findMany.mockResolvedValue([]);
       mockPrismaService.job.findUnique.mockImplementation(({ where }: { where: { id: string } }) => ({
         id: where.id,
@@ -987,16 +995,23 @@ describe('RegistrationsService', () => {
           },
         },
       });
+      expect(mockPrismaService.registration.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: approvedRegistration.id,
+          status: { in: [RegistrationStatus.APPLICATION_APPROVED] },
+        },
+        data: {
+          status: RegistrationStatus.PENDING,
+          paymentDeferred: false,
+        },
+      });
       expect(mockPrismaService.registrationJob.createMany).toHaveBeenCalledWith({
         data: [{ registrationId: approvedRegistration.id, jobId: 'job-1' }],
+        skipDuplicates: true,
       });
-      expect(mockPrismaService.registration.update).toHaveBeenCalledWith(
+      expect(mockPrismaService.registration.findUnique).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { id: approvedRegistration.id },
-          data: {
-            status: RegistrationStatus.PENDING,
-            paymentDeferred: false,
-          },
         }),
       );
       expect(result).toEqual({
@@ -1033,7 +1048,7 @@ describe('RegistrationsService', () => {
         ...completeDto,
         deferPayment: true,
       };
-      mockPrismaService.registration.update.mockResolvedValue({
+      mockPrismaService.registration.findUnique.mockResolvedValue({
         ...updatedRegistration,
         status: RegistrationStatus.CONFIRMED,
         paymentDeferred: true,
@@ -1074,20 +1089,18 @@ describe('RegistrationsService', () => {
         new BadRequestException('You must select at least one work shift to register.'),
       );
 
-      expect(mockPrismaService.registration.update).not.toHaveBeenCalled();
+      expect(mockPrismaService.registration.updateMany).not.toHaveBeenCalled();
     });
 
     it('should reject concurrent completion when registration status has already changed', async () => {
-      // Simulate race condition: registration was already completed by another request
-      mockPrismaService.registration.findUnique.mockResolvedValue({
-        status: RegistrationStatus.PENDING, // Already transitioned out of APPLICATION_APPROVED
-      });
+      mockPrismaService.registration.updateMany.mockResolvedValue({ count: 0 });
 
       await expect(service.completeRegistration(userId, completeDto)).rejects.toThrow(
         ConflictException,
       );
 
-      expect(mockPrismaService.registration.update).not.toHaveBeenCalled();
+      expect(mockPrismaService.registrationJob.createMany).not.toHaveBeenCalled();
+      expect(mockPrismaService.registration.findUnique).not.toHaveBeenCalled();
     });
   });
 

@@ -1560,5 +1560,59 @@ describe('DashboardPage - Registration after cancellation', () => {
 
       expect(screen.queryByText(/pending application/)).not.toBeInTheDocument();
     });
+
+    it('should not show notice when application approval is disabled', async () => {
+      mockUseAuth.mockReturnValue({
+        user: { ...mockUser, role: 'admin' as const },
+        isAuthenticated: true,
+        isLoading: false,
+        error: null,
+        requestVerificationCode: vi.fn(),
+        verifyCode: vi.fn(),
+        logout: vi.fn(),
+        isConnecting: false,
+        isConnected: true,
+        connectionError: null,
+      });
+
+      mockUseConfig.mockReturnValue({
+        config: {
+          name: 'Test Camp',
+          description: 'Test',
+          homePageBlurb: 'Test',
+          registrationOpen: true,
+          earlyRegistrationOpen: false,
+          currentYear: 2024,
+          applicationApprovalRequired: false,
+        },
+        isLoading: false,
+        error: null,
+        refreshConfig: vi.fn(),
+        isConnecting: false,
+        isConnected: true,
+        connectionError: null,
+      });
+
+      mockUseApplications.mockReturnValue({
+        applications: [],
+        total: 3,
+        loading: false,
+        error: null,
+        fetchApplications: vi.fn().mockResolvedValue(undefined),
+        approveApplication: vi.fn(),
+        declineApplication: vi.fn(),
+        bulkProcess: vi.fn(),
+        getApplicationDetail: vi.fn(),
+      });
+
+      const Wrapper = createWrapper();
+      render(<DashboardPage />, { wrapper: Wrapper });
+
+      await waitFor(() => {
+        expect(screen.getByText(/Welcome/)).toBeInTheDocument();
+      });
+
+      expect(screen.queryByText(/pending application/)).not.toBeInTheDocument();
+    });
   });
 });
