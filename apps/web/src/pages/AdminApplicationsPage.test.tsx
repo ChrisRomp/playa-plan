@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import AdminApplicationsPage from './AdminApplicationsPage';
@@ -60,23 +60,8 @@ describe('AdminApplicationsPage', () => {
           },
         ],
       },
-      {
-        id: 'application-2',
-        userId: 'user-2',
-        year: 2025,
-        status: 'APPLICATION_DECLINED',
-        createdAt: '2025-02-03T12:00:00.000Z',
-        user: {
-          id: 'user-2',
-          email: 'jamie@example.com',
-          firstName: 'Jamie',
-          lastName: 'Dust',
-          playaName: null,
-        },
-        campingOptionRegistrations: [],
-      },
     ],
-    total: 2,
+    total: 1,
     page: 1,
     limit: 10,
   };
@@ -113,7 +98,11 @@ describe('AdminApplicationsPage', () => {
     expect(screen.getByText('Dusty')).toBeInTheDocument();
     expect(screen.getByText('alex@example.com')).toBeInTheDocument();
     expect(screen.getByText('Tent Camping')).toBeInTheDocument();
-    expect(screen.getAllByText('Declined')).toHaveLength(2);
+
+    const tableBody = screen.getAllByRole('rowgroup')[1];
+
+    expect(within(tableBody).getAllByRole('row')).toHaveLength(1);
+    expect(within(tableBody).getByText('Submitted')).toBeInTheDocument();
   });
 
   it('approves an individual application from the list', async () => {

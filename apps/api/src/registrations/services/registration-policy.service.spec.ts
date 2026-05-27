@@ -1,8 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
+import { UserRole } from '@prisma/client';
 import { RegistrationPolicyService } from './registration-policy.service';
 import { CoreConfigService } from '../../core-config/services/core-config.service';
-import { UserRole } from '../../common/types/enums';
 
 type PolicyUser = {
   id: string;
