@@ -133,6 +133,15 @@ export class CreateUserDto {
   allowNoJob?: boolean;
 
   @ApiPropertyOptional({
+    description: 'Whether the user registration applications are auto-approved',
+    example: false,
+    default: false,
+  })
+  @IsBoolean()
+  @IsOptional()
+  autoApproveRegistration?: boolean;
+
+  @ApiPropertyOptional({
     description: 'User role',
     enum: UserRole,
     default: UserRole.PARTICIPANT,

@@ -77,7 +77,11 @@ async function withApplicationApprovalEnabled<T>(action: () => Promise<T>): Prom
 }
 
 async function submitApplication(page: Page): Promise<void> {
+  // Force a full page reload so the ConfigProvider fetches the freshly-toggled
+  // applicationApprovalRequired flag. A plain page.goto with a hash-only change
+  // may not trigger a document reload when the browser is already on the same origin.
   await page.goto(webUrl('/registration'));
+  await page.reload({ waitUntil: 'networkidle' });
   await expect(page.getByRole('heading', { name: 'Camp Application' })).toBeVisible({
     timeout: 10_000,
   });
