@@ -262,8 +262,8 @@ test.describe(
       });
 
       // Verify step indicator only shows completion steps (not application steps).
-      // Scope to the main content area to avoid matching nav links.
-      const main = page.locator('main, .max-w-3xl').first();
+      // Scope to the registration content card so we do not match nav links in <main>.
+      const main = page.locator('div.max-w-3xl.mx-auto.p-6').first();
       await expect(main.getByText('Profile', { exact: true })).toHaveCount(0);
       await expect(main.getByText('Options', { exact: true })).toHaveCount(0);
       await expect(main.getByText('Details', { exact: true })).toHaveCount(0);
