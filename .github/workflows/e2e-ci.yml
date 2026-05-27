@@ -395,7 +395,7 @@ jobs:
     # Must be the last step so job.status reflects the outcome of EVERY
     # preceding step (test run, uploads, cleanup).
     - name: Complete E2E status
-      if: always() && !cancelled() && needs.resolve-context.outputs.head_sha != ''
+      if: always() && needs.resolve-context.outputs.head_sha != ''
       uses: actions/github-script@v7
       env:
         JOB_STATUS: ${{ job.status }}
