@@ -21,6 +21,7 @@ describe('NotificationsService', () => {
   const mockConfigService = {
     get: jest.fn((key: string, defaultValue?: unknown) => {
       if (key === 'app.baseUrl') return 'http://test.com';
+      if (key === 'frontend.url') return 'http://frontend.test/';
       if (key === 'nodeEnv') return 'test';
       return defaultValue;
     }),
@@ -447,6 +448,50 @@ describe('NotificationsService', () => {
           userId: 'user-123',
         }),
       );
+    });
+
+    it('should default application approved registration links to the frontend URL', async () => {
+      mockEmailService.sendEmail.mockResolvedValueOnce(true);
+
+      const result = await service.sendNotification(
+        'user@example.playaplan.app',
+        NotificationType.APPLICATION_APPROVED,
+        {
+          userId: 'user-123',
+          name: 'John Doe',
+          applicationDetails: {
+            year: 2025,
+          },
+        },
+      );
+
+      expect(result).toBeTruthy();
+      const callArgs = mockEmailService.sendEmail.mock.calls[0][0];
+      expect(callArgs.html).toContain('http://frontend.test/#/registration');
+      expect(callArgs.text).toContain('http://frontend.test/#/registration');
+      expect(callArgs.html).not.toContain('http://test.com/#/registration');
+      expect(callArgs.text).not.toContain('http://test.com/#/registration');
+    });
+
+    it('should preserve an explicit registration URL for application approved emails', async () => {
+      mockEmailService.sendEmail.mockResolvedValueOnce(true);
+
+      const result = await service.sendNotification(
+        'user@example.playaplan.app',
+        NotificationType.APPLICATION_APPROVED,
+        {
+          userId: 'user-123',
+          applicationDetails: {
+            year: 2025,
+            registrationUrl: 'https://camp.example/complete-registration',
+          },
+        },
+      );
+
+      expect(result).toBeTruthy();
+      const callArgs = mockEmailService.sendEmail.mock.calls[0][0];
+      expect(callArgs.html).toContain('https://camp.example/complete-registration');
+      expect(callArgs.text).toContain('https://camp.example/complete-registration');
     });
 
     it('should escape admin-provided test email values in HTML while preserving plain text', async () => {
