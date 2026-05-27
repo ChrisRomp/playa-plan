@@ -1250,7 +1250,7 @@ This is an automated test email from ${campName}. If you received this unexpecte
   private getApplicationApprovedTemplate(data: TemplateData, campName: string): NotificationTemplate {
     const name = data.name || data.playaName || 'there';
     const year = data.applicationDetails?.year || new Date().getFullYear();
-    const registrationUrl = data.applicationDetails?.registrationUrl || this.baseUrl;
+    const registrationUrl = data.applicationDetails?.registrationUrl || `${this.baseUrl}/#/registration`;
     const decisionMessage = data.applicationDetails?.decisionMessage;
     const subject = `${campName} - Application Approved!`;
     const messageParagraph = decisionMessage
