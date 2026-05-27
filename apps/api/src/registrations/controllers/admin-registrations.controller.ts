@@ -163,6 +163,32 @@ export class AdminRegistrationsController {
     return this.adminService.getCampingOptionRegistrationsWithFields(filters);
   }
 
+  @Get('year-users')
+  @Roles(UserRole.ADMIN, UserRole.STAFF)
+  @ApiOperation({
+    summary: 'Get lightweight registration year/user summary',
+    description: 'Returns only year and userId for every registration. Use this to populate year filter dropdowns and determine which users have registrations in a given year without transferring full payloads.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Successfully retrieved registration year/user pairs',
+    schema: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          year: { type: 'number' },
+          userId: { type: 'string' },
+        },
+      },
+    },
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized - Invalid or missing JWT token' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Staff or Admin role required' })
+  async getRegistrationYearUsers() {
+    return this.adminService.getRegistrationYearUsers();
+  }
+
   @Get()
   @Roles(UserRole.ADMIN, UserRole.STAFF)
   @ApiOperation({

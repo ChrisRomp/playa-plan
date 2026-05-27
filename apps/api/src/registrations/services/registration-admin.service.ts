@@ -226,6 +226,20 @@ export class RegistrationAdminService {
   }
 
   /**
+   * Get a lightweight summary of registrations containing only year and userId.
+   * Used to populate year filter dropdowns and determine which users have
+   * registrations in a given year without transferring full registration payloads.
+   */
+  async getRegistrationYearUsers(): Promise<{ year: number; userId: string }[]> {
+    return this.prisma.registration.findMany({
+      select: {
+        year: true,
+        userId: true,
+      },
+    });
+  }
+
+  /**
    * Edit a registration with admin privileges
    * @param registrationId - ID of the registration to edit
    * @param editData - Data to update

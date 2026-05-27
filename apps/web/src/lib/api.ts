@@ -1195,6 +1195,21 @@ export const registrations = {
 
 export const reports = {
   /**
+   * Get a lightweight summary of registration year/user pairs.
+   * Used to populate year filter dropdowns and determine which users have
+   * registrations in a given year without transferring full registration payloads.
+   */
+  getRegistrationYearUsers: async (): Promise<{ year: number; userId: string }[]> => {
+    try {
+      const response = await api.get<{ year: number; userId: string }[]>('/admin/registrations/year-users');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching registration year/user summary:', error);
+      throw error;
+    }
+  },
+
+  /**
    * Get all registrations for staff/admin reports
    * @param filters Optional filters for the report
    * @returns A promise that resolves to an array of all registrations

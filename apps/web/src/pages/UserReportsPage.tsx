@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { ArrowLeft, Download, Filter, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { DataTable, DataTableColumn } from '../components/common/DataTable/DataTable';
-import { reports, User, Registration } from '../lib/api';
+import { reports, User } from '../lib/api';
 import { PATHS } from '../routes';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import { downloadCsv } from '../utils/csv';
@@ -20,7 +20,7 @@ interface UserReportFilters {
  */
 export function UserReportsPage() {
   const [users, setUsers] = useState<User[]>([]);
-  const [registrations, setRegistrations] = useState<Registration[]>([]);
+  const [registrationYearUsers, setRegistrationYearUsers] = useState<{ year: number; userId: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filters, setFilters] = useState<UserReportFilters>({});
@@ -41,12 +41,12 @@ export function UserReportsPage() {
     setLoading(true);
     setError(null);
     try {
-      const [usersData, registrationsData] = await Promise.all([
+      const [usersData, yearUsersData] = await Promise.all([
         reports.getUsers(),
-        reports.getRegistrations(),
+        reports.getRegistrationYearUsers(),
       ]);
       setUsers(usersData);
-      setRegistrations(registrationsData);
+      setRegistrationYearUsers(yearUsersData);
     } catch (err) {
       setError('Failed to fetch user and registration data');
       console.error('Error fetching users:', err);
@@ -64,7 +64,7 @@ export function UserReportsPage() {
     // Pre-compute set of user IDs with registrations for the selected year
     const userIdsWithRegistration = filters.year
       ? new Set(
-          registrations
+          registrationYearUsers
             .filter(reg => reg.year === filters.year)
             .map(reg => reg.userId)
         )
@@ -93,13 +93,13 @@ export function UserReportsPage() {
       
       return true;
     });
-  }, [users, registrations, filters]);
+  }, [users, registrationYearUsers, filters]);
 
   // Get unique years for filter dropdown from actual registration data
   const availableYears = useMemo(() => {
-    const years = [...new Set(registrations.map(reg => reg.year))].sort((a, b) => b - a);
+    const years = [...new Set(registrationYearUsers.map(reg => reg.year))].sort((a, b) => b - a);
     return years;
-  }, [registrations]);
+  }, [registrationYearUsers]);
 
   // Calculate summary statistics based on filtered data
   const summaryStats = useMemo(() => {
