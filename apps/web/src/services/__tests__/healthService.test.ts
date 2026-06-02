@@ -68,6 +68,13 @@ describe('HealthService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     
+    // Restore localStorage to working state before each test to prevent leakage
+    // from tests that override it with a throwing implementation
+    Object.defineProperty(window, 'localStorage', {
+      value: mockWindow.localStorage,
+      writable: true,
+    });
+
     // Ensure navigator.cookieEnabled returns true in tests
     Object.defineProperty(navigator, 'cookieEnabled', {
       value: true,

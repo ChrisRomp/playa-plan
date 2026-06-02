@@ -155,14 +155,12 @@ describe('Proper CSV utility functions', () => {
         }
       });
 
-      // Mock Blob
+      // Mock Blob - must use a regular function (not arrow) so it can be called with `new`
       Object.defineProperty(global, 'Blob', {
         writable: true,
-        value: vi.fn((content: BlobPart[], options?: BlobPropertyBag) => ({
-          content,
-          type: options?.type || '',
-          size: content.length
-        }))
+        value: vi.fn(function(content: BlobPart[], options?: BlobPropertyBag) {
+          return { content, type: options?.type || '', size: content.length };
+        })
       });
     });
 
