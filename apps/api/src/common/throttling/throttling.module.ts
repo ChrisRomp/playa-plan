@@ -11,6 +11,21 @@ import { ThrottlingGuard } from './throttling.guard';
 import { APP_GUARD } from '@nestjs/core';
 import { Reflector } from '@nestjs/core';
 
+interface ThrottleLimits {
+  defaultLimit: number;
+  authLimit: number;
+}
+
+export function resolveThrottleLimits(
+  getNumber: (key: string) => number | undefined,
+  sharedLimit: number
+): ThrottleLimits {
+  const defaultLimit = getNumber('THROTTLE_DEFAULT_LIMIT') ?? Math.min(sharedLimit, 300);
+  const authLimit = getNumber('THROTTLE_AUTH_LIMIT') ?? Math.min(sharedLimit, 30);
+
+  return { defaultLimit, authLimit };
+}
+
 /**
  * Configuration options for the ThrottlingModule
  */
@@ -78,6 +93,11 @@ export class ThrottlingModule {
             const limit = options?.limit ||
               configService.get<number>('THROTTLE_LIMIT') || 100; // Default: 100 requests
 
+            const throttleLimits = resolveThrottleLimits(
+              (key: string) => configService.get<number>(key),
+              limit
+            );
+
             // Convert to milliseconds for the newer Throttler API version
             const ttlMs = ttl * 1000;
 
@@ -86,13 +106,13 @@ export class ThrottlingModule {
                 {
                   name: 'default',
                   ttl: ttlMs,
-                  limit: Math.min(limit, 300), // 300 requests per minute for normal usage
+                  limit: throttleLimits.defaultLimit,
                   skipIf: skipIfAuth,
                 },
                 {
                   name: 'auth',
                   ttl: ttlMs,
-                  limit: Math.min(limit, 30), // 30 requests per minute for auth endpoints
+                  limit: throttleLimits.authLimit,
                   skipIf: skipIfNotAuth,
                 },
               ],

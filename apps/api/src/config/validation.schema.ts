@@ -90,6 +90,8 @@ const validationSchema = Joi.object({
   // Throttling configuration
   THROTTLE_TTL: Joi.number().default(60),
   THROTTLE_LIMIT: Joi.number().default(300),
+  THROTTLE_DEFAULT_LIMIT: Joi.number().integer().min(1),
+  THROTTLE_AUTH_LIMIT: Joi.number().integer().min(1),
   
   // Admin defaults
   DEFAULT_ADMIN_EMAIL: Joi.string().email().default('webadmin@example.playaplan.app'),
