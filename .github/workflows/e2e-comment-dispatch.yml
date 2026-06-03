@@ -38,9 +38,15 @@ jobs:
             permission = permResponse.data.permission;
           } catch (error) {
             core.warning(`Failed to resolve collaborator permission for @${actor}: ${error.message}`);
+            return;
           }
 
           if (!['admin', 'maintain', 'write'].includes(permission)) {
+            if (!['read', 'triage'].includes(permission)) {
+              core.info(`Ignoring /run-e2e from @${actor} with permission: ${permission}`);
+              return;
+            }
+
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
