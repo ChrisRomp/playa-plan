@@ -1,0 +1,110 @@
+name: E2E Comment Dispatch
+
+permissions:
+  actions: write
+  contents: read
+  issues: write
+  pull-requests: read
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  dispatch-e2e:
+    name: Dispatch E2E workflow from /run-e2e comment
+    if: github.event.issue.pull_request != null
+    runs-on: ubuntu-latest
+    steps:
+    - name: Validate commenter and dispatch E2E workflow
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const commandLine = (context.payload.comment.body || '').split(/\r?\n/, 1)[0].trim();
+          const match = commandLine.match(/^\/run-e2e(?:\s+(.+))?$/i);
+          if (!match) {
+            core.info(`Ignoring non-matching command line: ${commandLine}`);
+            return;
+          }
+
+          const actor = context.payload.comment.user.login;
+          let permission = 'none';
+          try {
+            const permResponse = await github.rest.repos.getCollaboratorPermissionLevel({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              username: actor,
+            });
+            permission = permResponse.data.permission;
+          } catch (error) {
+            core.warning(`Failed to resolve collaborator permission for @${actor}: ${error.message}`);
+            return;
+          }
+
+          if (!['admin', 'maintain', 'write'].includes(permission)) {
+            if (!['read', 'triage'].includes(permission)) {
+              core.info(`Ignoring /run-e2e from @${actor} with permission: ${permission}`);
+              return;
+            }
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.issue.number,
+              body: `@${actor} /run-e2e requires write access to this repository.`,
+            });
+            return;
+          }
+
+          const prNumber = context.payload.issue.number;
+          const { data: pr } = await github.rest.pulls.get({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            pull_number: prNumber,
+          });
+
+          const baseRepo = `${context.repo.owner}/${context.repo.repo}`.toLowerCase();
+          const headRepo = (pr.head.repo?.full_name || '').toLowerCase();
+          if (headRepo !== baseRepo) {
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              body: `@${actor} /run-e2e only supports PR branches in \`${baseRepo}\`; got \`${headRepo || 'unknown'}\`.`,
+            });
+            return;
+          }
+
+          const rawArg = (match[1] || '').trim();
+          const scopeTags = {
+            all: '',
+            smoke: '@smoke',
+            auth: '@auth',
+            registration: '@registration',
+            admin: '@admin',
+          };
+
+          let tags = '';
+          if (rawArg) {
+            if (rawArg.startsWith('--grep=')) {
+              tags = rawArg.slice('--grep='.length).trim();
+            } else if (rawArg.startsWith('grep=')) {
+              tags = rawArg.slice('grep='.length).trim();
+            } else {
+              tags = scopeTags[rawArg.toLowerCase()] ?? rawArg;
+            }
+            tags = tags.replace(/^"(.*)"$/, '$1');
+          }
+
+          await github.rest.actions.createWorkflowDispatch({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            workflow_id: 'e2e-ci.yml',
+            ref: context.payload.repository.default_branch,
+            inputs: {
+              tags,
+              pr_number: String(prNumber),
+              head_sha: pr.head.sha,
+              trigger_actor: actor,
+            },
+          });
