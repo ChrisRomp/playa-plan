@@ -61,7 +61,7 @@
     "cookie-parser": "^1.4.7",
     "helmet": "^7.2.0",
     "iterare": "^1.2.1",
-    "joi": "^17.13.3",
+    "joi": "^17.13.4",
     "keyv": "^5.3.3",
     "load-esm": "^1.0.2",
     "nodemailer": "^8.0.4",
