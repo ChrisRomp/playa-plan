@@ -54,18 +54,18 @@
         "docker:run:web:prod": "docker run -p 5173:5173 -e VITE_API_URL=${VITE_API_URL:-http://localhost:3000} playaplan-web:prod"
     },
     "devDependencies": {
-        "@playwright/test": "^1.52.0",
-        "@typescript-eslint/eslint-plugin": "^8.33.1",
-        "@typescript-eslint/parser": "^8.33.1",
+        "@playwright/test": "^1.61.0",
+        "@typescript-eslint/eslint-plugin": "^8.62.0",
+        "@typescript-eslint/parser": "^8.62.0",
         "@vitest/coverage-v8": "^4.1.8",
-        "concurrently": "^9.1.2",
+        "concurrently": "^10.0.3",
         "dotenv": "^16.6.1",
-        "eslint": "^9.28.0",
+        "eslint": "^9.39.4",
         "eslint-config-prettier": "^10.1.5",
         "prettier": "^3.5.3",
         "prettier-eslint": "^17.0.0-alpha.1",
         "rimraf": "^6.0.1",
-        "typescript": "^5.8.3"
+        "typescript": "^5.9.3"
     },
     "type": "module",
     "dependencies": {
@@ -80,6 +80,10 @@
         "lodash": "4.18.1",
         "handlebars": "4.7.9",
         "path-to-regexp@>=8.0.0": "8.4.2",
-        "effect": "3.21.0"
+        "effect": "3.21.0",
+        "multer": "2.2.0",
+        "js-yaml": "4.2.0",
+        "form-data": "4.0.6",
+        "ws": "8.21.0"
     }
 }

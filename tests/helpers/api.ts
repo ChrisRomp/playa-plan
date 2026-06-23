@@ -26,9 +26,10 @@ export async function createAuthedApiClient(email: string): Promise<ApiClient> {
     data: { email, code: DEV_LOGIN_CODE },
   });
   if (!loginRes.ok()) {
+    const responseText = await loginRes.text();
     await context.dispose();
     throw new Error(
-      `login-with-code failed for ${email}: ${loginRes.status()} ${await loginRes.text()}`,
+      `login-with-code failed for ${email}: ${loginRes.status()} ${responseText}`,
     );
   }
 
