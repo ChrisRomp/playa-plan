@@ -25,6 +25,7 @@ services:
       JWT_SECRET: test-secret-key-for-ci
       NODE_ENV: development
       PORT: 3000
+      THROTTLE_AUTH_LIMIT: 1000
     depends_on:
       postgres:
         condition: service_healthy

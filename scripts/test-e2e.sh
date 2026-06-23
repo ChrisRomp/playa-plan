@@ -25,6 +25,36 @@ print_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
+wait_for_http() {
+    local url=$1
+    local attempts=${2:-30}
+    local i=0
+
+    until curl -f "$url" &>/dev/null; do
+        i=$((i + 1))
+        if [ "$i" -ge "$attempts" ]; then
+            print_error "Timed out waiting for $url"
+            return 1
+        fi
+        sleep 2
+    done
+}
+
+wait_for_docker_services() {
+    local attempts=${1:-60}
+    local i=0
+
+    until [ "$(docker compose -f docker-compose.e2e.yml ps --services --filter health=healthy | wc -l)" -eq 3 ]; do
+        i=$((i + 1))
+        if [ "$i" -ge "$attempts" ]; then
+            print_error "Timed out waiting for Docker Compose services"
+            return 1
+        fi
+        echo "Waiting for services..."
+        sleep 2
+    done
+}
+
 # Check if we're using Docker Compose or manual setup
 USE_DOCKER=${USE_DOCKER:-false}
 
@@ -37,6 +67,7 @@ if [ "$USE_DOCKER" = "true" ]; then
         echo "DATABASE_URL=postgresql://postgres:postgres@postgres:5432/playaplan_test" >> .env
         echo "JWT_SECRET=test-secret-key-for-ci" >> .env
         echo "NODE_ENV=development" >> .env
+        echo "THROTTLE_AUTH_LIMIT=1000" >> .env
     fi
     
     # Start services
@@ -45,15 +76,12 @@ if [ "$USE_DOCKER" = "true" ]; then
     
     # Wait for services
     print_status "Waiting for services to be ready..."
-    timeout 120 bash -c 'until [ $(docker compose -f docker-compose.e2e.yml ps --services --filter health=healthy | wc -l) -eq 3 ]; do
-        echo "Waiting for services..."
-        sleep 2
-    done'
+    wait_for_docker_services 60
     
     # Setup database
     print_status "Setting up database..."
     docker compose -f docker-compose.e2e.yml exec api npx prisma migrate deploy
-    docker compose -f docker-compose.e2e.yml exec api npx prisma db seed
+    docker compose -f docker-compose.e2e.yml exec api npm run seed:e2e:full
     
     # Run tests
     print_status "Running Playwright tests..."
@@ -65,12 +93,6 @@ if [ "$USE_DOCKER" = "true" ]; then
     
 else
     print_status "Using manual service startup for e2e testing"
-    
-    # Check prerequisites
-    if ! command -v psql &> /dev/null; then
-        print_error "PostgreSQL client not found. Please install postgresql-client."
-        exit 1
-    fi
     
     # Setup environment
     if [ ! -f .env.test ]; then
@@ -86,8 +108,10 @@ VITE_API_URL=http://localhost:3000
 EOF
     fi
     
-    # Start PostgreSQL if not running
-    if ! pg_isready -h localhost -p 5432 -U postgres &> /dev/null; then
+    # Start PostgreSQL if not running. If pg_isready is unavailable, let Prisma
+    # surface the connection error during setup; local dev machines often have
+    # the server running without the client tools installed.
+    if command -v pg_isready &> /dev/null && ! pg_isready -h localhost -p 5432 -U postgres &> /dev/null; then
         print_warning "PostgreSQL not running. Starting with Docker..."
         docker run --name postgres-e2e -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=playaplan_test -p 5432:5432 -d postgres:15
         sleep 5
@@ -98,7 +122,7 @@ EOF
     cd apps/api
     DATABASE_URL=postgresql://postgres:postgres@localhost:5432/playaplan_test npx prisma generate
     DATABASE_URL=postgresql://postgres:postgres@localhost:5432/playaplan_test npx prisma migrate deploy
-    DATABASE_URL=postgresql://postgres:postgres@localhost:5432/playaplan_test npx prisma db seed
+    DATABASE_URL=postgresql://postgres:postgres@localhost:5432/playaplan_test npm run seed:e2e:full
     cd ../..
     
     # Start API server
@@ -107,6 +131,7 @@ EOF
     DATABASE_URL=postgresql://postgres:postgres@localhost:5432/playaplan_test \
     JWT_SECRET=test-secret-key-for-ci \
     NODE_ENV=development \
+    THROTTLE_AUTH_LIMIT=1000 \
     PORT=3000 \
     nohup npm run dev > ../../api.log 2>&1 &
     API_PID=$!
@@ -115,7 +140,7 @@ EOF
     
     # Wait for API
     print_status "Waiting for API server..."
-    timeout 60 bash -c 'until curl -f http://localhost:3000/health &>/dev/null; do sleep 2; done'
+    wait_for_http http://localhost:3000/health 30
     
     # Start Web server
     print_status "Starting Web server..."
@@ -129,7 +154,7 @@ EOF
     
     # Wait for Web server
     print_status "Waiting for Web server..."
-    timeout 60 bash -c 'until curl -f http://localhost:5173 &>/dev/null; do sleep 2; done'
+    wait_for_http http://localhost:5173 30
     
     # Run tests
     print_status "Running Playwright tests..."
