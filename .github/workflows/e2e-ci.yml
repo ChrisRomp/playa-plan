@@ -61,83 +61,83 @@ jobs:
       checkout_ref: ${{ steps.e2e_context.outputs.checkout_ref }}
       trigger_actor: ${{ steps.e2e_context.outputs.trigger_actor }}
     steps:
-    - name: Resolve E2E context
-      id: e2e_context
-      uses: actions/github-script@v7
-      env:
-        WORKFLOW_TAGS: ${{ inputs.tags }}
-        WORKFLOW_PR_NUMBER: ${{ inputs.pr_number }}
-        WORKFLOW_HEAD_SHA: ${{ inputs.head_sha }}
-        WORKFLOW_TRIGGER_ACTOR: ${{ inputs.trigger_actor }}
-      with:
-        script: |
-          const getString = (value) => value == null ? '' : String(value).trim();
-          const payload = context.payload;
-          const clientPayload = payload.client_payload ?? {};
-          const data = clientPayload.data ?? {};
-          const command = clientPayload.command ?? {};
-          const resource = command.resource ?? command.pull_request ?? clientPayload.pull_request ?? {};
+      - name: Resolve E2E context
+        id: e2e_context
+        uses: actions/github-script@v9
+        env:
+          WORKFLOW_TAGS: ${{ inputs.tags }}
+          WORKFLOW_PR_NUMBER: ${{ inputs.pr_number }}
+          WORKFLOW_HEAD_SHA: ${{ inputs.head_sha }}
+          WORKFLOW_TRIGGER_ACTOR: ${{ inputs.trigger_actor }}
+        with:
+          script: |
+            const getString = (value) => value == null ? '' : String(value).trim();
+            const payload = context.payload;
+            const clientPayload = payload.client_payload ?? {};
+            const data = clientPayload.data ?? {};
+            const command = clientPayload.command ?? {};
+            const resource = command.resource ?? command.pull_request ?? clientPayload.pull_request ?? {};
 
-          let tags = getString(process.env.WORKFLOW_TAGS);
-          let prNumber = getString(process.env.WORKFLOW_PR_NUMBER);
-          let headSha = getString(process.env.WORKFLOW_HEAD_SHA);
-          let headRef = '';
-          let triggerActor = getString(process.env.WORKFLOW_TRIGGER_ACTOR) || context.actor;
+            let tags = getString(process.env.WORKFLOW_TAGS);
+            let prNumber = getString(process.env.WORKFLOW_PR_NUMBER);
+            let headSha = getString(process.env.WORKFLOW_HEAD_SHA);
+            let headRef = '';
+            let triggerActor = getString(process.env.WORKFLOW_TRIGGER_ACTOR) || context.actor;
 
-          if (context.eventName === 'repository_dispatch') {
-            const scope = getString(data.Scope ?? data.scope);
-            const grep = getString(data['Grep filter'] ?? data.grep ?? data.tags);
-            const scopeTags = {
-              all: '',
-              smoke: '@smoke',
-              auth: '@auth',
-              registration: '@registration',
-              admin: '@admin',
-            };
-            tags = grep || scopeTags[scope] || '';
-            prNumber = getString(
-              resource.number ??
-              resource.pull_request?.number ??
-              command.resource_number ??
-              command.issue?.number ??
-              command.pull_request?.number ??
-              clientPayload.issue?.number ??
-              clientPayload.number
-            );
-            triggerActor = getString(command.user?.login ?? clientPayload.sender?.login) || context.actor;
+            if (context.eventName === 'repository_dispatch') {
+              const scope = getString(data.Scope ?? data.scope);
+              const grep = getString(data['Grep filter'] ?? data.grep ?? data.tags);
+              const scopeTags = {
+                all: '',
+                smoke: '@smoke',
+                auth: '@auth',
+                registration: '@registration',
+                admin: '@admin',
+              };
+              tags = grep || scopeTags[scope] || '';
+              prNumber = getString(
+                resource.number ??
+                resource.pull_request?.number ??
+                command.resource_number ??
+                command.issue?.number ??
+                command.pull_request?.number ??
+                clientPayload.issue?.number ??
+                clientPayload.number
+              );
+              triggerActor = getString(command.user?.login ?? clientPayload.sender?.login) || context.actor;
 
-            if (!prNumber) {
-              core.setFailed('repository_dispatch run_e2e payload did not include a pull request number.');
-              core.info(JSON.stringify({ data, command, clientPayload }, null, 2));
-              return;
-            }
-          }
-
-          if (prNumber) {
-            const { data: pr } = await github.rest.pulls.get({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: Number(prNumber),
-            });
-
-            const baseRepo = `${context.repo.owner}/${context.repo.repo}`.toLowerCase();
-            const headRepo = (pr.head.repo?.full_name || '').toLowerCase();
-            if (headRepo !== baseRepo) {
-              core.setFailed(`E2E is only supported for PR branches in ${baseRepo}; got ${headRepo || 'unknown'}.`);
-              return;
+              if (!prNumber) {
+                core.setFailed('repository_dispatch run_e2e payload did not include a pull request number.');
+                core.info(JSON.stringify({ data, command, clientPayload }, null, 2));
+                return;
+              }
             }
 
-            headSha ||= pr.head.sha;
-            headRef = pr.head.ref;
-          }
+            if (prNumber) {
+              const { data: pr } = await github.rest.pulls.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: Number(prNumber),
+              });
 
-          const checkoutRef = headSha || context.sha;
-          core.setOutput('tags', tags);
-          core.setOutput('pr_number', prNumber);
-          core.setOutput('head_sha', headSha);
-          core.setOutput('head_ref', headRef);
-          core.setOutput('checkout_ref', checkoutRef);
-          core.setOutput('trigger_actor', triggerActor);
+              const baseRepo = `${context.repo.owner}/${context.repo.repo}`.toLowerCase();
+              const headRepo = (pr.head.repo?.full_name || '').toLowerCase();
+              if (headRepo !== baseRepo) {
+                core.setFailed(`E2E is only supported for PR branches in ${baseRepo}; got ${headRepo || 'unknown'}.`);
+                return;
+              }
+
+              headSha ||= pr.head.sha;
+              headRef = pr.head.ref;
+            }
+
+            const checkoutRef = headSha || context.sha;
+            core.setOutput('tags', tags);
+            core.setOutput('pr_number', prNumber);
+            core.setOutput('head_sha', headSha);
+            core.setOutput('head_ref', headRef);
+            core.setOutput('checkout_ref', checkoutRef);
+            core.setOutput('trigger_actor', triggerActor);
 
   e2e-tests:
     name: End-to-End Tests
@@ -167,259 +167,259 @@ jobs:
           - 5432:5432
 
     steps:
-    - uses: actions/checkout@v4
-      with:
-        ref: ${{ needs.resolve-context.outputs.checkout_ref }}
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve-context.outputs.checkout_ref }}
 
-    # Fail fast on missing CI secret BEFORE we spend minutes on installs.
-    - name: Validate E2E_SEED_LOCAL secret and stage seed.local.ts
-      env:
-        E2E_SEED_LOCAL: ${{ secrets.E2E_SEED_LOCAL }}
-      run: |
-        if [ -z "$E2E_SEED_LOCAL" ]; then
-          echo "::error::E2E_SEED_LOCAL secret is not set. Stripe-dependent tests would fail with confusing timeouts on the disabled 'Complete Registration' button. Add the secret under repo Settings → Secrets and variables → Actions (use the apps/api/prisma/seeds/seed.local.template.ts as a starting point, with Stripe TEST keys: pk_test_* / sk_test_*)."
-          exit 1
-        fi
-        printf '%s' "$E2E_SEED_LOCAL" > apps/api/prisma/seeds/seed.local.ts
-        echo "Wrote apps/api/prisma/seeds/seed.local.ts ($(wc -c < apps/api/prisma/seeds/seed.local.ts) bytes)"
+      # Fail fast on missing CI secret BEFORE we spend minutes on installs.
+      - name: Validate E2E_SEED_LOCAL secret and stage seed.local.ts
+        env:
+          E2E_SEED_LOCAL: ${{ secrets.E2E_SEED_LOCAL }}
+        run: |
+          if [ -z "$E2E_SEED_LOCAL" ]; then
+            echo "::error::E2E_SEED_LOCAL secret is not set. Stripe-dependent tests would fail with confusing timeouts on the disabled 'Complete Registration' button. Add the secret under repo Settings → Secrets and variables → Actions (use the apps/api/prisma/seeds/seed.local.template.ts as a starting point, with Stripe TEST keys: pk_test_* / sk_test_*)."
+            exit 1
+          fi
+          printf '%s' "$E2E_SEED_LOCAL" > apps/api/prisma/seeds/seed.local.ts
+          echo "Wrote apps/api/prisma/seeds/seed.local.ts ($(wc -c < apps/api/prisma/seeds/seed.local.ts) bytes)"
 
-    - name: Create pending E2E status
-      if: needs.resolve-context.outputs.head_sha != ''
-      uses: actions/github-script@v7
-      env:
-        PR_NUMBER: ${{ needs.resolve-context.outputs.pr_number }}
-        HEAD_SHA: ${{ needs.resolve-context.outputs.head_sha }}
-        TRIGGER_ACTOR: ${{ needs.resolve-context.outputs.trigger_actor }}
-      with:
-        script: |
-          const { PR_NUMBER, HEAD_SHA, TRIGGER_ACTOR } = process.env;
-          const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
-          const description = PR_NUMBER
-            ? `Triggered by ${TRIGGER_ACTOR} on PR #${PR_NUMBER}`
-            : `Triggered by ${TRIGGER_ACTOR}`;
-          await github.rest.repos.createCommitStatus({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            sha: HEAD_SHA,
-            state: 'pending',
-            context: 'E2E Tests',
-            description: description.slice(0, 140),
-            target_url: runUrl,
-          });
+      - name: Create pending E2E status
+        if: needs.resolve-context.outputs.head_sha != ''
+        uses: actions/github-script@v9
+        env:
+          PR_NUMBER: ${{ needs.resolve-context.outputs.pr_number }}
+          HEAD_SHA: ${{ needs.resolve-context.outputs.head_sha }}
+          TRIGGER_ACTOR: ${{ needs.resolve-context.outputs.trigger_actor }}
+        with:
+          script: |
+            const { PR_NUMBER, HEAD_SHA, TRIGGER_ACTOR } = process.env;
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const description = PR_NUMBER
+              ? `Triggered by ${TRIGGER_ACTOR} on PR #${PR_NUMBER}`
+              : `Triggered by ${TRIGGER_ACTOR}`;
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: HEAD_SHA,
+              state: 'pending',
+              context: 'E2E Tests',
+              description: description.slice(0, 140),
+              target_url: runUrl,
+            });
 
-    - name: Use Node.js 22.x
-      uses: actions/setup-node@v4
-      with:
-        node-version: 22.x
-        cache: 'npm'
+      - name: Use Node.js 22.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: 'npm'
 
-    - name: Install dependencies
-      run: npm ci
+      - name: Install dependencies
+        run: npm ci
 
-    - name: Install Playwright Browsers
-      run: npx --yes playwright install --with-deps
+      - name: Install Playwright Browsers
+        run: npx --yes playwright install --with-deps
 
-    - name: Setup test environment
-      run: |
-        cp .env.sample .env
-        echo "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/playaplan_test" >> .env
-        echo "JWT_SECRET=test-secret-key-for-ci" >> .env
-        echo "NODE_ENV=development" >> .env
+      - name: Setup test environment
+        run: |
+          cp .env.sample .env
+          echo "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/playaplan_test" >> .env
+          echo "JWT_SECRET=test-secret-key-for-ci" >> .env
+          echo "NODE_ENV=development" >> .env
 
-    - name: Setup database (migrate + base seed + e2e personas + local creds)
-      run: |
-        cd apps/api
-        npx --yes prisma generate
-        npx --yes prisma migrate deploy
-        npm run seed:dev:force
-        npm run seed:e2e
-        if [ -f prisma/seeds/seed.local.ts ]; then
-          npm run seed:local
-        fi
-      env:
-        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/playaplan_test
+      - name: Setup database (migrate + base seed + e2e personas + local creds)
+        run: |
+          cd apps/api
+          npx --yes prisma generate
+          npx --yes prisma migrate deploy
+          npm run seed:dev:force
+          npm run seed:e2e
+          if [ -f prisma/seeds/seed.local.ts ]; then
+            npm run seed:local
+          fi
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/playaplan_test
 
-    - name: Start API server in background
-      run: |
-        cd apps/api
-        echo "Starting API server in development mode..."
-        nohup npm run dev > api.log 2>&1 &
-        echo $! > api.pid
-        echo "API server started with PID $(cat api.pid)"
-      env:
-        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/playaplan_test
-        JWT_SECRET: test-secret-key-for-ci
-        NODE_ENV: development
-        PORT: 3000
-        THROTTLE_DEFAULT_LIMIT: 2000
-        THROTTLE_AUTH_LIMIT: 400
+      - name: Start API server in background
+        run: |
+          cd apps/api
+          echo "Starting API server in development mode..."
+          nohup npm run dev > api.log 2>&1 &
+          echo $! > api.pid
+          echo "API server started with PID $(cat api.pid)"
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/playaplan_test
+          JWT_SECRET: test-secret-key-for-ci
+          NODE_ENV: development
+          PORT: 3000
+          THROTTLE_DEFAULT_LIMIT: 2000
+          THROTTLE_AUTH_LIMIT: 400
 
-    - name: Wait for API server to be ready
-      run: |
-        echo "Waiting for API server to start..."
-        timeout 60 bash -c 'until curl -f http://localhost:3000/health 2>/dev/null; do
-          echo "API not ready yet, waiting..."
+      - name: Wait for API server to be ready
+        run: |
+          echo "Waiting for API server to start..."
+          timeout 60 bash -c 'until curl -f http://localhost:3000/health 2>/dev/null; do
+            echo "API not ready yet, waiting..."
+            if [ -f apps/api/api.log ]; then
+              echo "Last 10 lines of API log:"
+              tail -10 apps/api/api.log
+            fi
+            sleep 2
+          done'
+          echo "API server is ready!"
+
+      - name: Start Web server in background
+        run: |
+          cd apps/web
+          echo "Starting Web server..."
+          nohup npm run dev > web.log 2>&1 &
+          echo $! > web.pid
+          echo "Web server started with PID $(cat web.pid)"
+        env:
+          VITE_API_URL: http://localhost:3000
+          NODE_ENV: development
+          PORT: 5173
+
+      - name: Wait for Web server to be ready
+        run: |
+          echo "Waiting for Web server to start..."
+          timeout 60 bash -c 'until curl -f http://localhost:5173 2>/dev/null; do
+            echo "Web server not ready yet, waiting..."
+            if [ -f apps/web/web.log ]; then
+              echo "Last 10 lines of Web log:"
+              tail -10 apps/web/web.log
+            fi
+            sleep 2
+          done'
+          echo "Web server is ready!"
+
+      - name: Run Playwright tests
+        env:
+          CI: true
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/playaplan_test
+          JWT_SECRET: test-secret-key-for-ci
+          NODE_ENV: development
+          E2E_TAGS: ${{ needs.resolve-context.outputs.tags }}
+        run: |
+          if [ -n "$E2E_TAGS" ]; then
+            echo "Running with --grep \"$E2E_TAGS\""
+            npx --yes playwright test --grep "$E2E_TAGS"
+          else
+            npx --yes playwright test
+          fi
+
+      - name: Generate Playwright summary markdown
+        if: always()
+        run: |
+          mkdir -p /tmp/e2e
+          node scripts/playwright-summary.mjs playwright-report/results.json > /tmp/e2e/summary.md
+          cat /tmp/e2e/summary.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Post PR comment with results
+        if: always() && !cancelled() && needs.resolve-context.outputs.pr_number != ''
+        uses: actions/github-script@v9
+        env:
+          PR_NUMBER: ${{ needs.resolve-context.outputs.pr_number }}
+          HEAD_SHA: ${{ needs.resolve-context.outputs.head_sha }}
+          HEAD_REF: ${{ needs.resolve-context.outputs.head_ref }}
+          E2E_TAGS: ${{ needs.resolve-context.outputs.tags }}
+          TRIGGER_ACTOR: ${{ needs.resolve-context.outputs.trigger_actor }}
+        with:
+          script: |
+            const fs = require('fs');
+            let summary;
+            try {
+              summary = fs.readFileSync('/tmp/e2e/summary.md', 'utf8');
+            } catch {
+              summary = '_E2E summary unavailable — the test step may have failed before producing a report._\n';
+            }
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const tags = process.env.E2E_TAGS || 'all tests';
+            const shortSha = (process.env.HEAD_SHA || '').slice(0, 7);
+            const metadata = [
+              `Triggered by: @${process.env.TRIGGER_ACTOR}`,
+              `Scope: \`${tags}\``,
+              process.env.HEAD_REF ? `Branch: \`${process.env.HEAD_REF}\`` : '',
+              shortSha ? `Commit: \`${shortSha}\`` : '',
+              `[View full run](${runUrl})`,
+            ].filter(Boolean).join(' | ');
+            const body = `${summary}\n${metadata}\n`;
+            const prNumber = parseInt(process.env.PR_NUMBER, 10);
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              body,
+            });
+
+      - name: Upload Playwright Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 10
+
+      - name: Upload Test Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: test-results/
+          retention-days: 10
+
+      - name: Show server logs on failure
+        if: failure()
+        run: |
+          echo "=== API server logs ==="
           if [ -f apps/api/api.log ]; then
-            echo "Last 10 lines of API log:"
-            tail -10 apps/api/api.log
+            cat apps/api/api.log
+          else
+            echo "No API log file found"
           fi
-          sleep 2
-        done'
-        echo "API server is ready!"
-
-    - name: Start Web server in background
-      run: |
-        cd apps/web
-        echo "Starting Web server..."
-        nohup npm run dev > web.log 2>&1 &
-        echo $! > web.pid
-        echo "Web server started with PID $(cat web.pid)"
-      env:
-        VITE_API_URL: http://localhost:3000
-        NODE_ENV: development
-        PORT: 5173
-
-    - name: Wait for Web server to be ready
-      run: |
-        echo "Waiting for Web server to start..."
-        timeout 60 bash -c 'until curl -f http://localhost:5173 2>/dev/null; do
-          echo "Web server not ready yet, waiting..."
+          echo ""
+          echo "=== Web server logs ==="
           if [ -f apps/web/web.log ]; then
-            echo "Last 10 lines of Web log:"
-            tail -10 apps/web/web.log
+            cat apps/web/web.log
+          else
+            echo "No Web log file found"
           fi
-          sleep 2
-        done'
-        echo "Web server is ready!"
 
-    - name: Run Playwright tests
-      env:
-        CI: true
-        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/playaplan_test
-        JWT_SECRET: test-secret-key-for-ci
-        NODE_ENV: development
-        E2E_TAGS: ${{ needs.resolve-context.outputs.tags }}
-      run: |
-        if [ -n "$E2E_TAGS" ]; then
-          echo "Running with --grep \"$E2E_TAGS\""
-          npx --yes playwright test --grep "$E2E_TAGS"
-        else
-          npx --yes playwright test
-        fi
+      - name: Cleanup servers
+        if: always()
+        run: |
+          echo "Stopping servers..."
+          if [ -f apps/api/api.pid ]; then
+            echo "Stopping API server with PID $(cat apps/api/api.pid)"
+            kill $(cat apps/api/api.pid) || echo "API server already stopped"
+            rm apps/api/api.pid
+          fi
+          if [ -f apps/web/web.pid ]; then
+            echo "Stopping Web server with PID $(cat apps/web/web.pid)"
+            kill $(cat apps/web/web.pid) || echo "Web server already stopped"
+            rm apps/web/web.pid
+          fi
 
-    - name: Generate Playwright summary markdown
-      if: always()
-      run: |
-        mkdir -p /tmp/e2e
-        node scripts/playwright-summary.mjs playwright-report/results.json > /tmp/e2e/summary.md
-        cat /tmp/e2e/summary.md >> "$GITHUB_STEP_SUMMARY"
-
-    - name: Post PR comment with results
-      if: always() && !cancelled() && needs.resolve-context.outputs.pr_number != ''
-      uses: actions/github-script@v7
-      env:
-        PR_NUMBER: ${{ needs.resolve-context.outputs.pr_number }}
-        HEAD_SHA: ${{ needs.resolve-context.outputs.head_sha }}
-        HEAD_REF: ${{ needs.resolve-context.outputs.head_ref }}
-        E2E_TAGS: ${{ needs.resolve-context.outputs.tags }}
-        TRIGGER_ACTOR: ${{ needs.resolve-context.outputs.trigger_actor }}
-      with:
-        script: |
-          const fs = require('fs');
-          let summary;
-          try {
-            summary = fs.readFileSync('/tmp/e2e/summary.md', 'utf8');
-          } catch {
-            summary = '_E2E summary unavailable — the test step may have failed before producing a report._\n';
-          }
-          const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
-          const tags = process.env.E2E_TAGS || 'all tests';
-          const shortSha = (process.env.HEAD_SHA || '').slice(0, 7);
-          const metadata = [
-            `Triggered by: @${process.env.TRIGGER_ACTOR}`,
-            `Scope: \`${tags}\``,
-            process.env.HEAD_REF ? `Branch: \`${process.env.HEAD_REF}\`` : '',
-            shortSha ? `Commit: \`${shortSha}\`` : '',
-            `[View full run](${runUrl})`,
-          ].filter(Boolean).join(' | ');
-          const body = `${summary}\n${metadata}\n`;
-          const prNumber = parseInt(process.env.PR_NUMBER, 10);
-          await github.rest.issues.createComment({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            issue_number: prNumber,
-            body,
-          });
-
-    - name: Upload Playwright Report
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: playwright-report
-        path: playwright-report/
-        retention-days: 10
-
-    - name: Upload Test Results
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: test-results
-        path: test-results/
-        retention-days: 10
-
-    - name: Show server logs on failure
-      if: failure()
-      run: |
-        echo "=== API server logs ==="
-        if [ -f apps/api/api.log ]; then
-          cat apps/api/api.log
-        else
-          echo "No API log file found"
-        fi
-        echo ""
-        echo "=== Web server logs ==="
-        if [ -f apps/web/web.log ]; then
-          cat apps/web/web.log
-        else
-          echo "No Web log file found"
-        fi
-
-    - name: Cleanup servers
-      if: always()
-      run: |
-        echo "Stopping servers..."
-        if [ -f apps/api/api.pid ]; then
-          echo "Stopping API server with PID $(cat apps/api/api.pid)"
-          kill $(cat apps/api/api.pid) || echo "API server already stopped"
-          rm apps/api/api.pid
-        fi
-        if [ -f apps/web/web.pid ]; then
-          echo "Stopping Web server with PID $(cat apps/web/web.pid)"
-          kill $(cat apps/web/web.pid) || echo "Web server already stopped"
-          rm apps/web/web.pid
-        fi
-
-    # Must be the last step so job.status reflects the outcome of EVERY
-    # preceding step (test run, uploads, cleanup).
-    - name: Complete E2E status
-      if: always() && needs.resolve-context.outputs.head_sha != ''
-      uses: actions/github-script@v7
-      env:
-        JOB_STATUS: ${{ job.status }}
-        HEAD_SHA: ${{ needs.resolve-context.outputs.head_sha }}
-      with:
-        script: |
-          const jobStatus = process.env.JOB_STATUS;
-          const state = jobStatus === 'success'
-            ? 'success'
-            : jobStatus === 'cancelled' ? 'error' : 'failure';
-          const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
-          await github.rest.repos.createCommitStatus({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            sha: process.env.HEAD_SHA,
-            state,
-            context: 'E2E Tests',
-            description: `E2E ${state}`.slice(0, 140),
-            target_url: runUrl,
-          });
+      # Must be the last step so job.status reflects the outcome of EVERY
+      # preceding step (test run, uploads, cleanup).
+      - name: Complete E2E status
+        if: always() && needs.resolve-context.outputs.head_sha != ''
+        uses: actions/github-script@v9
+        env:
+          JOB_STATUS: ${{ job.status }}
+          HEAD_SHA: ${{ needs.resolve-context.outputs.head_sha }}
+        with:
+          script: |
+            const jobStatus = process.env.JOB_STATUS;
+            const state = jobStatus === 'success'
+              ? 'success'
+              : jobStatus === 'cancelled' ? 'error' : 'failure';
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: process.env.HEAD_SHA,
+              state,
+              context: 'E2E Tests',
+              description: `E2E ${state}`.slice(0, 140),
+              target_url: runUrl,
+            });
