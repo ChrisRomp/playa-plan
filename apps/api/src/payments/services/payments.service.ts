@@ -574,7 +574,14 @@ export class PaymentsService {
       data.registrationId &&
       (data.status ?? PaymentStatus.COMPLETED) === PaymentStatus.COMPLETED
     ) {
-      await this.markRegistrationPaid(data.registrationId);
+      try {
+        await this.markRegistrationPaid(data.registrationId);
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        this.logger.warn(
+          `Failed to mark registration ${data.registrationId} paid after manual payment ${payment.id}: ${errorMessage}`,
+        );
+      }
     }
 
     await this.adminAuditService.createAuditRecord({

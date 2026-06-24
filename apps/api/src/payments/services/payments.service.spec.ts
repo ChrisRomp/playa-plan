@@ -1613,6 +1613,65 @@ describe('PaymentsService', () => {
       );
     });
 
+    it('recordManualPayment still audits and returns payment when marking the registration paid fails', async () => {
+      const created = {
+        id: 'payment-manual',
+        status: PaymentStatus.PENDING,
+        amount: 100,
+        currency: 'USD',
+        provider: PaymentProvider.MANUAL,
+        userId: 'user-id',
+        registrationId: 'registration-id',
+        providerRefId: 'manual:check-123',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      const updatedPayment = {
+        ...created,
+        status: PaymentStatus.COMPLETED,
+      };
+      mockPrismaService.user.findUnique.mockResolvedValue({
+        id: 'user-id',
+        name: 'Test User',
+      });
+      mockPrismaService.registration.findUnique.mockResolvedValue({
+        id: 'registration-id',
+        userId: 'user-id',
+        status: 'CONFIRMED',
+        paymentDeferred: true,
+      });
+      mockPrismaService.payment.create.mockResolvedValueOnce(created);
+      mockPrismaService.payment.findUnique.mockResolvedValueOnce(created);
+      mockPrismaService.payment.update.mockResolvedValueOnce(updatedPayment);
+      mockPrismaService.registration.update.mockRejectedValueOnce(new Error('transient database error'));
+
+      const actualPayment = await service.recordManualPayment({
+        amount: 100,
+        currency: 'USD',
+        userId: 'user-id',
+        registrationId: 'registration-id',
+        reference: 'check-123',
+        status: PaymentStatus.COMPLETED,
+      }, 'admin-id');
+
+      expect(actualPayment).toEqual(updatedPayment);
+      expect(mockPrismaService.registration.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'registration-id' },
+          data: { status: 'CONFIRMED', paymentDeferred: false },
+        }),
+      );
+      expect(mockAdminAuditService.createAuditRecord).toHaveBeenCalledWith(
+        expect.objectContaining({
+          adminUserId: 'admin-id',
+          actionType: 'PAYMENT_RECORD',
+          targetRecordType: 'PAYMENT',
+          targetRecordId: 'payment-manual',
+          throwOnError: false,
+        }),
+      );
+    });
+
     it('recordManualPayment does NOT touch the registration when status is not COMPLETED', async () => {
       const created = {
         id: 'payment-manual',
