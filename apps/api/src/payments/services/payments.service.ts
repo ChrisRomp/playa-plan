@@ -178,7 +178,7 @@ export class PaymentsService {
       return;
     }
 
-    let reconciled = false;
+    const reconciledRefundIds = new Set<string>();
     for (const refund of pendingRefunds) {
       const providerRefund = refund.providerRefundId
         ? await this.stripeService.retrieveRefund(refund.providerRefundId)
@@ -197,10 +197,10 @@ export class PaymentsService {
           providerRefundId: providerRefund.id,
         },
       });
-      reconciled = true;
+      reconciledRefundIds.add(refund.id);
     }
 
-    if (!reconciled) {
+    if (reconciledRefundIds.size === 0) {
       return;
     }
 
@@ -227,6 +227,7 @@ export class PaymentsService {
 
     for (const refund of refreshedPayment.refunds) {
       if (
+        reconciledRefundIds.has(refund.id) &&
         refund.status === PaymentRefundStatus.SUCCEEDED &&
         refund.resultingRegistrationStatus &&
         refreshedPayment.registration
@@ -834,7 +835,7 @@ export class PaymentsService {
           );
           processorRefundSubmitted = true;
         } catch (error: unknown) {
-          processorRefundSubmitted = error instanceof StripeRefundError && error.refundRequestAttempted;
+          processorRefundSubmitted = error instanceof StripeRefundError && error.possiblySubmitted;
           throw error;
         }
 

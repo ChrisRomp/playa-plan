@@ -1123,6 +1123,78 @@ describe('PaymentsService', () => {
       expect(mockPrismaService.paymentRefund.create).not.toHaveBeenCalled();
     });
 
+    it('should not reapply prior refund registration status while reconciling another pending refund', async () => {
+      const priorSucceededRefund = {
+        id: 'prior-refund-id',
+        paymentId: 'payment-id',
+        amountCents: 2500,
+        currency: 'USD',
+        status: PaymentRefundStatus.SUCCEEDED,
+        processorRefund: true,
+        providerRefundId: 're_prior',
+        reason: 'Prior refund',
+        resultingRegistrationStatus: RegistrationStatus.WAITLISTED,
+        processedByUserId: 'admin-id',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      const pendingRefund = {
+        id: 'pending-refund-id',
+        paymentId: 'payment-id',
+        amountCents: 2500,
+        currency: 'USD',
+        status: PaymentRefundStatus.PENDING,
+        processorRefund: true,
+        providerRefundId: 're_pending',
+        reason: 'Pending refund',
+        resultingRegistrationStatus: null,
+        processedByUserId: 'admin-id',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      const reconciledRefund = {
+        ...pendingRefund,
+        status: PaymentRefundStatus.SUCCEEDED,
+      };
+
+      mockPrismaService.payment.findUnique
+        .mockResolvedValueOnce({
+          ...basePayment,
+          refunds: [priorSucceededRefund, pendingRefund],
+        })
+        .mockResolvedValueOnce({
+          ...basePayment,
+          refunds: [priorSucceededRefund, reconciledRefund],
+        })
+        .mockResolvedValueOnce({
+          ...basePayment,
+          status: PaymentStatus.PARTIALLY_REFUNDED,
+          refunds: [priorSucceededRefund, reconciledRefund],
+        });
+      mockStripeService.retrieveRefund.mockResolvedValueOnce({ id: 're_pending', status: 'succeeded' });
+
+      await expect(service.processRefund({
+        paymentId: 'payment-id',
+        amount: 60,
+        reason: 'Too much refund',
+      }, 'admin-id')).rejects.toThrow('Refund amount exceeds remaining refundable balance');
+
+      expect(mockStripeService.retrieveRefund).toHaveBeenCalledWith('re_pending');
+      expect(mockPrismaService.paymentRefund.update).toHaveBeenCalledWith({
+        where: { id: 'pending-refund-id' },
+        data: {
+          status: PaymentRefundStatus.SUCCEEDED,
+          providerRefundId: 're_pending',
+        },
+      });
+      expect(mockPrismaService.payment.update).toHaveBeenCalledWith({
+        where: { id: 'payment-id' },
+        data: { status: PaymentStatus.PARTIALLY_REFUNDED },
+      });
+      expect(mockPrismaService.registration.update).not.toHaveBeenCalled();
+      expect(mockPrismaService.paymentRefund.create).not.toHaveBeenCalled();
+    });
+
     it('should not update registration status when Stripe reports a failed refund', async () => {
       const failedRefund = {
         id: 'refund-id',

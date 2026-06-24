@@ -5,7 +5,7 @@ import { CreateStripePaymentDto } from '../dto';
 import { CoreConfigService } from '../../core-config/services/core-config.service';
 
 export class StripeRefundError extends Error {
-  constructor(message: string, readonly refundRequestAttempted: boolean) {
+  constructor(message: string, readonly possiblySubmitted: boolean) {
     super(message);
     this.name = 'StripeRefundError';
   }
@@ -231,9 +231,10 @@ export class StripeService {
     } catch (error: unknown) {
       const sanitizedMessage = this.sanitizeErrorMessage(error);
       this.logger.error(`Failed to process refund: ${sanitizedMessage}`);
+      const possiblySubmitted = refundRequestAttempted && this.isAmbiguousRefundSubmissionError(error);
       throw new StripeRefundError(
         sanitizedMessage,
-        refundRequestAttempted && this.isAmbiguousRefundSubmissionError(error),
+        possiblySubmitted,
       );
     }
   }
