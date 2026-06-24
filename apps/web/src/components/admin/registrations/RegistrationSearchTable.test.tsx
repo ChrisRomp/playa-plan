@@ -389,13 +389,19 @@ describe('RegistrationSearchTable', () => {
           { id: 'payment-1', amount: 100, status: 'COMPLETED' },
           { id: 'payment-2', amount: 50, status: 'PENDING' },
           { id: 'payment-3', amount: 25, status: 'FAILED' },
+          {
+            id: 'payment-4',
+            amount: 80,
+            status: 'PARTIALLY_REFUNDED',
+            refunds: [{ amountCents: 2000, status: 'SUCCEEDED' }],
+          },
         ],
       }];
 
       render(<RegistrationSearchTable {...defaultProps} registrations={registrationWithMixedPayments} />);
 
-      // Should only count COMPLETED payments
-      expect(screen.getByText('$100.00')).toBeInTheDocument();
+      // Should count completed and partially refunded net payments.
+      expect(screen.getByText('$160.00')).toBeInTheDocument();
     });
 
     it('should handle registrations with zero payment amounts', () => {

@@ -36,6 +36,8 @@ model User {
   loginCodeExpiry            DateTime?
   campingOptionRegistrations CampingOptionRegistration[]
   payments                   Payment[]
+  recordedPayments           Payment[]                   @relation("PaymentRecordedBy")
+  processedPaymentRefunds    PaymentRefund[]             @relation("PaymentRefundProcessedBy")
   registrations              Registration[]
   emailAudit                 EmailAudit[]
   adminAuditRecords          AdminAudit[]                @relation("AdminAuditRecords")
@@ -230,20 +232,46 @@ model RegistrationJob {
 }
 
 model Payment {
-  id             String          @id @default(uuid())
-  amount         Float
-  currency       String          @default("USD")
-  status         PaymentStatus   @default(PENDING)
-  provider       PaymentProvider
-  providerRefId  String?
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-  userId         String
-  registrationId String?
-  user           User            @relation(fields: [userId], references: [id])
-  registration   Registration?   @relation(fields: [registrationId], references: [id])
+  id                       String          @id @default(uuid())
+  amount                   Float
+  currency                 String          @default("USD")
+  status                   PaymentStatus   @default(PENDING)
+  provider                 PaymentProvider
+  providerRefId            String?
+  externalPaymentMethod    String?
+  externalPaymentReference String?
+  recordedByUserId         String?
+  createdAt                DateTime        @default(now())
+  updatedAt                DateTime        @updatedAt
+  userId                   String
+  registrationId           String?
+  user                     User            @relation(fields: [userId], references: [id])
+  registration             Registration?   @relation(fields: [registrationId], references: [id])
+  recordedBy               User?           @relation("PaymentRecordedBy", fields: [recordedByUserId], references: [id])
+  refunds                  PaymentRefund[]
 
   @@map("payments")
+}
+
+model PaymentRefund {
+  id                          String               @id @default(uuid())
+  paymentId                   String
+  amountCents                 Int
+  currency                    String               @default("USD")
+  status                      PaymentRefundStatus  @default(SUCCEEDED)
+  processorRefund             Boolean              @default(false)
+  providerRefundId            String?
+  reason                      String?
+  resultingRegistrationStatus RegistrationStatus?
+  processedByUserId           String
+  createdAt                   DateTime             @default(now())
+  updatedAt                   DateTime             @updatedAt
+  payment                     Payment              @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  processedBy                 User                 @relation("PaymentRefundProcessedBy", fields: [processedByUserId], references: [id])
+
+  @@index([paymentId])
+  @@index([processedByUserId])
+  @@map("payment_refunds")
 }
 
 model Notification {
@@ -369,6 +397,7 @@ enum RegistrationStatus {
 enum PaymentStatus {
   PENDING
   COMPLETED
+  PARTIALLY_REFUNDED
   FAILED
   REFUNDED
 }
@@ -377,6 +406,12 @@ enum PaymentProvider {
   STRIPE
   PAYPAL
   MANUAL
+}
+
+enum PaymentRefundStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
 }
 
 enum NotificationType {
@@ -416,6 +451,7 @@ enum PaypalMode {
 enum AdminAuditActionType {
   REGISTRATION_EDIT
   REGISTRATION_CANCEL
+  PAYMENT_RECORD
   PAYMENT_REFUND
   WORK_SHIFT_ADD
   WORK_SHIFT_REMOVE

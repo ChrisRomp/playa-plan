@@ -440,13 +440,61 @@ export interface Payment {
   id: string;
   amount: number;
   currency: string;
-  status: 'PENDING' | 'COMPLETED' | 'FAILED' | 'REFUNDED';
-  provider: 'STRIPE' | 'PAYPAL';
-  providerRefId?: string;
+  status: 'PENDING' | 'COMPLETED' | 'PARTIALLY_REFUNDED' | 'FAILED' | 'REFUNDED';
+  provider: 'STRIPE' | 'PAYPAL' | 'MANUAL';
+  providerRefId?: string | null;
+  externalPaymentMethod?: string | null;
+  externalPaymentReference?: string | null;
+  recordedByUserId?: string | null;
   createdAt: string;
   updatedAt: string;
   userId: string;
+  registrationId?: string | null;
+  refundedAmount?: number;
+  netAmount?: number;
+  refundableAmount?: number;
+  processorRefundAvailable?: boolean;
+  refunds?: PaymentRefund[];
+}
+
+export interface PaymentRefund {
+  id: string;
+  paymentId: string;
+  amountCents: number;
+  currency: string;
+  status: 'PENDING' | 'SUCCEEDED' | 'FAILED';
+  processorRefund: boolean;
+  providerRefundId?: string | null;
+  reason?: string | null;
+  resultingRegistrationStatus?: Registration['status'] | null;
+  processedByUserId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RecordExternalPaymentRequest {
+  amount: number;
+  currency?: string;
+  userId: string;
   registrationId?: string;
+  externalPaymentMethod?: string;
+  reference?: string;
+  status?: Payment['status'];
+}
+
+export interface CreateRefundRequest {
+  paymentId: string;
+  amount?: number;
+  reason?: string;
+  resultingRegistrationStatus?: Registration['status'];
+}
+
+export interface RefundResult {
+  paymentId: string;
+  refundAmount: number;
+  providerRefundId: string;
+  success: boolean;
+  refundStatus?: 'PENDING' | 'SUCCEEDED' | 'FAILED';
 }
 
 // Registration interface
@@ -1288,6 +1336,7 @@ export const reports = {
     registrationId?: string;
     status?: string;
     provider?: string;
+    year?: number;
   }): Promise<Payment[]> => {
     try {
       const params = new URLSearchParams();
@@ -1295,6 +1344,7 @@ export const reports = {
       if (filters?.registrationId) params.append('registrationId', filters.registrationId);
       if (filters?.status) params.append('status', filters.status);
       if (filters?.provider) params.append('provider', filters.provider);
+      if (filters?.year) params.append('year', filters.year.toString());
       
       // For reports, we want all payments, so set a high limit to avoid pagination
       params.append('take', '10000');
@@ -1317,6 +1367,32 @@ export const reports = {
       return [];
     } catch (error) {
       console.error('Error fetching payments report:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Record an externally handled payment against a user/registration.
+   */
+  recordExternalPayment: async (payment: RecordExternalPaymentRequest): Promise<Payment> => {
+    try {
+      const response = await api.post<Payment>('/payments/manual', payment);
+      return response.data;
+    } catch (error) {
+      console.error('Error recording external payment:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Process a processor refund or record an offline refund for a payment.
+   */
+  processRefund: async (refund: CreateRefundRequest): Promise<RefundResult> => {
+    try {
+      const response = await api.post<RefundResult>('/payments/refund', refund);
+      return response.data;
+    } catch (error) {
+      console.error('Error processing payment refund:', error);
       throw error;
     }
   },

@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator';
+import { IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator';
+import { RegistrationStatus } from '@prisma/client';
 
 /**
  * Data Transfer Object for creating a refund
@@ -46,4 +47,13 @@ export class CreateRefundDto {
   @IsOptional()
   @IsString()
   reason?: string;
-} 
+
+  @ApiProperty({
+    description: 'Optional registration status to apply after the refund',
+    enum: RegistrationStatus,
+    required: false,
+  })
+  @IsOptional()
+  @IsEnum(RegistrationStatus)
+  resultingRegistrationStatus?: RegistrationStatus;
+}

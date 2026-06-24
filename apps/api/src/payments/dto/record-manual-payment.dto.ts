@@ -36,13 +36,22 @@ export class RecordManualPaymentDto {
   status?: PaymentStatus = PaymentStatus.COMPLETED;
 
   @ApiProperty({
-    description: 'Reference information for this manual payment',
-    example: 'Cash payment collected on 2023-05-15',
+    description: 'How the external payment was received',
+    example: 'Check',
     required: false,
   })
   @IsOptional()
   @IsString()
-  reference: string | undefined;
+  externalPaymentMethod?: string;
+
+  @ApiProperty({
+    description: 'Reference information for this external payment',
+    example: 'Check #1234 collected on 2023-05-15',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  reference?: string;
 
   @ApiProperty({
     description: 'ID of the user the payment is for',

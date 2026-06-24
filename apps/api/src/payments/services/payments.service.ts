@@ -2,14 +2,33 @@ import { BadRequestException, Injectable, Logger, NotFoundException } from '@nes
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { NotificationsService } from '../../notifications/services/notifications.service';
 import { CreatePaymentDto, UpdatePaymentDto, CreateRefundDto, RecordManualPaymentDto, CreateStripePaymentDto, CreatePaypalPaymentDto } from '../dto';
-import { Payment, PaymentProvider, PaymentStatus, Registration, UserRole } from '@prisma/client';
-import { StripeService } from './stripe.service';
+import {
+  AdminAuditActionType,
+  AdminAuditTargetType,
+  Payment,
+  PaymentProvider,
+  PaymentRefund,
+  PaymentRefundStatus,
+  PaymentStatus,
+  Prisma,
+  Registration,
+  RegistrationStatus,
+  UserRole,
+} from '@prisma/client';
+import { StripeRefundError, StripeService } from './stripe.service';
 import { PaypalService } from './paypal.service';
 import { isApplicationStatus } from '../../registrations/constants/registration-status.constants';
+import { AdminAuditService } from '../../admin-audit/services/admin-audit.service';
 
 // Create an extended Payment type that includes registration relationship
 type PaymentWithRelations = Payment & {
   registration?: Registration | null;
+  refunds?: PaymentRefund[];
+};
+
+type RefundablePayment = Payment & {
+  registration: Registration | null;
+  refunds: PaymentRefund[];
 };
 
 // Interface for PayPal link object
@@ -19,9 +38,12 @@ interface PayPalLink {
 }
 
 // Interface for Prisma where clause
-interface PaymentWhereClause {
-  userId?: string;
-  status?: PaymentStatus;
+export interface PaymentOverview extends Payment {
+  refundedAmount: number;
+  netAmount: number;
+  refundableAmount: number;
+  processorRefundAvailable: boolean;
+  refunds: PaymentRefund[];
 }
 
 // Interface for refund result
@@ -30,11 +52,17 @@ export interface RefundResult {
   refundAmount: number;
   providerRefundId: string;
   success: boolean;
+  refundStatus: PaymentRefundStatus;
+}
+
+interface ProcessRefundOptions {
+  readonly allowRegistrationCancellation?: boolean;
 }
 
 // Interface for provider refund response
 interface ProviderRefund {
   id: string;
+  status?: string | null;
 }
 
 /**
@@ -49,7 +77,171 @@ export class PaymentsService {
     private readonly stripeService: StripeService,
     private readonly paypalService: PaypalService,
     private readonly notificationsService: NotificationsService,
+    private readonly adminAuditService: AdminAuditService,
   ) {}
+
+  private toCents(amount: number): number {
+    return Math.round(amount * 100);
+  }
+
+  private toDollars(amountCents: number): number {
+    return amountCents / 100;
+  }
+
+  private getSucceededRefundCents(refunds: PaymentRefund[] = []): number {
+    return refunds
+      .filter((refund) => refund.status === PaymentRefundStatus.SUCCEEDED)
+      .reduce((sum, refund) => sum + refund.amountCents, 0);
+  }
+
+  private getReservedRefundCents(refunds: PaymentRefund[] = []): number {
+    return refunds
+      .filter((refund) => refund.status === PaymentRefundStatus.SUCCEEDED || refund.status === PaymentRefundStatus.PENDING)
+      .reduce((sum, refund) => sum + refund.amountCents, 0);
+  }
+
+  private getPaymentStatusFromRefunds(paymentAmountCents: number, refundedCents: number): PaymentStatus {
+    if (refundedCents <= 0) {
+      return PaymentStatus.COMPLETED;
+    }
+
+    if (refundedCents >= paymentAmountCents) {
+      return PaymentStatus.REFUNDED;
+    }
+
+    return PaymentStatus.PARTIALLY_REFUNDED;
+  }
+
+  private isRefundableStatus(status: PaymentStatus): boolean {
+    return status === PaymentStatus.COMPLETED || status === PaymentStatus.PARTIALLY_REFUNDED;
+  }
+
+  private isProcessorRefundProvider(provider: PaymentProvider): boolean {
+    return provider === PaymentProvider.STRIPE;
+  }
+
+  private shouldCompletePaymentFromPaidSession(status: PaymentStatus): boolean {
+    return status !== PaymentStatus.COMPLETED &&
+      status !== PaymentStatus.PARTIALLY_REFUNDED &&
+      status !== PaymentStatus.REFUNDED;
+  }
+
+  private getRefundStatusFromProviderStatus(status?: string | null): PaymentRefundStatus {
+    const normalizedStatus = status?.toLowerCase();
+
+    if (normalizedStatus === 'succeeded' || normalizedStatus === 'completed') {
+      return PaymentRefundStatus.SUCCEEDED;
+    }
+
+    if (normalizedStatus === 'failed' || normalizedStatus === 'canceled' || normalizedStatus === 'cancelled') {
+      return PaymentRefundStatus.FAILED;
+    }
+
+    return PaymentRefundStatus.PENDING;
+  }
+
+  private getPaymentOverview<T extends Payment & { refunds?: PaymentRefund[] }>(payment: T): T & PaymentOverview {
+    const amountCents = this.toCents(payment.amount);
+    const succeededRefundCents = this.getSucceededRefundCents(payment.refunds ?? []);
+    const reservedRefundCents = this.getReservedRefundCents(payment.refunds ?? []);
+    const isLegacyRefundedPayment = payment.status === PaymentStatus.REFUNDED && succeededRefundCents === 0;
+    const refundedCents = isLegacyRefundedPayment ? amountCents : succeededRefundCents;
+    const reservedCents = isLegacyRefundedPayment ? amountCents : reservedRefundCents;
+    const refundableCents = this.isRefundableStatus(payment.status)
+      ? Math.max(amountCents - reservedCents, 0)
+      : 0;
+
+    return {
+      ...payment,
+      refundedAmount: this.toDollars(refundedCents),
+      netAmount: this.toDollars(Math.max(amountCents - refundedCents, 0)),
+      refundableAmount: this.toDollars(refundableCents),
+      processorRefundAvailable: this.isRefundableStatus(payment.status) &&
+        this.isProcessorRefundProvider(payment.provider) &&
+        !!payment.providerRefId &&
+        !payment.providerRefId.startsWith('manual') &&
+        refundableCents > 0,
+      refunds: payment.refunds ?? [],
+    };
+  }
+
+  private async reconcilePendingProcessorRefunds(payment: RefundablePayment): Promise<void> {
+    const pendingRefunds = payment.refunds.filter(
+      (refund) => refund.processorRefund && refund.status === PaymentRefundStatus.PENDING,
+    );
+
+    if (pendingRefunds.length === 0) {
+      return;
+    }
+
+    if (payment.provider !== PaymentProvider.STRIPE || !payment.providerRefId) {
+      return;
+    }
+
+    let reconciled = false;
+    for (const refund of pendingRefunds) {
+      const providerRefund = refund.providerRefundId
+        ? await this.stripeService.retrieveRefund(refund.providerRefundId)
+        : await this.stripeService.createRefund(
+          payment.providerRefId,
+          refund.amountCents,
+          refund.reason ?? undefined,
+          refund.id,
+        );
+      const refundStatus = this.getRefundStatusFromProviderStatus(providerRefund.status);
+
+      await this.prisma.paymentRefund.update({
+        where: { id: refund.id },
+        data: {
+          status: refundStatus,
+          providerRefundId: providerRefund.id,
+        },
+      });
+      reconciled = true;
+    }
+
+    if (!reconciled) {
+      return;
+    }
+
+    const refreshedPayment = await this.prisma.payment.findUnique({
+      where: { id: payment.id },
+      include: {
+        registration: true,
+        refunds: true,
+      },
+    });
+
+    if (!refreshedPayment) {
+      return;
+    }
+
+    const refundedCents = this.getSucceededRefundCents(refreshedPayment.refunds);
+    const nextStatus = this.getPaymentStatusFromRefunds(this.toCents(refreshedPayment.amount), refundedCents);
+    const transactionUpdates: Prisma.PrismaPromise<unknown>[] = [
+      this.prisma.payment.update({
+        where: { id: refreshedPayment.id },
+        data: { status: nextStatus },
+      }),
+    ];
+
+    for (const refund of refreshedPayment.refunds) {
+      if (
+        refund.status === PaymentRefundStatus.SUCCEEDED &&
+        refund.resultingRegistrationStatus &&
+        refreshedPayment.registration
+      ) {
+        transactionUpdates.push(
+          this.prisma.registration.update({
+            where: { id: refreshedPayment.registration.id },
+            data: { status: refund.resultingRegistrationStatus },
+          }),
+        );
+      }
+    }
+
+    await this.prisma.$transaction(transactionUpdates);
+  }
 
   /**
    * Create a new payment record
@@ -95,7 +287,12 @@ export class PaymentsService {
         status: PaymentStatus.PENDING,
         provider: createPaymentDto.provider,
         providerRefId: createPaymentDto.providerRefId,
+        externalPaymentMethod: createPaymentDto.externalPaymentMethod,
+        externalPaymentReference: createPaymentDto.externalPaymentReference,
         user: { connect: { id: createPaymentDto.userId } },
+        ...(createPaymentDto.recordedByUserId && {
+          recordedBy: { connect: { id: createPaymentDto.recordedByUserId } },
+        }),
         ...(createPaymentDto.registrationId && {
           registration: { connect: { id: createPaymentDto.registrationId } }
         }),
@@ -117,10 +314,21 @@ export class PaymentsService {
    * @param take - Number of records to take (pagination)
    * @param userId - Filter by user ID
    * @param status - Filter by payment status
+   * @param registrationId - Filter by registration ID
+   * @param provider - Filter by payment provider
+   * @param year - Filter by registration year, or payment date year when unlinked
    * @returns Paginated list of payments
    */
-  async findAll(skip = 0, take = 10, userId?: string, status?: PaymentStatus): Promise<{ payments: Payment[]; total: number }> {
-    const where: PaymentWhereClause = {};
+  async findAll(
+    skip = 0,
+    take = 10,
+    userId?: string,
+    status?: PaymentStatus,
+    registrationId?: string,
+    provider?: PaymentProvider,
+    year?: number,
+  ): Promise<{ payments: PaymentOverview[]; total: number }> {
+    const where: Prisma.PaymentWhereInput = {};
     
     if (userId) {
       where.userId = userId;
@@ -128,6 +336,29 @@ export class PaymentsService {
     
     if (status) {
       where.status = status;
+    }
+
+    if (registrationId) {
+      where.registrationId = registrationId;
+    }
+
+    if (provider) {
+      where.provider = provider;
+    }
+
+    if (year) {
+      const yearStart = new Date(Date.UTC(year, 0, 1));
+      const nextYearStart = new Date(Date.UTC(year + 1, 0, 1));
+      where.OR = [
+        { registration: { year } },
+        {
+          registrationId: null,
+          createdAt: {
+            gte: yearStart,
+            lt: nextYearStart,
+          },
+        },
+      ];
     }
     
     const [payments, total] = await Promise.all([
@@ -145,13 +376,16 @@ export class PaymentsService {
             },
           },
           registration: true,
+          refunds: {
+            orderBy: { createdAt: 'desc' },
+          },
         },
         orderBy: { createdAt: 'desc' },
       }),
       this.prisma.payment.count({ where }),
     ]);
     
-    return { payments, total };
+    return { payments: payments.map((payment) => this.getPaymentOverview(payment)), total };
   }
 
   /**
@@ -172,6 +406,9 @@ export class PaymentsService {
           },
         },
         registration: true,
+        refunds: {
+          orderBy: { createdAt: 'desc' },
+        },
       },
     });
     
@@ -202,6 +439,9 @@ export class PaymentsService {
           },
         },
         registration: true,
+        refunds: {
+          orderBy: { createdAt: 'desc' },
+        },
       },
     });
     
@@ -306,26 +546,23 @@ export class PaymentsService {
    * @param data - Manual payment data
    * @returns The created payment
    */
-  async recordManualPayment(data: RecordManualPaymentDto): Promise<Payment> {
+  async recordManualPayment(data: RecordManualPaymentDto, recordedByUserId: string): Promise<Payment> {
     // Create payment record with appropriate status
     const payment = await this.create({
       amount: data.amount,
       currency: data.currency,
-      provider: PaymentProvider.STRIPE, // Use Stripe as default for manual
+      provider: PaymentProvider.MANUAL,
       userId: data.userId,
       registrationId: data.registrationId,
-      providerRefId: data.reference ? `manual:${data.reference}` : 'manual',
+      externalPaymentMethod: data.externalPaymentMethod,
+      externalPaymentReference: data.reference,
+      recordedByUserId,
     });
     
     // Update status immediately (since it's a manual payment)
     const updateDto: UpdatePaymentDto = {
       status: data.status || PaymentStatus.COMPLETED,
     };
-    
-    // Note: Previous code stored a reference as notes, but notes field is not present in schema
-    // if (data.reference) {
-    //   updateDto.notes = data.reference;
-    // }
     
     const updatedPayment = await this.update(payment.id, updateDto);
 
@@ -337,15 +574,27 @@ export class PaymentsService {
       data.registrationId &&
       (data.status ?? PaymentStatus.COMPLETED) === PaymentStatus.COMPLETED
     ) {
-      try {
-        await this.markRegistrationPaid(data.registrationId);
-      } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : 'Unknown error';
-        this.logger.warn(
-          `Manual payment ${payment.id} recorded, but failed to mark registration ${data.registrationId} paid: ${message}`,
-        );
-      }
+      await this.markRegistrationPaid(data.registrationId);
     }
+
+    await this.adminAuditService.createAuditRecord({
+      adminUserId: recordedByUserId,
+      actionType: AdminAuditActionType.PAYMENT_RECORD,
+      targetRecordType: AdminAuditTargetType.PAYMENT,
+      targetRecordId: payment.id,
+      newValues: {
+        amount: data.amount,
+        currency: data.currency ?? 'USD',
+        provider: PaymentProvider.MANUAL,
+        status: data.status ?? PaymentStatus.COMPLETED,
+        externalPaymentMethod: data.externalPaymentMethod,
+        externalPaymentReference: data.reference,
+        userId: data.userId,
+        registrationId: data.registrationId,
+      },
+      reason: data.reference,
+      throwOnError: false,
+    });
 
     return updatedPayment;
   }
@@ -468,80 +717,215 @@ export class PaymentsService {
    * @param data - Refund data
    * @returns Refund processing result
    */
-  async processRefund(data: CreateRefundDto): Promise<RefundResult> {
-    // Check if payment exists
-    const payment = await this.findOne(data.paymentId);
-    
-    // Can only refund completed payments
-    if (payment.status !== PaymentStatus.COMPLETED) {
-      throw new BadRequestException(`Cannot refund payment with status ${payment.status}`);
-    }
-    
+  async processRefund(data: CreateRefundDto, processedByUserId: string, options: ProcessRefundOptions = {}): Promise<RefundResult> {
+    const refundRequestId = `refund-${data.paymentId}-${Date.now()}`;
+
+    let pendingRefund: PaymentRefund | null = null;
+    let paymentForProcessor: RefundablePayment | null = null;
+    let processorRefundSubmitted = false;
+
     try {
-      // Calculate refund amount
-      let refundAmount = data.amount;
-      
-      if (!refundAmount && data.percentageOfOriginal) {
-        refundAmount = (payment.amount * data.percentageOfOriginal) / 100;
+      if (
+        data.resultingRegistrationStatus === RegistrationStatus.CANCELLED &&
+        !options.allowRegistrationCancellation
+      ) {
+        throw new BadRequestException('Use the registration cancellation flow to cancel a registration');
       }
-      
-      if (!refundAmount) {
-        refundAmount = payment.amount; // Full refund
-      }
-      
-      // Process refund with payment provider
-      let providerRefund: ProviderRefund;
-      
-      if (payment.provider === PaymentProvider.STRIPE) {
-        if (!payment.providerRefId) {
-          throw new BadRequestException('Payment has no provider reference ID');
-        }
-        
-        // Convert from dollars (database) to cents (Stripe expects cents)
-        const refundAmountCents = Math.round(refundAmount * 100);
-        
-        providerRefund = await this.stripeService.createRefund(
-          payment.providerRefId,
-          refundAmountCents,
-          data.reason,
-        );
-      } else if (payment.provider === PaymentProvider.PAYPAL) {
-        if (!payment.providerRefId) {
-          throw new BadRequestException('Payment has no provider reference ID');
-        }
-        
-        // Use dollar amount as-is since PayPal expects dollar amounts and database stores in dollars
-        providerRefund = await this.paypalService.createRefund(
-          payment.providerRefId,
-          refundAmount,
-          data.reason,
-        );
-      } else {
-        // Manual refund (just update the database)
-        providerRefund = { id: `manual-refund-${Date.now()}` };
-      }
-      
-      // Update payment status
-      await this.update(payment.id, {
-        status: PaymentStatus.REFUNDED,
-        // notes field removed as it's not in the Prisma schema
+
+      const existingPayment = await this.prisma.payment.findUnique({
+        where: { id: data.paymentId },
+        include: {
+          registration: true,
+          refunds: true,
+        },
       });
-      
-      // If there's a registration, update its status
-      if (payment.registration) {
-        await this.prisma.registration.update({
-          where: { id: payment.registration.id },
-          data: { status: 'CANCELLED' },
-        });
+
+      if (!existingPayment) {
+        throw new NotFoundException(`Payment with ID ${data.paymentId} not found`);
       }
-      
+
+      await this.reconcilePendingProcessorRefunds(existingPayment);
+
+      const pendingRefundData = await this.prisma.$transaction(async (tx) => {
+        const payment = await tx.payment.findUnique({
+          where: { id: data.paymentId },
+          include: {
+            registration: true,
+            refunds: true,
+          },
+        });
+
+        if (!payment) {
+          throw new NotFoundException(`Payment with ID ${data.paymentId} not found`);
+        }
+
+        if (!this.isRefundableStatus(payment.status)) {
+          throw new BadRequestException(`Cannot refund payment with status ${payment.status}`);
+        }
+
+        if (payment.provider === PaymentProvider.PAYPAL) {
+          throw new BadRequestException('Automated PayPal refunds are not currently supported');
+        }
+
+        const paymentAmountCents = this.toCents(payment.amount);
+        const alreadyRefundedCents = (payment.refunds ?? [])
+          .filter((refund) => refund.status === PaymentRefundStatus.SUCCEEDED || refund.status === PaymentRefundStatus.PENDING)
+          .reduce((sum, refund) => sum + refund.amountCents, 0);
+        const remainingCents = paymentAmountCents - alreadyRefundedCents;
+
+        if (remainingCents <= 0) {
+          throw new BadRequestException('Payment has no remaining refundable balance');
+        }
+
+        let refundAmountCents = data.amount ? this.toCents(data.amount) : remainingCents;
+
+        if (!data.amount && data.percentageOfOriginal) {
+          refundAmountCents = Math.round(paymentAmountCents * (data.percentageOfOriginal / 100));
+        }
+
+        if (refundAmountCents <= 0) {
+          throw new BadRequestException('Refund amount must be greater than zero');
+        }
+
+        if (refundAmountCents > remainingCents) {
+          throw new BadRequestException('Refund amount exceeds remaining refundable balance');
+        }
+
+        const refund = await tx.paymentRefund.create({
+          data: {
+            paymentId: payment.id,
+            amountCents: refundAmountCents,
+            currency: payment.currency,
+            status: this.isProcessorRefundProvider(payment.provider) ? PaymentRefundStatus.PENDING : PaymentRefundStatus.SUCCEEDED,
+            processorRefund: this.isProcessorRefundProvider(payment.provider),
+            reason: data.reason,
+            resultingRegistrationStatus: data.resultingRegistrationStatus,
+            processedByUserId,
+          },
+        });
+
+        return { refund, payment };
+      }, {
+        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+      });
+
+      pendingRefund = pendingRefundData.refund;
+      paymentForProcessor = pendingRefundData.payment;
+      let providerRefund: ProviderRefund = { id: pendingRefund.id };
+
+      if (paymentForProcessor.provider === PaymentProvider.STRIPE) {
+        if (!paymentForProcessor.providerRefId || paymentForProcessor.providerRefId.startsWith('manual')) {
+          throw new BadRequestException('Payment is not eligible for automated Stripe refund');
+        }
+
+        try {
+          providerRefund = await this.stripeService.createRefund(
+            paymentForProcessor.providerRefId,
+            pendingRefund.amountCents,
+            data.reason,
+            pendingRefund.id,
+          );
+          processorRefundSubmitted = true;
+        } catch (error: unknown) {
+          processorRefundSubmitted = error instanceof StripeRefundError && error.refundRequestAttempted;
+          throw error;
+        }
+
+        const providerRefundStatus = this.getRefundStatusFromProviderStatus(providerRefund.status);
+        await this.prisma.paymentRefund.update({
+          where: { id: pendingRefund.id },
+          data: {
+            status: providerRefundStatus,
+            providerRefundId: providerRefund.id,
+          },
+        });
+        pendingRefund = {
+          ...pendingRefund,
+          status: providerRefundStatus,
+          providerRefundId: providerRefund.id,
+        };
+      }
+
+      const payment = await this.prisma.payment.findUnique({
+        where: { id: data.paymentId },
+        include: {
+          registration: true,
+          refunds: true,
+        },
+      });
+
+      if (!payment) {
+        throw new NotFoundException(`Payment with ID ${data.paymentId} not found`);
+      }
+
+      const refundedCents = this.getSucceededRefundCents(payment.refunds);
+      const nextStatus = this.getPaymentStatusFromRefunds(this.toCents(payment.amount), refundedCents);
+      const previousRefundedCents = pendingRefund.status === PaymentRefundStatus.SUCCEEDED
+        ? Math.max(refundedCents - pendingRefund.amountCents, 0)
+        : refundedCents;
+
+      const transactionUpdates: Prisma.PrismaPromise<unknown>[] = [
+        this.prisma.payment.update({
+          where: { id: payment.id },
+          data: { status: nextStatus },
+        }),
+      ];
+      const appliedRegistrationStatus = pendingRefund.status === PaymentRefundStatus.SUCCEEDED
+        ? data.resultingRegistrationStatus
+        : undefined;
+
+      if (
+        payment.registration &&
+        appliedRegistrationStatus
+      ) {
+        transactionUpdates.push(
+          this.prisma.registration.update({
+            where: { id: payment.registration.id },
+            data: { status: appliedRegistrationStatus },
+          }),
+        );
+      }
+
+      await this.prisma.$transaction(transactionUpdates);
+
+      await this.adminAuditService.createAuditRecord({
+        adminUserId: processedByUserId,
+        actionType: AdminAuditActionType.PAYMENT_REFUND,
+        targetRecordType: AdminAuditTargetType.PAYMENT,
+        targetRecordId: payment.id,
+        oldValues: {
+          status: payment.status,
+          refundedAmount: this.toDollars(previousRefundedCents),
+        },
+        newValues: {
+          status: nextStatus,
+          refundId: pendingRefund.id,
+          refundAmount: this.toDollars(pendingRefund.amountCents),
+          refundAmountCents: pendingRefund.amountCents,
+          providerRefundId: providerRefund.id,
+          processorRefund: pendingRefund.processorRefund,
+          resultingRegistrationStatus: appliedRegistrationStatus,
+        },
+        reason: data.reason,
+        transactionId: refundRequestId,
+        throwOnError: false,
+      });
+
       return {
         paymentId: payment.id,
-        refundAmount,
+        refundAmount: this.toDollars(pendingRefund.amountCents),
         providerRefundId: providerRefund.id,
-        success: true,
+        success: pendingRefund.status === PaymentRefundStatus.SUCCEEDED,
+        refundStatus: pendingRefund.status,
       };
     } catch (error: unknown) {
+      if (pendingRefund?.status === PaymentRefundStatus.PENDING && !processorRefundSubmitted) {
+        await this.prisma.paymentRefund.update({
+          where: { id: pendingRefund.id },
+          data: { status: PaymentRefundStatus.FAILED },
+        });
+      }
+
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(`Failed to process refund: ${errorMessage}`, error instanceof Error ? error.stack : undefined);
       throw error;
@@ -585,7 +969,8 @@ export class PaymentsService {
       
       if (stripeSession.payment_status === 'paid') {
         // Payment was successful - mark payment and registration as complete
-        updatedPaymentStatus = PaymentStatus.COMPLETED;
+        const shouldCompletePayment = this.shouldCompletePaymentFromPaidSession(payment.status);
+        updatedPaymentStatus = shouldCompletePayment ? PaymentStatus.COMPLETED : payment.status;
         
         if (payment.registration) {
           // Capacity beats payment: a WAITLISTED registration must NOT be
@@ -605,9 +990,27 @@ export class PaymentsService {
           // always set the registration to CONFIRMED on paid sessions
           // — a latent issue that became reachable once dashboard
           // "Pay Now" was added.
+          const isCancelled = payment.registration.status === 'CANCELLED';
           const isWaitlisted = payment.registration.status === 'WAITLISTED';
           updatedRegistrationStatus = isWaitlisted ? 'WAITLISTED' : 'CONFIRMED';
           const targetStatus = updatedRegistrationStatus;
+
+          if (isCancelled) {
+            if (shouldCompletePayment) {
+              await this.prisma.payment.update({
+                where: { id: payment.id },
+                data: { status: updatedPaymentStatus },
+              });
+            }
+
+            return {
+              sessionId,
+              paymentStatus: updatedPaymentStatus,
+              registrationStatus: RegistrationStatus.CANCELLED,
+              registrationId: payment.registration.id,
+              paymentId: payment.id,
+            };
+          }
 
           // Update path fires when ANY of (a) payment not yet COMPLETED,
           // (b) registration not at its target status (CONFIRMED unless
@@ -617,7 +1020,7 @@ export class PaymentsService {
           // + paymentDeferred=true, so without this clause a retry after
           // payment would skip the update and leave paymentDeferred true.
           if (
-            payment.status !== PaymentStatus.COMPLETED ||
+            shouldCompletePayment ||
             payment.registration.status !== targetStatus ||
             payment.registration.paymentDeferred
           ) {
@@ -629,7 +1032,7 @@ export class PaymentsService {
                 const transactionResults = await this.prisma.$transaction([
                   this.prisma.payment.update({
                     where: { id: payment.id },
-                    data: { status: PaymentStatus.COMPLETED },
+                    data: { status: updatedPaymentStatus },
                   }),
                   this.prisma.registration.update({
                     where: { id: payment.registration.id },
@@ -660,11 +1063,11 @@ export class PaymentsService {
                 // This ensures we record the successful Stripe payment even if registration update fails
                 this.logger.warn(`Transaction failed, falling back to payment-only update: ${transactionError instanceof Error ? transactionError.message : 'Unknown error'}`);
                 
-                if (payment.status !== PaymentStatus.COMPLETED) {
+                if (shouldCompletePayment) {
                   await this.prisma.payment.update({
                     where: { id: payment.id },
                     data: { 
-                      status: PaymentStatus.COMPLETED
+                      status: updatedPaymentStatus
                     },
                   });
                   this.logger.log(`Updated payment ${payment.id} to COMPLETED (registration update failed: ${transactionError instanceof Error ? transactionError.message : 'Unknown error'})`);
@@ -680,9 +1083,9 @@ export class PaymentsService {
           }
         } else {
           // No registration linked, just update the payment if needed
-          if (payment.status !== PaymentStatus.COMPLETED) {
+          if (shouldCompletePayment) {
             await this.update(payment.id, {
-              status: PaymentStatus.COMPLETED,
+              status: updatedPaymentStatus,
             });
             this.logger.log(`Updated payment ${payment.id} to COMPLETED (no registration)`);
           } else {

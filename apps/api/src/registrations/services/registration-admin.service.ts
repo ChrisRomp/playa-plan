@@ -17,6 +17,7 @@ import {
   AdminAuditTargetType, 
   PaymentStatus,
   PaymentProvider,
+  PaymentRefundStatus,
   Prisma 
 } from '@prisma/client';
 import { 
@@ -147,7 +148,11 @@ export class RegistrationAdminService {
               },
             },
           },
-          payments: true,
+          payments: {
+            include: {
+              refunds: true,
+            },
+          },
         },
         orderBy: {
           createdAt: 'desc',
@@ -271,7 +276,11 @@ export class RegistrationAdminService {
                 },
               },
             },
-            payments: true,
+            payments: {
+              include: {
+                refunds: true,
+              },
+            },
           },
         });
 
@@ -473,7 +482,11 @@ export class RegistrationAdminService {
                 },
               },
             },
-            payments: true,
+            payments: {
+              include: {
+                refunds: true,
+              },
+            },
           },
         });
 
@@ -586,8 +599,11 @@ export class RegistrationAdminService {
             payments: {
               where: {
                 status: {
-                  in: [PaymentStatus.COMPLETED, PaymentStatus.PENDING],
+                  in: [PaymentStatus.COMPLETED, PaymentStatus.PENDING, PaymentStatus.PARTIALLY_REFUNDED],
                 },
+              },
+              include: {
+                refunds: true,
               },
             },
           },
@@ -620,7 +636,11 @@ export class RegistrationAdminService {
                 },
               },
             },
-            payments: true,
+            payments: {
+              include: {
+                refunds: true,
+              },
+            },
           },
         });
 
@@ -658,7 +678,7 @@ export class RegistrationAdminService {
       let actualRefundInfo = result.refundInfo;
       if (cancelData.processRefund && result.refundInfo?.hasPayments) {
         try {
-          actualRefundInfo = await this.processAutoRefunds(result.registration.payments, cancelData.reason);
+          actualRefundInfo = await this.processAutoRefunds(result.registration.payments, cancelData.reason, adminUserId);
           this.logger.log(`Processed automatic refunds for registration ${registrationId}: ${actualRefundInfo.message}`);
         } catch (refundError) {
           const errorMessage = refundError instanceof Error ? refundError.message : 'Unknown refund error';
@@ -731,6 +751,26 @@ export class RegistrationAdminService {
     }
   }
 
+  private isRefundablePaymentStatus(status: PaymentStatus): boolean {
+    return status === PaymentStatus.COMPLETED || status === PaymentStatus.PARTIALLY_REFUNDED;
+  }
+
+  private toCents(amount: number): number {
+    return Math.round(amount * 100);
+  }
+
+  private toDollars(amountCents: number): number {
+    return amountCents / 100;
+  }
+
+  private getRemainingRefundableAmount(payment: { amount: number; refunds?: Array<{ amountCents: number; status: PaymentRefundStatus }> }): number {
+    const refundedCents = payment.refunds
+      ?.filter(refund => refund.status === PaymentRefundStatus.SUCCEEDED || refund.status === PaymentRefundStatus.PENDING)
+      .reduce((sum, refund) => sum + refund.amountCents, 0) ?? 0;
+    const remainingCents = Math.max(0, this.toCents(payment.amount) - refundedCents);
+    return this.toDollars(remainingCents);
+  }
+
   /**
    * Process automatic refunds for payment processor payments
    * @param payments - Array of payments to potentially refund
@@ -738,22 +778,27 @@ export class RegistrationAdminService {
    * @returns Updated refund information
    */
   private async processAutoRefunds(
-    payments: Array<{ id: string; amount: number; status: PaymentStatus; provider: PaymentProvider; providerRefId: string | null }>,
-    reason: string
+    payments: Array<{ id: string; amount: number; status: PaymentStatus; provider: PaymentProvider; providerRefId: string | null; refunds?: Array<{ amountCents: number; status: PaymentRefundStatus }> }>,
+    reason: string,
+    adminUserId: string,
   ): Promise<RefundInfo> {
     const eligiblePayments = payments.filter(
-      p => p.status === PaymentStatus.COMPLETED && 
-          (p.provider === PaymentProvider.STRIPE || p.provider === PaymentProvider.PAYPAL) &&
-          p.providerRefId
+      p => this.isRefundablePaymentStatus(p.status) &&
+        p.provider === PaymentProvider.STRIPE &&
+        p.providerRefId
     );
 
     const manualPayments = payments.filter(
-      p => p.status === PaymentStatus.COMPLETED && 
-          (p.provider === PaymentProvider.MANUAL || !p.providerRefId)
+      p => this.isRefundablePaymentStatus(p.status) &&
+        !(
+          p.provider === PaymentProvider.STRIPE &&
+          p.providerRefId
+        )
     );
 
     let totalRefunded = 0;
     let refundedCount = 0;
+    let pendingRefunds = 0;
     let failedRefunds: string[] = [];
 
     // Process automatic refunds for payment processor payments
@@ -762,12 +807,16 @@ export class RegistrationAdminService {
         const refundResult = await this.paymentsService.processRefund({
           paymentId: payment.id,
           reason: `Registration cancellation: ${reason}`,
-        });
+          resultingRegistrationStatus: RegistrationStatus.CANCELLED,
+        }, adminUserId, { allowRegistrationCancellation: true });
 
         if (refundResult.success) {
           totalRefunded += refundResult.refundAmount;
           refundedCount++;
           this.logger.log(`Successfully refunded payment ${payment.id}: $${refundResult.refundAmount}`);
+        } else if (refundResult.refundStatus === PaymentRefundStatus.PENDING) {
+          pendingRefunds++;
+          this.logger.log(`Refund submitted for payment ${payment.id} and is pending processor confirmation`);
         } else {
           failedRefunds.push(payment.id);
         }
@@ -780,13 +829,16 @@ export class RegistrationAdminService {
 
     // Calculate total amounts
     const totalEligible = eligiblePayments.reduce((sum, p) => sum + p.amount, 0);
-    const totalManual = manualPayments.reduce((sum, p) => sum + p.amount, 0);
+    const totalManual = manualPayments.reduce((sum, p) => sum + this.getRemainingRefundableAmount(p), 0);
     const allPayments = [...eligiblePayments, ...manualPayments];
 
     // Build result message
     let message = '';
     if (refundedCount > 0) {
       message += `Automatically refunded ${refundedCount} payment(s) totaling $${totalRefunded.toFixed(2)}.`;
+    }
+    if (pendingRefunds > 0) {
+      message += ` ${pendingRefunds} refund(s) submitted and pending processor confirmation.`;
     }
     if (failedRefunds.length > 0) {
       message += ` ${failedRefunds.length} automatic refund(s) failed and require manual processing.`;
@@ -949,12 +1001,12 @@ export class RegistrationAdminService {
    * @param payments - Array of payments
    * @returns Refund information
    */
-  private calculateRefundInfo(payments: Array<{ id: string; amount: number; status: PaymentStatus }>): RefundInfo {
+  private calculateRefundInfo(payments: Array<{ id: string; amount: number; status: PaymentStatus; refunds?: Array<{ amountCents: number; status: PaymentRefundStatus }> }>): RefundInfo {
     const eligiblePayments = payments.filter(
-      p => p.status === PaymentStatus.COMPLETED || p.status === PaymentStatus.PENDING
+      p => p.status === PaymentStatus.PENDING || this.isRefundablePaymentStatus(p.status)
     );
 
-    const totalAmount = eligiblePayments.reduce((sum, payment) => sum + payment.amount, 0);
+    const totalAmount = eligiblePayments.reduce((sum, payment) => sum + this.getRemainingRefundableAmount(payment), 0);
     const paymentIds = eligiblePayments.map(p => p.id);
 
     return {

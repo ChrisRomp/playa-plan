@@ -76,14 +76,72 @@ describe('reports.getPayments pagination fix', () => {
 
     const filters = {
       status: 'COMPLETED',
-      provider: 'STRIPE'
+      provider: 'STRIPE',
+      year: 2026,
     };
 
     // Act
     await reports.getPayments(filters);
 
     // Assert
-    expect(mockAxiosInstance.get).toHaveBeenCalledWith('/payments?status=COMPLETED&provider=STRIPE&take=10000');
+    expect(mockAxiosInstance.get).toHaveBeenCalledWith('/payments?status=COMPLETED&provider=STRIPE&year=2026&take=10000');
+  });
+
+  it('should record an externally handled payment with manual source details', async () => {
+    // Arrange
+    const mockPayment = {
+      id: 'payment-1',
+      amount: 100,
+      status: 'COMPLETED',
+      provider: 'MANUAL',
+      externalPaymentMethod: 'Check',
+      externalPaymentReference: 'Check #1234',
+    };
+
+    const payload = {
+      amount: 100,
+      currency: 'USD',
+      userId: 'user-1',
+      registrationId: 'registration-1',
+      externalPaymentMethod: 'Check',
+      reference: 'Check #1234',
+      status: 'COMPLETED' as const,
+    };
+
+    mockAxiosInstance.post.mockResolvedValue({ data: mockPayment });
+
+    // Act
+    const result = await reports.recordExternalPayment(payload);
+
+    // Assert
+    expect(mockAxiosInstance.post).toHaveBeenCalledWith('/payments/manual', payload);
+    expect(result).toEqual(mockPayment);
+  });
+
+  it('should submit an amount-based payment refund request', async () => {
+    // Arrange
+    const mockRefundResult = {
+      paymentId: 'payment-1',
+      refundAmount: 42.5,
+      providerRefundId: 'manual-refund-1',
+      success: true,
+    };
+
+    const payload = {
+      paymentId: 'payment-1',
+      amount: 42.5,
+      reason: 'Camp fee adjustment',
+      resultingRegistrationStatus: 'CANCELLED' as const,
+    };
+
+    mockAxiosInstance.post.mockResolvedValue({ data: mockRefundResult });
+
+    // Act
+    const result = await reports.processRefund(payload);
+
+    // Assert
+    expect(mockAxiosInstance.post).toHaveBeenCalledWith('/payments/refund', payload);
+    expect(result).toEqual(mockRefundResult);
   });
 
   it('should return all payments when response has payments array', async () => {

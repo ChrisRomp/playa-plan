@@ -216,6 +216,16 @@ export function ManageRegistrationsPage() {
     }
   };
 
+  const getPaymentAdminUrl = (registration: Registration) => {
+    const params = new URLSearchParams({
+      registrationId: registration.id,
+      userId: registration.user.id,
+      year: registration.year.toString(),
+    });
+
+    return `${ROUTES.REPORTS_PAYMENTS.path}?${params.toString()}`;
+  };
+
   // Handle successful operations by refreshing data
   useEffect(() => {
     if (managementState.lastSuccessMessage) {
@@ -402,6 +412,7 @@ export function ManageRegistrationsPage() {
           onEditRegistration={handleEditRegistration}
           onCancelRegistration={handleCancelRegistration}
           onViewAuditTrail={handleViewAuditTrail}
+          getPaymentAdminUrl={getPaymentAdminUrl}
           emptyMessage="No registrations found"
         />
 

@@ -12,6 +12,7 @@ import {
   AdminAuditTargetType,
   PaymentStatus,
   PaymentProvider,
+  PaymentRefundStatus,
   UserRole
 } from '@prisma/client';
 import { 
@@ -188,7 +189,11 @@ describe('RegistrationAdminService', () => {
               },
             },
           },
-          payments: true,
+          payments: {
+            include: {
+              refunds: true,
+            },
+          },
         },
       });
 
@@ -437,6 +442,7 @@ describe('RegistrationAdminService', () => {
         refundAmount: 150.00,
         providerRefundId: 'refund-123',
         success: true,
+        refundStatus: PaymentRefundStatus.SUCCEEDED,
       };
 
       prismaService.$transaction.mockImplementation(async (callback) => {
@@ -457,9 +463,61 @@ describe('RegistrationAdminService', () => {
       expect(paymentsService.processRefund).toHaveBeenCalledWith({
         paymentId: 'payment-123',
         reason: 'Registration cancellation: User request',
-      });
+        resultingRegistrationStatus: RegistrationStatus.CANCELLED,
+      }, 'admin-123', { allowRegistrationCancellation: true });
 
       expect(result.refundInfo).toContain('Automatically refunded');
+    });
+
+    it('should process remaining refunds for partially refunded registrations during cancellation', async () => {
+      const partiallyRefundedPayment = {
+        ...mockPayment,
+        status: PaymentStatus.PARTIALLY_REFUNDED,
+      };
+      const registrationWithPayments = {
+        ...mockRegistration,
+        payments: [partiallyRefundedPayment],
+      };
+
+      const cancelData: AdminCancelRegistrationDto = {
+        reason: 'User request',
+        sendNotification: false,
+        processRefund: true,
+      };
+
+      const mockCleanupResult = {
+        workShiftsRemoved: 0,
+        campingOptionsReleased: 0,
+        auditRecords: [],
+      };
+
+      prismaService.$transaction.mockImplementation(async (callback) => {
+        return await callback(prismaService);
+      });
+
+      (prismaService.registration.findUnique as jest.Mock).mockResolvedValue(registrationWithPayments);
+      (prismaService.registration.update as jest.Mock).mockResolvedValue({
+        ...registrationWithPayments,
+        status: RegistrationStatus.CANCELLED,
+      });
+      adminAuditService.createAuditRecord.mockResolvedValue(mockAuditRecord);
+      cleanupService.cleanupRegistration.mockResolvedValue(mockCleanupResult);
+      paymentsService.processRefund.mockResolvedValue({
+        paymentId: 'payment-123',
+        refundAmount: 75.00,
+        providerRefundId: 'refund-123',
+        success: true,
+        refundStatus: PaymentRefundStatus.SUCCEEDED,
+      });
+
+      const result = await service.cancelRegistration('reg-123', cancelData, 'admin-123');
+
+      expect(paymentsService.processRefund).toHaveBeenCalledWith({
+        paymentId: 'payment-123',
+        reason: 'Registration cancellation: User request',
+        resultingRegistrationStatus: RegistrationStatus.CANCELLED,
+      }, 'admin-123', { allowRegistrationCancellation: true });
+      expect(result.refundInfo).toContain('Automatically refunded 1 payment(s) totaling $75.00');
     });
 
     // Task 5.2.8: Test error handling for invalid registration IDs and unauthorized access
@@ -549,8 +607,8 @@ describe('RegistrationAdminService', () => {
   });
 
   describe('processAutoRefunds', () => {
-    // Task 5.2.9: Test processAutoRefunds() correctly processes Stripe and PayPal payments automatically
-    it('should correctly process Stripe and PayPal payments automatically', async () => {
+    // Task 5.2.9: Test processAutoRefunds() correctly processes Stripe payments automatically and leaves PayPal manual
+    it('should process Stripe payments automatically and leave PayPal payments for manual processing', async () => {
       const payments = [
         {
           id: 'stripe-payment',
@@ -569,24 +627,21 @@ describe('RegistrationAdminService', () => {
       ];
 
       paymentsService.processRefund
-        .mockResolvedValueOnce({ paymentId: 'stripe-payment', refundAmount: 100.00, providerRefundId: 'refund-1', success: true })
-        .mockResolvedValueOnce({ paymentId: 'paypal-payment', refundAmount: 50.00, providerRefundId: 'refund-2', success: true });
+        .mockResolvedValueOnce({ paymentId: 'stripe-payment', refundAmount: 100.00, providerRefundId: 'refund-1', success: true, refundStatus: PaymentRefundStatus.SUCCEEDED });
 
-      const result = await (service as unknown as { processAutoRefunds: (payments: unknown[], reason: string) => Promise<RefundInfo> }).processAutoRefunds(payments, 'Test refund');
+      const result = await (service as unknown as { processAutoRefunds: (payments: unknown[], reason: string, adminUserId: string) => Promise<RefundInfo> }).processAutoRefunds(payments, 'Test refund', 'admin-123');
 
-      expect(paymentsService.processRefund).toHaveBeenCalledTimes(2);
+      expect(paymentsService.processRefund).toHaveBeenCalledTimes(1);
       expect(paymentsService.processRefund).toHaveBeenCalledWith({
         paymentId: 'stripe-payment',
         reason: 'Registration cancellation: Test refund',
-      });
-      expect(paymentsService.processRefund).toHaveBeenCalledWith({
-        paymentId: 'paypal-payment',
-        reason: 'Registration cancellation: Test refund',
-      });
+        resultingRegistrationStatus: RegistrationStatus.CANCELLED,
+      }, 'admin-123', { allowRegistrationCancellation: true });
 
       expect(result.processed).toBe(true);
-      expect(result.refundAmount).toBe(150.00);
-      expect(result.message).toContain('Automatically refunded 2 payment(s) totaling $150.00');
+      expect(result.refundAmount).toBe(100.00);
+      expect(result.message).toContain('Automatically refunded 1 payment(s) totaling $100.00');
+      expect(result.message).toContain('1 manual payment(s) totaling $5000.00 require manual refund processing');
     });
 
     // Task 5.2.10: Test processAutoRefunds() skips MANUAL payments and includes them in manual processing message
@@ -613,18 +668,47 @@ describe('RegistrationAdminService', () => {
         refundAmount: 50.00,
         providerRefundId: 'refund-1',
         success: true,
+        refundStatus: PaymentRefundStatus.SUCCEEDED,
       });
 
-      const result = await (service as unknown as { processAutoRefunds: (payments: unknown[], reason: string) => Promise<RefundInfo> }).processAutoRefunds(payments, 'Test refund');
+      const result = await (service as unknown as { processAutoRefunds: (payments: unknown[], reason: string, adminUserId: string) => Promise<RefundInfo> }).processAutoRefunds(payments, 'Test refund', 'admin-123');
 
       expect(paymentsService.processRefund).toHaveBeenCalledTimes(1);
       expect(paymentsService.processRefund).toHaveBeenCalledWith({
         paymentId: 'stripe-payment',
         reason: 'Registration cancellation: Test refund',
-      });
+        resultingRegistrationStatus: RegistrationStatus.CANCELLED,
+      }, 'admin-123', { allowRegistrationCancellation: true });
 
       expect(result.message).toContain('Automatically refunded 1 payment(s) totaling $50.00');
       expect(result.message).toContain('1 manual payment(s) totaling $10000.00 require manual refund processing');
+    });
+
+    it('should report remaining refundable amount for partially refunded MANUAL payments', async () => {
+      const payments = [
+        {
+          id: 'manual-payment',
+          amount: 100,
+          status: PaymentStatus.PARTIALLY_REFUNDED,
+          provider: PaymentProvider.MANUAL,
+          providerRefId: null,
+          refunds: [
+            {
+              amountCents: 2500,
+              status: PaymentRefundStatus.SUCCEEDED,
+            },
+            {
+              amountCents: 2500,
+              status: PaymentRefundStatus.PENDING,
+            },
+          ],
+        },
+      ];
+
+      const result = await (service as unknown as { processAutoRefunds: (payments: unknown[], reason: string, adminUserId: string) => Promise<RefundInfo> }).processAutoRefunds(payments, 'Test refund', 'admin-123');
+
+      expect(paymentsService.processRefund).not.toHaveBeenCalled();
+      expect(result.message).toContain('1 manual payment(s) totaling $50.00 require manual refund processing');
     });
 
     // Task 5.2.11: Test processAutoRefunds() handles partial refund failures gracefully
@@ -647,14 +731,40 @@ describe('RegistrationAdminService', () => {
       ];
 
       paymentsService.processRefund
-        .mockResolvedValueOnce({ paymentId: 'success-payment', refundAmount: 100.00, providerRefundId: 'refund-1', success: true })
+        .mockResolvedValueOnce({ paymentId: 'success-payment', refundAmount: 100.00, providerRefundId: 'refund-1', success: true, refundStatus: PaymentRefundStatus.SUCCEEDED })
         .mockRejectedValueOnce(new Error('Refund failed'));
 
-      const result = await (service as unknown as { processAutoRefunds: (payments: unknown[], reason: string) => Promise<RefundInfo> }).processAutoRefunds(payments, 'Test refund');
+      const result = await (service as unknown as { processAutoRefunds: (payments: unknown[], reason: string, adminUserId: string) => Promise<RefundInfo> }).processAutoRefunds(payments, 'Test refund', 'admin-123');
 
       expect(result.refundAmount).toBe(100.00);
       expect(result.message).toContain('Automatically refunded 1 payment(s) totaling $100.00');
       expect(result.message).toContain('1 automatic refund(s) failed and require manual processing');
+    });
+
+    it('should report pending processor refunds without counting them as completed refunds', async () => {
+      const payments = [
+        {
+          id: 'pending-payment',
+          amount: 10000,
+          status: PaymentStatus.COMPLETED,
+          provider: PaymentProvider.STRIPE,
+          providerRefId: 'pi_pending123',
+        },
+      ];
+
+      paymentsService.processRefund.mockResolvedValue({
+        paymentId: 'pending-payment',
+        refundAmount: 100.00,
+        providerRefundId: 'refund-1',
+        success: false,
+        refundStatus: PaymentRefundStatus.PENDING,
+      });
+
+      const result = await (service as unknown as { processAutoRefunds: (payments: unknown[], reason: string, adminUserId: string) => Promise<RefundInfo> }).processAutoRefunds(payments, 'Test refund', 'admin-123');
+
+      expect(result.refundAmount).toBe(0);
+      expect(result.message).toContain('1 refund(s) submitted and pending processor confirmation');
+      expect(result.message).not.toContain('Automatically refunded');
     });
 
     // Task 5.2.12: Test processAutoRefunds() formats refund amounts correctly (no division by 100)
@@ -674,9 +784,10 @@ describe('RegistrationAdminService', () => {
         refundAmount: 150.00,
         providerRefundId: 'refund-1',
         success: true,
+        refundStatus: PaymentRefundStatus.SUCCEEDED,
       });
 
-      const result = await (service as unknown as { processAutoRefunds: (payments: unknown[], reason: string) => Promise<RefundInfo> }).processAutoRefunds(payments, 'Test refund');
+      const result = await (service as unknown as { processAutoRefunds: (payments: unknown[], reason: string, adminUserId: string) => Promise<RefundInfo> }).processAutoRefunds(payments, 'Test refund', 'admin-123');
 
       expect(result.refundAmount).toBe(150.00);
       expect(result.message).toContain('$150.00');

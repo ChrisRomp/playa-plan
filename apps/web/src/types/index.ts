@@ -171,8 +171,23 @@ export interface Shift {
   dayOfWeek: string;
 }
 
-export type PaymentStatus = 'PENDING' | 'COMPLETED' | 'FAILED' | 'REFUNDED';
-export type PaymentProvider = 'STRIPE' | 'PAYPAL';
+export type PaymentStatus = 'PENDING' | 'COMPLETED' | 'PARTIALLY_REFUNDED' | 'FAILED' | 'REFUNDED';
+export type PaymentProvider = 'STRIPE' | 'PAYPAL' | 'MANUAL';
+
+export interface PaymentRefund {
+  id: string;
+  paymentId: string;
+  amountCents: number;
+  currency: string;
+  status: 'PENDING' | 'SUCCEEDED' | 'FAILED';
+  processorRefund: boolean;
+  providerRefundId?: string | null;
+  reason?: string | null;
+  resultingRegistrationStatus?: RegistrationStatus | null;
+  processedByUserId: string;
+  createdAt: string;
+  updatedAt: string;
+}
 
 export interface Payment {
   id: string;
@@ -180,17 +195,55 @@ export interface Payment {
   currency: string;
   status: PaymentStatus;
   provider: PaymentProvider;
-  providerRefId?: string;
+  providerRefId?: string | null;
+  externalPaymentMethod?: string | null;
+  externalPaymentReference?: string | null;
+  recordedByUserId?: string | null;
   createdAt: string;
   updatedAt: string;
   userId: string;
-  registrationId?: string;
+  registrationId?: string | null;
   user?: {
     id: string;
     firstName: string;
     lastName: string;
     email: string;
   };
+  registration?: {
+    id: string;
+    year?: number;
+    status?: RegistrationStatus;
+  } | null;
+  refunds?: PaymentRefund[];
+  refundedAmount?: number;
+  netAmount?: number;
+  refundableAmount?: number;
+  processorRefundAvailable?: boolean;
+}
+
+export interface RecordExternalPaymentRequest {
+  amount: number;
+  currency?: string;
+  userId: string;
+  registrationId?: string;
+  externalPaymentMethod?: string;
+  reference?: string;
+  status?: PaymentStatus;
+}
+
+export interface CreateRefundRequest {
+  paymentId: string;
+  amount?: number;
+  reason?: string;
+  resultingRegistrationStatus?: RegistrationStatus;
+}
+
+export interface RefundResult {
+  paymentId: string;
+  refundAmount: number;
+  providerRefundId: string;
+  success: boolean;
+  refundStatus?: 'PENDING' | 'SUCCEEDED' | 'FAILED';
 }
 
 // Stripe Payment Types

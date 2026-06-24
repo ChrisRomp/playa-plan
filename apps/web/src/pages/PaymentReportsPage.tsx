@@ -1,9 +1,9 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef, type FormEvent } from 'react';
 import { ArrowLeft, Download, Filter, X } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { DataTable, DataTableColumn } from '../components/common/DataTable/DataTable';
 import { reports } from '../lib/api';
-import { Payment } from '../types';
+import { Payment, RegistrationStatus } from '../types';
 import { PATHS } from '../routes';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import { downloadCsv } from '../utils/csv';
@@ -12,28 +12,102 @@ interface PaymentReportFilters {
   year?: number;
   status?: string;
   provider?: string;
+  registrationId?: string;
 }
+
+interface ExternalPaymentFormState {
+  amount: string;
+  userId: string;
+  registrationId: string;
+  externalPaymentMethod: string;
+  reference: string;
+}
+
+interface RefundFormState {
+  payment: Payment;
+  amount: string;
+  reason: string;
+  resultingRegistrationStatus: '' | RegistrationStatus;
+}
+
+const emptyExternalPaymentForm: ExternalPaymentFormState = {
+  amount: '',
+  userId: '',
+  registrationId: '',
+  externalPaymentMethod: '',
+  reference: '',
+};
+
+const formatCurrency = (amount: number | undefined): string => `$${(amount ?? 0).toFixed(2)}`;
+
+const getRefundableAmount = (payment: Payment): number => {
+  if (typeof payment.refundableAmount === 'number') {
+    return payment.refundableAmount;
+  }
+
+  if (payment.status === 'REFUNDED' || payment.status === 'FAILED' || payment.status === 'PENDING') {
+    return 0;
+  }
+
+  const refundedAmount = typeof payment.refundedAmount === 'number'
+    ? payment.refundedAmount
+    : (payment.refunds ?? [])
+      .filter((refund) => refund.status === 'SUCCEEDED')
+      .reduce((sum, refund) => sum + refund.amountCents / 100, 0);
+
+  return Math.max(payment.amount - refundedAmount, 0);
+};
+
+const getPaymentReportYear = (payment: Payment): number => (
+  payment.registration?.year ?? new Date(payment.createdAt).getFullYear()
+);
+
+const canSubmitRefund = (payment: Payment): boolean => (
+  getRefundableAmount(payment) > 0 && payment.provider !== 'PAYPAL'
+);
 
 /**
  * Payment Reports page - Admin only
  * Displays all payments in a filterable, sortable table for admin users
  */
 export function PaymentReportsPage() {
+  const [searchParams] = useSearchParams();
+  const initialYear = searchParams.get('year');
+  const parsedInitialYear = initialYear ? parseInt(initialYear, 10) : undefined;
+  const initialRegistrationId = searchParams.get('registrationId') || '';
+  const initialUserId = searchParams.get('userId') || '';
+  const initialFilters: PaymentReportFilters = {
+    registrationId: initialRegistrationId || undefined,
+    year: parsedInitialYear && !Number.isNaN(parsedInitialYear) ? parsedInitialYear : undefined,
+  };
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [filters, setFilters] = useState<PaymentReportFilters>({});
+  const [filters, setFilters] = useState<PaymentReportFilters>(initialFilters);
   const [showFilters, setShowFilters] = useState(false);
+  const [showExternalPaymentForm, setShowExternalPaymentForm] = useState(false);
+  const [externalPaymentForm, setExternalPaymentForm] = useState<ExternalPaymentFormState>({
+    ...emptyExternalPaymentForm,
+    userId: initialUserId,
+    registrationId: initialRegistrationId,
+  });
+  const [refundForm, setRefundForm] = useState<RefundFormState | null>(null);
+  const [mutationError, setMutationError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const hasLoadedPaymentsRef = useRef(false);
 
   // Fetch payments data
   const fetchPayments = useCallback(async () => {
-    setLoading(true);
+    if (!hasLoadedPaymentsRef.current) {
+      setLoading(true);
+    }
     setError(null);
     try {
-      const data = await reports.getPayments();
+      const data = await reports.getPayments(filters);
       // Ensure data is an array before setting it
       if (Array.isArray(data)) {
         setPayments(data);
+        hasLoadedPaymentsRef.current = true;
       } else {
         console.error('Payments data is not an array:', data);
         setPayments([]);
@@ -46,7 +120,7 @@ export function PaymentReportsPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [filters]);
 
   useEffect(() => {
     fetchPayments();
@@ -54,14 +128,14 @@ export function PaymentReportsPage() {
 
   // Get unique years for filter dropdown
   const availableYears = useMemo(() => {
-    // Extract years from payment dates
+    // Extract years from payment registration context, falling back to payment date
     if (!Array.isArray(payments) || payments.length === 0) {
       return []; // Return empty array if no payments data
     }
     
     // Extract unique years from payment data
     const years = [...new Set(
-      payments.map(payment => new Date(payment.createdAt).getFullYear())
+      payments.map(getPaymentReportYear)
     )];
     
     return years.sort((a, b) => b - a); // Sort descending
@@ -74,7 +148,7 @@ export function PaymentReportsPage() {
     return payments.filter(payment => {
       // Year filter
       if (filters.year) {
-        const paymentYear = new Date(payment.createdAt).getFullYear();
+        const paymentYear = getPaymentReportYear(payment);
         if (paymentYear !== filters.year) return false;
       }
       
@@ -102,6 +176,7 @@ export function PaymentReportsPage() {
         pending: 0,
         failed: 0,
         refunded: 0,
+        partiallyRefunded: 0,
         totalAmount: 0
       };
     }
@@ -111,12 +186,83 @@ export function PaymentReportsPage() {
     const pending = filteredPayments.filter(payment => payment.status === 'PENDING').length;
     const failed = filteredPayments.filter(payment => payment.status === 'FAILED').length;
     const refunded = filteredPayments.filter(payment => payment.status === 'REFUNDED').length;
+    const partiallyRefunded = filteredPayments.filter(payment => payment.status === 'PARTIALLY_REFUNDED').length;
     const totalAmount = filteredPayments
-      .filter(payment => payment.status === 'COMPLETED')
-      .reduce((sum, payment) => sum + payment.amount, 0);
+      .filter(payment => payment.status === 'COMPLETED' || payment.status === 'PARTIALLY_REFUNDED')
+      .reduce((sum, payment) => sum + (payment.netAmount ?? payment.amount), 0);
     
-    return { total, completed, pending, failed, refunded, totalAmount };
+    return { total, completed, pending, failed, refunded, partiallyRefunded, totalAmount };
   }, [filteredPayments]);
+
+  const handleRecordExternalPayment = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setSubmitting(true);
+    setMutationError(null);
+
+    try {
+      await reports.recordExternalPayment({
+        amount: parseFloat(externalPaymentForm.amount),
+        currency: 'USD',
+        userId: externalPaymentForm.userId,
+        registrationId: externalPaymentForm.registrationId || undefined,
+        externalPaymentMethod: externalPaymentForm.externalPaymentMethod || undefined,
+        reference: externalPaymentForm.reference || undefined,
+        status: 'COMPLETED',
+      });
+      setExternalPaymentForm(emptyExternalPaymentForm);
+      setShowExternalPaymentForm(false);
+      await fetchPayments();
+    } catch (err) {
+      setMutationError('Failed to record external payment');
+      console.error('Error recording external payment:', err);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const openRefundForm = (payment: Payment) => {
+    if (!canSubmitRefund(payment)) {
+      return;
+    }
+
+    setMutationError(null);
+    setRefundForm({
+      payment,
+      amount: getRefundableAmount(payment).toFixed(2),
+      reason: '',
+      resultingRegistrationStatus: '',
+    });
+  };
+
+  const handleProcessRefund = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!refundForm) {
+      return;
+    }
+
+    setSubmitting(true);
+    setMutationError(null);
+
+    try {
+      const refundResult = await reports.processRefund({
+        paymentId: refundForm.payment.id,
+        amount: parseFloat(refundForm.amount),
+        reason: refundForm.reason || undefined,
+        resultingRegistrationStatus: refundForm.resultingRegistrationStatus || undefined,
+      });
+      if (!refundResult.success && refundResult.refundStatus !== 'PENDING') {
+        throw new Error(`Refund failed with status ${refundResult.refundStatus}`);
+      }
+      setRefundForm(null);
+      await fetchPayments();
+    } catch (err) {
+      setMutationError('Failed to process refund');
+      console.error('Error processing refund:', err);
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   // Define table columns
   const columns: DataTableColumn<Payment>[] = [
@@ -139,10 +285,17 @@ export function PaymentReportsPage() {
     },
     {
       id: 'amount',
-      header: 'Amount',
-      accessor: (row) => `$${row.amount.toFixed(2)}`,
+      header: 'Amounts',
+      accessor: (row) => row.netAmount ?? row.amount,
+      Cell: ({ row }) => (
+        <div>
+          <div className="font-medium text-gray-900">{formatCurrency(row.amount)} {row.currency}</div>
+          <div className="text-xs text-gray-500">Refunded {formatCurrency(row.refundedAmount)}</div>
+          <div className="text-xs text-gray-500">Net {formatCurrency(row.netAmount ?? row.amount)}</div>
+        </div>
+      ),
       sortable: true,
-      width: '12%',
+      width: '14%',
     },
     {
       id: 'status',
@@ -153,6 +306,8 @@ export function PaymentReportsPage() {
           className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
             row.status === 'COMPLETED'
               ? 'bg-green-100 text-green-800'
+              : row.status === 'PARTIALLY_REFUNDED'
+              ? 'bg-amber-100 text-amber-800'
               : row.status === 'PENDING'
               ? 'bg-yellow-100 text-yellow-800'
               : row.status === 'FAILED'
@@ -160,7 +315,7 @@ export function PaymentReportsPage() {
               : 'bg-gray-100 text-gray-800'
           }`}
         >
-          {row.status}
+          {row.status.replace(/_/g, ' ')}
         </span>
       ),
       sortable: true,
@@ -168,18 +323,59 @@ export function PaymentReportsPage() {
     },
     {
       id: 'provider',
-      header: 'Provider',
-      accessor: (row) => row.provider,
+      header: 'Source',
+      accessor: (row) => row.provider === 'MANUAL' ? 'External' : row.provider,
+      Cell: ({ row }) => (
+        <span>
+          {row.provider === 'STRIPE' ? 'Stripe' : row.provider === 'PAYPAL' ? 'PayPal' : 'External'}
+        </span>
+      ),
       sortable: true,
-      width: '12%',
+      width: '10%',
     },
     {
-      id: 'providerRefId',
-      header: 'Reference ID',
-      accessor: (row) => row.providerRefId || 'N/A',
+      id: 'externalDetails',
+      header: 'External Details',
+      accessor: (row) => [row.externalPaymentMethod, row.externalPaymentReference].filter(Boolean).join(' ') || row.providerRefId || 'N/A',
+      Cell: ({ row }) => (
+        <div>
+          <div>{row.externalPaymentMethod || row.providerRefId || 'N/A'}</div>
+          {row.externalPaymentReference && (
+            <div className="text-xs text-gray-500">{row.externalPaymentReference}</div>
+          )}
+        </div>
+      ),
       sortable: true,
       hideOnMobile: true,
-      width: '26%',
+      width: '18%',
+    },
+    {
+      id: 'refundableAmount',
+      header: 'Refundable',
+      accessor: (row) => getRefundableAmount(row),
+      Cell: ({ row }) => formatCurrency(getRefundableAmount(row)),
+      sortable: true,
+      width: '10%',
+    },
+    {
+      id: 'actions',
+      header: 'Actions',
+      accessor: () => '',
+      Cell: ({ row }) => {
+        const refundDisabled = !canSubmitRefund(row) || submitting;
+        return (
+          <button
+            type="button"
+            onClick={() => openRefundForm(row)}
+            disabled={refundDisabled}
+            title={row.provider === 'PAYPAL' ? 'PayPal refunds must be handled outside PlayaPlan' : undefined}
+            className="rounded-md border border-amber-700 px-3 py-1 text-sm font-medium text-amber-800 hover:bg-amber-50 disabled:cursor-not-allowed disabled:border-gray-200 disabled:text-gray-400"
+          >
+            Refund
+          </button>
+        );
+      },
+      width: '10%',
     },
   ];
 
@@ -200,9 +396,13 @@ export function PaymentReportsPage() {
       'Name',
       'Date/Time',
       'Amount',
+      'Refunded',
+      'Net Amount',
+      'Refundable',
       'Status',
-      'Provider',
-      'Reference ID',
+      'Source',
+      'External Method',
+      'External Reference',
       'Registration ID'
     ];
 
@@ -213,10 +413,14 @@ export function PaymentReportsPage() {
       return [
         payment.user ? `${payment.user.firstName} ${payment.user.lastName}` : 'Unknown',
         dateTime,
-        `$${payment.amount.toFixed(2)}`,
+        formatCurrency(payment.amount),
+        formatCurrency(payment.refundedAmount),
+        formatCurrency(payment.netAmount ?? payment.amount),
+        formatCurrency(getRefundableAmount(payment)),
         payment.status,
-        payment.provider,
-        payment.providerRefId || 'N/A',
+        payment.provider === 'MANUAL' ? 'External' : payment.provider,
+        payment.externalPaymentMethod || 'N/A',
+        payment.externalPaymentReference || payment.providerRefId || 'N/A',
         payment.registrationId || 'N/A'
       ];
     });
@@ -259,6 +463,16 @@ export function PaymentReportsPage() {
             </span>
           </div>
           <div className="flex space-x-2">
+            <button
+              type="button"
+              onClick={() => {
+                setMutationError(null);
+                setShowExternalPaymentForm((isShowing) => !isShowing);
+              }}
+              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-amber-700 hover:bg-amber-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500"
+            >
+              Record External Payment
+            </button>
             <button
               onClick={() => setShowFilters(!showFilters)}
               className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
@@ -332,11 +546,14 @@ export function PaymentReportsPage() {
             <div className="p-5">
               <div className="flex items-center">
                 <div className="flex-shrink-0">
-                  <div className="text-lg font-medium text-gray-900">{summaryStats.refunded}</div>
+                  <div className="text-lg font-medium text-gray-900">
+                    {summaryStats.refunded}
+                    <span className="ml-1 text-sm text-gray-500">/ {summaryStats.partiallyRefunded}</span>
+                  </div>
                 </div>
               </div>
               <div className="mt-1">
-                <div className="text-sm text-gray-500">Refunded</div>
+                <div className="text-sm text-gray-500">Refunded / Partial</div>
               </div>
             </div>
           </div>
@@ -350,7 +567,7 @@ export function PaymentReportsPage() {
                 </div>
               </div>
               <div className="mt-1">
-                <div className="text-sm text-gray-500">Total Revenue</div>
+                <div className="text-sm text-gray-500">Net Revenue</div>
               </div>
             </div>
           </div>
@@ -400,6 +617,7 @@ export function PaymentReportsPage() {
                   <option value="COMPLETED">Completed</option>
                   <option value="PENDING">Pending</option>
                   <option value="FAILED">Failed</option>
+                  <option value="PARTIALLY_REFUNDED">Partially Refunded</option>
                   <option value="REFUNDED">Refunded</option>
                 </select>
               </div>
@@ -413,13 +631,216 @@ export function PaymentReportsPage() {
                   onChange={(e) => handleFilterChange('provider', e.target.value)}
                   className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                 >
-                  <option value="">All Providers</option>
+                  <option value="">All Sources</option>
                   <option value="STRIPE">Stripe</option>
                   <option value="PAYPAL">PayPal</option>
+                  <option value="MANUAL">External</option>
                 </select>
               </div>
             </div>
           </div>
+        )}
+
+        {mutationError && (
+          <div className="bg-red-50 border border-red-200 rounded-md p-4 mb-6">
+            <div className="text-sm text-red-700">{mutationError}</div>
+          </div>
+        )}
+
+        {showExternalPaymentForm && (
+          <form
+            onSubmit={handleRecordExternalPayment}
+            className="mb-6 rounded-lg border border-amber-200 bg-amber-50 p-4"
+          >
+            <h2 className="mb-4 text-lg font-medium text-gray-900">Record external payment</h2>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              <div>
+                <label htmlFor="external-payment-amount" className="block text-sm font-medium text-gray-700">
+                  Amount
+                </label>
+                <input
+                  id="external-payment-amount"
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  required
+                  value={externalPaymentForm.amount}
+                  onChange={(event) => setExternalPaymentForm((prev) => ({ ...prev, amount: event.target.value }))}
+                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+                />
+              </div>
+              <div>
+                <label htmlFor="external-payment-user-id" className="block text-sm font-medium text-gray-700">
+                  User ID
+                </label>
+                <input
+                  id="external-payment-user-id"
+                  type="text"
+                  required
+                  value={externalPaymentForm.userId}
+                  onChange={(event) => setExternalPaymentForm((prev) => ({ ...prev, userId: event.target.value }))}
+                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+                />
+              </div>
+              <div>
+                <label htmlFor="external-payment-registration-id" className="block text-sm font-medium text-gray-700">
+                  Registration ID
+                </label>
+                <input
+                  id="external-payment-registration-id"
+                  type="text"
+                  required
+                  value={externalPaymentForm.registrationId}
+                  onChange={(event) => setExternalPaymentForm((prev) => ({ ...prev, registrationId: event.target.value }))}
+                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+                />
+              </div>
+              <div>
+                <label htmlFor="external-payment-method" className="block text-sm font-medium text-gray-700">
+                  External method
+                </label>
+                <input
+                  id="external-payment-method"
+                  type="text"
+                  placeholder="Stripe terminal, PayPal invoice, check, cash"
+                  value={externalPaymentForm.externalPaymentMethod}
+                  onChange={(event) => setExternalPaymentForm((prev) => ({ ...prev, externalPaymentMethod: event.target.value }))}
+                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label htmlFor="external-payment-reference" className="block text-sm font-medium text-gray-700">
+                  Reference
+                </label>
+                <input
+                  id="external-payment-reference"
+                  type="text"
+                  placeholder="Check #1234, PayPal invoice ID, terminal receipt"
+                  value={externalPaymentForm.reference}
+                  onChange={(event) => setExternalPaymentForm((prev) => ({ ...prev, reference: event.target.value }))}
+                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+                />
+              </div>
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setShowExternalPaymentForm(false)}
+                disabled={submitting}
+                className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={submitting}
+                className="rounded-md border border-transparent bg-amber-700 px-4 py-2 text-sm font-medium text-white hover:bg-amber-800 disabled:opacity-50"
+              >
+                {submitting ? 'Recording...' : 'Record payment'}
+              </button>
+            </div>
+          </form>
+        )}
+
+        {refundForm && (
+          <form
+            onSubmit={handleProcessRefund}
+            className="mb-6 rounded-lg border border-gray-200 bg-white p-4 shadow"
+          >
+            <div className="mb-4 flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-medium text-gray-900">Refund payment</h2>
+                <p className="text-sm text-gray-600">
+                  {refundForm.payment.provider === 'STRIPE' && refundForm.payment.processorRefundAvailable
+                    ? 'This refund will be processed through Stripe.'
+                    : 'This refund will be recorded as a manual/offline refund.'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setRefundForm(null)}
+                disabled={submitting}
+                className="text-gray-500 hover:text-gray-700 disabled:opacity-50"
+                aria-label="Close refund form"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="mb-4 rounded-md bg-gray-50 p-3 text-sm text-gray-700">
+              <div>Gross: {formatCurrency(refundForm.payment.amount)}</div>
+              <div>Already refunded: {formatCurrency(refundForm.payment.refundedAmount)}</div>
+              <div>Remaining refundable: {formatCurrency(getRefundableAmount(refundForm.payment))}</div>
+            </div>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              <div>
+                <label htmlFor="refund-amount" className="block text-sm font-medium text-gray-700">
+                  Refund amount
+                </label>
+                <input
+                  id="refund-amount"
+                  type="number"
+                  min="0.01"
+                  max={getRefundableAmount(refundForm.payment)}
+                  step="0.01"
+                  required
+                  value={refundForm.amount}
+                  onChange={(event) => setRefundForm((prev) => prev ? { ...prev, amount: event.target.value } : prev)}
+                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+                />
+              </div>
+              <div>
+                <label htmlFor="refund-registration-status" className="block text-sm font-medium text-gray-700">
+                  Registration status change
+                </label>
+                <select
+                  id="refund-registration-status"
+                  value={refundForm.resultingRegistrationStatus}
+                  onChange={(event) => setRefundForm((prev) => prev ? {
+                    ...prev,
+                    resultingRegistrationStatus: event.target.value as '' | RegistrationStatus,
+                  } : prev)}
+                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+                >
+                  <option value="">No status change</option>
+                  <option value="PENDING">Pending</option>
+                  <option value="CONFIRMED">Confirmed</option>
+                  <option value="WAITLISTED">Waitlisted</option>
+                  <option value="APPLICATION_SUBMITTED">Application submitted</option>
+                  <option value="APPLICATION_APPROVED">Application approved</option>
+                  <option value="APPLICATION_DECLINED">Application declined</option>
+                </select>
+              </div>
+              <div>
+                <label htmlFor="refund-reason" className="block text-sm font-medium text-gray-700">
+                  Reason
+                </label>
+                <input
+                  id="refund-reason"
+                  type="text"
+                  value={refundForm.reason}
+                  onChange={(event) => setRefundForm((prev) => prev ? { ...prev, reason: event.target.value } : prev)}
+                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+                />
+              </div>
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setRefundForm((prev) => prev ? { ...prev, amount: getRefundableAmount(prev.payment).toFixed(2) } : prev)}
+                disabled={submitting}
+                className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                Full remaining amount
+              </button>
+              <button
+                type="submit"
+                disabled={submitting}
+                className="rounded-md border border-transparent bg-amber-700 px-4 py-2 text-sm font-medium text-white hover:bg-amber-800 disabled:opacity-50"
+              >
+                {submitting ? 'Submitting...' : 'Submit refund'}
+              </button>
+            </div>
+          </form>
         )}
 
         {/* Error State */}

@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
-import { Edit, Trash2, Eye } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { CreditCard, Edit, Trash2, Eye } from 'lucide-react';
 import { DataTable, DataTableColumn } from '../../common/DataTable/DataTable';
 import { formatRegistrationStatus } from '../../../utils/registrationUtils';
 
@@ -42,6 +43,11 @@ interface Registration {
     id: string;
     amount: number;
     status: string;
+    netAmount?: number;
+    refunds?: Array<{
+      amountCents: number;
+      status: string;
+    }>;
   }>;
 }
 
@@ -54,6 +60,8 @@ interface RegistrationSearchTableProps {
   onCancelRegistration: (registrationId: string) => void;
   /** Handler for viewing audit trail */
   onViewAuditTrail: (registrationId: string) => void;
+  /** Optional URL builder for managing payments for a registration */
+  getPaymentAdminUrl?: (registration: Registration) => string;
   /** Optional handler for row clicks */
   onRowClick?: (registration: Registration) => void;
   /** Whether to show the actions column */
@@ -71,6 +79,7 @@ export function RegistrationSearchTable({
   onEditRegistration,
   onCancelRegistration,
   onViewAuditTrail,
+  getPaymentAdminUrl,
   onRowClick,
   showActions = true,
   emptyMessage = 'No registrations found',
@@ -156,11 +165,16 @@ export function RegistrationSearchTable({
         id: 'payments',
         header: 'Payment',
         accessor: (row) => {
-          const completedPayments = row.payments.filter(p => p.status === 'COMPLETED');
+          const paidPayments = row.payments.filter(p => p.status === 'COMPLETED' || p.status === 'PARTIALLY_REFUNDED');
           
-          if (completedPayments.length === 0) return 'No payments';
+          if (paidPayments.length === 0) return 'No payments';
           
-          const totalPaid = completedPayments.reduce((sum, p) => sum + p.amount, 0);
+          const totalPaid = paidPayments.reduce((sum, p) => {
+            const refundedAmount = (p.refunds ?? [])
+              .filter(refund => refund.status === 'SUCCEEDED')
+              .reduce((refundSum, refund) => refundSum + (refund.amountCents / 100), 0);
+            return sum + (p.netAmount ?? Math.max(0, p.amount - refundedAmount));
+          }, 0);
           return `$${totalPaid.toFixed(2)}`;
         },
         sortable: false,
@@ -182,6 +196,16 @@ export function RegistrationSearchTable({
         header: 'Actions',
         accessor: (row) => (
           <div className="flex items-center space-x-2">
+            {getPaymentAdminUrl && (
+              <Link
+                to={getPaymentAdminUrl(row)}
+                onClick={(e) => e.stopPropagation()}
+                className="text-green-700 hover:text-green-900 p-1 rounded"
+                title="Manage payments"
+              >
+                <CreditCard size={16} />
+              </Link>
+            )}
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -221,7 +245,7 @@ export function RegistrationSearchTable({
     }
 
     return baseColumns;
-  }, [showActions, onEditRegistration, onCancelRegistration, onViewAuditTrail]);
+  }, [showActions, onEditRegistration, onCancelRegistration, onViewAuditTrail, getPaymentAdminUrl]);
 
   return (
     <div className="bg-white rounded-lg shadow">

@@ -38,6 +38,7 @@ export enum FieldType {
 export enum PaymentStatus {
   PENDING = 'PENDING',
   COMPLETED = 'COMPLETED',
+  PARTIALLY_REFUNDED = 'PARTIALLY_REFUNDED',
   FAILED = 'FAILED',
   REFUNDED = 'REFUNDED',
 }
@@ -45,6 +46,7 @@ export enum PaymentStatus {
 export enum PaymentProvider {
   STRIPE = 'STRIPE',
   PAYPAL = 'PAYPAL',
+  MANUAL = 'MANUAL',
 }
 
 export enum NotificationType {

@@ -4,6 +4,13 @@ import Stripe from 'stripe';
 import { CreateStripePaymentDto } from '../dto';
 import { CoreConfigService } from '../../core-config/services/core-config.service';
 
+export class StripeRefundError extends Error {
+  constructor(message: string, readonly refundRequestAttempted: boolean) {
+    super(message);
+    this.name = 'StripeRefundError';
+  }
+}
+
 /**
  * Service for handling Stripe payment processing
  */
@@ -60,6 +67,15 @@ export class StripeService {
       .replace(/pk_test_[a-zA-Z0-9]+/g, 'pk_test_***')
       .replace(/pk_live_[a-zA-Z0-9]+/g, 'pk_live_***')
       .replace(/whsec_[a-zA-Z0-9]+/g, 'whsec_***');
+  }
+
+  private isAmbiguousRefundSubmissionError(error: unknown): boolean {
+    if (!error || typeof error !== 'object' || !('type' in error)) {
+      return false;
+    }
+
+    const stripeErrorType = String((error as { type?: unknown }).type ?? '');
+    return stripeErrorType === 'StripeConnectionError' || stripeErrorType === 'StripeAPIError';
   }
 
   /**
@@ -157,7 +173,10 @@ export class StripeService {
     providerRefId: string,
     amount?: number,
     reason?: string,
+    idempotencyKey?: string,
   ): Promise<Stripe.Refund> {
+    let refundRequestAttempted = false;
+
     try {
       this.logger.log(`Creating refund for payment ${providerRefId}`);
       
@@ -202,13 +221,31 @@ export class StripeService {
         }
       }
       
-      const refund = await stripe.refunds.create(refundParams);
+      refundRequestAttempted = true;
+      const refund = await stripe.refunds.create(
+        refundParams,
+        idempotencyKey ? { idempotencyKey } : undefined,
+      );
       
       this.logger.log(`Created refund ${refund.id} for payment intent ${paymentIntentId}`);
       return refund;
     } catch (error: unknown) {
       const sanitizedMessage = this.sanitizeErrorMessage(error);
       this.logger.error(`Failed to process refund: ${sanitizedMessage}`);
+      throw new StripeRefundError(
+        sanitizedMessage,
+        refundRequestAttempted && this.isAmbiguousRefundSubmissionError(error),
+      );
+    }
+  }
+
+  async retrieveRefund(refundId: string): Promise<Stripe.Refund> {
+    try {
+      const stripe = await this.getStripe();
+      return await stripe.refunds.retrieve(refundId);
+    } catch (error: unknown) {
+      const sanitizedMessage = this.sanitizeErrorMessage(error);
+      this.logger.error(`Failed to retrieve refund: ${sanitizedMessage}`);
       throw new Error(sanitizedMessage);
     }
   }

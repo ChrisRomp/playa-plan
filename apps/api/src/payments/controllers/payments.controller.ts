@@ -5,7 +5,7 @@ import { CreatePaymentDto, CreateStripePaymentDto, CreatePaypalPaymentDto, Creat
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
-import { PaymentStatus, UserRole } from '@prisma/client';
+import { PaymentProvider, PaymentStatus, UserRole } from '@prisma/client';
 import { AuthenticatedRequest } from '../../auth/types/safe-user';
 
 @ApiTags('payments')
@@ -38,6 +38,9 @@ export class PaymentsController {
   @ApiQuery({ name: 'take', required: false, type: Number })
   @ApiQuery({ name: 'userId', required: false })
   @ApiQuery({ name: 'status', required: false, enum: PaymentStatus })
+  @ApiQuery({ name: 'registrationId', required: false })
+  @ApiQuery({ name: 'provider', required: false, enum: PaymentProvider })
+  @ApiQuery({ name: 'year', required: false, type: Number })
   @ApiResponse({ status: 200, description: 'Payments retrieved successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden - Admin/Staff access required' })
@@ -46,12 +49,18 @@ export class PaymentsController {
     @Query('take') take?: string,
     @Query('userId') userId?: string,
     @Query('status') status?: PaymentStatus,
+    @Query('registrationId') registrationId?: string,
+    @Query('provider') provider?: PaymentProvider,
+    @Query('year') year?: string,
   ) {
     return this.paymentsService.findAll(
       skip ? parseInt(skip, 10) : undefined,
       take ? parseInt(take, 10) : undefined,
       userId,
       status,
+      registrationId,
+      provider,
+      year ? parseInt(year, 10) : undefined,
     );
   }
 
@@ -116,8 +125,11 @@ export class PaymentsController {
   @ApiResponse({ status: 201, description: 'Manual payment recorded successfully' })
   @ApiResponse({ status: 400, description: 'Invalid input data' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async recordManualPayment(@Body() recordManualPaymentDto: RecordManualPaymentDto) {
-    return this.paymentsService.recordManualPayment(recordManualPaymentDto);
+  async recordManualPayment(
+    @Body() recordManualPaymentDto: RecordManualPaymentDto,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    return this.paymentsService.recordManualPayment(recordManualPaymentDto, req.user.id);
   }
 
   @Post('stripe')
@@ -150,8 +162,11 @@ export class PaymentsController {
   @ApiResponse({ status: 201, description: 'Refund processed successfully' })
   @ApiResponse({ status: 400, description: 'Invalid input data or cannot refund this payment' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async processRefund(@Body() createRefundDto: CreateRefundDto) {
-    return this.paymentsService.processRefund(createRefundDto);
+  async processRefund(
+    @Body() createRefundDto: CreateRefundDto,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    return this.paymentsService.processRefund(createRefundDto, req.user.id);
   }
 
   @Post('link/:paymentId/registration/:registrationId')

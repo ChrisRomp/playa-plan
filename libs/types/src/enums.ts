@@ -37,6 +37,7 @@ export enum RegistrationStatus {
 export enum PaymentStatus {
   PENDING = 'PENDING',
   COMPLETED = 'COMPLETED',
+  PARTIALLY_REFUNDED = 'PARTIALLY_REFUNDED',
   FAILED = 'FAILED',
   REFUNDED = 'REFUNDED'
 }
@@ -46,5 +47,6 @@ export enum PaymentStatus {
  */
 export enum PaymentMethod {
   STRIPE = 'STRIPE',
-  PAYPAL = 'PAYPAL'
-} 
+  PAYPAL = 'PAYPAL',
+  MANUAL = 'MANUAL'
+}

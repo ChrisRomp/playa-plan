@@ -1,4 +1,5 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import type { ReactNode } from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { PaymentReportsPage } from '../PaymentReportsPage';
@@ -9,6 +10,8 @@ import { Payment } from '../../types';
 vi.mock('../../lib/api', () => ({
   reports: {
     getPayments: vi.fn(),
+    recordExternalPayment: vi.fn(),
+    processRefund: vi.fn(),
   },
 }));
 
@@ -19,10 +22,14 @@ vi.mock('../../components/common/LoadingSpinner', () => ({
 
 // Mock the DataTable component
 vi.mock('../../components/common/DataTable/DataTable', () => ({
-  DataTable: ({ data, emptyMessage, caption }: { 
+  DataTable: ({ data, emptyMessage, caption, columns }: {
     data: Payment[]; 
     emptyMessage: string; 
     caption: string;
+    columns: Array<{
+      id: string;
+      Cell?: (props: { row: Payment }) => ReactNode;
+    }>;
   }) => (
     <div data-testid="data-table" aria-label={caption}>
       {data.length === 0 ? (
@@ -32,6 +39,9 @@ vi.mock('../../components/common/DataTable/DataTable', () => ({
           {data.map((item: Payment) => (
             <div key={item.id} data-testid={`payment-${item.id}`}>
               {item.id} - {item.status} - ${item.amount}
+              {columns.map((column) => (
+                <div key={column.id}>{column.Cell?.({ row: item })}</div>
+              ))}
             </div>
           ))}
         </div>
@@ -199,9 +209,9 @@ describe('PaymentReportsPage', () => {
       expect(screen.getByText('Completed')).toBeInTheDocument();
       expect(screen.getByText('Pending')).toBeInTheDocument();
       expect(screen.getByText('Failed')).toBeInTheDocument();
-      expect(screen.getByText('Refunded')).toBeInTheDocument();
-      expect(screen.getByText('Total Revenue')).toBeInTheDocument();
-      expect(screen.getByText('$150.00')).toBeInTheDocument();
+      expect(screen.getByText('Refunded / Partial')).toBeInTheDocument();
+      expect(screen.getByText('Net Revenue')).toBeInTheDocument();
+      expect(screen.getAllByText('$150.00').length).toBeGreaterThan(0);
     });
 
     it('should call getPayments on mount with empty filters', async () => {
@@ -210,7 +220,7 @@ describe('PaymentReportsPage', () => {
       renderComponent();
 
       await waitFor(() => {
-        expect(mockGetPayments).toHaveBeenCalledWith();
+        expect(mockGetPayments).toHaveBeenCalledWith({});
       });
     });
   });
@@ -382,6 +392,128 @@ describe('PaymentReportsPage', () => {
     });
   });
 
+  describe('Payment Admin Actions', () => {
+    beforeEach(() => {
+      vi.mocked(reports.getPayments).mockResolvedValue(mockPayments);
+    });
+
+    it('should submit externally recorded payment details', async () => {
+      vi.mocked(reports.recordExternalPayment).mockResolvedValue({
+        ...mockPayments[0],
+        id: 'external-payment',
+        provider: 'MANUAL',
+        externalPaymentMethod: 'Check',
+        externalPaymentReference: 'Check #1234',
+      });
+
+      renderComponent();
+
+      await waitFor(() => {
+        expect(screen.getByText('Record External Payment')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Record External Payment'));
+      fireEvent.change(screen.getByLabelText('Amount'), { target: { value: '125.50' } });
+      fireEvent.change(screen.getByLabelText('User ID'), { target: { value: 'user-1' } });
+      fireEvent.change(screen.getByLabelText('Registration ID'), { target: { value: 'registration-1' } });
+      fireEvent.change(screen.getByLabelText('External method'), { target: { value: 'Check' } });
+      fireEvent.change(screen.getByLabelText('Reference'), { target: { value: 'Check #1234' } });
+      fireEvent.click(screen.getByText('Record payment'));
+
+      await waitFor(() => {
+        expect(reports.recordExternalPayment).toHaveBeenCalledWith({
+          amount: 125.5,
+          currency: 'USD',
+          userId: 'user-1',
+          registrationId: 'registration-1',
+          externalPaymentMethod: 'Check',
+          reference: 'Check #1234',
+          status: 'COMPLETED',
+        });
+      });
+    });
+
+    it('should submit a partial refund with no registration status change by default', async () => {
+      vi.mocked(reports.processRefund).mockResolvedValue({
+        paymentId: 'payment1',
+        refundAmount: 50,
+        providerRefundId: 'refund-1',
+        success: true,
+        refundStatus: 'SUCCEEDED',
+      });
+
+      renderComponent();
+
+      await waitFor(() => {
+        expect(screen.getByTestId('payment-payment1')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getAllByText('Refund')[0]);
+      fireEvent.change(screen.getByLabelText('Refund amount'), { target: { value: '50.00' } });
+      fireEvent.change(screen.getByLabelText('Reason'), { target: { value: 'Camp fee adjustment' } });
+      fireEvent.click(screen.getByText('Submit refund'));
+
+      await waitFor(() => {
+        expect(reports.processRefund).toHaveBeenCalledWith({
+          paymentId: 'payment1',
+          amount: 50,
+          reason: 'Camp fee adjustment',
+          resultingRegistrationStatus: undefined,
+        });
+      });
+    });
+
+    it('should show an error when refund processing returns an unsuccessful result', async () => {
+      vi.mocked(reports.processRefund).mockResolvedValue({
+        paymentId: 'payment1',
+        refundAmount: 50,
+        providerRefundId: 'refund-1',
+        success: false,
+        refundStatus: 'FAILED',
+      });
+
+      renderComponent();
+
+      await waitFor(() => {
+        expect(screen.getByTestId('payment-payment1')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getAllByText('Refund')[0]);
+      fireEvent.change(screen.getByLabelText('Refund amount'), { target: { value: '50.00' } });
+      fireEvent.click(screen.getByText('Submit refund'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Failed to process refund')).toBeInTheDocument();
+      });
+      expect(screen.getByText('Submit refund')).toBeInTheDocument();
+    });
+
+    it('should close the refund form when refund processing is pending processor confirmation', async () => {
+      vi.mocked(reports.processRefund).mockResolvedValue({
+        paymentId: 'payment1',
+        refundAmount: 50,
+        providerRefundId: 'refund-1',
+        success: false,
+        refundStatus: 'PENDING',
+      });
+
+      renderComponent();
+
+      await waitFor(() => {
+        expect(screen.getByTestId('payment-payment1')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getAllByText('Refund')[0]);
+      fireEvent.change(screen.getByLabelText('Refund amount'), { target: { value: '50.00' } });
+      fireEvent.click(screen.getByText('Submit refund'));
+
+      await waitFor(() => {
+        expect(screen.queryByText('Submit refund')).not.toBeInTheDocument();
+      });
+      expect(screen.queryByText('Failed to process refund')).not.toBeInTheDocument();
+    });
+  });
+
   describe('CSV Export Functionality', () => {
     let originalURL: typeof window.URL;
     let originalCreateElement: typeof document.createElement;
@@ -497,8 +629,8 @@ describe('PaymentReportsPage', () => {
       expect(screen.getByText('Completed')).toBeInTheDocument();
       expect(screen.getByText('Pending')).toBeInTheDocument();
       expect(screen.getByText('Failed')).toBeInTheDocument();
-      expect(screen.getByText('Refunded')).toBeInTheDocument();
-      expect(screen.getByText('Total Revenue')).toBeInTheDocument();
+      expect(screen.getByText('Refunded / Partial')).toBeInTheDocument();
+      expect(screen.getByText('Net Revenue')).toBeInTheDocument();
       expect(screen.getByText('$0.00')).toBeInTheDocument();
     });
   });
@@ -572,8 +704,8 @@ describe('PaymentReportsPage', () => {
       });
 
       // Should handle different currencies in summary (component shows amount in dollars regardless)
-      expect(screen.getByText('Total Revenue')).toBeInTheDocument();
-      expect(screen.getByText('$85.50')).toBeInTheDocument();
+      expect(screen.getByText('Net Revenue')).toBeInTheDocument();
+      expect(screen.getAllByText('$85.50').length).toBeGreaterThan(0);
     });
   });
 });

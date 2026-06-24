@@ -44,6 +44,33 @@ export class CreatePaymentDto {
   providerRefId?: string;
 
   @ApiProperty({
+    description: 'How the payment was received when provider is MANUAL',
+    example: 'Check',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  externalPaymentMethod?: string;
+
+  @ApiProperty({
+    description: 'External reference when provider is MANUAL',
+    example: 'Check #1234',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  externalPaymentReference?: string;
+
+  @ApiProperty({
+    description: 'Admin user ID that recorded the payment',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  @IsUUID()
+  recordedByUserId?: string;
+
+  @ApiProperty({
     description: 'ID of the user making the payment',
     example: '5f8d0d55-e0a3-4cf0-a620-2412acd4361c',
   })

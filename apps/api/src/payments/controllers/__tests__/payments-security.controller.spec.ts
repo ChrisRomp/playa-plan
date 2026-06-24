@@ -18,9 +18,17 @@ describe('PaymentsController Security', () => {
     status: PaymentStatus.COMPLETED,
     provider: PaymentProvider.STRIPE,
     providerRefId: 'stripe-123',
+    externalPaymentMethod: null,
+    externalPaymentReference: null,
+    recordedByUserId: null,
     createdAt: new Date(),
     updatedAt: new Date(),
     registrationId: null,
+    refundedAmount: 0,
+    netAmount: 100,
+    refundableAmount: 100,
+    processorRefundAvailable: true,
+    refunds: [],
   };
 
   beforeEach(async () => {
@@ -57,7 +65,7 @@ describe('PaymentsController Security', () => {
       const result = await controller.findAll();
 
       expect(result).toEqual(mockResult);
-      expect(paymentsService.findAll).toHaveBeenCalledWith(undefined, undefined, undefined, undefined);
+      expect(paymentsService.findAll).toHaveBeenCalledWith(undefined, undefined, undefined, undefined, undefined, undefined, undefined);
     });
 
     it('should allow filtering by userId for reports', async () => {
@@ -67,7 +75,7 @@ describe('PaymentsController Security', () => {
       const result = await controller.findAll('0', '10', 'user-123', undefined);
 
       expect(result).toEqual(mockResult);
-      expect(paymentsService.findAll).toHaveBeenCalledWith(0, 10, 'user-123', undefined);
+      expect(paymentsService.findAll).toHaveBeenCalledWith(0, 10, 'user-123', undefined, undefined, undefined, undefined);
     });
   });
 
