@@ -1052,6 +1052,77 @@ describe('PaymentsService', () => {
       });
     });
 
+    it('should reconcile a previously pending Stripe refund before rejecting a duplicate refund attempt', async () => {
+      const pendingRefund = {
+        id: 'pending-refund-id',
+        paymentId: 'payment-id',
+        amountCents: 10000,
+        currency: 'USD',
+        status: PaymentRefundStatus.PENDING,
+        processorRefund: true,
+        providerRefundId: null,
+        reason: 'Full pending refund',
+        resultingRegistrationStatus: RegistrationStatus.WAITLISTED,
+        processedByUserId: 'admin-id',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      const succeededRefund = {
+        ...pendingRefund,
+        status: PaymentRefundStatus.SUCCEEDED,
+        providerRefundId: 're_reconciled',
+      };
+
+      mockPrismaService.payment.findUnique
+        .mockResolvedValueOnce({
+          ...basePayment,
+          refunds: [pendingRefund],
+        })
+        .mockResolvedValueOnce({
+          ...basePayment,
+          refunds: [succeededRefund],
+        })
+        .mockResolvedValueOnce({
+          ...basePayment,
+          status: PaymentStatus.REFUNDED,
+          registration: {
+            ...basePayment.registration,
+            status: RegistrationStatus.WAITLISTED,
+          },
+          refunds: [succeededRefund],
+        });
+      mockStripeService.createRefund.mockResolvedValueOnce({ id: 're_reconciled', status: 'succeeded' });
+
+      await expect(service.processRefund({
+        paymentId: 'payment-id',
+        amount: 10,
+        reason: 'Duplicate refund attempt',
+      }, 'admin-id')).rejects.toThrow('Cannot refund payment with status REFUNDED');
+
+      expect(mockStripeService.createRefund).toHaveBeenCalledWith(
+        'pi_stripe123',
+        10000,
+        'Full pending refund',
+        'pending-refund-id',
+      );
+      expect(mockPrismaService.paymentRefund.update).toHaveBeenCalledWith({
+        where: { id: 'pending-refund-id' },
+        data: {
+          status: PaymentRefundStatus.SUCCEEDED,
+          providerRefundId: 're_reconciled',
+        },
+      });
+      expect(mockPrismaService.payment.update).toHaveBeenCalledWith({
+        where: { id: 'payment-id' },
+        data: { status: PaymentStatus.REFUNDED },
+      });
+      expect(mockPrismaService.registration.update).toHaveBeenCalledWith({
+        where: { id: 'registration-id' },
+        data: { status: RegistrationStatus.WAITLISTED },
+      });
+      expect(mockPrismaService.paymentRefund.create).not.toHaveBeenCalled();
+    });
+
     it('should not update registration status when Stripe reports a failed refund', async () => {
       const failedRefund = {
         id: 'refund-id',
