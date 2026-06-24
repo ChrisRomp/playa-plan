@@ -222,10 +222,9 @@ export class StripeService {
       }
       
       refundRequestAttempted = true;
-      const refund = await stripe.refunds.create(
-        refundParams,
-        idempotencyKey ? { idempotencyKey } : undefined,
-      );
+      const refund = idempotencyKey
+        ? await stripe.refunds.create(refundParams, { idempotencyKey })
+        : await stripe.refunds.create(refundParams);
       
       this.logger.log(`Created refund ${refund.id} for payment intent ${paymentIntentId}`);
       return refund;

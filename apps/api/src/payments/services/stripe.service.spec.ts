@@ -251,6 +251,32 @@ describe('StripeService', () => {
       expect(result).toEqual(mockRefund);
     });
 
+    it('should pass idempotency keys to Stripe refund requests', async () => {
+      const paymentIntentId = 'pi_1234567890';
+      const amount = 1000;
+      const idempotencyKey = 'refund-id';
+      const mockRefund = { id: 're_123', amount: 1000 };
+
+      mockStripeInstance.refunds.create.mockResolvedValue(mockRefund);
+
+      const result = await service.createRefund(
+        paymentIntentId,
+        amount,
+        undefined,
+        idempotencyKey,
+      );
+
+      expect(mockStripeInstance.refunds.create).toHaveBeenCalledWith(
+        {
+          payment_intent: paymentIntentId,
+          amount,
+        },
+        { idempotencyKey },
+      );
+
+      expect(result).toEqual(mockRefund);
+    });
+
     it('should convert checkout session IDs to payment intent IDs', async () => {
       const sessionId = 'cs_1234567890';
       const paymentIntentId = 'pi_0987654321';
