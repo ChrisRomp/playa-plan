@@ -269,7 +269,7 @@ describe('AdminPaymentsPage', () => {
       expect(screen.getByText('Failed')).toBeInTheDocument();
       expect(screen.getByText('Refunded / Partial')).toBeInTheDocument();
       expect(screen.getByText('Net Revenue')).toBeInTheDocument();
-      expect(screen.getAllByText('$150.00').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('$150.00 USD').length).toBeGreaterThan(0);
     });
 
     it('should call getPayments on mount with empty filters', async () => {
@@ -307,6 +307,42 @@ describe('AdminPaymentsPage', () => {
       fireEvent.click(screen.getByText('Change registration'));
 
       expect(await screen.findByRole('searchbox', { name: 'Registration' })).toBeInTheDocument();
+    });
+
+    it('should clear an unresolvable prefilled registration before a replacement search', async () => {
+      vi.mocked(adminRegistrationsApi.searchExternalPaymentRegistrations).mockResolvedValue({
+        registrations: [],
+        total: 0,
+        page: 1,
+        limit: 8,
+        totalPages: 0,
+      });
+
+      renderComponent('/admin/payments?registrationId=stale-registration&userId=stale-user&year=2026');
+
+      fireEvent.click(await screen.findByText('Record External Payment'));
+
+      await waitFor(() => {
+        expect(adminRegistrationsApi.searchExternalPaymentRegistrations).toHaveBeenCalledWith({
+          year: 2026,
+          registrationId: 'stale-registration',
+          search: undefined,
+          limit: 8,
+        });
+      });
+
+      fireEvent.change(screen.getByRole('searchbox', { name: 'Registration' }), {
+        target: { value: 'jane@example.com' },
+      });
+
+      await waitFor(() => {
+        expect(adminRegistrationsApi.searchExternalPaymentRegistrations).toHaveBeenLastCalledWith({
+          year: 2026,
+          registrationId: undefined,
+          search: 'jane@example.com',
+          limit: 8,
+        });
+      });
     });
   });
 
@@ -622,10 +658,8 @@ describe('AdminPaymentsPage', () => {
       const refundButton = await screen.findByRole('button', { name: 'Refund' });
 
       expect(refundButton).toBeDisabled();
-      expect(refundButton).toHaveAttribute(
-        'title',
-        'Stripe refunds are unavailable for this payment'
-      );
+      expect(refundButton).toHaveAttribute('aria-describedby', 'refund-unavailable-payment1');
+      expect(screen.getByText('Stripe refunds are unavailable for this payment.')).toBeInTheDocument();
     });
 
     it('should submit an explicit registration status change with a refund', async () => {
@@ -695,10 +729,10 @@ describe('AdminPaymentsPage', () => {
       const refundButton = await screen.findByRole('button', { name: 'Refund' });
 
       expect(refundButton).toBeDisabled();
-      expect(refundButton).toHaveAttribute(
-        'title',
-        'PayPal refunds must be handled outside PlayaPlan'
-      );
+      expect(refundButton).toHaveAttribute('aria-describedby', 'refund-unavailable-payment2');
+      expect(
+        screen.getByText('PayPal refunds must be handled outside PlayaPlan.')
+      ).toBeInTheDocument();
     });
 
     it('should display gross, refunded, net, and refundable amounts', async () => {
@@ -718,11 +752,11 @@ describe('AdminPaymentsPage', () => {
       renderComponent();
 
       await waitFor(() => {
-        expect(screen.getByText('$150.00 USD')).toBeInTheDocument();
+        expect(screen.getAllByText('$150.00 USD').length).toBeGreaterThan(0);
       });
-      expect(screen.getByText('Refunded $25.00')).toBeInTheDocument();
-      expect(screen.getByText('Net $125.00')).toBeInTheDocument();
-      expect(screen.getAllByText('$125.00')).toHaveLength(2);
+      expect(screen.getByText('Refunded $25.00 USD')).toBeInTheDocument();
+      expect(screen.getByText('Net $125.00 USD')).toBeInTheDocument();
+      expect(screen.getAllByText('$125.00 USD')).toHaveLength(2);
       expect(screen.getByText('External')).toBeInTheDocument();
       expect(screen.getByText('Check #1234')).toBeInTheDocument();
     });
@@ -815,10 +849,10 @@ describe('AdminPaymentsPage', () => {
           [
             'John Doe',
             expect.any(String),
-            '$150.00',
-            '$25.00',
-            '$125.00',
-            '$125.00',
+            '$150.00 USD',
+            '$25.00 USD',
+            '$125.00 USD',
+            '$125.00 USD',
             'PARTIALLY_REFUNDED',
             'External',
             'Check',
@@ -831,6 +865,40 @@ describe('AdminPaymentsPage', () => {
             /^payment_reports_registrationId-reg1_year-2024_\d{4}-\d{2}-\d{2}\.csv$/
           ),
         }
+      );
+    });
+
+    it('should export amounts in each payment currency', async () => {
+      vi.mocked(reports.getPayments).mockResolvedValue([
+        {
+          ...mockPayments[0],
+          currency: 'EUR',
+          amount: 85.5,
+        },
+      ]);
+
+      renderComponent();
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Export payments data' }));
+
+      expect(downloadCsv).toHaveBeenCalledWith(
+        expect.any(Array),
+        [
+          [
+            'John Doe',
+            expect.any(String),
+            '€85.50 EUR',
+            '€0.00 EUR',
+            '€85.50 EUR',
+            '€85.50 EUR',
+            'COMPLETED',
+            'STRIPE',
+            'N/A',
+            'stripe_12345',
+            'reg1',
+          ],
+        ],
+        expect.any(Object)
       );
     });
   });
@@ -866,7 +934,7 @@ describe('AdminPaymentsPage', () => {
       expect(screen.getByText('Failed')).toBeInTheDocument();
       expect(screen.getByText('Refunded / Partial')).toBeInTheDocument();
       expect(screen.getByText('Net Revenue')).toBeInTheDocument();
-      expect(screen.getByText('$0.00')).toBeInTheDocument();
+      expect(screen.getByText('$0.00 USD')).toBeInTheDocument();
     });
   });
 
@@ -909,8 +977,9 @@ describe('AdminPaymentsPage', () => {
       expect(totalPaymentsCards.length).toBeGreaterThan(0);
     });
 
-    it('should handle different currency formats', async () => {
+    it('should group net revenue and format amounts by currency', async () => {
       const paymentsWithDifferentCurrencies: Payment[] = [
+        mockPayments[0],
         {
           id: 'payment-eur',
           amount: 85.5, // Corrected amount
@@ -938,9 +1007,9 @@ describe('AdminPaymentsPage', () => {
         expect(screen.getByTestId('payment-payment-eur')).toBeInTheDocument();
       });
 
-      // Should handle different currencies in summary (component shows amount in dollars regardless)
       expect(screen.getByText('Net Revenue')).toBeInTheDocument();
-      expect(screen.getAllByText('$85.50').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('$150.00 USD').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('€85.50 EUR').length).toBeGreaterThan(0);
     });
   });
 });

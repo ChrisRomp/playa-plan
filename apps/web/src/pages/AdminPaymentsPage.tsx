@@ -45,7 +45,16 @@ const emptyExternalPaymentForm: ExternalPaymentFormState = {
   reference: '',
 };
 
-const formatCurrency = (amount: number | undefined): string => `$${(amount ?? 0).toFixed(2)}`;
+const formatCurrency = (amount: number | undefined, currency = 'USD'): string => {
+  const currencyCode = currency.toUpperCase();
+  const formattedAmount = new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: currencyCode,
+    currencyDisplay: 'narrowSymbol',
+  }).format(amount ?? 0);
+
+  return `${formattedAmount} ${currencyCode}`;
+};
 
 const getRefundableAmount = (payment: Payment): number => {
   if (typeof payment.refundableAmount === 'number') {
@@ -77,6 +86,18 @@ const canSubmitRefund = (payment: Payment): boolean =>
   getRefundableAmount(payment) > 0 &&
   payment.provider !== 'PAYPAL' &&
   (payment.provider !== 'STRIPE' || payment.processorRefundAvailable === true);
+
+const getRefundUnavailableMessage = (payment: Payment): string | undefined => {
+  if (payment.provider === 'PAYPAL') {
+    return 'PayPal refunds must be handled outside PlayaPlan.';
+  }
+
+  if (payment.provider === 'STRIPE' && payment.processorRefundAvailable !== true) {
+    return 'Stripe refunds are unavailable for this payment.';
+  }
+
+  return undefined;
+};
 
 /**
  * Payment administration page.
@@ -274,7 +295,7 @@ export function AdminPaymentsPage() {
         failed: 0,
         refunded: 0,
         partiallyRefunded: 0,
-        totalAmount: 0,
+        netAmountsByCurrency: {},
       };
     }
 
@@ -286,11 +307,15 @@ export function AdminPaymentsPage() {
     const partiallyRefunded = filteredPayments.filter(
       payment => payment.status === 'PARTIALLY_REFUNDED'
     ).length;
-    const totalAmount = filteredPayments
+    const netAmountsByCurrency = filteredPayments
       .filter(payment => payment.status === 'COMPLETED' || payment.status === 'PARTIALLY_REFUNDED')
-      .reduce((sum, payment) => sum + (payment.netAmount ?? payment.amount), 0);
+      .reduce<Record<string, number>>((amounts, payment) => {
+        const currency = (payment.currency || 'USD').toUpperCase();
+        amounts[currency] = (amounts[currency] ?? 0) + (payment.netAmount ?? payment.amount);
+        return amounts;
+      }, {});
 
-    return { total, completed, pending, failed, refunded, partiallyRefunded, totalAmount };
+    return { total, completed, pending, failed, refunded, partiallyRefunded, netAmountsByCurrency };
   }, [filteredPayments]);
 
   const handleRecordExternalPayment = async (event: FormEvent<HTMLFormElement>) => {
@@ -396,11 +421,13 @@ export function AdminPaymentsPage() {
       Cell: ({ row }) => (
         <div>
           <div className="font-medium text-gray-900">
-            {formatCurrency(row.amount)} {row.currency}
+            {formatCurrency(row.amount, row.currency)}
           </div>
-          <div className="text-xs text-gray-500">Refunded {formatCurrency(row.refundedAmount)}</div>
           <div className="text-xs text-gray-500">
-            Net {formatCurrency(row.netAmount ?? row.amount)}
+            Refunded {formatCurrency(row.refundedAmount, row.currency)}
+          </div>
+          <div className="text-xs text-gray-500">
+            Net {formatCurrency(row.netAmount ?? row.amount, row.currency)}
           </div>
         </div>
       ),
@@ -466,7 +493,7 @@ export function AdminPaymentsPage() {
       id: 'refundableAmount',
       header: 'Refundable',
       accessor: row => getRefundableAmount(row),
-      Cell: ({ row }) => formatCurrency(getRefundableAmount(row)),
+      Cell: ({ row }) => formatCurrency(getRefundableAmount(row), row.currency),
       sortable: true,
       width: '10%',
     },
@@ -476,22 +503,27 @@ export function AdminPaymentsPage() {
       accessor: () => '',
       Cell: ({ row }) => {
         const refundDisabled = !canSubmitRefund(row) || submitting;
+        const refundUnavailableMessage = getRefundUnavailableMessage(row);
+        const refundUnavailableMessageId = `refund-unavailable-${row.id}`;
         return (
-          <button
-            type="button"
-            onClick={() => openRefundForm(row)}
-            disabled={refundDisabled}
-            title={
-              row.provider === 'PAYPAL'
-                ? 'PayPal refunds must be handled outside PlayaPlan'
-                : row.provider === 'STRIPE'
-                  ? 'Stripe refunds are unavailable for this payment'
-                : undefined
-            }
-            className="rounded-md border border-amber-700 px-3 py-1 text-sm font-medium text-amber-800 hover:bg-amber-50 disabled:cursor-not-allowed disabled:border-gray-200 disabled:text-gray-400"
-          >
-            Refund
-          </button>
+          <div>
+            <button
+              type="button"
+              onClick={() => openRefundForm(row)}
+              disabled={refundDisabled}
+              aria-describedby={
+                refundUnavailableMessage ? refundUnavailableMessageId : undefined
+              }
+              className="rounded-md border border-amber-700 px-3 py-1 text-sm font-medium text-amber-800 hover:bg-amber-50 disabled:cursor-not-allowed disabled:border-gray-200 disabled:text-gray-400"
+            >
+              Refund
+            </button>
+            {refundUnavailableMessage && (
+              <p id={refundUnavailableMessageId} className="mt-1 text-xs text-gray-600">
+                {refundUnavailableMessage}
+              </p>
+            )}
+          </div>
         );
       },
       width: '10%',
@@ -532,10 +564,10 @@ export function AdminPaymentsPage() {
       return [
         payment.user ? `${payment.user.firstName} ${payment.user.lastName}` : 'Unknown',
         dateTime,
-        formatCurrency(payment.amount),
-        formatCurrency(payment.refundedAmount),
-        formatCurrency(payment.netAmount ?? payment.amount),
-        formatCurrency(getRefundableAmount(payment)),
+        formatCurrency(payment.amount, payment.currency),
+        formatCurrency(payment.refundedAmount, payment.currency),
+        formatCurrency(payment.netAmount ?? payment.amount, payment.currency),
+        formatCurrency(getRefundableAmount(payment), payment.currency),
         payment.status,
         payment.provider === 'MANUAL' ? 'External' : payment.provider,
         payment.externalPaymentMethod || 'N/A',
@@ -683,7 +715,15 @@ export function AdminPaymentsPage() {
               <div className="flex items-center">
                 <div className="flex-shrink-0">
                   <div className="text-lg font-medium text-gray-900">
-                    ${summaryStats.totalAmount.toFixed(2)}
+                    {Object.entries(summaryStats.netAmountsByCurrency).length > 0 ? (
+                      Object.entries(summaryStats.netAmountsByCurrency).map(([currency, amount]) => (
+                        <div key={currency}>
+                          {formatCurrency(amount, currency)}
+                        </div>
+                      ))
+                    ) : (
+                      formatCurrency(0)
+                    )}
                   </div>
                 </div>
               </div>
@@ -835,7 +875,19 @@ export function AdminPaymentsPage() {
                       id="external-payment-registration-search"
                       type="search"
                       value={registrationSearch}
-                      onChange={event => setRegistrationSearch(event.target.value)}
+                      onChange={event => {
+                        if (
+                          externalPaymentForm.registrationId &&
+                          !selectedExternalPaymentRegistration
+                        ) {
+                          setExternalPaymentForm(prev => ({
+                            ...prev,
+                            userId: '',
+                            registrationId: '',
+                          }));
+                        }
+                        setRegistrationSearch(event.target.value);
+                      }}
                       placeholder="Start typing a name or email"
                       disabled={registrationsLoading || submitting}
                       autoComplete="off"
@@ -1004,10 +1056,14 @@ export function AdminPaymentsPage() {
               </button>
             </div>
             <div className="mb-4 rounded-md bg-gray-50 p-3 text-sm text-gray-700">
-              <div>Gross: {formatCurrency(refundForm.payment.amount)}</div>
-              <div>Already refunded: {formatCurrency(refundForm.payment.refundedAmount)}</div>
+              <div>Gross: {formatCurrency(refundForm.payment.amount, refundForm.payment.currency)}</div>
               <div>
-                Remaining refundable: {formatCurrency(getRefundableAmount(refundForm.payment))}
+                Already refunded:{' '}
+                {formatCurrency(refundForm.payment.refundedAmount, refundForm.payment.currency)}
+              </div>
+              <div>
+                Remaining refundable:{' '}
+                {formatCurrency(getRefundableAmount(refundForm.payment), refundForm.payment.currency)}
               </div>
             </div>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-3">

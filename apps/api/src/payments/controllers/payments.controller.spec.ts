@@ -95,7 +95,7 @@ describe('PaymentsController', () => {
       mockPaymentsService.findAll.mockResolvedValue(mockResponse);
 
       // Execute
-      const result = await controller.findAll('0', '10');
+      const result = await controller.findAll({ skip: 0, take: 10 });
 
       // Assert
       expect(mockPaymentsService.findAll).toHaveBeenCalledWith(0, 10, undefined, undefined, undefined, undefined, undefined);
@@ -107,8 +107,8 @@ describe('PaymentsController', () => {
       const mockPayments = [{ id: 'payment-1', amount: 100 }];
       const mockTotal = 1;
       const mockResponse = { payments: mockPayments, total: mockTotal };
-      const skip = '0';
-      const take = '10';
+      const skip = 0;
+      const take = 10;
       const userId = 'user-id';
       const status = PaymentStatus.COMPLETED;
 
@@ -116,7 +116,7 @@ describe('PaymentsController', () => {
       mockPaymentsService.findAll.mockResolvedValue(mockResponse);
 
       // Execute
-      const result = await controller.findAll(skip, take, userId, status);
+      const result = await controller.findAll({ skip, take, userId, status });
 
       // Assert
       expect(mockPaymentsService.findAll).toHaveBeenCalledWith(0, 10, userId, status, undefined, undefined, undefined);

@@ -135,7 +135,7 @@ test.describe(
       await page.getByRole('button', { name: 'Record payment' }).click();
 
       await expect(page.getByText('Check #E2E-1234')).toBeVisible();
-      await expect(page.getByText('$125.50 USD')).toBeVisible();
+      await expect(page.getByRole('gridcell', { name: '$125.50 USD', exact: true })).toBeVisible();
 
       await expect
         .poll(async () =>
@@ -272,10 +272,10 @@ test.describe(
       const refundButton = page.getByRole('button', { name: 'Refund' });
 
       await expect(refundButton).toBeDisabled();
-      await expect(refundButton).toHaveAttribute(
-        'title',
-        'PayPal refunds must be handled outside PlayaPlan'
-      );
+      await expect(refundButton).toHaveAttribute('aria-describedby', /^refund-unavailable-/);
+      await expect(
+        page.getByText('PayPal refunds must be handled outside PlayaPlan.', { exact: true })
+      ).toBeVisible();
     });
   }
 );

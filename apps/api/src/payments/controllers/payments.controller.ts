@@ -1,7 +1,7 @@
 import { Controller, Post, Body, Get, Param, Query, UseGuards, ParseUUIDPipe, Put, HttpCode, HttpStatus, Request } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiParam, ApiBearerAuth } from '@nestjs/swagger';
 import { PaymentsService, StripeService, PaypalService } from '../services';
-import { CreatePaymentDto, CreateStripePaymentDto, CreatePaypalPaymentDto, CreateRefundDto, RecordManualPaymentDto, UpdatePaymentDto } from '../dto';
+import { CreatePaymentDto, CreateStripePaymentDto, CreatePaypalPaymentDto, CreateRefundDto, FindPaymentsQueryDto, RecordManualPaymentDto, UpdatePaymentDto } from '../dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
@@ -44,23 +44,16 @@ export class PaymentsController {
   @ApiResponse({ status: 200, description: 'Payments retrieved successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden - Admin/Staff access required' })
-  async findAll(
-    @Query('skip') skip?: string,
-    @Query('take') take?: string,
-    @Query('userId') userId?: string,
-    @Query('status') status?: PaymentStatus,
-    @Query('registrationId') registrationId?: string,
-    @Query('provider') provider?: PaymentProvider,
-    @Query('year') year?: string,
-  ) {
+  async findAll(@Query() query: FindPaymentsQueryDto) {
+    const { skip, take, userId, status, registrationId, provider, year } = query;
     return this.paymentsService.findAll(
-      skip ? parseInt(skip, 10) : undefined,
-      take ? parseInt(take, 10) : undefined,
+      skip,
+      take,
       userId,
       status,
       registrationId,
       provider,
-      year ? parseInt(year, 10) : undefined,
+      year,
     );
   }
 

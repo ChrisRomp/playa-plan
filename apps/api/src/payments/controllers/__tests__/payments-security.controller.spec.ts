@@ -62,7 +62,7 @@ describe('PaymentsController Security', () => {
       const mockResult = { payments: [mockPayment], total: 1 };
       jest.spyOn(paymentsService, 'findAll').mockResolvedValue(mockResult);
 
-      const result = await controller.findAll();
+      const result = await controller.findAll({});
 
       expect(result).toEqual(mockResult);
       expect(paymentsService.findAll).toHaveBeenCalledWith(undefined, undefined, undefined, undefined, undefined, undefined, undefined);
@@ -72,7 +72,11 @@ describe('PaymentsController Security', () => {
       const mockResult = { payments: [mockPayment], total: 1 };
       jest.spyOn(paymentsService, 'findAll').mockResolvedValue(mockResult);
 
-      const result = await controller.findAll('0', '10', 'user-123', undefined);
+      const result = await controller.findAll({
+        skip: 0,
+        take: 10,
+        userId: 'user-123',
+      });
 
       expect(result).toEqual(mockResult);
       expect(paymentsService.findAll).toHaveBeenCalledWith(0, 10, 'user-123', undefined, undefined, undefined, undefined);

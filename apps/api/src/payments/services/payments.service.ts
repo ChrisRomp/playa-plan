@@ -120,6 +120,22 @@ export class PaymentsService {
     return PaymentStatus.PARTIALLY_REFUNDED;
   }
 
+  private getAppliedRegistrationStatus(
+    registration: Registration | null,
+    requestedStatus?: RegistrationStatus | null,
+  ): RegistrationStatus | undefined {
+    if (
+      !registration ||
+      !requestedStatus ||
+      requestedStatus === registration.status ||
+      registration.status === RegistrationStatus.CANCELLED
+    ) {
+      return undefined;
+    }
+
+    return requestedStatus;
+  }
+
   private isRefundableStatus(status: PaymentStatus): boolean {
     return status === PaymentStatus.COMPLETED || status === PaymentStatus.PARTIALLY_REFUNDED;
   }
@@ -205,7 +221,10 @@ export class PaymentsService {
         ? Math.max(refundedCents - finalizedRefund.amountCents, 0)
         : refundedCents;
       const appliedRegistrationStatus = finalizedRefund.status === PaymentRefundStatus.SUCCEEDED
-        ? finalizedRefund.resultingRegistrationStatus ?? undefined
+        ? this.getAppliedRegistrationStatus(
+          payment.registration,
+          finalizedRefund.resultingRegistrationStatus,
+        )
         : undefined;
 
       await tx.payment.update({
@@ -260,6 +279,20 @@ export class PaymentsService {
       transactionId,
       throwOnError: false,
     });
+
+    if (finalization.payment.registration && finalization.appliedRegistrationStatus) {
+      await this.adminAuditService.createAuditRecord({
+        adminUserId: finalization.refund.processedByUserId,
+        actionType: AdminAuditActionType.REGISTRATION_EDIT,
+        targetRecordType: AdminAuditTargetType.REGISTRATION,
+        targetRecordId: finalization.payment.registration.id,
+        oldValues: { status: finalization.payment.registration.status },
+        newValues: { status: finalization.appliedRegistrationStatus },
+        reason: finalization.refund.reason ?? undefined,
+        transactionId,
+        throwOnError: false,
+      });
+    }
   }
 
   private async reconcilePendingProcessorRefunds(payment: RefundablePayment): Promise<void> {
@@ -826,6 +859,14 @@ export class PaymentsService {
           );
         }
 
+        if (
+          data.resultingRegistrationStatus &&
+          payment.registration?.status === RegistrationStatus.CANCELLED &&
+          data.resultingRegistrationStatus !== RegistrationStatus.CANCELLED
+        ) {
+          throw new BadRequestException('Cannot edit a cancelled registration');
+        }
+
         if (!this.isRefundableStatus(payment.status)) {
           throw new BadRequestException(`Cannot refund payment with status ${payment.status}`);
         }
@@ -882,8 +923,10 @@ export class PaymentsService {
           paymentAmountCents,
           refundedCents,
         );
-        const appliedRegistrationStatus =
-          refund.resultingRegistrationStatus ?? undefined;
+        const appliedRegistrationStatus = this.getAppliedRegistrationStatus(
+          payment.registration,
+          refund.resultingRegistrationStatus,
+        );
 
         await tx.payment.update({
           where: { id: payment.id },

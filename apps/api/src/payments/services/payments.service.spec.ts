@@ -1683,6 +1683,20 @@ describe('PaymentsService', () => {
         where: { id: 'registration-id' },
         data: { status: RegistrationStatus.WAITLISTED },
       });
+      expect(mockAdminAuditService.createAuditRecord).toHaveBeenCalledTimes(2);
+      expect(mockAdminAuditService.createAuditRecord).toHaveBeenCalledWith(
+        expect.objectContaining({
+          adminUserId: 'admin-id',
+          actionType: 'REGISTRATION_EDIT',
+          targetRecordType: 'REGISTRATION',
+          targetRecordId: 'registration-id',
+          oldValues: { status: RegistrationStatus.CONFIRMED },
+          newValues: { status: RegistrationStatus.WAITLISTED },
+          reason: 'Move back to waitlist',
+          transactionId: expect.any(String),
+          throwOnError: false,
+        }),
+      );
     });
 
     it('should reject a registration status change when the payment has no linked registration', async () => {
@@ -1705,6 +1719,29 @@ describe('PaymentsService', () => {
 
       expect(mockPrismaService.paymentRefund.create).not.toHaveBeenCalled();
       expect(mockStripeService.createRefund).not.toHaveBeenCalled();
+    });
+
+    it('should reject status changes for a cancelled registration', async () => {
+      const cancelledPayment = {
+        ...basePayment,
+        registration: {
+          ...basePayment.registration,
+          status: RegistrationStatus.CANCELLED,
+        },
+      };
+      mockPrismaService.payment.findUnique
+        .mockResolvedValueOnce(cancelledPayment)
+        .mockResolvedValueOnce(cancelledPayment);
+
+      await expect(service.processRefund({
+        paymentId: 'payment-id',
+        amount: 25,
+        resultingRegistrationStatus: RegistrationStatus.WAITLISTED,
+      }, 'admin-id')).rejects.toThrow('Cannot edit a cancelled registration');
+
+      expect(mockPrismaService.paymentRefund.create).not.toHaveBeenCalled();
+      expect(mockStripeService.createRefund).not.toHaveBeenCalled();
+      expect(mockPrismaService.registration.update).not.toHaveBeenCalled();
     });
 
     it('should reject direct cancellation status changes outside the registration cancellation flow', async () => {
