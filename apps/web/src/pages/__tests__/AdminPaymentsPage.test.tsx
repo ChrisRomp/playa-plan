@@ -663,6 +663,25 @@ describe('AdminPaymentsPage', () => {
       });
     });
 
+    it('should hide registration status changes for an unlinked payment', async () => {
+      vi.mocked(reports.getPayments).mockResolvedValue([
+        {
+          ...mockPayments[0],
+          registrationId: null,
+        },
+      ]);
+
+      renderComponent();
+
+      await waitFor(() => {
+        expect(screen.getByTestId('payment-payment1')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByRole('button', { name: 'Refund' }));
+
+      expect(screen.queryByLabelText('Registration status change')).not.toBeInTheDocument();
+    });
+
     it('should disable PayPal refunds with an explanation', async () => {
       vi.mocked(reports.getPayments).mockResolvedValue([
         {

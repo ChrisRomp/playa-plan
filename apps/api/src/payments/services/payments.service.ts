@@ -820,6 +820,12 @@ export class PaymentsService {
           throw new NotFoundException(`Payment with ID ${data.paymentId} not found`);
         }
 
+        if (data.resultingRegistrationStatus && !payment.registration) {
+          throw new BadRequestException(
+            'Cannot change registration status for a payment without a linked registration',
+          );
+        }
+
         if (!this.isRefundableStatus(payment.status)) {
           throw new BadRequestException(`Cannot refund payment with status ${payment.status}`);
         }

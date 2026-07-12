@@ -20,6 +20,7 @@ import {
   AdminCancelRegistrationDto,
   AdminRegistrationQueryDto
 } from '../dto/admin-registration.dto';
+import { APPLICATION_STATUSES } from '../constants/registration-status.constants';
 
 describe('RegistrationAdminService', () => {
   let service: RegistrationAdminService;
@@ -1001,6 +1002,9 @@ describe('RegistrationAdminService', () => {
       expect(prismaService.registration.findMany).toHaveBeenCalledWith({
         where: {
           year: 2026,
+          status: {
+            notIn: [...APPLICATION_STATUSES],
+          },
           user: {
             AND: [
               {

@@ -1685,6 +1685,28 @@ describe('PaymentsService', () => {
       });
     });
 
+    it('should reject a registration status change when the payment has no linked registration', async () => {
+      const unlinkedPayment = {
+        ...basePayment,
+        registrationId: null,
+        registration: null,
+      };
+      mockPrismaService.payment.findUnique
+        .mockResolvedValueOnce(unlinkedPayment)
+        .mockResolvedValueOnce(unlinkedPayment);
+
+      await expect(service.processRefund({
+        paymentId: 'payment-id',
+        amount: 25,
+        resultingRegistrationStatus: RegistrationStatus.WAITLISTED,
+      }, 'admin-id')).rejects.toThrow(
+        'Cannot change registration status for a payment without a linked registration',
+      );
+
+      expect(mockPrismaService.paymentRefund.create).not.toHaveBeenCalled();
+      expect(mockStripeService.createRefund).not.toHaveBeenCalled();
+    });
+
     it('should reject direct cancellation status changes outside the registration cancellation flow', async () => {
       await expect(service.processRefund({
         paymentId: 'payment-id',

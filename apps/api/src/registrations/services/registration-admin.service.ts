@@ -28,6 +28,7 @@ import {
   ExternalPaymentRegistrationSearchQueryDto,
 } from '../dto/admin-registration.dto';
 import { randomUUID } from 'crypto';
+import { APPLICATION_STATUSES } from '../constants/registration-status.constants';
 
 export interface RefundInfo {
   hasPayments: boolean;
@@ -271,6 +272,9 @@ export class RegistrationAdminService {
     const limit = query.limit ?? 8;
     const where: Prisma.RegistrationWhereInput = {
       year: query.year,
+      status: {
+        notIn: [...APPLICATION_STATUSES],
+      },
     };
 
     if (query.registrationId) {
