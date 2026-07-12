@@ -65,6 +65,14 @@ interface ProviderRefund {
   status?: string | null;
 }
 
+interface RefundFinalization {
+  readonly refund: PaymentRefund;
+  readonly payment: RefundablePayment;
+  readonly nextStatus: PaymentStatus;
+  readonly previousRefundedCents: number;
+  readonly appliedRegistrationStatus?: RegistrationStatus;
+}
+
 /**
  * Service for managing payments
  */
@@ -165,6 +173,93 @@ export class PaymentsService {
     };
   }
 
+  private async finalizeProcessorRefund(
+    refund: PaymentRefund,
+    providerRefund: ProviderRefund,
+  ): Promise<RefundFinalization> {
+    const providerRefundStatus = this.getRefundStatusFromProviderStatus(providerRefund.status);
+
+    return this.prisma.$transaction(async (tx) => {
+      const finalizedRefund = await tx.paymentRefund.update({
+        where: { id: refund.id },
+        data: {
+          status: providerRefundStatus,
+          providerRefundId: providerRefund.id,
+        },
+      });
+      const payment = await tx.payment.findUnique({
+        where: { id: refund.paymentId },
+        include: {
+          registration: true,
+          refunds: true,
+        },
+      });
+
+      if (!payment) {
+        throw new NotFoundException(`Payment with ID ${refund.paymentId} not found`);
+      }
+
+      const refundedCents = this.getSucceededRefundCents(payment.refunds);
+      const nextStatus = this.getPaymentStatusFromRefunds(this.toCents(payment.amount), refundedCents);
+      const previousRefundedCents = finalizedRefund.status === PaymentRefundStatus.SUCCEEDED
+        ? Math.max(refundedCents - finalizedRefund.amountCents, 0)
+        : refundedCents;
+      const appliedRegistrationStatus = finalizedRefund.status === PaymentRefundStatus.SUCCEEDED
+        ? finalizedRefund.resultingRegistrationStatus ?? undefined
+        : undefined;
+
+      await tx.payment.update({
+        where: { id: payment.id },
+        data: { status: nextStatus },
+      });
+
+      if (payment.registration && appliedRegistrationStatus) {
+        await tx.registration.update({
+          where: { id: payment.registration.id },
+          data: { status: appliedRegistrationStatus },
+        });
+      }
+
+      return {
+        refund: finalizedRefund,
+        payment,
+        nextStatus,
+        previousRefundedCents,
+        appliedRegistrationStatus,
+      };
+    }, {
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+    });
+  }
+
+  private async createRefundAudit(
+    finalization: RefundFinalization,
+    transactionId: string,
+  ): Promise<void> {
+    await this.adminAuditService.createAuditRecord({
+      adminUserId: finalization.refund.processedByUserId,
+      actionType: AdminAuditActionType.PAYMENT_REFUND,
+      targetRecordType: AdminAuditTargetType.PAYMENT,
+      targetRecordId: finalization.payment.id,
+      oldValues: {
+        status: finalization.payment.status,
+        refundedAmount: this.toDollars(finalization.previousRefundedCents),
+      },
+      newValues: {
+        status: finalization.nextStatus,
+        refundId: finalization.refund.id,
+        refundAmount: this.toDollars(finalization.refund.amountCents),
+        refundAmountCents: finalization.refund.amountCents,
+        providerRefundId: finalization.refund.providerRefundId,
+        processorRefund: finalization.refund.processorRefund,
+        resultingRegistrationStatus: finalization.appliedRegistrationStatus,
+      },
+      reason: finalization.refund.reason ?? undefined,
+      transactionId,
+      throwOnError: false,
+    });
+  }
+
   private async reconcilePendingProcessorRefunds(payment: RefundablePayment): Promise<void> {
     const pendingRefunds = payment.refunds.filter(
       (refund) => refund.processorRefund && refund.status === PaymentRefundStatus.PENDING,
@@ -178,70 +273,21 @@ export class PaymentsService {
       return;
     }
 
-    const reconciledRefundIds = new Set<string>();
     for (const refund of pendingRefunds) {
       const providerRefund = refund.providerRefundId
         ? await this.stripeService.retrieveRefund(refund.providerRefundId)
-        : await this.stripeService.createRefund(
-          payment.providerRefId,
-          refund.amountCents,
-          refund.reason ?? undefined,
-          refund.id,
+        : await this.stripeService.findRefundByMetadata(payment.providerRefId, refund.id);
+
+      if (!providerRefund) {
+        this.logger.warn(
+          `Pending refund ${refund.id} could not be found in Stripe; leaving it pending for later reconciliation`,
         );
-      const refundStatus = this.getRefundStatusFromProviderStatus(providerRefund.status);
-
-      await this.prisma.paymentRefund.update({
-        where: { id: refund.id },
-        data: {
-          status: refundStatus,
-          providerRefundId: providerRefund.id,
-        },
-      });
-      reconciledRefundIds.add(refund.id);
-    }
-
-    if (reconciledRefundIds.size === 0) {
-      return;
-    }
-
-    const refreshedPayment = await this.prisma.payment.findUnique({
-      where: { id: payment.id },
-      include: {
-        registration: true,
-        refunds: true,
-      },
-    });
-
-    if (!refreshedPayment) {
-      return;
-    }
-
-    const refundedCents = this.getSucceededRefundCents(refreshedPayment.refunds);
-    const nextStatus = this.getPaymentStatusFromRefunds(this.toCents(refreshedPayment.amount), refundedCents);
-    const transactionUpdates: Prisma.PrismaPromise<unknown>[] = [
-      this.prisma.payment.update({
-        where: { id: refreshedPayment.id },
-        data: { status: nextStatus },
-      }),
-    ];
-
-    for (const refund of refreshedPayment.refunds) {
-      if (
-        reconciledRefundIds.has(refund.id) &&
-        refund.status === PaymentRefundStatus.SUCCEEDED &&
-        refund.resultingRegistrationStatus &&
-        refreshedPayment.registration
-      ) {
-        transactionUpdates.push(
-          this.prisma.registration.update({
-            where: { id: refreshedPayment.registration.id },
-            data: { status: refund.resultingRegistrationStatus },
-          }),
-        );
+        continue;
       }
-    }
 
-    await this.prisma.$transaction(transactionUpdates);
+      const finalization = await this.finalizeProcessorRefund(refund, providerRefund);
+      await this.createRefundAudit(finalization, `refund-reconcile-${refund.id}`);
+    }
   }
 
   /**
@@ -832,6 +878,10 @@ export class PaymentsService {
             pendingRefund.amountCents,
             data.reason,
             pendingRefund.id,
+            {
+              refundId: pendingRefund.id,
+              paymentId: paymentForProcessor.id,
+            },
           );
           processorRefundSubmitted = true;
         } catch (error: unknown) {
@@ -839,18 +889,31 @@ export class PaymentsService {
           throw error;
         }
 
-        const providerRefundStatus = this.getRefundStatusFromProviderStatus(providerRefund.status);
-        await this.prisma.paymentRefund.update({
-          where: { id: pendingRefund.id },
-          data: {
-            status: providerRefundStatus,
+        let finalization: RefundFinalization;
+        try {
+          finalization = await this.finalizeProcessorRefund(pendingRefund, providerRefund);
+        } catch (error: unknown) {
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          this.logger.error(
+            `Stripe refund ${providerRefund.id} was submitted but local finalization failed: ${errorMessage}`,
+            error instanceof Error ? error.stack : undefined,
+          );
+          return {
+            paymentId: paymentForProcessor.id,
+            refundAmount: this.toDollars(pendingRefund.amountCents),
             providerRefundId: providerRefund.id,
-          },
-        });
-        pendingRefund = {
-          ...pendingRefund,
-          status: providerRefundStatus,
+            success: false,
+            refundStatus: PaymentRefundStatus.PENDING,
+          };
+        }
+
+        await this.createRefundAudit(finalization, refundRequestId);
+        return {
+          paymentId: finalization.payment.id,
+          refundAmount: this.toDollars(finalization.refund.amountCents),
           providerRefundId: providerRefund.id,
+          success: finalization.refund.status === PaymentRefundStatus.SUCCEEDED,
+          refundStatus: finalization.refund.status,
         };
       }
 

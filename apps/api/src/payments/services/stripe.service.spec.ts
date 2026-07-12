@@ -18,6 +18,7 @@ const mockStripeInstance = {
   },
   refunds: {
     create: jest.fn(),
+    list: jest.fn(),
   },
 };
 
@@ -277,6 +278,40 @@ describe('StripeService', () => {
       expect(result).toEqual(mockRefund);
     });
 
+    it('should attach PlayaPlan correlation metadata to Stripe refunds', async () => {
+      const paymentIntentId = 'pi_1234567890';
+      const amount = 1000;
+      const idempotencyKey = 'refund-id';
+      const metadata = {
+        refundId: 'refund-id',
+        paymentId: 'payment-id',
+      };
+      const mockRefund = { id: 're_123', amount: 1000 };
+
+      mockStripeInstance.refunds.create.mockResolvedValue(mockRefund);
+
+      const result = await service.createRefund(
+        paymentIntentId,
+        amount,
+        undefined,
+        idempotencyKey,
+        metadata,
+      );
+
+      expect(mockStripeInstance.refunds.create).toHaveBeenCalledWith(
+        {
+          payment_intent: paymentIntentId,
+          amount,
+          metadata: {
+            playaPlanRefundId: 'refund-id',
+            playaPlanPaymentId: 'payment-id',
+          },
+        },
+        { idempotencyKey },
+      );
+      expect(result).toEqual(mockRefund);
+    });
+
     it('should convert checkout session IDs to payment intent IDs', async () => {
       const sessionId = 'cs_1234567890';
       const paymentIntentId = 'pi_0987654321';
@@ -390,6 +425,45 @@ describe('StripeService', () => {
       expect(loggerSpy.error).toHaveBeenCalledWith(
         'Failed to process refund: Stripe API error'
       );
+    });
+  });
+
+  describe('findRefundByMetadata', () => {
+    it('should return the Stripe refund correlated to the local refund ID', async () => {
+      const matchingRefund = {
+        id: 're_matching',
+        metadata: {
+          playaPlanRefundId: 'refund-id',
+        },
+      };
+      mockStripeInstance.refunds.list.mockResolvedValue({
+        data: [
+          {
+            id: 're_other',
+            metadata: {
+              playaPlanRefundId: 'other-refund-id',
+            },
+          },
+          matchingRefund,
+        ],
+      });
+
+      const result = await service.findRefundByMetadata('pi_123', 'refund-id');
+
+      expect(mockStripeInstance.refunds.list).toHaveBeenCalledWith({
+        payment_intent: 'pi_123',
+        limit: 100,
+      });
+      expect(result).toEqual(matchingRefund);
+    });
+
+    it('should return null instead of creating another refund when no match exists', async () => {
+      mockStripeInstance.refunds.list.mockResolvedValue({ data: [] });
+
+      const result = await service.findRefundByMetadata('pi_123', 'refund-id');
+
+      expect(result).toBeNull();
+      expect(mockStripeInstance.refunds.create).not.toHaveBeenCalled();
     });
   });
   

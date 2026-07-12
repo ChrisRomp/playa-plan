@@ -11,6 +11,11 @@ export class StripeRefundError extends Error {
   }
 }
 
+interface RefundMetadata {
+  readonly refundId: string;
+  readonly paymentId: string;
+}
+
 /**
  * Service for handling Stripe payment processing
  */
@@ -76,6 +81,25 @@ export class StripeService {
 
     const stripeErrorType = String((error as { type?: unknown }).type ?? '');
     return stripeErrorType === 'StripeConnectionError' || stripeErrorType === 'StripeAPIError';
+  }
+
+  private async resolvePaymentIntentId(providerRefId: string): Promise<string> {
+    if (!providerRefId.startsWith('cs_')) {
+      return providerRefId;
+    }
+
+    this.logger.log(`Converting checkout session ${providerRefId} to payment intent ID`);
+    const session = await this.getCheckoutSession(providerRefId);
+
+    if (!session.payment_intent) {
+      throw new Error(`Checkout session ${providerRefId} has no associated payment intent`);
+    }
+
+    const paymentIntentId = typeof session.payment_intent === 'string'
+      ? session.payment_intent
+      : session.payment_intent.id;
+    this.logger.log(`Found payment intent ${paymentIntentId} for session ${providerRefId}`);
+    return paymentIntentId;
   }
 
   /**
@@ -174,6 +198,7 @@ export class StripeService {
     amount?: number,
     reason?: string,
     idempotencyKey?: string,
+    metadata?: RefundMetadata,
   ): Promise<Stripe.Refund> {
     let refundRequestAttempted = false;
 
@@ -181,24 +206,7 @@ export class StripeService {
       this.logger.log(`Creating refund for payment ${providerRefId}`);
       
       const stripe = await this.getStripe();
-      
-      // If the ID starts with 'cs_', it's a checkout session ID, we need to get the payment intent
-      let paymentIntentId = providerRefId;
-      if (providerRefId.startsWith('cs_')) {
-        this.logger.log(`Converting checkout session ${providerRefId} to payment intent ID`);
-        const session = await this.getCheckoutSession(providerRefId);
-        
-        if (!session.payment_intent) {
-          throw new Error(`Checkout session ${providerRefId} has no associated payment intent`);
-        }
-        
-        // payment_intent can be either a string ID or an expanded PaymentIntent object
-        paymentIntentId = typeof session.payment_intent === 'string' 
-          ? session.payment_intent 
-          : session.payment_intent.id;
-        
-        this.logger.log(`Found payment intent ${paymentIntentId} for session ${providerRefId}`);
-      }
+      const paymentIntentId = await this.resolvePaymentIntentId(providerRefId);
       
       const refundParams: Stripe.RefundCreateParams = {
         payment_intent: paymentIntentId,
@@ -220,6 +228,13 @@ export class StripeService {
           refundParams.reason = 'requested_by_customer';
         }
       }
+
+      if (metadata) {
+        refundParams.metadata = {
+          playaPlanRefundId: metadata.refundId,
+          playaPlanPaymentId: metadata.paymentId,
+        };
+      }
       
       refundRequestAttempted = true;
       const refund = idempotencyKey
@@ -236,6 +251,25 @@ export class StripeService {
         sanitizedMessage,
         possiblySubmitted,
       );
+    }
+  }
+
+  async findRefundByMetadata(providerRefId: string, refundId: string): Promise<Stripe.Refund | null> {
+    try {
+      const stripe = await this.getStripe();
+      const paymentIntentId = await this.resolvePaymentIntentId(providerRefId);
+      const refunds = await stripe.refunds.list({
+        payment_intent: paymentIntentId,
+        limit: 100,
+      });
+
+      return refunds.data.find(
+        (refund) => refund.metadata?.playaPlanRefundId === refundId,
+      ) ?? null;
+    } catch (error: unknown) {
+      const sanitizedMessage = this.sanitizeErrorMessage(error);
+      this.logger.error(`Failed to find refund by metadata: ${sanitizedMessage}`);
+      throw new Error(sanitizedMessage);
     }
   }
 

@@ -36,6 +36,7 @@ const mockStripeService = {
   createPaymentIntent: jest.fn(),
   createCheckoutSession: jest.fn(),
   createRefund: jest.fn(),
+  findRefundByMetadata: jest.fn(),
   retrieveRefund: jest.fn(),
   getPaymentIntent: jest.fn(),
   getCheckoutSession: jest.fn(),
@@ -957,6 +958,7 @@ describe('PaymentsService', () => {
         providerRefundId: null,
       });
       mockStripeService.createRefund.mockResolvedValue({ id: 're_stripe123', status: 'succeeded' });
+      mockPrismaService.paymentRefund.update.mockResolvedValueOnce(succeededRefund);
 
       const result = await service.processRefund({
         paymentId: 'payment-id',
@@ -973,7 +975,16 @@ describe('PaymentsService', () => {
           processedByUserId: 'admin-id',
         }),
       });
-      expect(mockStripeService.createRefund).toHaveBeenCalledWith('pi_stripe123', 2500, 'Partial refund', 'refund-id');
+      expect(mockStripeService.createRefund).toHaveBeenCalledWith(
+        'pi_stripe123',
+        2500,
+        'Partial refund',
+        'refund-id',
+        {
+          refundId: 'refund-id',
+          paymentId: 'payment-id',
+        },
+      );
       expect(mockPrismaService.payment.update).toHaveBeenCalledWith({
         where: { id: 'payment-id' },
         data: { status: PaymentStatus.PARTIALLY_REFUNDED },
@@ -1016,6 +1027,7 @@ describe('PaymentsService', () => {
         providerRefundId: null,
       });
       mockStripeService.createRefund.mockResolvedValue({ id: 're_stripe123', status: 'pending' });
+      mockPrismaService.paymentRefund.update.mockResolvedValueOnce(pendingRefund);
 
       const result = await service.processRefund({
         paymentId: 'payment-id',
@@ -1091,7 +1103,8 @@ describe('PaymentsService', () => {
           },
           refunds: [succeededRefund],
         });
-      mockStripeService.createRefund.mockResolvedValueOnce({ id: 're_reconciled', status: 'succeeded' });
+      mockStripeService.findRefundByMetadata.mockResolvedValueOnce({ id: 're_reconciled', status: 'succeeded' });
+      mockPrismaService.paymentRefund.update.mockResolvedValueOnce(succeededRefund);
 
       await expect(service.processRefund({
         paymentId: 'payment-id',
@@ -1099,12 +1112,11 @@ describe('PaymentsService', () => {
         reason: 'Duplicate refund attempt',
       }, 'admin-id')).rejects.toThrow('Cannot refund payment with status REFUNDED');
 
-      expect(mockStripeService.createRefund).toHaveBeenCalledWith(
+      expect(mockStripeService.findRefundByMetadata).toHaveBeenCalledWith(
         'pi_stripe123',
-        10000,
-        'Full pending refund',
         'pending-refund-id',
       );
+      expect(mockStripeService.createRefund).not.toHaveBeenCalled();
       expect(mockPrismaService.paymentRefund.update).toHaveBeenCalledWith({
         where: { id: 'pending-refund-id' },
         data: {
@@ -1120,6 +1132,45 @@ describe('PaymentsService', () => {
         where: { id: 'registration-id' },
         data: { status: RegistrationStatus.WAITLISTED },
       });
+      expect(mockPrismaService.paymentRefund.create).not.toHaveBeenCalled();
+    });
+
+    it('should leave an unlinked pending Stripe refund pending without resubmitting it', async () => {
+      const pendingRefund = {
+        id: 'pending-refund-id',
+        paymentId: 'payment-id',
+        amountCents: 10000,
+        currency: 'USD',
+        status: PaymentRefundStatus.PENDING,
+        processorRefund: true,
+        providerRefundId: null,
+        reason: 'Ambiguous full refund',
+        resultingRegistrationStatus: null,
+        processedByUserId: 'admin-id',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      const paymentWithPendingRefund = {
+        ...basePayment,
+        refunds: [pendingRefund],
+      };
+      mockPrismaService.payment.findUnique
+        .mockResolvedValueOnce(paymentWithPendingRefund)
+        .mockResolvedValueOnce(paymentWithPendingRefund);
+      mockStripeService.findRefundByMetadata.mockResolvedValueOnce(null);
+
+      await expect(service.processRefund({
+        paymentId: 'payment-id',
+        amount: 10,
+        reason: 'Follow-up refund attempt',
+      }, 'admin-id')).rejects.toThrow('Payment has no remaining refundable balance');
+
+      expect(mockStripeService.findRefundByMetadata).toHaveBeenCalledWith(
+        'pi_stripe123',
+        'pending-refund-id',
+      );
+      expect(mockStripeService.createRefund).not.toHaveBeenCalled();
+      expect(mockPrismaService.paymentRefund.update).not.toHaveBeenCalled();
       expect(mockPrismaService.paymentRefund.create).not.toHaveBeenCalled();
     });
 
@@ -1172,6 +1223,7 @@ describe('PaymentsService', () => {
           refunds: [priorSucceededRefund, reconciledRefund],
         });
       mockStripeService.retrieveRefund.mockResolvedValueOnce({ id: 're_pending', status: 'succeeded' });
+      mockPrismaService.paymentRefund.update.mockResolvedValueOnce(reconciledRefund);
 
       await expect(service.processRefund({
         paymentId: 'payment-id',
@@ -1224,6 +1276,7 @@ describe('PaymentsService', () => {
         providerRefundId: null,
       });
       mockStripeService.createRefund.mockResolvedValue({ id: 're_stripe123', status: 'failed' });
+      mockPrismaService.paymentRefund.update.mockResolvedValueOnce(failedRefund);
 
       const result = await service.processRefund({
         paymentId: 'payment-id',
@@ -1251,6 +1304,67 @@ describe('PaymentsService', () => {
         success: false,
         refundStatus: PaymentRefundStatus.FAILED,
       });
+    });
+
+    it('should return a pending result when Stripe succeeds but local finalization fails', async () => {
+      const pendingRefund = {
+        id: 'refund-id',
+        paymentId: 'payment-id',
+        amountCents: 2500,
+        currency: 'USD',
+        status: PaymentRefundStatus.PENDING,
+        processorRefund: true,
+        providerRefundId: null,
+        reason: 'Partial refund',
+        resultingRegistrationStatus: RegistrationStatus.WAITLISTED,
+        processedByUserId: 'admin-id',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      mockPrismaService.payment.findUnique
+        .mockResolvedValueOnce(basePayment)
+        .mockResolvedValueOnce(basePayment);
+      mockPrismaService.paymentRefund.create.mockResolvedValueOnce(pendingRefund);
+      mockStripeService.createRefund.mockResolvedValueOnce({
+        id: 're_stripe123',
+        status: 'succeeded',
+      });
+      mockPrismaService.$transaction
+        .mockImplementationOnce((operation: unknown) => (
+          typeof operation === 'function'
+            ? operation(mockPrismaService)
+            : Promise.resolve(operation)
+        ))
+        .mockRejectedValueOnce(new Error('database commit failed'));
+
+      const result = await service.processRefund({
+        paymentId: 'payment-id',
+        amount: 25,
+        reason: 'Partial refund',
+        resultingRegistrationStatus: RegistrationStatus.WAITLISTED,
+      }, 'admin-id');
+
+      expect(result).toEqual({
+        paymentId: 'payment-id',
+        refundAmount: 25,
+        providerRefundId: 're_stripe123',
+        success: false,
+        refundStatus: PaymentRefundStatus.PENDING,
+      });
+      expect(mockStripeService.createRefund).toHaveBeenCalledWith(
+        'pi_stripe123',
+        2500,
+        'Partial refund',
+        'refund-id',
+        {
+          refundId: 'refund-id',
+          paymentId: 'payment-id',
+        },
+      );
+      expect(mockPrismaService.paymentRefund.update).not.toHaveBeenCalled();
+      expect(mockPrismaService.payment.update).not.toHaveBeenCalled();
+      expect(mockPrismaService.registration.update).not.toHaveBeenCalled();
+      expect(mockAdminAuditService.createAuditRecord).not.toHaveBeenCalled();
     });
 
     it('should not mark a processor-submitted refund failed after an ambiguous Stripe error', async () => {
@@ -1286,6 +1400,10 @@ describe('PaymentsService', () => {
         2500,
         'Ambiguous refund',
         'refund-id',
+        {
+          refundId: 'refund-id',
+          paymentId: 'payment-id',
+        },
       );
       expect(mockPrismaService.paymentRefund.update).not.toHaveBeenCalled();
     });
@@ -1459,6 +1577,7 @@ describe('PaymentsService', () => {
         providerRefundId: null,
       });
       mockStripeService.createRefund.mockResolvedValue({ id: 're_stripe123', status: 'succeeded' });
+      mockPrismaService.paymentRefund.update.mockResolvedValueOnce(succeededRefund);
 
       await service.processRefund({
         paymentId: 'payment-id',
