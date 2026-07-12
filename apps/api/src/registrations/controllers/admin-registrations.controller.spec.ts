@@ -10,6 +10,7 @@ import {
   AdminCancelRegistrationDto,
   AdminRegistrationQueryDto,
   AdminRegistrationResponseDto,
+  ExternalPaymentRegistrationSearchQueryDto,
 } from '../dto/admin-registration.dto';
 
 interface MockAuthenticatedRequest {
@@ -113,6 +114,7 @@ describe('AdminRegistrationsController', () => {
   beforeEach(async () => {
     const mockAdminService = {
       getRegistrations: jest.fn(),
+      searchExternalPaymentRegistrations: jest.fn(),
       editRegistration: jest.fn(),
       cancelRegistration: jest.fn(),
       getRegistrationAuditTrail: jest.fn(),
@@ -155,6 +157,29 @@ describe('AdminRegistrationsController', () => {
 
       expect(adminService.getRegistrations).toHaveBeenCalledWith(query);
       expect(result).toEqual(mockRegistrationsResponse);
+    });
+
+    describe('searchExternalPaymentRegistrations', () => {
+      it('should search lightweight registration records with the supplied query', async () => {
+        const inputQuery: ExternalPaymentRegistrationSearchQueryDto = {
+          year: 2026,
+          search: 'John',
+          limit: 8,
+        };
+        const expectedResult = {
+          registrations: [mockRegistration],
+          total: 1,
+          page: 1,
+          limit: 8,
+          totalPages: 1,
+        };
+        adminService.searchExternalPaymentRegistrations.mockResolvedValue(expectedResult);
+
+        const actualResult = await controller.searchExternalPaymentRegistrations(inputQuery);
+
+        expect(adminService.searchExternalPaymentRegistrations).toHaveBeenCalledWith(inputQuery);
+        expect(actualResult).toEqual(expectedResult);
+      });
     });
 
     it('should handle query parameters correctly', async () => {

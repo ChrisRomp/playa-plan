@@ -1,10 +1,11 @@
 import { api } from '../api';
+import type { RegistrationStatus } from '../../types';
 
 // TODO: Replace with actual API types when implemented
 interface Registration {
   id: string;
   year: number;
-  status: 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'WAITLISTED';
+  status: RegistrationStatus;
   createdAt: string;
   user: {
     id: string;
@@ -86,8 +87,36 @@ interface RegistrationFilters {
   limit?: number;
 }
 
+interface ExternalPaymentRegistrationSearchFilters {
+  year: number;
+  search?: string;
+  registrationId?: string;
+  limit?: number;
+}
+
+interface ExternalPaymentRegistration {
+  id: string;
+  year: number;
+  status: RegistrationStatus;
+  user: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    playaName?: string | null;
+  };
+}
+
 export interface PaginatedRegistrationsResponse {
   registrations: Registration[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export interface ExternalPaymentRegistrationSearchResponse {
+  registrations: ExternalPaymentRegistration[];
   total: number;
   page: number;
   limit: number;
@@ -153,6 +182,19 @@ export const adminRegistrationsApi = {
     if (filters.limit) params.append('limit', filters.limit.toString());
 
     const response = await api.get(`/admin/registrations?${params.toString()}`);
+    return response.data;
+  },
+
+  searchExternalPaymentRegistrations: async (
+    filters: ExternalPaymentRegistrationSearchFilters
+  ): Promise<ExternalPaymentRegistrationSearchResponse> => {
+    const params = new URLSearchParams({ year: filters.year.toString() });
+
+    if (filters.search) params.append('search', filters.search);
+    if (filters.registrationId) params.append('registrationId', filters.registrationId);
+    if (filters.limit) params.append('limit', filters.limit.toString());
+
+    const response = await api.get(`/admin/registrations/search?${params.toString()}`);
     return response.data;
   },
 

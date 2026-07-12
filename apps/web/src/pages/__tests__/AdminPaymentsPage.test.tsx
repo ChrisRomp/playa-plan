@@ -24,6 +24,7 @@ vi.mock('../../utils/csv', () => ({
 vi.mock('../../lib/api/admin-registrations', () => ({
   adminRegistrationsApi: {
     getRegistrations: vi.fn(),
+    searchExternalPaymentRegistrations: vi.fn(),
   },
 }));
 
@@ -87,6 +88,7 @@ const mockPayments: Payment[] = [
     status: 'COMPLETED',
     provider: 'STRIPE',
     providerRefId: 'stripe_12345',
+    processorRefundAvailable: true,
     createdAt: '2024-01-15T10:00:00Z',
     updatedAt: '2024-01-15T10:00:00Z',
     userId: 'user1',
@@ -189,6 +191,13 @@ describe('AdminPaymentsPage', () => {
       limit: 100,
       totalPages: 1,
     });
+    vi.mocked(adminRegistrationsApi.searchExternalPaymentRegistrations).mockResolvedValue({
+      registrations: [mockCurrentYearRegistration],
+      total: 1,
+      page: 1,
+      limit: 8,
+      totalPages: 1,
+    });
   });
 
   afterEach(() => {
@@ -288,9 +297,11 @@ describe('AdminPaymentsPage', () => {
       expect(await screen.findByText(/john@example\.com/)).toBeInTheDocument();
       expect(screen.queryByLabelText('User ID')).not.toBeInTheDocument();
       expect(screen.queryByLabelText('Registration ID')).not.toBeInTheDocument();
-      expect(adminRegistrationsApi.getRegistrations).toHaveBeenCalledWith({
+      expect(adminRegistrationsApi.searchExternalPaymentRegistrations).toHaveBeenCalledWith({
         year: 2026,
-        limit: 100,
+        registrationId: 'registration-1',
+        search: undefined,
+        limit: 8,
       });
 
       fireEvent.click(screen.getByText('Change registration'));
@@ -393,6 +404,37 @@ describe('AdminPaymentsPage', () => {
       expect(statusSelect).toHaveValue('COMPLETED');
     });
 
+    it('should keep the latest payment response when filter requests resolve out of order', async () => {
+      let resolvePreviousRequest: (value: Payment[]) => void = () => {};
+      const previousRequest = new Promise<Payment[]>(resolve => {
+        resolvePreviousRequest = resolve;
+      });
+      const mockGetPayments = vi
+        .mocked(reports.getPayments)
+        .mockResolvedValueOnce(mockPayments)
+        .mockImplementationOnce(() => previousRequest)
+        .mockResolvedValueOnce([mockPayments[1]]);
+
+      renderComponent();
+      await screen.findByTestId('payment-payment1');
+
+      fireEvent.click(screen.getByText('Filters'));
+      const statusSelect = await screen.findByLabelText('Status');
+      fireEvent.change(statusSelect, { target: { value: 'COMPLETED' } });
+      await waitFor(() => expect(mockGetPayments).toHaveBeenCalledTimes(2));
+
+      fireEvent.change(statusSelect, { target: { value: 'PENDING' } });
+      await waitFor(() => expect(mockGetPayments).toHaveBeenCalledTimes(3));
+      await screen.findByTestId('payment-payment2');
+
+      resolvePreviousRequest([mockPayments[0]]);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('payment-payment2')).toBeInTheDocument();
+      });
+      expect(screen.queryByTestId('empty-message')).not.toBeInTheDocument();
+    });
+
     it('should apply provider filter', async () => {
       renderComponent();
 
@@ -490,7 +532,7 @@ describe('AdminPaymentsPage', () => {
       fireEvent.change(await screen.findByLabelText('Registration'), {
         target: { value: 'john@example.com' },
       });
-      fireEvent.click(screen.getByRole('button', { name: /John Doe.*john@example\.com/i }));
+      fireEvent.click(await screen.findByRole('button', { name: /John Doe.*john@example\.com/i }));
       fireEvent.change(screen.getByLabelText('Amount'), { target: { value: '125.50' } });
       fireEvent.change(screen.getByLabelText('External method'), { target: { value: 'Check' } });
       fireEvent.change(screen.getByLabelText('Reference'), { target: { value: 'Check #1234' } });
@@ -542,6 +584,13 @@ describe('AdminPaymentsPage', () => {
     });
 
     it('should require an explicit refund amount and prominently identify offline refunds', async () => {
+      vi.mocked(reports.getPayments).mockResolvedValue([
+        {
+          ...mockPayments[0],
+          provider: 'MANUAL',
+        },
+      ]);
+
       renderComponent();
 
       await waitFor(() => {
@@ -557,6 +606,25 @@ describe('AdminPaymentsPage', () => {
       expect(screen.getByRole('alert')).toHaveTextContent('Manual refund only');
       expect(screen.getByRole('alert')).toHaveTextContent(
         'This refund will be recorded as a manual/offline refund.'
+      );
+    });
+
+    it('should disable Stripe refunds when processor refunds are unavailable', async () => {
+      vi.mocked(reports.getPayments).mockResolvedValue([
+        {
+          ...mockPayments[0],
+          processorRefundAvailable: false,
+        },
+      ]);
+
+      renderComponent();
+
+      const refundButton = await screen.findByRole('button', { name: 'Refund' });
+
+      expect(refundButton).toBeDisabled();
+      expect(refundButton).toHaveAttribute(
+        'title',
+        'Stripe refunds are unavailable for this payment'
       );
     });
 

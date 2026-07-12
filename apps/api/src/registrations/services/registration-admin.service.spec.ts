@@ -964,6 +964,88 @@ describe('RegistrationAdminService', () => {
     });
   });
 
+  describe('searchExternalPaymentRegistrations', () => {
+    it('should return a small paginated result without registration relations', async () => {
+      const inputQuery = {
+        year: 2026,
+        search: 'John Smith',
+        page: 2,
+        limit: 8,
+      };
+      const mockSearchResults = [
+        {
+          id: 'reg-456',
+          year: 2026,
+          status: RegistrationStatus.CONFIRMED,
+          user: {
+            id: 'user-456',
+            email: 'john.smith@example.com',
+            firstName: 'John',
+            lastName: 'Smith',
+            playaName: 'Dusty',
+          },
+        },
+      ];
+      (prismaService.registration.findMany as jest.Mock).mockResolvedValue(mockSearchResults);
+      (prismaService.registration.count as jest.Mock).mockResolvedValue(9);
+
+      const actualResult = await service.searchExternalPaymentRegistrations(inputQuery);
+
+      expect(actualResult).toEqual({
+        registrations: mockSearchResults,
+        total: 9,
+        page: 2,
+        limit: 8,
+        totalPages: 2,
+      });
+      expect(prismaService.registration.findMany).toHaveBeenCalledWith({
+        where: {
+          year: 2026,
+          user: {
+            AND: [
+              {
+                OR: [
+                  { firstName: { contains: 'John', mode: 'insensitive' } },
+                  { lastName: { contains: 'John', mode: 'insensitive' } },
+                  { playaName: { contains: 'John', mode: 'insensitive' } },
+                  { email: { contains: 'John', mode: 'insensitive' } },
+                ],
+              },
+              {
+                OR: [
+                  { firstName: { contains: 'Smith', mode: 'insensitive' } },
+                  { lastName: { contains: 'Smith', mode: 'insensitive' } },
+                  { playaName: { contains: 'Smith', mode: 'insensitive' } },
+                  { email: { contains: 'Smith', mode: 'insensitive' } },
+                ],
+              },
+            ],
+          },
+        },
+        select: {
+          id: true,
+          year: true,
+          status: true,
+          user: {
+            select: {
+              id: true,
+              email: true,
+              firstName: true,
+              lastName: true,
+              playaName: true,
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip: 8,
+        take: 8,
+      });
+      expect(prismaService.registration.count).toHaveBeenCalledWith({
+        where: expect.objectContaining({ year: 2026 }),
+      });
+    });
+  });
+
   describe('getUserCampingOptions', () => {
     it('should return camping options for a registration user', async () => {
       const mockCampingOptionRegistrations = [

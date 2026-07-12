@@ -151,10 +151,17 @@ describe('Admin payments (e2e)', () => {
   });
 
   it('records partial and full manual refunds without changing registration status unless requested', async () => {
-    const payment = await prismaService.payment.findFirstOrThrow({
-      where: {
-        registrationId,
+    const payment = await prismaService.payment.create({
+      data: {
+        amount: 125.5,
+        currency: 'USD',
+        status: PaymentStatus.COMPLETED,
         provider: PaymentProvider.MANUAL,
+        userId: participantUserId,
+        registrationId,
+        externalPaymentMethod: 'Check',
+        externalPaymentReference: 'Refund test payment',
+        recordedByUserId: adminUserId,
       },
     });
 

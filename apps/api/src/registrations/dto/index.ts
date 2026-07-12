@@ -14,6 +14,7 @@ export {
   AdminCancelRegistrationDto,
   AdminRegistrationResponseDto,
   AdminRegistrationQueryDto,
+  ExternalPaymentRegistrationSearchQueryDto,
   CampingOptionFieldValueDto,
   CampingOptionRegistrationWithFieldsDto,
   AdminCampingOptionQueryDto,

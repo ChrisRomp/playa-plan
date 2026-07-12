@@ -8,6 +8,7 @@ import {
   IsBoolean,
   IsInt,
   Min,
+  Max,
   ValidateNested
 } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
@@ -190,6 +191,55 @@ export class AdminRegistrationQueryDto {
   })
   @IsBoolean({ message: 'Include user profile must be a boolean' })
   includeUserProfile?: boolean = false;
+}
+
+export class ExternalPaymentRegistrationSearchQueryDto {
+  @ApiProperty({
+    description: 'Registration year to search',
+    example: 2026,
+  })
+  @Type(() => Number)
+  @IsInt({ message: 'Year must be an integer' })
+  @Min(2020, { message: 'Year must be 2020 or later' })
+  year!: number;
+
+  @ApiPropertyOptional({
+    description: 'Search user name, playa name, or email',
+    example: 'John Smith',
+  })
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  @ApiPropertyOptional({
+    description: 'Return an exact registration',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
+  @IsOptional()
+  @IsUUID(4, { message: 'Registration ID must be a valid UUID' })
+  registrationId?: string;
+
+  @ApiPropertyOptional({
+    description: 'Page number (1-based)',
+    default: 1,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: 'Page must be an integer' })
+  @Min(1, { message: 'Page must be 1 or greater' })
+  page?: number;
+
+  @ApiPropertyOptional({
+    description: 'Number of matching registrations to return',
+    default: 8,
+    maximum: 8,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: 'Limit must be an integer' })
+  @Min(1, { message: 'Limit must be 1 or greater' })
+  @Max(8, { message: 'Limit must be 8 or less' })
+  limit?: number;
 }
 
 /**

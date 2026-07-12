@@ -24,7 +24,8 @@ import {
   AdminEditRegistrationDto, 
   AdminCancelRegistrationDto, 
   AdminRegistrationResponseDto,
-  AdminRegistrationQueryDto
+  AdminRegistrationQueryDto,
+  ExternalPaymentRegistrationSearchQueryDto,
 } from '../dto/admin-registration.dto';
 import { randomUUID } from 'crypto';
 
@@ -35,6 +36,19 @@ export interface RefundInfo {
   message: string;
   processed?: boolean;
   refundAmount?: number;
+}
+
+export interface ExternalPaymentRegistrationSearchResult {
+  id: string;
+  year: number;
+  status: RegistrationStatus;
+  user: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    playaName: string | null;
+  };
 }
 
 /**
@@ -242,6 +256,80 @@ export class RegistrationAdminService {
         userId: true,
       },
     });
+  }
+
+  async searchExternalPaymentRegistrations(
+    query: ExternalPaymentRegistrationSearchQueryDto,
+  ): Promise<{
+    registrations: ExternalPaymentRegistrationSearchResult[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }> {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 8;
+    const where: Prisma.RegistrationWhereInput = {
+      year: query.year,
+    };
+
+    if (query.registrationId) {
+      where.id = query.registrationId;
+    }
+
+    const searchTerm = query.search?.trim();
+    if (searchTerm) {
+      const tokens = searchTerm.split(/\s+/).filter(Boolean);
+      const searchClauses = (token: string): Prisma.UserWhereInput[] => [
+        { firstName: { contains: token, mode: 'insensitive' } },
+        { lastName: { contains: token, mode: 'insensitive' } },
+        { playaName: { contains: token, mode: 'insensitive' } },
+        { email: { contains: token, mode: 'insensitive' } },
+      ];
+
+      where.user =
+        tokens.length === 1
+          ? { OR: searchClauses(tokens[0]) }
+          : {
+              AND: tokens.map((token) => ({
+                OR: searchClauses(token),
+              })),
+            };
+    }
+
+    const [registrations, total] = await Promise.all([
+      this.prisma.registration.findMany({
+        where,
+        select: {
+          id: true,
+          year: true,
+          status: true,
+          user: {
+            select: {
+              id: true,
+              email: true,
+              firstName: true,
+              lastName: true,
+              playaName: true,
+            },
+          },
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.registration.count({ where }),
+    ]);
+
+    return {
+      registrations,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
   }
 
   /**

@@ -100,6 +100,7 @@ export function PaymentReportsPage() {
         pending: 0,
         failed: 0,
         refunded: 0,
+        partiallyRefunded: 0,
         totalAmount: 0,
       };
     }
@@ -109,11 +110,17 @@ export function PaymentReportsPage() {
     const pending = filteredPayments.filter(payment => payment.status === 'PENDING').length;
     const failed = filteredPayments.filter(payment => payment.status === 'FAILED').length;
     const refunded = filteredPayments.filter(payment => payment.status === 'REFUNDED').length;
+    const partiallyRefunded = filteredPayments.filter(
+      payment => payment.status === 'PARTIALLY_REFUNDED'
+    ).length;
     const totalAmount = filteredPayments
-      .filter(payment => payment.status === 'COMPLETED')
-      .reduce((sum, payment) => sum + payment.amount, 0);
+      .filter(
+        payment =>
+          payment.status === 'COMPLETED' || payment.status === 'PARTIALLY_REFUNDED'
+      )
+      .reduce((sum, payment) => sum + (payment.netAmount ?? payment.amount), 0);
 
-    return { total, completed, pending, failed, refunded, totalAmount };
+    return { total, completed, pending, failed, refunded, partiallyRefunded, totalAmount };
   }, [filteredPayments]);
 
   // Define table columns
@@ -334,7 +341,10 @@ export function PaymentReportsPage() {
                 </div>
               </div>
               <div className="mt-1">
-                <div className="text-sm text-gray-500">Refunded</div>
+                <div className="text-sm text-gray-500">
+                  <span>Refunded</span>
+                  <span> / Partial: {summaryStats.partiallyRefunded}</span>
+                </div>
               </div>
             </div>
           </div>
@@ -406,6 +416,7 @@ export function PaymentReportsPage() {
                   <option value="COMPLETED">Completed</option>
                   <option value="PENDING">Pending</option>
                   <option value="FAILED">Failed</option>
+                  <option value="PARTIALLY_REFUNDED">Partially Refunded</option>
                   <option value="REFUNDED">Refunded</option>
                 </select>
               </div>
@@ -425,6 +436,7 @@ export function PaymentReportsPage() {
                   <option value="">All Providers</option>
                   <option value="STRIPE">Stripe</option>
                   <option value="PAYPAL">PayPal</option>
+                  <option value="MANUAL">External</option>
                 </select>
               </div>
             </div>

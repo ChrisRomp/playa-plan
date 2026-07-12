@@ -208,6 +208,27 @@ describe('PaymentReportsPage', () => {
       expect(screen.getByText('$150.00')).toBeInTheDocument();
     });
 
+    it('should include partially refunded payments in total revenue', async () => {
+      vi.mocked(reports.getPayments).mockResolvedValue([
+        mockPayments[0],
+        {
+          ...mockPayments[3],
+          id: 'payment-partial',
+          amount: 75,
+          status: 'PARTIALLY_REFUNDED',
+          refundedAmount: 25,
+          netAmount: 50,
+        },
+      ]);
+
+      renderComponent();
+
+      await waitFor(() => {
+        expect(screen.getByText('$200.00')).toBeInTheDocument();
+      });
+      expect(screen.getByText('Refunded').parentElement).toHaveTextContent('Refunded / Partial: 1');
+    });
+
     it('should call getPayments on mount with empty filters', async () => {
       const mockGetPayments = vi.mocked(reports.getPayments);
 
@@ -281,6 +302,8 @@ describe('PaymentReportsPage', () => {
 
       expect(screen.getByLabelText('Provider')).toBeInTheDocument();
       expect(screen.getByLabelText('Year')).toBeInTheDocument();
+      expect(screen.getByRole('option', { name: 'Partially Refunded' })).toBeInTheDocument();
+      expect(screen.getByRole('option', { name: 'External' })).toBeInTheDocument();
 
       // Close filters
       fireEvent.click(filtersButton);

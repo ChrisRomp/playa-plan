@@ -5,7 +5,7 @@ import { DataTable, DataTableColumn } from '../components/common/DataTable/DataT
 import { reports } from '../lib/api';
 import {
   adminRegistrationsApi,
-  type PaginatedRegistrationsResponse,
+  type ExternalPaymentRegistrationSearchResponse,
 } from '../lib/api/admin-registrations';
 import { Payment, RegistrationStatus } from '../types';
 import { PATHS } from '../routes';
@@ -35,7 +35,7 @@ interface RefundFormState {
   resultingRegistrationStatus: '' | RegistrationStatus;
 }
 
-type ExternalPaymentRegistration = PaginatedRegistrationsResponse['registrations'][number];
+type ExternalPaymentRegistration = ExternalPaymentRegistrationSearchResponse['registrations'][number];
 
 const emptyExternalPaymentForm: ExternalPaymentFormState = {
   amount: '',
@@ -74,7 +74,9 @@ const getPaymentReportYear = (payment: Payment): number =>
   payment.registration?.year ?? new Date(payment.createdAt).getFullYear();
 
 const canSubmitRefund = (payment: Payment): boolean =>
-  getRefundableAmount(payment) > 0 && payment.provider !== 'PAYPAL';
+  getRefundableAmount(payment) > 0 &&
+  payment.provider !== 'PAYPAL' &&
+  (payment.provider !== 'STRIPE' || payment.processorRefundAvailable === true);
 
 /**
  * Payment administration page.
@@ -112,17 +114,22 @@ export function AdminPaymentsPage() {
   const [mutationError, setMutationError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const hasLoadedPaymentsRef = useRef(false);
+  const paymentsRequestIdRef = useRef(0);
   const externalPaymentRegistrationYear =
     initialFilters.year ?? config?.currentYear ?? new Date().getFullYear();
 
   // Fetch payments data
   const fetchPayments = useCallback(async () => {
+    const requestId = ++paymentsRequestIdRef.current;
     if (!hasLoadedPaymentsRef.current) {
       setLoading(true);
     }
     setError(null);
     try {
       const data = await reports.getPayments(filters);
+      if (requestId !== paymentsRequestIdRef.current) {
+        return;
+      }
       // Ensure data is an array before setting it
       if (Array.isArray(data)) {
         setPayments(data);
@@ -133,54 +140,22 @@ export function AdminPaymentsPage() {
         setError('Received invalid payment data format');
       }
     } catch (err) {
+      if (requestId !== paymentsRequestIdRef.current) {
+        return;
+      }
       setError('Failed to fetch payments data');
       console.error('Error fetching payments:', err);
       setPayments([]);
     } finally {
-      setLoading(false);
+      if (requestId === paymentsRequestIdRef.current) {
+        setLoading(false);
+      }
     }
   }, [filters]);
 
   useEffect(() => {
     fetchPayments();
   }, [fetchPayments]);
-
-  useEffect(() => {
-    if (!showExternalPaymentForm) {
-      return;
-    }
-
-    let isCurrent = true;
-    setRegistrationsLoading(true);
-    setRegistrationsError(null);
-
-    adminRegistrationsApi
-      .getRegistrations({
-        year: externalPaymentRegistrationYear,
-        limit: 100,
-      })
-      .then(response => {
-        if (isCurrent) {
-          setExternalPaymentRegistrations(response.registrations);
-        }
-      })
-      .catch((err: unknown) => {
-        if (isCurrent) {
-          console.error('Error fetching registrations for external payment:', err);
-          setExternalPaymentRegistrations([]);
-          setRegistrationsError('Failed to load registrations');
-        }
-      })
-      .finally(() => {
-        if (isCurrent) {
-          setRegistrationsLoading(false);
-        }
-      });
-
-    return () => {
-      isCurrent = false;
-    };
-  }, [externalPaymentRegistrationYear, showExternalPaymentForm]);
 
   const selectedExternalPaymentRegistration = useMemo(
     () =>
@@ -192,29 +167,63 @@ export function AdminPaymentsPage() {
     [externalPaymentForm.registrationId, externalPaymentForm.userId, externalPaymentRegistrations]
   );
 
-  const matchingExternalPaymentRegistrations = useMemo(() => {
-    const normalizedSearch = registrationSearch.trim().toLocaleLowerCase();
+  useEffect(() => {
+    if (
+      !showExternalPaymentForm ||
+      (externalPaymentForm.registrationId && selectedExternalPaymentRegistration)
+    ) {
+      return;
+    }
 
-    return externalPaymentRegistrations
-      .filter(registration => {
-        if (!normalizedSearch) {
-          return true;
-        }
+    if (!registrationSearch.trim() && !externalPaymentForm.registrationId) {
+      setExternalPaymentRegistrations([]);
+      setRegistrationsError(null);
+      setRegistrationsLoading(false);
+      return;
+    }
 
-        const userSearchText = [
-          registration.user.firstName,
-          registration.user.lastName,
-          registration.user.playaName,
-          registration.user.email,
-        ]
-          .filter(Boolean)
-          .join(' ')
-          .toLocaleLowerCase();
+    let isCurrent = true;
+    const timeoutId = window.setTimeout(() => {
+      setRegistrationsLoading(true);
+      setRegistrationsError(null);
 
-        return userSearchText.includes(normalizedSearch);
-      })
-      .slice(0, 8);
-  }, [externalPaymentRegistrations, registrationSearch]);
+      adminRegistrationsApi
+        .searchExternalPaymentRegistrations({
+          year: externalPaymentRegistrationYear,
+          search: registrationSearch.trim() || undefined,
+          registrationId: externalPaymentForm.registrationId || undefined,
+          limit: 8,
+        })
+        .then(response => {
+          if (isCurrent) {
+            setExternalPaymentRegistrations(response.registrations);
+          }
+        })
+        .catch((err: unknown) => {
+          if (isCurrent) {
+            console.error('Error searching registrations for external payment:', err);
+            setExternalPaymentRegistrations([]);
+            setRegistrationsError('Failed to load registrations');
+          }
+        })
+        .finally(() => {
+          if (isCurrent) {
+            setRegistrationsLoading(false);
+          }
+        });
+    }, 250);
+
+    return () => {
+      isCurrent = false;
+      window.clearTimeout(timeoutId);
+    };
+  }, [
+    externalPaymentForm.registrationId,
+    externalPaymentRegistrationYear,
+    registrationSearch,
+    selectedExternalPaymentRegistration,
+    showExternalPaymentForm,
+  ]);
 
   // Get unique years for filter dropdown
   const availableYears = useMemo(() => {
@@ -475,6 +484,8 @@ export function AdminPaymentsPage() {
             title={
               row.provider === 'PAYPAL'
                 ? 'PayPal refunds must be handled outside PlayaPlan'
+                : row.provider === 'STRIPE'
+                  ? 'Stripe refunds are unavailable for this payment'
                 : undefined
             }
             className="rounded-md border border-amber-700 px-3 py-1 text-sm font-medium text-amber-800 hover:bg-amber-50 disabled:cursor-not-allowed disabled:border-gray-200 disabled:text-gray-400"
@@ -836,8 +847,8 @@ export function AdminPaymentsPage() {
                       <p className="mt-2 text-sm text-red-700">{registrationsError}</p>
                     ) : (
                       <div className="mt-2 max-h-56 overflow-y-auto rounded-md border border-gray-200 bg-white">
-                        {matchingExternalPaymentRegistrations.length > 0 ? (
-                          matchingExternalPaymentRegistrations.map(registration => (
+                        {externalPaymentRegistrations.length > 0 ? (
+                          externalPaymentRegistrations.map(registration => (
                             <button
                               key={registration.id}
                               type="button"

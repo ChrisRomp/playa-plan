@@ -29,6 +29,7 @@ import {
   AdminCancelRegistrationDto,
   AdminRegistrationResponseDto,
   AdminRegistrationQueryDto,
+  ExternalPaymentRegistrationSearchQueryDto,
 } from '../dto/admin-registration.dto';
 
 interface AuthenticatedRequest {
@@ -187,6 +188,24 @@ export class AdminRegistrationsController {
   @ApiResponse({ status: 403, description: 'Forbidden - Staff or Admin role required' })
   async getRegistrationYearUsers() {
     return this.adminService.getRegistrationYearUsers();
+  }
+
+  @Get('search')
+  @Roles(UserRole.ADMIN, UserRole.STAFF)
+  @ApiOperation({
+    summary: 'Search registrations for recording an external payment',
+    description: 'Returns a small, paginated registration and user result set without jobs or payments.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Successfully retrieved matching registrations',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized - Invalid or missing JWT token' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Staff or Admin role required' })
+  async searchExternalPaymentRegistrations(
+    @Query() query: ExternalPaymentRegistrationSearchQueryDto,
+  ) {
+    return this.adminService.searchExternalPaymentRegistrations(query);
   }
 
   @Get()

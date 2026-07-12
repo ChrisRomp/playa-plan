@@ -250,7 +250,9 @@ export class PaymentsService {
         refundId: finalization.refund.id,
         refundAmount: this.toDollars(finalization.refund.amountCents),
         refundAmountCents: finalization.refund.amountCents,
-        providerRefundId: finalization.refund.providerRefundId,
+        providerRefundId:
+          finalization.refund.providerRefundId ??
+          (finalization.refund.processorRefund ? undefined : finalization.refund.id),
         processorRefund: finalization.refund.processorRefund,
         resultingRegistrationStatus: finalization.appliedRegistrationStatus,
       },
@@ -655,9 +657,10 @@ export class PaymentsService {
 
   /**
    * Mark a registration as paid: clear `paymentDeferred` and set status
-   * to CONFIRMED — UNLESS the registration is currently WAITLISTED, in
-   * which case status stays WAITLISTED (capacity beats payment). Payment
-   * does not buy a slot the user can't have. The WAITLISTED case is
+   * to CONFIRMED — UNLESS the registration is currently WAITLISTED or
+   * CANCELLED, in which case its status is preserved. Payment does not buy
+   * a slot the user can't have or reactivate a cancelled registration.
+   * The WAITLISTED case is
    * unreachable for participants through normal UI but possible via
    * direct API call or a TOCTOU race against capacity; mirrors the same
    * guard in `verifyStripeSession`.
@@ -674,7 +677,11 @@ export class PaymentsService {
       select: { status: true },
     });
     if (!current) return;
-    const targetStatus = current.status === 'WAITLISTED' ? 'WAITLISTED' : 'CONFIRMED';
+    const targetStatus =
+      current.status === RegistrationStatus.WAITLISTED ||
+      current.status === RegistrationStatus.CANCELLED
+        ? current.status
+        : RegistrationStatus.CONFIRMED;
     await this.prisma.registration.update({
       where: { id: registrationId },
       data: { status: targetStatus, paymentDeferred: false },
@@ -845,20 +852,56 @@ export class PaymentsService {
           throw new BadRequestException('Refund amount exceeds remaining refundable balance');
         }
 
+        const processorRefund = this.isProcessorRefundProvider(payment.provider);
         const refund = await tx.paymentRefund.create({
           data: {
             paymentId: payment.id,
             amountCents: refundAmountCents,
             currency: payment.currency,
-            status: this.isProcessorRefundProvider(payment.provider) ? PaymentRefundStatus.PENDING : PaymentRefundStatus.SUCCEEDED,
-            processorRefund: this.isProcessorRefundProvider(payment.provider),
+            status: processorRefund ? PaymentRefundStatus.PENDING : PaymentRefundStatus.SUCCEEDED,
+            processorRefund,
             reason: data.reason,
             resultingRegistrationStatus: data.resultingRegistrationStatus,
             processedByUserId,
           },
         });
 
-        return { refund, payment };
+        if (processorRefund) {
+          return { refund, payment, finalization: undefined };
+        }
+
+        const previousRefundedCents = this.getSucceededRefundCents(payment.refunds);
+        const refundedCents = previousRefundedCents + refund.amountCents;
+        const nextStatus = this.getPaymentStatusFromRefunds(
+          paymentAmountCents,
+          refundedCents,
+        );
+        const appliedRegistrationStatus =
+          refund.resultingRegistrationStatus ?? undefined;
+
+        await tx.payment.update({
+          where: { id: payment.id },
+          data: { status: nextStatus },
+        });
+
+        if (payment.registration && appliedRegistrationStatus) {
+          await tx.registration.update({
+            where: { id: payment.registration.id },
+            data: { status: appliedRegistrationStatus },
+          });
+        }
+
+        return {
+          refund,
+          payment,
+          finalization: {
+            refund,
+            payment,
+            nextStatus,
+            previousRefundedCents,
+            appliedRegistrationStatus,
+          },
+        };
       }, {
         isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
       });
@@ -917,73 +960,15 @@ export class PaymentsService {
         };
       }
 
-      const payment = await this.prisma.payment.findUnique({
-        where: { id: data.paymentId },
-        include: {
-          registration: true,
-          refunds: true,
-        },
-      });
-
-      if (!payment) {
-        throw new NotFoundException(`Payment with ID ${data.paymentId} not found`);
+      const finalization = pendingRefundData.finalization;
+      if (!finalization) {
+        throw new BadRequestException('Refund provider requires processor finalization');
       }
 
-      const refundedCents = this.getSucceededRefundCents(payment.refunds);
-      const nextStatus = this.getPaymentStatusFromRefunds(this.toCents(payment.amount), refundedCents);
-      const previousRefundedCents = pendingRefund.status === PaymentRefundStatus.SUCCEEDED
-        ? Math.max(refundedCents - pendingRefund.amountCents, 0)
-        : refundedCents;
-
-      const transactionUpdates: Prisma.PrismaPromise<unknown>[] = [
-        this.prisma.payment.update({
-          where: { id: payment.id },
-          data: { status: nextStatus },
-        }),
-      ];
-      const appliedRegistrationStatus = pendingRefund.status === PaymentRefundStatus.SUCCEEDED
-        ? data.resultingRegistrationStatus
-        : undefined;
-
-      if (
-        payment.registration &&
-        appliedRegistrationStatus
-      ) {
-        transactionUpdates.push(
-          this.prisma.registration.update({
-            where: { id: payment.registration.id },
-            data: { status: appliedRegistrationStatus },
-          }),
-        );
-      }
-
-      await this.prisma.$transaction(transactionUpdates);
-
-      await this.adminAuditService.createAuditRecord({
-        adminUserId: processedByUserId,
-        actionType: AdminAuditActionType.PAYMENT_REFUND,
-        targetRecordType: AdminAuditTargetType.PAYMENT,
-        targetRecordId: payment.id,
-        oldValues: {
-          status: payment.status,
-          refundedAmount: this.toDollars(previousRefundedCents),
-        },
-        newValues: {
-          status: nextStatus,
-          refundId: pendingRefund.id,
-          refundAmount: this.toDollars(pendingRefund.amountCents),
-          refundAmountCents: pendingRefund.amountCents,
-          providerRefundId: providerRefund.id,
-          processorRefund: pendingRefund.processorRefund,
-          resultingRegistrationStatus: appliedRegistrationStatus,
-        },
-        reason: data.reason,
-        transactionId: refundRequestId,
-        throwOnError: false,
-      });
+      await this.createRefundAudit(finalization, refundRequestId);
 
       return {
-        paymentId: payment.id,
+        paymentId: finalization.payment.id,
         refundAmount: this.toDollars(pendingRefund.amountCents),
         providerRefundId: providerRefund.id,
         success: pendingRefund.status === PaymentRefundStatus.SUCCEEDED,
