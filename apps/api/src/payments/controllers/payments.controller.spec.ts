@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { PaymentsController } from './payments.controller';
 import { PaymentsService, StripeService, PaypalService } from '../services';
 import { PaymentStatus, PaymentProvider, UserRole } from '@prisma/client';
+import { AuthenticatedRequest } from '../../auth/types/safe-user';
 
 // Mock implementations
 const mockPaymentsService = {
@@ -52,7 +53,7 @@ describe('PaymentsController', () => {
   });
 
   describe('createPayment', () => {
-    it('should create a payment record', async () => {
+    it('should create a payment record using the authenticated user as the recording actor', async () => {
       // Mock data
       const mockPaymentDto = {
         amount: 100,
@@ -68,16 +69,38 @@ describe('PaymentsController', () => {
         createdAt: new Date(),
         updatedAt: new Date(),
       };
+      const mockRequest = { user: { id: 'admin-id', role: UserRole.ADMIN } } as AuthenticatedRequest;
 
       // Setup mocks
       mockPaymentsService.create.mockResolvedValue(mockPayment);
 
       // Execute
-      const result = await controller.createPayment(mockPaymentDto);
+      const result = await controller.createPayment(mockPaymentDto, mockRequest);
 
       // Assert
-      expect(mockPaymentsService.create).toHaveBeenCalledWith(mockPaymentDto);
+      expect(mockPaymentsService.create).toHaveBeenCalledWith(mockPaymentDto, 'admin-id');
       expect(result).toEqual(mockPayment);
+    });
+
+    it('should not allow the request body to override the authenticated recording actor', async () => {
+      // A caller attempts to attribute the payment to a different user via the DTO;
+      // CreatePaymentDto has no recordedByUserId field, so this extra property must
+      // be ignored and only the authenticated req.user.id is passed to the service.
+      const mockPaymentDto = {
+        amount: 100,
+        currency: 'USD',
+        provider: PaymentProvider.STRIPE,
+        userId: 'user-id',
+        providerRefId: 'provider-ref-id',
+        recordedByUserId: 'spoofed-admin-id',
+      };
+      const mockRequest = { user: { id: 'real-admin-id', role: UserRole.ADMIN } } as AuthenticatedRequest;
+
+      mockPaymentsService.create.mockResolvedValue({ id: 'payment-id' });
+
+      await controller.createPayment(mockPaymentDto, mockRequest);
+
+      expect(mockPaymentsService.create).toHaveBeenCalledWith(mockPaymentDto, 'real-admin-id');
     });
   });
 

@@ -345,9 +345,12 @@ export class PaymentsService {
   /**
    * Create a new payment record
    * @param createPaymentDto - Payment data
+   * @param recordedByUserId - ID of the authenticated admin recording the payment, derived
+   *   from the request rather than accepted from the request body. Omit for
+   *   processor/participant-initiated payments where no admin recorded it.
    * @returns The created payment
    */
-  async create(createPaymentDto: CreatePaymentDto): Promise<Payment> {
+  async create(createPaymentDto: CreatePaymentDto, recordedByUserId?: string): Promise<Payment> {
     this.logger.log(`Creating payment record for user ${createPaymentDto.userId}`);
     
     // Verify user exists
@@ -389,8 +392,8 @@ export class PaymentsService {
         externalPaymentMethod: createPaymentDto.externalPaymentMethod,
         externalPaymentReference: createPaymentDto.externalPaymentReference,
         user: { connect: { id: createPaymentDto.userId } },
-        ...(createPaymentDto.recordedByUserId && {
-          recordedBy: { connect: { id: createPaymentDto.recordedByUserId } },
+        ...(recordedByUserId && {
+          recordedBy: { connect: { id: recordedByUserId } },
         }),
         ...(createPaymentDto.registrationId && {
           registration: { connect: { id: createPaymentDto.registrationId } }
@@ -655,8 +658,7 @@ export class PaymentsService {
       registrationId: data.registrationId,
       externalPaymentMethod: data.externalPaymentMethod,
       externalPaymentReference: data.reference,
-      recordedByUserId,
-    });
+    }, recordedByUserId);
     
     // Update status immediately (since it's a manual payment)
     const updateDto: UpdatePaymentDto = {
@@ -841,6 +843,15 @@ export class PaymentsService {
         !options.allowRegistrationCancellation
       ) {
         throw new BadRequestException('Use the registration cancellation flow to cancel a registration');
+      }
+
+      if (
+        data.resultingRegistrationStatus &&
+        isApplicationStatus(data.resultingRegistrationStatus)
+      ) {
+        throw new BadRequestException(
+          'Cannot set an application-phase registration status from the refund flow',
+        );
       }
 
       const existingPayment = await this.prisma.payment.findUnique({

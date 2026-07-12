@@ -199,6 +199,50 @@ describe('PaymentsService', () => {
       expect(result).toEqual(mockPayment);
     });
 
+    it('should ignore any recordedByUserId supplied on the DTO and not connect a recordedBy relation when no actor ID is passed', async () => {
+      // Mock data: a caller attempts to smuggle an actor ID via the DTO body
+      const mockPaymentDto = {
+        amount: 100,
+        currency: 'USD',
+        provider: PaymentProvider.STRIPE,
+        userId: 'user-id',
+        providerRefId: 'provider-ref-id',
+        // Not part of CreatePaymentDto's type, but simulates an attacker-supplied
+        // extra property reaching the service if validation were misconfigured.
+        recordedByUserId: 'attacker-supplied-admin-id',
+      };
+
+      const mockUser = { id: 'user-id', name: 'Test User' };
+      mockPrismaService.user.findUnique.mockResolvedValue(mockUser);
+      mockPrismaService.payment.create.mockResolvedValue({ id: 'payment-id' });
+
+      await service.create(mockPaymentDto);
+
+      const createCallArgs = mockPrismaService.payment.create.mock.calls[0][0];
+      expect(createCallArgs.data.recordedBy).toBeUndefined();
+    });
+
+    it('should connect the recordedBy relation to the explicit recordedByUserId service parameter', async () => {
+      const mockPaymentDto = {
+        amount: 100,
+        currency: 'USD',
+        provider: PaymentProvider.STRIPE,
+        userId: 'user-id',
+        providerRefId: 'provider-ref-id',
+      };
+
+      const mockUser = { id: 'user-id', name: 'Test User' };
+      mockPrismaService.user.findUnique.mockResolvedValue(mockUser);
+      mockPrismaService.payment.create.mockResolvedValue({ id: 'payment-id' });
+
+      await service.create(mockPaymentDto, 'authenticated-admin-id');
+
+      const createCallArgs = mockPrismaService.payment.create.mock.calls[0][0];
+      expect(createCallArgs.data.recordedBy).toEqual({
+        connect: { id: 'authenticated-admin-id' },
+      });
+    });
+
     it('should throw NotFoundException if user does not exist', async () => {
       // Mock data
       const mockPaymentDto = {
@@ -1824,6 +1868,23 @@ describe('PaymentsService', () => {
         reason: 'Cancellation',
         resultingRegistrationStatus: RegistrationStatus.CANCELLED,
       }, 'admin-id')).rejects.toThrow('Use the registration cancellation flow to cancel a registration');
+
+      expect(mockPrismaService.paymentRefund.create).not.toHaveBeenCalled();
+      expect(mockStripeService.createRefund).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      RegistrationStatus.APPLICATION_SUBMITTED,
+      RegistrationStatus.APPLICATION_APPROVED,
+      RegistrationStatus.APPLICATION_DECLINED,
+    ])('should reject application-phase status changes (%s) even when requested directly', async (applicationStatus) => {
+      await expect(service.processRefund({
+        paymentId: 'payment-id',
+        reason: 'Application status change attempt',
+        resultingRegistrationStatus: applicationStatus,
+      }, 'admin-id')).rejects.toThrow(
+        'Cannot set an application-phase registration status from the refund flow',
+      );
 
       expect(mockPrismaService.paymentRefund.create).not.toHaveBeenCalled();
       expect(mockStripeService.createRefund).not.toHaveBeenCalled();

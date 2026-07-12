@@ -919,8 +919,9 @@ export class RegistrationAdminService {
       }
     }
 
-    // Calculate total amounts
-    const totalEligible = eligiblePayments.reduce((sum, p) => sum + p.amount, 0);
+    // Calculate total amounts based on remaining refundable balance (not gross payment amount),
+    // so partially-refunded Stripe payments only count their remaining balance.
+    const totalEligible = eligiblePayments.reduce((sum, p) => sum + this.getRemainingRefundableAmount(p), 0);
     const totalManual = manualPayments.reduce((sum, p) => sum + this.getRemainingRefundableAmount(p), 0);
     const allPayments = [...eligiblePayments, ...manualPayments];
 

@@ -25,8 +25,11 @@ export class PaymentsController {
   @ApiResponse({ status: 201, description: 'Payment created successfully' })
   @ApiResponse({ status: 400, description: 'Invalid input data' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async createPayment(@Body() createPaymentDto: CreatePaymentDto) {
-    return this.paymentsService.create(createPaymentDto);
+  async createPayment(
+    @Body() createPaymentDto: CreatePaymentDto,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    return this.paymentsService.create(createPaymentDto, req.user.id);
   }
 
   @Get()

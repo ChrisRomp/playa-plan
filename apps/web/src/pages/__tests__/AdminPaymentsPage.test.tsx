@@ -716,6 +716,25 @@ describe('AdminPaymentsPage', () => {
       expect(screen.queryByLabelText('Registration status change')).not.toBeInTheDocument();
     });
 
+    it('should only offer post-application registration statuses in the refund status dropdown', async () => {
+      renderComponent();
+
+      await waitFor(() => {
+        expect(screen.getByTestId('payment-payment1')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getAllByText('Refund')[0]);
+
+      const statusSelect = screen.getByLabelText('Registration status change') as HTMLSelectElement;
+      const optionValues = Array.from(statusSelect.options).map(option => option.value);
+
+      expect(optionValues).toEqual(['', 'PENDING', 'CONFIRMED', 'WAITLISTED']);
+      expect(optionValues).not.toContain('APPLICATION_SUBMITTED');
+      expect(optionValues).not.toContain('APPLICATION_APPROVED');
+      expect(optionValues).not.toContain('APPLICATION_DECLINED');
+      expect(optionValues).not.toContain('CANCELLED');
+    });
+
     it('should disable PayPal refunds with an explanation', async () => {
       vi.mocked(reports.getPayments).mockResolvedValue([
         {

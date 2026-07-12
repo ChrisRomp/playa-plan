@@ -62,15 +62,6 @@ export class CreatePaymentDto {
   externalPaymentReference?: string;
 
   @ApiProperty({
-    description: 'Admin user ID that recorded the payment',
-    required: false,
-  })
-  @IsOptional()
-  @IsString()
-  @IsUUID()
-  recordedByUserId?: string;
-
-  @ApiProperty({
     description: 'ID of the user making the payment',
     example: '5f8d0d55-e0a3-4cf0-a620-2412acd4361c',
   })

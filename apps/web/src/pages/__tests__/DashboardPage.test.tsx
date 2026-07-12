@@ -585,6 +585,76 @@ describe('DashboardPage Registration Status', () => {
       expect(screen.getByText('Partially Refunded')).toBeInTheDocument();
       expect(screen.queryByText(/Historical refund should not display/)).not.toBeInTheDocument();
     });
+
+    it('should format a non-USD refund using its ISO currency instead of a dollar sign', () => {
+      mockUseConfig.mockReturnValue({
+        config: {
+          name: 'Test Camp',
+          description: 'Test Description',
+          homePageBlurb: 'Test Blurb',
+          registrationOpen: true,
+          earlyRegistrationOpen: false,
+          currentYear: 2025,
+        },
+        isLoading: false,
+        error: null,
+        refreshConfig: vi.fn(),
+        isConnecting: false,
+        isConnected: true,
+        connectionError: null,
+      });
+
+      mockUseUserRegistrations.mockReturnValue({
+        registrations: [
+          {
+            id: 'current-registration',
+            userId: 'user-1',
+            year: 2025,
+            status: 'CONFIRMED',
+            jobs: [],
+            payments: [
+              {
+                id: 'current-payment',
+                amount: 150,
+                currency: 'EUR',
+                status: 'PARTIALLY_REFUNDED',
+                provider: 'STRIPE',
+                providerRefId: 'stripe-payment',
+                userId: 'user-1',
+                registrationId: 'current-registration',
+                createdAt: '2025-01-01T00:00:00.000Z',
+                updatedAt: '2025-01-01T00:00:00.000Z',
+                refunds: [
+                  {
+                    id: 'current-refund',
+                    paymentId: 'current-payment',
+                    amountCents: 2500,
+                    currency: 'eur',
+                    status: 'SUCCEEDED',
+                    processorRefund: true,
+                    reason: 'Partial camp fee adjustment',
+                    processedByUserId: 'admin-1',
+                    createdAt: '2025-02-01T00:00:00.000Z',
+                    updatedAt: '2025-02-01T00:00:00.000Z',
+                  },
+                ],
+              },
+            ],
+            createdAt: '2025-01-01T00:00:00.000Z',
+            updatedAt: '2025-01-01T00:00:00.000Z',
+          },
+        ],
+        loading: false,
+        error: null,
+        refetch: vi.fn(),
+      });
+
+      render(<DashboardPageWrapper />);
+
+      expect(screen.getByText('€150.00 EUR')).toBeInTheDocument();
+      expect(screen.getByText('-€25.00 EUR')).toBeInTheDocument();
+      expect(screen.queryByText(/\$25\.00/)).not.toBeInTheDocument();
+    });
   });
 
   /**

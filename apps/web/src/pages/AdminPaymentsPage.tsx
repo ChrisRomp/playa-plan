@@ -11,6 +11,7 @@ import { Payment, RegistrationStatus } from '../types';
 import { PATHS } from '../routes';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import { downloadCsv } from '../utils/csv';
+import { formatCurrency } from '../utils/currency';
 import { useConfig } from '../hooks/useConfig';
 
 interface PaymentReportFilters {
@@ -43,17 +44,6 @@ const emptyExternalPaymentForm: ExternalPaymentFormState = {
   registrationId: '',
   externalPaymentMethod: '',
   reference: '',
-};
-
-const formatCurrency = (amount: number | undefined, currency = 'USD'): string => {
-  const currencyCode = currency.toUpperCase();
-  const formattedAmount = new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: currencyCode,
-    currencyDisplay: 'narrowSymbol',
-  }).format(amount ?? 0);
-
-  return `${formattedAmount} ${currencyCode}`;
 };
 
 const getRefundableAmount = (payment: Payment): number => {
@@ -1114,9 +1104,6 @@ export function AdminPaymentsPage() {
                     <option value="PENDING">Pending</option>
                     <option value="CONFIRMED">Confirmed</option>
                     <option value="WAITLISTED">Waitlisted</option>
-                    <option value="APPLICATION_SUBMITTED">Application submitted</option>
-                    <option value="APPLICATION_APPROVED">Application approved</option>
-                    <option value="APPLICATION_DECLINED">Application declined</option>
                   </select>
                 </div>
               )}

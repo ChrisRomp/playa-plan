@@ -8,6 +8,7 @@ import { useConfig } from '../hooks/useConfig';
 import { useApplications } from '../hooks/useApplications';
 import { getFriendlyDayName, formatTime } from '../utils/shiftUtils';
 import { isRegistrationAccessible, getRegistrationStatusMessage, getActiveRegistrations, formatRegistrationStatus } from '../utils/registrationUtils';
+import { formatCurrency } from '../utils/currency';
 import { PATHS } from '../routes';
 import PaymentButton from '../components/payment/PaymentButton';
 
@@ -302,7 +303,7 @@ const DashboardPage: React.FC = () => {
                           <div className="flex items-center justify-between">
                             <div>
                               <p className="text-sm font-medium text-gray-900">
-                                ${payment.amount.toFixed(2)} {payment.currency}
+                                {formatCurrency(payment.amount, payment.currency)}
                               </p>
                               <p className="text-xs text-gray-500">
                                 {new Date(payment.createdAt).toLocaleDateString()}
@@ -338,8 +339,7 @@ const DashboardPage: React.FC = () => {
                                   >
                                     <div>
                                       <p className="text-sm font-medium text-blue-950">
-                                        -${(refund.amountCents / 100).toFixed(2)}{' '}
-                                        {refund.currency.toUpperCase()}
+                                        {formatCurrency(-(refund.amountCents / 100), refund.currency)}
                                       </p>
                                       <p className="text-xs text-blue-800">
                                         {new Date(refund.createdAt).toLocaleDateString()}

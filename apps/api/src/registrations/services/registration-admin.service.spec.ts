@@ -712,6 +712,39 @@ describe('RegistrationAdminService', () => {
       expect(result.message).toContain('1 manual payment(s) totaling $50.00 require manual refund processing');
     });
 
+    it('should report only the remaining refundable balance for a partially refunded Stripe payment', async () => {
+      const payments = [
+        {
+          id: 'stripe-partial-payment',
+          amount: 100,
+          status: PaymentStatus.PARTIALLY_REFUNDED,
+          provider: PaymentProvider.STRIPE,
+          providerRefId: 'pi_stripe123',
+          refunds: [
+            {
+              amountCents: 2500,
+              status: PaymentRefundStatus.SUCCEEDED,
+            },
+          ],
+        },
+      ];
+
+      paymentsService.processRefund.mockResolvedValue({
+        paymentId: 'stripe-partial-payment',
+        refundAmount: 75.00,
+        providerRefundId: 'refund-1',
+        success: true,
+        refundStatus: PaymentRefundStatus.SUCCEEDED,
+      });
+
+      const result = await (service as unknown as { processAutoRefunds: (payments: unknown[], reason: string, adminUserId: string) => Promise<RefundInfo> }).processAutoRefunds(payments, 'Test refund', 'admin-123');
+
+      expect(result.refundAmount).toBe(75.00);
+      // The already-refunded $25 must not be counted again: totalAmount should reflect
+      // only the remaining $75 balance, not the original $100 gross payment.
+      expect(result.totalAmount).toBe(75);
+    });
+
     // Task 5.2.11: Test processAutoRefunds() handles partial refund failures gracefully
     it('should handle partial refund failures gracefully', async () => {
       const payments = [
