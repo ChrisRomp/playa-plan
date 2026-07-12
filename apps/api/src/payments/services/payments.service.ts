@@ -309,9 +309,26 @@ export class PaymentsService {
     }
 
     for (const refund of pendingRefunds) {
-      const providerRefund = refund.providerRefundId
+      let providerRefund = refund.providerRefundId
         ? await this.stripeService.retrieveRefund(refund.providerRefundId)
         : await this.stripeService.findRefundByMetadata(payment.providerRefId, refund.id);
+
+      if (!providerRefund && !refund.providerRefundId) {
+        // The original submission was ambiguous (its outcome at Stripe is unknown) and
+        // no matching refund was found by metadata, so it may never have reached Stripe.
+        // Retry using the same idempotency key and metadata: Stripe returns the original
+        // refund if it did receive the first request, or creates it safely otherwise.
+        providerRefund = await this.stripeService.createRefund(
+          payment.providerRefId,
+          refund.amountCents,
+          refund.reason ?? undefined,
+          refund.id,
+          {
+            refundId: refund.id,
+            paymentId: payment.id,
+          },
+        );
+      }
 
       if (!providerRefund) {
         this.logger.warn(
@@ -1190,7 +1207,7 @@ export class PaymentsService {
           // No registration linked, just update the payment if needed
           if (shouldCompletePayment) {
             await this.update(payment.id, {
-              status: updatedPaymentStatus,
+              status: PaymentStatus.COMPLETED,
             });
             this.logger.log(`Updated payment ${payment.id} to COMPLETED (no registration)`);
           } else {

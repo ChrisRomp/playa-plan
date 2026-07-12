@@ -1,6 +1,14 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEnum, IsOptional, IsString } from 'class-validator';
+import { IsIn, IsOptional, IsString } from 'class-validator';
 import { PaymentStatus } from '@prisma/client';
+
+const UPDATABLE_PAYMENT_STATUSES = [
+  PaymentStatus.PENDING,
+  PaymentStatus.COMPLETED,
+  PaymentStatus.FAILED,
+] as const;
+
+type UpdatablePaymentStatus = typeof UPDATABLE_PAYMENT_STATUSES[number];
 
 /**
  * Data Transfer Object for updating a payment
@@ -8,12 +16,12 @@ import { PaymentStatus } from '@prisma/client';
 export class UpdatePaymentDto {
   @ApiProperty({
     description: 'The payment status',
-    enum: PaymentStatus,
+    enum: UPDATABLE_PAYMENT_STATUSES,
     example: PaymentStatus.COMPLETED,
   })
   @IsOptional()
-  @IsEnum(PaymentStatus)
-  status?: PaymentStatus;
+  @IsIn(UPDATABLE_PAYMENT_STATUSES)
+  status?: UpdatablePaymentStatus;
 
   @ApiProperty({
     description: 'The provider reference ID (for external payment systems)',

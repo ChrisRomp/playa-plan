@@ -1158,7 +1158,75 @@ describe('PaymentsService', () => {
       expect(mockPrismaService.paymentRefund.create).not.toHaveBeenCalled();
     });
 
-    it('should leave an unlinked pending Stripe refund pending without resubmitting it', async () => {
+    it('should retry an ambiguous Stripe refund with its idempotency key when no metadata match is found', async () => {
+      const pendingRefund = {
+        id: 'pending-refund-id',
+        paymentId: 'payment-id',
+        amountCents: 10000,
+        currency: 'USD',
+        status: PaymentRefundStatus.PENDING,
+        processorRefund: true,
+        providerRefundId: null,
+        reason: 'Ambiguous full refund',
+        resultingRegistrationStatus: null,
+        processedByUserId: 'admin-id',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      const reconciledRefund = {
+        ...pendingRefund,
+        status: PaymentRefundStatus.SUCCEEDED,
+        providerRefundId: 're_retried',
+      };
+      mockPrismaService.payment.findUnique
+        .mockResolvedValueOnce({
+          ...basePayment,
+          refunds: [pendingRefund],
+        })
+        .mockResolvedValueOnce({
+          ...basePayment,
+          refunds: [reconciledRefund],
+        })
+        .mockResolvedValueOnce({
+          ...basePayment,
+          status: PaymentStatus.REFUNDED,
+          refunds: [reconciledRefund],
+        });
+      mockStripeService.findRefundByMetadata.mockResolvedValueOnce(null);
+      mockStripeService.createRefund.mockResolvedValueOnce({ id: 're_retried', status: 'succeeded' });
+      mockPrismaService.paymentRefund.update.mockResolvedValueOnce(reconciledRefund);
+
+      await expect(service.processRefund({
+        paymentId: 'payment-id',
+        amount: 10,
+        reason: 'Follow-up refund attempt',
+      }, 'admin-id')).rejects.toThrow('Cannot refund payment with status REFUNDED');
+
+      expect(mockStripeService.findRefundByMetadata).toHaveBeenCalledWith(
+        'pi_stripe123',
+        'pending-refund-id',
+      );
+      expect(mockStripeService.createRefund).toHaveBeenCalledWith(
+        'pi_stripe123',
+        10000,
+        'Ambiguous full refund',
+        'pending-refund-id',
+        {
+          refundId: 'pending-refund-id',
+          paymentId: 'payment-id',
+        },
+      );
+      expect(mockPrismaService.paymentRefund.update).toHaveBeenCalledWith({
+        where: { id: 'pending-refund-id' },
+        data: {
+          status: PaymentRefundStatus.SUCCEEDED,
+          providerRefundId: 're_retried',
+        },
+      });
+      expect(mockPrismaService.paymentRefund.create).not.toHaveBeenCalled();
+    });
+
+    it('should leave an unlinked pending Stripe refund pending when the retry itself is ambiguous', async () => {
       const pendingRefund = {
         id: 'pending-refund-id',
         paymentId: 'payment-id',
@@ -1177,22 +1245,28 @@ describe('PaymentsService', () => {
         ...basePayment,
         refunds: [pendingRefund],
       };
-      mockPrismaService.payment.findUnique
-        .mockResolvedValueOnce(paymentWithPendingRefund)
-        .mockResolvedValueOnce(paymentWithPendingRefund);
+      mockPrismaService.payment.findUnique.mockResolvedValueOnce(paymentWithPendingRefund);
       mockStripeService.findRefundByMetadata.mockResolvedValueOnce(null);
+      mockStripeService.createRefund.mockRejectedValueOnce(
+        new StripeRefundError('Gateway timeout', true),
+      );
 
       await expect(service.processRefund({
         paymentId: 'payment-id',
         amount: 10,
         reason: 'Follow-up refund attempt',
-      }, 'admin-id')).rejects.toThrow('Payment has no remaining refundable balance');
+      }, 'admin-id')).rejects.toThrow('Gateway timeout');
 
-      expect(mockStripeService.findRefundByMetadata).toHaveBeenCalledWith(
+      expect(mockStripeService.createRefund).toHaveBeenCalledWith(
         'pi_stripe123',
+        10000,
+        'Ambiguous full refund',
         'pending-refund-id',
+        {
+          refundId: 'pending-refund-id',
+          paymentId: 'payment-id',
+        },
       );
-      expect(mockStripeService.createRefund).not.toHaveBeenCalled();
       expect(mockPrismaService.paymentRefund.update).not.toHaveBeenCalled();
       expect(mockPrismaService.paymentRefund.create).not.toHaveBeenCalled();
     });
