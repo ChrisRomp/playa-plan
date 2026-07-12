@@ -298,26 +298,68 @@ const DashboardPage: React.FC = () => {
                     <h4 className="font-medium text-gray-900 mb-3">Payments</h4>
                     <div className="space-y-2">
                       {currentRegistration.payments.map((payment) => (
-                        <div key={payment.id} className="flex items-center justify-between border border-gray-200 rounded-lg p-3">
-                          <div>
-                            <p className="text-sm font-medium text-gray-900">
-                              ${payment.amount.toFixed(2)} {payment.currency}
-                            </p>
-                            <p className="text-xs text-gray-500">
-                              {new Date(payment.createdAt).toLocaleDateString()}
-                            </p>
+                        <div key={payment.id} className="border border-gray-200 rounded-lg p-3">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-sm font-medium text-gray-900">
+                                ${payment.amount.toFixed(2)} {payment.currency}
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                {new Date(payment.createdAt).toLocaleDateString()}
+                              </p>
+                            </div>
+                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                              payment.status === 'COMPLETED' ? 'bg-green-100 text-green-800' :
+                              payment.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' :
+                              payment.status === 'FAILED' ? 'bg-red-100 text-red-800' :
+                              payment.status === 'PARTIALLY_REFUNDED' || payment.status === 'REFUNDED'
+                                ? 'bg-blue-100 text-blue-800' :
+                                'bg-gray-100 text-gray-800'
+                            }`}>
+                              {payment.status === 'COMPLETED' ? 'Completed' :
+                               payment.status === 'PENDING' ? 'Pending' :
+                               payment.status === 'FAILED' ? 'Failed' :
+                               payment.status === 'PARTIALLY_REFUNDED' ? 'Partially Refunded' :
+                               payment.status === 'REFUNDED' ? 'Refunded' :
+                               payment.status}
+                            </span>
                           </div>
-                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                            payment.status === 'COMPLETED' ? 'bg-green-100 text-green-800' :
-                            payment.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' :
-                            payment.status === 'FAILED' ? 'bg-red-100 text-red-800' :
-                            'bg-gray-100 text-gray-800'
-                          }`}>
-                            {payment.status === 'COMPLETED' ? 'Completed' :
-                             payment.status === 'PENDING' ? 'Pending' :
-                             payment.status === 'FAILED' ? 'Failed' :
-                             payment.status}
-                          </span>
+
+                          {(payment.refunds?.length ?? 0) > 0 && (
+                            <div className="mt-3 border-t border-gray-200 pt-3">
+                              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-600">
+                                Refunds
+                              </p>
+                              <div className="space-y-2">
+                                {payment.refunds?.map((refund) => (
+                                  <div
+                                    key={refund.id}
+                                    className="flex items-start justify-between gap-4 rounded-md bg-blue-50 px-3 py-2"
+                                  >
+                                    <div>
+                                      <p className="text-sm font-medium text-blue-950">
+                                        -${(refund.amountCents / 100).toFixed(2)}{' '}
+                                        {refund.currency.toUpperCase()}
+                                      </p>
+                                      <p className="text-xs text-blue-800">
+                                        {new Date(refund.createdAt).toLocaleDateString()}
+                                        {refund.reason ? ` · ${refund.reason}` : ''}
+                                      </p>
+                                    </div>
+                                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                      refund.status === 'SUCCEEDED' ? 'bg-blue-100 text-blue-800' :
+                                      refund.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' :
+                                      'bg-red-100 text-red-800'
+                                    }`}>
+                                      {refund.status === 'SUCCEEDED' ? 'Refunded' :
+                                       refund.status === 'PENDING' ? 'Pending' :
+                                       'Failed'}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>

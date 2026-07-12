@@ -8,7 +8,13 @@ import RegistrationEditForm from '../components/admin/registrations/Registration
 import RegistrationCancelForm from '../components/admin/registrations/RegistrationCancelForm';
 import AuditTrailView from '../components/admin/registrations/AuditTrailView';
 import { useRegistrationManagement } from '../hooks/useRegistrationManagement';
-import { adminRegistrationsApi, PaginatedRegistrationsResponse, Job, CampingOption, UserCampingOptionRegistration } from '../lib/api/admin-registrations';
+import {
+  adminRegistrationsApi,
+  PaginatedRegistrationsResponse,
+  Job,
+  CampingOption,
+  UserCampingOptionRegistration,
+} from '../lib/api/admin-registrations';
 
 // TODO: Replace with actual API types when implemented
 interface Registration {
@@ -100,7 +106,8 @@ export function ManageRegistrationsPage() {
     setLoading(true);
     setError(null);
     try {
-      const data: PaginatedRegistrationsResponse = await adminRegistrationsApi.getRegistrations(filters);
+      const data: PaginatedRegistrationsResponse =
+        await adminRegistrationsApi.getRegistrations(filters);
       console.log('API response:', data); // Debug log
       // Extract registrations array from the response object
       const registrationsArray = data?.registrations || [];
@@ -148,7 +155,7 @@ export function ManageRegistrationsPage() {
     const confirmed = regArray.filter(r => r.status === 'CONFIRMED').length;
     const pending = regArray.filter(r => r.status === 'PENDING').length;
     const cancelled = regArray.filter(r => r.status === 'CANCELLED').length;
-    
+
     return { total, confirmed, pending, cancelled };
   }, [registrations]);
 
@@ -162,7 +169,7 @@ export function ManageRegistrationsPage() {
   const handleFilterChange = (key: keyof RegistrationFilters, value: string) => {
     setLocalFilters(prev => ({
       ...prev,
-      [key]: value === '' ? undefined : key === 'year' ? parseInt(value) : value
+      [key]: value === '' ? undefined : key === 'year' ? parseInt(value) : value,
     }));
   };
 
@@ -172,18 +179,21 @@ export function ManageRegistrationsPage() {
   };
 
   // Convert API registration format to component format with camping options
-  const convertRegistrationForComponent = (registration: Registration, userCampingOptions: UserCampingOptionRegistration[] = []) => {
+  const convertRegistrationForComponent = (
+    registration: Registration,
+    userCampingOptions: UserCampingOptionRegistration[] = []
+  ) => {
     return {
       ...registration,
       jobs: registration.jobs.map((rj, index) => ({
         id: `registration-job-${index}`, // Generate ID since it's not in the API response
-        job: rj.job
+        job: rj.job,
       })),
       // Convert user camping options to the format expected by the component
-      campingOptions: userCampingOptions.map((ucor) => ({
+      campingOptions: userCampingOptions.map(ucor => ({
         id: ucor.id,
-        campingOption: ucor.campingOption
-      }))
+        campingOption: ucor.campingOption,
+      })),
     };
   };
 
@@ -199,7 +209,8 @@ export function ManageRegistrationsPage() {
     if (registration) {
       try {
         // Fetch user's camping options for this registration
-        const userCampingOptions = await adminRegistrationsApi.getUserCampingOptions(registrationId);
+        const userCampingOptions =
+          await adminRegistrationsApi.getUserCampingOptions(registrationId);
         openEditModal(convertRegistrationForComponent(registration, userCampingOptions));
       } catch (error) {
         console.error('Error fetching user camping options:', error);
@@ -223,19 +234,19 @@ export function ManageRegistrationsPage() {
       year: registration.year.toString(),
     });
 
-    return `${ROUTES.REPORTS_PAYMENTS.path}?${params.toString()}`;
+    return `${ROUTES.ADMIN_PAYMENTS.path}?${params.toString()}`;
   };
 
   // Handle successful operations by refreshing data
   useEffect(() => {
     if (managementState.lastSuccessMessage) {
       fetchRegistrations(); // Refresh the list after successful operations
-      
+
       // Clear success message after 5 seconds
       const timer = setTimeout(() => {
         clearMessages();
       }, 5000);
-      
+
       return () => clearTimeout(timer);
     }
   }, [managementState.lastSuccessMessage, fetchRegistrations, clearMessages]);
@@ -326,36 +337,31 @@ export function ManageRegistrationsPage() {
           <div className="bg-white p-4 rounded-lg shadow-sm border mb-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-medium text-gray-900">Filters</h3>
-              <button
-                onClick={clearFilters}
-                className="text-sm text-gray-500 hover:text-gray-700"
-              >
+              <button onClick={clearFilters} className="text-sm text-gray-500 hover:text-gray-700">
                 Clear all
               </button>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Year
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Year</label>
                 <select
                   value={localFilters.year || ''}
-                  onChange={(e) => handleFilterChange('year', e.target.value)}
+                  onChange={e => handleFilterChange('year', e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500"
                 >
                   <option value="">All years</option>
                   {availableYears.map(year => (
-                    <option key={year} value={year}>{year}</option>
+                    <option key={year} value={year}>
+                      {year}
+                    </option>
                   ))}
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Status
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
                 <select
                   value={localFilters.status || ''}
-                  onChange={(e) => handleFilterChange('status', e.target.value)}
+                  onChange={e => handleFilterChange('status', e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500"
                 >
                   <option value="">All statuses</option>
@@ -366,25 +372,21 @@ export function ManageRegistrationsPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Email
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
                 <input
                   type="text"
                   value={localFilters.email || ''}
-                  onChange={(e) => handleFilterChange('email', e.target.value)}
+                  onChange={e => handleFilterChange('email', e.target.value)}
                   placeholder="Search by email..."
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Name
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
                 <input
                   type="text"
                   value={localFilters.name || ''}
-                  onChange={(e) => handleFilterChange('name', e.target.value)}
+                  onChange={e => handleFilterChange('name', e.target.value)}
                   placeholder="Search by name..."
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500"
                 />
@@ -431,10 +433,7 @@ export function ManageRegistrationsPage() {
             <div className="flex">
               <AlertTriangle className="h-5 w-5 text-red-400 mr-2 flex-shrink-0" />
               <span>{managementState.lastErrorMessage}</span>
-              <button
-                onClick={clearMessages}
-                className="ml-4 text-red-700 hover:text-red-900"
-              >
+              <button onClick={clearMessages} className="ml-4 text-red-700 hover:text-red-900">
                 <X size={16} />
               </button>
             </div>
@@ -444,7 +443,11 @@ export function ManageRegistrationsPage() {
         {/* Modals */}
         {managementState.editModalOpen && managementState.selectedRegistration && (
           <RegistrationEditForm
-            registration={managementState.selectedRegistration as unknown as Parameters<typeof RegistrationEditForm>[0]['registration']}
+            registration={
+              managementState.selectedRegistration as unknown as Parameters<
+                typeof RegistrationEditForm
+              >[0]['registration']
+            }
             availableJobs={availableJobs}
             availableCampingOptions={availableCampingOptions}
             loading={managementState.editLoading}
@@ -455,7 +458,11 @@ export function ManageRegistrationsPage() {
 
         {managementState.cancelModalOpen && managementState.selectedRegistration && (
           <RegistrationCancelForm
-            registration={managementState.selectedRegistration as unknown as Parameters<typeof RegistrationCancelForm>[0]['registration']}
+            registration={
+              managementState.selectedRegistration as unknown as Parameters<
+                typeof RegistrationCancelForm
+              >[0]['registration']
+            }
             loading={managementState.cancelLoading}
             onSubmit={cancelRegistration}
             onClose={closeAllModals}
@@ -473,4 +480,4 @@ export function ManageRegistrationsPage() {
   );
 }
 
-export default ManageRegistrationsPage; 
+export default ManageRegistrationsPage;

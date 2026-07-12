@@ -1,5 +1,6 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
+import { MemoryRouter } from 'react-router-dom';
 import { RegistrationSearchTable } from './RegistrationSearchTable';
 
 interface MockColumn {
@@ -10,7 +11,12 @@ interface MockColumn {
 
 // Mock the DataTable component
 vi.mock('../../common/DataTable/DataTable', () => ({
-  DataTable: ({ data, columns, emptyMessage, onRowClick }: {
+  DataTable: ({
+    data,
+    columns,
+    emptyMessage,
+    onRowClick,
+  }: {
     data: unknown[];
     columns: MockColumn[];
     emptyMessage: string;
@@ -32,8 +38,8 @@ vi.mock('../../common/DataTable/DataTable', () => ({
           </thead>
           <tbody>
             {data.map((row: unknown, rowIndex: number) => (
-              <tr 
-                key={rowIndex} 
+              <tr
+                key={rowIndex}
                 onClick={() => onRowClick?.(row)}
                 data-testid={`table-row-${rowIndex}`}
               >
@@ -183,7 +189,7 @@ describe('RegistrationSearchTable', () => {
       render(<RegistrationSearchTable {...defaultProps} />);
 
       expect(screen.getByTestId('data-table')).toBeInTheDocument();
-      
+
       // Check that table headers are present
       expect(screen.getByText('User')).toBeInTheDocument();
       expect(screen.getByText('Email')).toBeInTheDocument();
@@ -226,10 +232,10 @@ describe('RegistrationSearchTable', () => {
 
       // First registration has multiple jobs
       expect(screen.getByText('Kitchen Helper, Cleanup Crew')).toBeInTheDocument();
-      
+
       // Second registration has no jobs
       expect(screen.getByText('No shifts assigned')).toBeInTheDocument();
-      
+
       // Third registration has one job
       expect(screen.getByText('Safety Monitor')).toBeInTheDocument();
     });
@@ -239,7 +245,7 @@ describe('RegistrationSearchTable', () => {
 
       // First registration has payments totaling $200
       expect(screen.getByText('$200.00')).toBeInTheDocument();
-      
+
       // Second and third registrations have no payments - use getAllByText to handle multiple instances
       const noPaymentsElements = screen.getAllByText('No payments');
       expect(noPaymentsElements).toHaveLength(2);
@@ -263,9 +269,9 @@ describe('RegistrationSearchTable', () => {
     it('should show custom empty message', () => {
       const customEmptyMessage = 'No matching registrations';
       render(
-        <RegistrationSearchTable 
-          {...defaultProps} 
-          registrations={[]} 
+        <RegistrationSearchTable
+          {...defaultProps}
+          registrations={[]}
           emptyMessage={customEmptyMessage}
         />
       );
@@ -289,6 +295,27 @@ describe('RegistrationSearchTable', () => {
       // Should have cancel buttons only for non-cancelled registrations (Trash icons)
       const cancelButtons = screen.getAllByTitle('Cancel registration');
       expect(cancelButtons).toHaveLength(2); // Only for CONFIRMED and PENDING, not CANCELLED
+    });
+
+    it('should link each registration to its payment administration context', () => {
+      const getPaymentAdminUrl = vi.fn(
+        (registration: (typeof mockRegistrations)[number]) =>
+          `/admin/payments?registrationId=${registration.id}&userId=${registration.user.id}&year=${registration.year}`
+      );
+
+      render(
+        <MemoryRouter>
+          <RegistrationSearchTable {...defaultProps} getPaymentAdminUrl={getPaymentAdminUrl} />
+        </MemoryRouter>
+      );
+
+      const paymentLinks = screen.getAllByTitle('Manage payments');
+      expect(paymentLinks).toHaveLength(3);
+      expect(paymentLinks[0]).toHaveAttribute(
+        'href',
+        '/admin/payments?registrationId=reg-1&userId=user-1&year=2024'
+      );
+      expect(getPaymentAdminUrl).toHaveBeenCalledWith(mockRegistrations[0]);
     });
 
     it('should call onViewAuditTrail when audit trail button is clicked', () => {
@@ -363,102 +390,131 @@ describe('RegistrationSearchTable', () => {
 
   describe('Edge Cases', () => {
     it('should handle registrations with missing job category', () => {
-      const registrationWithMissingJobCategory = [{
-        ...mockRegistrations[0],
-        jobs: [
-          {
-            job: {
-              id: 'job-incomplete',
-              name: 'Job Without Category',
-              category: undefined,
-              shift: undefined,
+      const registrationWithMissingJobCategory = [
+        {
+          ...mockRegistrations[0],
+          jobs: [
+            {
+              job: {
+                id: 'job-incomplete',
+                name: 'Job Without Category',
+                category: undefined,
+                shift: undefined,
+              },
             },
-          },
-        ],
-      }];
+          ],
+        },
+      ];
 
-      render(<RegistrationSearchTable {...defaultProps} registrations={registrationWithMissingJobCategory} />);
+      render(
+        <RegistrationSearchTable
+          {...defaultProps}
+          registrations={registrationWithMissingJobCategory}
+        />
+      );
 
       expect(screen.getByText('Job Without Category')).toBeInTheDocument();
     });
 
     it('should handle registrations with mixed payment statuses', () => {
-      const registrationWithMixedPayments = [{
-        ...mockRegistrations[0],
-        payments: [
-          { id: 'payment-1', amount: 100, status: 'COMPLETED' },
-          { id: 'payment-2', amount: 50, status: 'PENDING' },
-          { id: 'payment-3', amount: 25, status: 'FAILED' },
-          {
-            id: 'payment-4',
-            amount: 80,
-            status: 'PARTIALLY_REFUNDED',
-            refunds: [{ amountCents: 2000, status: 'SUCCEEDED' }],
-          },
-        ],
-      }];
+      const registrationWithMixedPayments = [
+        {
+          ...mockRegistrations[0],
+          payments: [
+            { id: 'payment-1', amount: 100, status: 'COMPLETED' },
+            { id: 'payment-2', amount: 50, status: 'PENDING' },
+            { id: 'payment-3', amount: 25, status: 'FAILED' },
+            {
+              id: 'payment-4',
+              amount: 80,
+              status: 'PARTIALLY_REFUNDED',
+              refunds: [{ amountCents: 2000, status: 'SUCCEEDED' }],
+            },
+          ],
+        },
+      ];
 
-      render(<RegistrationSearchTable {...defaultProps} registrations={registrationWithMixedPayments} />);
+      render(
+        <RegistrationSearchTable {...defaultProps} registrations={registrationWithMixedPayments} />
+      );
 
       // Should count completed and partially refunded net payments.
       expect(screen.getByText('$160.00')).toBeInTheDocument();
     });
 
     it('should handle registrations with zero payment amounts', () => {
-      const registrationWithZeroPayments = [{
-        ...mockRegistrations[0],
-        payments: [
-          { id: 'payment-1', amount: 0, status: 'COMPLETED' },
-        ],
-      }];
+      const registrationWithZeroPayments = [
+        {
+          ...mockRegistrations[0],
+          payments: [{ id: 'payment-1', amount: 0, status: 'COMPLETED' }],
+        },
+      ];
 
-      render(<RegistrationSearchTable {...defaultProps} registrations={registrationWithZeroPayments} />);
+      render(
+        <RegistrationSearchTable {...defaultProps} registrations={registrationWithZeroPayments} />
+      );
 
       expect(screen.getByText('$0.00')).toBeInTheDocument();
     });
 
     it('should handle users without playa names', () => {
-      const registrationWithoutPlayaName = [{
-        ...mockRegistrations[0],
-        user: {
-          ...mockRegistrations[0].user,
-          playaName: '',
+      const registrationWithoutPlayaName = [
+        {
+          ...mockRegistrations[0],
+          user: {
+            ...mockRegistrations[0].user,
+            playaName: '',
+          },
         },
-      }];
+      ];
 
-      render(<RegistrationSearchTable {...defaultProps} registrations={registrationWithoutPlayaName} />);
+      render(
+        <RegistrationSearchTable {...defaultProps} registrations={registrationWithoutPlayaName} />
+      );
 
       expect(screen.getByText('John Doe')).toBeInTheDocument();
       expect(screen.queryByText('JohnnyPlaya')).not.toBeInTheDocument();
     });
 
     it('should handle very long job names', () => {
-      const registrationWithLongJobName = [{
-        ...mockRegistrations[0],
-        jobs: [
-          {
-            job: {
-              id: 'job-long',
-              name: 'This is a very long job name that might cause layout issues if not handled properly',
-              category: { name: 'Category' },
-              shift: undefined,
+      const registrationWithLongJobName = [
+        {
+          ...mockRegistrations[0],
+          jobs: [
+            {
+              job: {
+                id: 'job-long',
+                name: 'This is a very long job name that might cause layout issues if not handled properly',
+                category: { name: 'Category' },
+                shift: undefined,
+              },
             },
-          },
-        ],
-      }];
+          ],
+        },
+      ];
 
-      render(<RegistrationSearchTable {...defaultProps} registrations={registrationWithLongJobName} />);
+      render(
+        <RegistrationSearchTable {...defaultProps} registrations={registrationWithLongJobName} />
+      );
 
-      expect(screen.getByText('This is a very long job name that might cause layout issues if not handled properly')).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          'This is a very long job name that might cause layout issues if not handled properly'
+        )
+      ).toBeInTheDocument();
     });
 
     it('should handle invalid dates gracefully', () => {
-      const registrationWithInvalidDate = [{
-        ...mockRegistrations[0],
-        createdAt: 'invalid-date',
-      }];
+      const registrationWithInvalidDate = [
+        {
+          ...mockRegistrations[0],
+          createdAt: 'invalid-date',
+        },
+      ];
 
-      render(<RegistrationSearchTable {...defaultProps} registrations={registrationWithInvalidDate} />);
+      render(
+        <RegistrationSearchTable {...defaultProps} registrations={registrationWithInvalidDate} />
+      );
 
       // Should still render the table even with invalid date
       expect(screen.getByTestId('data-table')).toBeInTheDocument();
@@ -474,7 +530,9 @@ describe('RegistrationSearchTable', () => {
         { ...mockRegistrations[0], id: 'reg-4', status: 'WAITLISTED' as const },
       ];
 
-      render(<RegistrationSearchTable {...defaultProps} registrations={registrationsWithAllStatuses} />);
+      render(
+        <RegistrationSearchTable {...defaultProps} registrations={registrationsWithAllStatuses} />
+      );
 
       expect(screen.getByText('Confirmed')).toBeInTheDocument();
       expect(screen.getByText('Pending')).toBeInTheDocument();
@@ -483,16 +541,23 @@ describe('RegistrationSearchTable', () => {
     });
 
     it('should properly calculate payment totals', () => {
-      const registrationWithMultiplePayments = [{
-        ...mockRegistrations[0],
-        payments: [
-          { id: 'payment-1', amount: 123.45, status: 'COMPLETED' },
-          { id: 'payment-2', amount: 67.89, status: 'COMPLETED' },
-          { id: 'payment-3', amount: 100.00, status: 'PENDING' }, // Should be ignored
-        ],
-      }];
+      const registrationWithMultiplePayments = [
+        {
+          ...mockRegistrations[0],
+          payments: [
+            { id: 'payment-1', amount: 123.45, status: 'COMPLETED' },
+            { id: 'payment-2', amount: 67.89, status: 'COMPLETED' },
+            { id: 'payment-3', amount: 100.0, status: 'PENDING' }, // Should be ignored
+          ],
+        },
+      ];
 
-      render(<RegistrationSearchTable {...defaultProps} registrations={registrationWithMultiplePayments} />);
+      render(
+        <RegistrationSearchTable
+          {...defaultProps}
+          registrations={registrationWithMultiplePayments}
+        />
+      );
 
       // 123.45 + 67.89 = 191.34
       expect(screen.getByText('$191.34')).toBeInTheDocument();
@@ -505,11 +570,16 @@ describe('RegistrationSearchTable', () => {
         { ...mockRegistrations[2], year: 2022 },
       ];
 
-      render(<RegistrationSearchTable {...defaultProps} registrations={registrationsWithDifferentYears} />);
+      render(
+        <RegistrationSearchTable
+          {...defaultProps}
+          registrations={registrationsWithDifferentYears}
+        />
+      );
 
       expect(screen.getByText('2025')).toBeInTheDocument();
       expect(screen.getByText('2023')).toBeInTheDocument();
       expect(screen.getByText('2022')).toBeInTheDocument();
     });
   });
-}); 
+});

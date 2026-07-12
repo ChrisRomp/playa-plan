@@ -997,6 +997,29 @@ describe('PaymentsService', () => {
         success: true,
         refundStatus: PaymentRefundStatus.SUCCEEDED,
       });
+      expect(mockAdminAuditService.createAuditRecord).toHaveBeenCalledWith(
+        expect.objectContaining({
+          adminUserId: 'admin-id',
+          actionType: 'PAYMENT_REFUND',
+          targetRecordType: 'PAYMENT',
+          targetRecordId: 'payment-id',
+          oldValues: {
+            status: PaymentStatus.COMPLETED,
+            refundedAmount: 0,
+          },
+          newValues: expect.objectContaining({
+            status: PaymentStatus.PARTIALLY_REFUNDED,
+            refundId: 'refund-id',
+            refundAmount: 25,
+            refundAmountCents: 2500,
+            providerRefundId: 're_stripe123',
+            processorRefund: true,
+          }),
+          reason: 'Partial refund',
+          transactionId: expect.any(String),
+          throwOnError: false,
+        }),
+      );
     });
 
     it('should keep payment completed when Stripe returns a pending refund status', async () => {
@@ -1502,6 +1525,83 @@ describe('PaymentsService', () => {
       });
     });
 
+    it('should record and audit a partial offline refund', async () => {
+      const manualPayment = {
+        ...basePayment,
+        provider: PaymentProvider.MANUAL,
+        providerRefId: null,
+        externalPaymentMethod: 'Check',
+        refunds: [],
+      };
+      const succeededRefund = {
+        id: 'refund-id',
+        paymentId: 'payment-id',
+        amountCents: 2500,
+        currency: 'USD',
+        status: PaymentRefundStatus.SUCCEEDED,
+        processorRefund: false,
+        providerRefundId: null,
+        reason: 'Partial camp fee adjustment',
+        resultingRegistrationStatus: null,
+        processedByUserId: 'admin-id',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      mockPrismaService.payment.findUnique
+        .mockResolvedValueOnce(manualPayment)
+        .mockResolvedValueOnce(manualPayment)
+        .mockResolvedValueOnce({
+          ...manualPayment,
+          refunds: [succeededRefund],
+        });
+      mockPrismaService.paymentRefund.create.mockResolvedValueOnce(succeededRefund);
+
+      const actualResult = await service.processRefund({
+        paymentId: 'payment-id',
+        amount: 25,
+        reason: 'Partial camp fee adjustment',
+      }, 'admin-id');
+
+      expect(mockStripeService.createRefund).not.toHaveBeenCalled();
+      expect(mockPaypalService.createRefund).not.toHaveBeenCalled();
+      expect(mockPrismaService.payment.update).toHaveBeenCalledWith({
+        where: { id: 'payment-id' },
+        data: { status: PaymentStatus.PARTIALLY_REFUNDED },
+      });
+      expect(mockAdminAuditService.createAuditRecord).toHaveBeenCalledWith(
+        expect.objectContaining({
+          adminUserId: 'admin-id',
+          actionType: 'PAYMENT_REFUND',
+          targetRecordType: 'PAYMENT',
+          targetRecordId: 'payment-id',
+          oldValues: {
+            status: PaymentStatus.COMPLETED,
+            refundedAmount: 0,
+          },
+          newValues: {
+            status: PaymentStatus.PARTIALLY_REFUNDED,
+            refundId: 'refund-id',
+            refundAmount: 25,
+            refundAmountCents: 2500,
+            providerRefundId: 'refund-id',
+            processorRefund: false,
+            resultingRegistrationStatus: undefined,
+          },
+          reason: 'Partial camp fee adjustment',
+          transactionId: expect.any(String),
+          throwOnError: false,
+        }),
+      );
+      expect(actualResult).toEqual({
+        paymentId: 'payment-id',
+        refundAmount: 25,
+        providerRefundId: 'refund-id',
+        success: true,
+        refundStatus: PaymentRefundStatus.SUCCEEDED,
+      });
+    });
+
     it('should reject PayPal portal refunds instead of recording a false offline success', async () => {
       const paypalPayment = {
         ...basePayment,
@@ -1873,6 +1973,24 @@ describe('PaymentsService', () => {
           data: { status: 'CONFIRMED', paymentDeferred: false },
         }),
       );
+      expect(mockAdminAuditService.createAuditRecord).toHaveBeenCalledWith({
+        adminUserId: 'admin-id',
+        actionType: 'PAYMENT_RECORD',
+        targetRecordType: 'PAYMENT',
+        targetRecordId: 'payment-manual',
+        newValues: {
+          amount: 100,
+          currency: 'USD',
+          provider: PaymentProvider.MANUAL,
+          status: PaymentStatus.COMPLETED,
+          externalPaymentMethod: undefined,
+          externalPaymentReference: 'check-123',
+          userId: 'user-id',
+          registrationId: 'registration-id',
+        },
+        reason: 'check-123',
+        throwOnError: false,
+      });
     });
 
     it('recordManualPayment still audits and returns payment when marking the registration paid fails', async () => {

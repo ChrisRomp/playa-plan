@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import { beforeEach, describe, it, expect, vi } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -471,6 +471,119 @@ describe('DashboardPage Registration Status', () => {
       // Should not show the pending payment section
       expect(screen.queryByText('Outstanding Dues')).not.toBeInTheDocument();
       expect(screen.queryByTestId('payment-button')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('Current registration refunds', () => {
+    it('should show refunds attached to current registration payments only', () => {
+      mockUseConfig.mockReturnValue({
+        config: {
+          name: 'Test Camp',
+          description: 'Test Description',
+          homePageBlurb: 'Test Blurb',
+          registrationOpen: true,
+          earlyRegistrationOpen: false,
+          currentYear: 2025,
+        },
+        isLoading: false,
+        error: null,
+        refreshConfig: vi.fn(),
+        isConnecting: false,
+        isConnected: true,
+        connectionError: null,
+      });
+
+      mockUseUserRegistrations.mockReturnValue({
+        registrations: [
+          {
+            id: 'current-registration',
+            userId: 'user-1',
+            year: 2025,
+            status: 'CONFIRMED',
+            jobs: [],
+            payments: [
+              {
+                id: 'current-payment',
+                amount: 150,
+                currency: 'USD',
+                status: 'PARTIALLY_REFUNDED',
+                provider: 'STRIPE',
+                providerRefId: 'stripe-payment',
+                userId: 'user-1',
+                registrationId: 'current-registration',
+                createdAt: '2025-01-01T00:00:00.000Z',
+                updatedAt: '2025-01-01T00:00:00.000Z',
+                refunds: [
+                  {
+                    id: 'current-refund',
+                    paymentId: 'current-payment',
+                    amountCents: 2500,
+                    currency: 'usd',
+                    status: 'SUCCEEDED',
+                    processorRefund: true,
+                    reason: 'Partial camp fee adjustment',
+                    processedByUserId: 'admin-1',
+                    createdAt: '2025-02-01T00:00:00.000Z',
+                    updatedAt: '2025-02-01T00:00:00.000Z',
+                  },
+                ],
+              },
+            ],
+            createdAt: '2025-01-01T00:00:00.000Z',
+            updatedAt: '2025-01-01T00:00:00.000Z',
+          },
+          {
+            id: 'historical-registration',
+            userId: 'user-1',
+            year: 2024,
+            status: 'CANCELLED',
+            jobs: [],
+            payments: [
+              {
+                id: 'historical-payment',
+                amount: 100,
+                currency: 'USD',
+                status: 'REFUNDED',
+                provider: 'MANUAL',
+                userId: 'user-1',
+                registrationId: 'historical-registration',
+                createdAt: '2024-01-01T00:00:00.000Z',
+                updatedAt: '2024-01-01T00:00:00.000Z',
+                refunds: [
+                  {
+                    id: 'historical-refund',
+                    paymentId: 'historical-payment',
+                    amountCents: 10000,
+                    currency: 'usd',
+                    status: 'SUCCEEDED',
+                    processorRefund: false,
+                    reason: 'Historical refund should not display',
+                    processedByUserId: 'admin-1',
+                    createdAt: '2024-02-01T00:00:00.000Z',
+                    updatedAt: '2024-02-01T00:00:00.000Z',
+                  },
+                ],
+              },
+            ],
+            createdAt: '2024-01-01T00:00:00.000Z',
+            updatedAt: '2024-01-01T00:00:00.000Z',
+          },
+        ],
+        loading: false,
+        error: null,
+        refetch: vi.fn(),
+      });
+
+      render(<DashboardPageWrapper />);
+
+      expect(screen.getByText('Refunds')).toBeInTheDocument();
+      const refundAmount = screen.getByText('-$25.00 USD');
+      const refundRow = refundAmount.closest('.flex.items-start');
+      expect(refundRow).not.toBeNull();
+      expect(within(refundRow as HTMLElement).getByText('Refunded')).toBeInTheDocument();
+      expect(screen.getByText(/Partial camp fee adjustment/)).toBeInTheDocument();
+      expect(screen.getByText('Partially Refunded')).toBeInTheDocument();
+      expect(screen.queryByText(/Historical refund should not display/)).not.toBeInTheDocument();
     });
   });
 

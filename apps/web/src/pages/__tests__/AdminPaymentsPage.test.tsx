@@ -1,15 +1,38 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import type { ReactNode } from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { PaymentReportsPage } from '../PaymentReportsPage';
+import { AdminPaymentsPage } from '../AdminPaymentsPage';
 import { reports } from '../../lib/api';
+import { adminRegistrationsApi } from '../../lib/api/admin-registrations';
 import { Payment } from '../../types';
+import { downloadCsv } from '../../utils/csv';
 
 // Mock the api module
 vi.mock('../../lib/api', () => ({
   reports: {
     getPayments: vi.fn(),
+    recordExternalPayment: vi.fn(),
+    processRefund: vi.fn(),
   },
+}));
+
+vi.mock('../../utils/csv', () => ({
+  downloadCsv: vi.fn(),
+}));
+
+vi.mock('../../lib/api/admin-registrations', () => ({
+  adminRegistrationsApi: {
+    getRegistrations: vi.fn(),
+  },
+}));
+
+vi.mock('../../hooks/useConfig', () => ({
+  useConfig: () => ({
+    config: {
+      currentYear: 2026,
+    },
+  }),
 }));
 
 // Mock the LoadingSpinner component
@@ -23,10 +46,15 @@ vi.mock('../../components/common/DataTable/DataTable', () => ({
     data,
     emptyMessage,
     caption,
+    columns,
   }: {
     data: Payment[];
     emptyMessage: string;
     caption: string;
+    columns: Array<{
+      id: string;
+      Cell?: (props: { row: Payment }) => ReactNode;
+    }>;
   }) => (
     <div data-testid="data-table" aria-label={caption}>
       {data.length === 0 ? (
@@ -36,6 +64,9 @@ vi.mock('../../components/common/DataTable/DataTable', () => ({
           {data.map((item: Payment) => (
             <div key={item.id} data-testid={`payment-${item.id}`}>
               {item.id} - {item.status} - ${item.amount}
+              {columns.map(column => (
+                <div key={column.id}>{column.Cell?.({ row: item })}</div>
+              ))}
             </div>
           ))}
         </div>
@@ -123,17 +154,41 @@ const mockPayments: Payment[] = [
   },
 ];
 
-const renderComponent = () => {
+const mockCurrentYearRegistration = {
+  id: 'registration-1',
+  year: 2026,
+  status: 'CONFIRMED' as const,
+  createdAt: '2026-01-15T10:00:00Z',
+  user: {
+    id: 'user-1',
+    email: 'john@example.com',
+    firstName: 'John',
+    lastName: 'Doe',
+    playaName: 'Dusty John',
+    role: 'PARTICIPANT',
+  },
+  jobs: [],
+  payments: [],
+};
+
+const renderComponent = (initialEntry = '/admin/payments') => {
   return render(
-    <MemoryRouter>
-      <PaymentReportsPage />
+    <MemoryRouter initialEntries={[initialEntry]}>
+      <AdminPaymentsPage />
     </MemoryRouter>
   );
 };
 
-describe('PaymentReportsPage', () => {
+describe('AdminPaymentsPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(adminRegistrationsApi.getRegistrations).mockResolvedValue({
+      registrations: [mockCurrentYearRegistration],
+      total: 1,
+      page: 1,
+      limit: 100,
+      totalPages: 1,
+    });
   });
 
   afterEach(() => {
@@ -163,10 +218,10 @@ describe('PaymentReportsPage', () => {
       renderComponent();
 
       await waitFor(() => {
-        expect(screen.getByText('Payment Reports')).toBeInTheDocument();
+        expect(screen.getByText('Payment Administration')).toBeInTheDocument();
       });
 
-      expect(screen.getByText('Back to Reports')).toBeInTheDocument();
+      expect(screen.getByText('Back to Admin')).toBeInTheDocument();
     });
 
     it('should render action buttons', async () => {
@@ -203,9 +258,9 @@ describe('PaymentReportsPage', () => {
       expect(screen.getByText('Completed')).toBeInTheDocument();
       expect(screen.getByText('Pending')).toBeInTheDocument();
       expect(screen.getByText('Failed')).toBeInTheDocument();
-      expect(screen.getByText('Refunded')).toBeInTheDocument();
-      expect(screen.getByText('Total Revenue')).toBeInTheDocument();
-      expect(screen.getByText('$150.00')).toBeInTheDocument();
+      expect(screen.getByText('Refunded / Partial')).toBeInTheDocument();
+      expect(screen.getByText('Net Revenue')).toBeInTheDocument();
+      expect(screen.getAllByText('$150.00').length).toBeGreaterThan(0);
     });
 
     it('should call getPayments on mount with empty filters', async () => {
@@ -214,8 +269,33 @@ describe('PaymentReportsPage', () => {
       renderComponent();
 
       await waitFor(() => {
-        expect(mockGetPayments).toHaveBeenCalledWith();
+        expect(mockGetPayments).toHaveBeenCalledWith({});
       });
+    });
+
+    it('should initialize registration context from URL parameters', async () => {
+      renderComponent('/admin/payments?registrationId=registration-1&userId=user-1&year=2026');
+
+      await waitFor(() => {
+        expect(reports.getPayments).toHaveBeenCalledWith({
+          registrationId: 'registration-1',
+          year: 2026,
+        });
+      });
+
+      fireEvent.click(screen.getByText('Record External Payment'));
+
+      expect(await screen.findByText(/john@example\.com/)).toBeInTheDocument();
+      expect(screen.queryByLabelText('User ID')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('Registration ID')).not.toBeInTheDocument();
+      expect(adminRegistrationsApi.getRegistrations).toHaveBeenCalledWith({
+        year: 2026,
+        limit: 100,
+      });
+
+      fireEvent.click(screen.getByText('Change registration'));
+
+      expect(await screen.findByRole('searchbox', { name: 'Registration' })).toBeInTheDocument();
     });
   });
 
@@ -386,92 +466,285 @@ describe('PaymentReportsPage', () => {
     });
   });
 
-  describe('CSV Export Functionality', () => {
-    let originalURL: typeof window.URL;
-    let originalCreateElement: typeof document.createElement;
-    let originalAppendChild: typeof document.body.appendChild;
-    let originalRemoveChild: typeof document.body.removeChild;
-
+  describe('Payment Admin Actions', () => {
     beforeEach(() => {
-      const mockGetPayments = vi.mocked(reports.getPayments);
-      mockGetPayments.mockResolvedValue(mockPayments);
-
-      // Save original implementations before each test
-      originalURL = window.URL;
-      originalCreateElement = document.createElement;
-      originalAppendChild = document.body.appendChild;
-      originalRemoveChild = document.body.removeChild;
+      vi.mocked(reports.getPayments).mockResolvedValue(mockPayments);
     });
 
-    afterEach(() => {
-      // Always restore original implementations after each test
-      Object.defineProperty(window, 'URL', {
-        value: originalURL,
-        writable: true,
-        configurable: true,
-      });
-      document.createElement = originalCreateElement;
-      document.body.appendChild = originalAppendChild;
-      document.body.removeChild = originalRemoveChild;
-    });
-
-    it.skip('should export CSV when export button is clicked', async () => {
-      // Mock URL API with a simple implementation that doesn't interfere with testing
-      const mockCreateObjectURL = vi.fn(() => 'mock-url');
-      const mockRevokeObjectURL = vi.fn();
-
-      // Create a minimal mock anchor that doesn't interfere with DOM
-      const mockClick = vi.fn();
-      const mockSetAttribute = vi.fn();
-
-      // Store original URL to restore later
-      const originalCreateObjectURL = window.URL.createObjectURL;
-      const originalRevokeObjectURL = window.URL.revokeObjectURL;
-
-      // Mock only what we need without breaking the DOM
-      window.URL.createObjectURL = mockCreateObjectURL;
-      window.URL.revokeObjectURL = mockRevokeObjectURL;
-
-      // Mock createElement for anchor element only
-      const originalCreateElement = document.createElement;
-      vi.spyOn(document, 'createElement').mockImplementation((tagName: string) => {
-        if (tagName === 'a') {
-          const mockElement = {
-            click: mockClick,
-            setAttribute: mockSetAttribute,
-            style: {},
-          } as unknown as HTMLAnchorElement;
-
-          // Mock appendChild and removeChild to just track calls
-          vi.spyOn(document.body, 'appendChild').mockImplementationOnce(() => mockElement);
-          vi.spyOn(document.body, 'removeChild').mockImplementationOnce(() => mockElement);
-
-          return mockElement;
-        }
-        return originalCreateElement.call(document, tagName);
+    it('should submit externally recorded payment details', async () => {
+      vi.mocked(reports.recordExternalPayment).mockResolvedValue({
+        ...mockPayments[0],
+        id: 'external-payment',
+        provider: 'MANUAL',
+        externalPaymentMethod: 'Check',
+        externalPaymentReference: 'Check #1234',
       });
 
       renderComponent();
 
       await waitFor(() => {
-        expect(screen.getByText('Export')).toBeInTheDocument();
+        expect(screen.getByText('Record External Payment')).toBeInTheDocument();
       });
 
-      const exportButton = screen.getByText('Export');
-      fireEvent.click(exportButton);
+      fireEvent.click(screen.getByText('Record External Payment'));
+      fireEvent.change(await screen.findByLabelText('Registration'), {
+        target: { value: 'john@example.com' },
+      });
+      fireEvent.click(screen.getByRole('button', { name: /John Doe.*john@example\.com/i }));
+      fireEvent.change(screen.getByLabelText('Amount'), { target: { value: '125.50' } });
+      fireEvent.change(screen.getByLabelText('External method'), { target: { value: 'Check' } });
+      fireEvent.change(screen.getByLabelText('Reference'), { target: { value: 'Check #1234' } });
+      fireEvent.click(screen.getByText('Record payment'));
 
-      // Verify that the export process was initiated
-      expect(mockCreateObjectURL).toHaveBeenCalledWith(expect.any(Blob));
-      expect(mockClick).toHaveBeenCalled();
-      expect(mockRevokeObjectURL).toHaveBeenCalledWith('mock-url');
-      expect(mockSetAttribute).toHaveBeenCalledWith(
-        'download',
-        expect.stringMatching(/^payment_reports_\d{4}-\d{2}-\d{2}\.csv$/)
+      await waitFor(() => {
+        expect(reports.recordExternalPayment).toHaveBeenCalledWith({
+          amount: 125.5,
+          currency: 'USD',
+          userId: 'user-1',
+          registrationId: 'registration-1',
+          externalPaymentMethod: 'Check',
+          reference: 'Check #1234',
+          status: 'COMPLETED',
+        });
+      });
+    });
+
+    it('should submit a partial refund with no registration status change by default', async () => {
+      vi.mocked(reports.processRefund).mockResolvedValue({
+        paymentId: 'payment1',
+        refundAmount: 50,
+        providerRefundId: 'refund-1',
+        success: true,
+        refundStatus: 'SUCCEEDED',
+      });
+
+      renderComponent();
+
+      await waitFor(() => {
+        expect(screen.getByTestId('payment-payment1')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getAllByText('Refund')[0]);
+      fireEvent.change(screen.getByLabelText('Refund amount'), { target: { value: '50.00' } });
+      fireEvent.change(screen.getByLabelText('Reason'), {
+        target: { value: 'Camp fee adjustment' },
+      });
+      fireEvent.click(screen.getByText('Submit refund'));
+
+      await waitFor(() => {
+        expect(reports.processRefund).toHaveBeenCalledWith({
+          paymentId: 'payment1',
+          amount: 50,
+          reason: 'Camp fee adjustment',
+          resultingRegistrationStatus: undefined,
+        });
+      });
+    });
+
+    it('should require an explicit refund amount and prominently identify offline refunds', async () => {
+      renderComponent();
+
+      await waitFor(() => {
+        expect(screen.getByTestId('payment-payment1')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getAllByText('Refund')[0]);
+
+      expect(screen.getByLabelText('Refund amount')).toHaveValue(null);
+      expect(
+        screen.queryByRole('button', { name: 'Full remaining amount' })
+      ).not.toBeInTheDocument();
+      expect(screen.getByRole('alert')).toHaveTextContent('Manual refund only');
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        'This refund will be recorded as a manual/offline refund.'
       );
+    });
 
-      // Restore original implementations
-      window.URL.createObjectURL = originalCreateObjectURL;
-      window.URL.revokeObjectURL = originalRevokeObjectURL;
+    it('should submit an explicit registration status change with a refund', async () => {
+      vi.mocked(reports.processRefund).mockResolvedValue({
+        paymentId: 'payment1',
+        refundAmount: 150,
+        providerRefundId: 'refund-1',
+        success: true,
+        refundStatus: 'SUCCEEDED',
+      });
+
+      renderComponent();
+
+      await waitFor(() => {
+        expect(screen.getByTestId('payment-payment1')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getAllByText('Refund')[0]);
+      fireEvent.change(screen.getByLabelText('Refund amount'), { target: { value: '150.00' } });
+      fireEvent.change(screen.getByLabelText('Registration status change'), {
+        target: { value: 'WAITLISTED' },
+      });
+      fireEvent.change(screen.getByLabelText('Reason'), {
+        target: { value: 'Move registration to waitlist' },
+      });
+      fireEvent.click(screen.getByText('Submit refund'));
+
+      await waitFor(() => {
+        expect(reports.processRefund).toHaveBeenCalledWith({
+          paymentId: 'payment1',
+          amount: 150,
+          reason: 'Move registration to waitlist',
+          resultingRegistrationStatus: 'WAITLISTED',
+        });
+      });
+    });
+
+    it('should disable PayPal refunds with an explanation', async () => {
+      vi.mocked(reports.getPayments).mockResolvedValue([
+        {
+          ...mockPayments[1],
+          status: 'COMPLETED',
+        },
+      ]);
+
+      renderComponent();
+
+      const refundButton = await screen.findByRole('button', { name: 'Refund' });
+
+      expect(refundButton).toBeDisabled();
+      expect(refundButton).toHaveAttribute(
+        'title',
+        'PayPal refunds must be handled outside PlayaPlan'
+      );
+    });
+
+    it('should display gross, refunded, net, and refundable amounts', async () => {
+      vi.mocked(reports.getPayments).mockResolvedValue([
+        {
+          ...mockPayments[0],
+          provider: 'MANUAL',
+          status: 'PARTIALLY_REFUNDED',
+          refundedAmount: 25,
+          netAmount: 125,
+          refundableAmount: 125,
+          externalPaymentMethod: 'Check',
+          externalPaymentReference: 'Check #1234',
+        },
+      ]);
+
+      renderComponent();
+
+      await waitFor(() => {
+        expect(screen.getByText('$150.00 USD')).toBeInTheDocument();
+      });
+      expect(screen.getByText('Refunded $25.00')).toBeInTheDocument();
+      expect(screen.getByText('Net $125.00')).toBeInTheDocument();
+      expect(screen.getAllByText('$125.00')).toHaveLength(2);
+      expect(screen.getByText('External')).toBeInTheDocument();
+      expect(screen.getByText('Check #1234')).toBeInTheDocument();
+    });
+
+    it('should show an error when refund processing returns an unsuccessful result', async () => {
+      vi.mocked(reports.processRefund).mockResolvedValue({
+        paymentId: 'payment1',
+        refundAmount: 50,
+        providerRefundId: 'refund-1',
+        success: false,
+        refundStatus: 'FAILED',
+      });
+
+      renderComponent();
+
+      await waitFor(() => {
+        expect(screen.getByTestId('payment-payment1')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getAllByText('Refund')[0]);
+      fireEvent.change(screen.getByLabelText('Refund amount'), { target: { value: '50.00' } });
+      fireEvent.click(screen.getByText('Submit refund'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Failed to process refund')).toBeInTheDocument();
+      });
+      expect(screen.getByText('Submit refund')).toBeInTheDocument();
+    });
+
+    it('should close the refund form when refund processing is pending processor confirmation', async () => {
+      vi.mocked(reports.processRefund).mockResolvedValue({
+        paymentId: 'payment1',
+        refundAmount: 50,
+        providerRefundId: 'refund-1',
+        success: false,
+        refundStatus: 'PENDING',
+      });
+
+      renderComponent();
+
+      await waitFor(() => {
+        expect(screen.getByTestId('payment-payment1')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getAllByText('Refund')[0]);
+      fireEvent.change(screen.getByLabelText('Refund amount'), { target: { value: '50.00' } });
+      fireEvent.click(screen.getByText('Submit refund'));
+
+      await waitFor(() => {
+        expect(screen.queryByText('Submit refund')).not.toBeInTheDocument();
+      });
+      expect(screen.queryByText('Failed to process refund')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('CSV Export Functionality', () => {
+    it('should export payment and refund details for the filtered rows', async () => {
+      vi.mocked(reports.getPayments).mockResolvedValue([
+        {
+          ...mockPayments[0],
+          provider: 'MANUAL',
+          status: 'PARTIALLY_REFUNDED',
+          refundedAmount: 25,
+          netAmount: 125,
+          refundableAmount: 125,
+          externalPaymentMethod: 'Check',
+          externalPaymentReference: 'Check #1234',
+        },
+      ]);
+
+      renderComponent('/admin/payments?registrationId=reg1&year=2024');
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Export payments data' }));
+
+      expect(downloadCsv).toHaveBeenCalledWith(
+        [
+          'Name',
+          'Date/Time',
+          'Amount',
+          'Refunded',
+          'Net Amount',
+          'Refundable',
+          'Status',
+          'Source',
+          'External Method',
+          'External Reference',
+          'Registration ID',
+        ],
+        [
+          [
+            'John Doe',
+            expect.any(String),
+            '$150.00',
+            '$25.00',
+            '$125.00',
+            '$125.00',
+            'PARTIALLY_REFUNDED',
+            'External',
+            'Check',
+            'Check #1234',
+            'reg1',
+          ],
+        ],
+        {
+          filename: expect.stringMatching(
+            /^payment_reports_registrationId-reg1_year-2024_\d{4}-\d{2}-\d{2}\.csv$/
+          ),
+        }
+      );
     });
   });
 
@@ -504,8 +777,8 @@ describe('PaymentReportsPage', () => {
       expect(screen.getByText('Completed')).toBeInTheDocument();
       expect(screen.getByText('Pending')).toBeInTheDocument();
       expect(screen.getByText('Failed')).toBeInTheDocument();
-      expect(screen.getByText('Refunded')).toBeInTheDocument();
-      expect(screen.getByText('Total Revenue')).toBeInTheDocument();
+      expect(screen.getByText('Refunded / Partial')).toBeInTheDocument();
+      expect(screen.getByText('Net Revenue')).toBeInTheDocument();
       expect(screen.getByText('$0.00')).toBeInTheDocument();
     });
   });
@@ -579,8 +852,8 @@ describe('PaymentReportsPage', () => {
       });
 
       // Should handle different currencies in summary (component shows amount in dollars regardless)
-      expect(screen.getByText('Total Revenue')).toBeInTheDocument();
-      expect(screen.getByText('$85.50')).toBeInTheDocument();
+      expect(screen.getByText('Net Revenue')).toBeInTheDocument();
+      expect(screen.getAllByText('$85.50').length).toBeGreaterThan(0);
     });
   });
 });

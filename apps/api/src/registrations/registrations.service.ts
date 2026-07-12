@@ -336,7 +336,25 @@ export class RegistrationsService {
             },
           },
         },
-        payments: true,
+        payments: {
+          include: {
+            refunds: {
+              select: {
+                id: true,
+                paymentId: true,
+                amountCents: true,
+                currency: true,
+                status: true,
+                reason: true,
+                createdAt: true,
+                updatedAt: true,
+              },
+              orderBy: {
+                createdAt: 'desc',
+              },
+            },
+          },
+        },
       },
       orderBy: {
         year: 'desc',

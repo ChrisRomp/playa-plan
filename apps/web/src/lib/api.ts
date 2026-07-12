@@ -463,11 +463,11 @@ export interface PaymentRefund {
   amountCents: number;
   currency: string;
   status: 'PENDING' | 'SUCCEEDED' | 'FAILED';
-  processorRefund: boolean;
+  processorRefund?: boolean;
   providerRefundId?: string | null;
   reason?: string | null;
   resultingRegistrationStatus?: Registration['status'] | null;
-  processedByUserId: string;
+  processedByUserId?: string;
   createdAt: string;
   updatedAt: string;
 }
