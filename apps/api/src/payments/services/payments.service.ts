@@ -1324,10 +1324,24 @@ export class PaymentsService {
       };
     } catch (error: unknown) {
       if (pendingRefund?.status === PaymentRefundStatus.PENDING && !processorRefundSubmitted) {
-        await this.prisma.paymentRefund.update({
-          where: { id: pendingRefund.id },
+        // Only fail the refund if this is still the untouched attempt. If another
+        // request has already reconciled the same visible PENDING row (attaching a
+        // provider refund ID or advancing its status), a zero-row update signals
+        // concurrent progress and we must not overwrite that outcome.
+        const { count } = await this.prisma.paymentRefund.updateMany({
+          where: {
+            id: pendingRefund.id,
+            status: PaymentRefundStatus.PENDING,
+            providerRefundId: null,
+          },
           data: { status: PaymentRefundStatus.FAILED },
         });
+
+        if (count === 0) {
+          this.logger.warn(
+            `Refund ${pendingRefund.id} was concurrently reconciled; leaving its state unchanged after refund failure`,
+          );
+        }
       }
 
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';

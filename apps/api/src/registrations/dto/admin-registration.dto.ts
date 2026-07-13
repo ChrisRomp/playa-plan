@@ -9,6 +9,7 @@ import {
   IsInt,
   Min,
   Max,
+  MaxLength,
   ValidateNested
 } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
@@ -211,6 +212,7 @@ export class ExternalPaymentRegistrationSearchQueryDto {
   })
   @IsOptional()
   @IsString()
+  @MaxLength(100, { message: 'Search must be at most 100 characters long' })
   search?: string;
 
   @ApiPropertyOptional({
