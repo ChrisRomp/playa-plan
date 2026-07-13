@@ -475,7 +475,7 @@ describe('DashboardPage Registration Status', () => {
   });
 
   describe('Current registration refunds', () => {
-    it('should show refunds attached to current registration payments only', () => {
+    it('should present current and historical payments consistently while showing only current refunds', () => {
       mockUseConfig.mockReturnValue({
         config: {
           name: 'Test Camp',
@@ -542,8 +542,8 @@ describe('DashboardPage Registration Status', () => {
               {
                 id: 'historical-payment',
                 amount: 100,
-                currency: 'USD',
-                status: 'REFUNDED',
+                currency: 'EUR',
+                status: 'PARTIALLY_REFUNDED',
                 provider: 'MANUAL',
                 userId: 'user-1',
                 registrationId: 'historical-registration',
@@ -582,7 +582,9 @@ describe('DashboardPage Registration Status', () => {
       expect(refundRow).not.toBeNull();
       expect(within(refundRow as HTMLElement).getByText('Refunded')).toBeInTheDocument();
       expect(screen.getByText(/Partial camp fee adjustment/)).toBeInTheDocument();
-      expect(screen.getByText('Partially Refunded')).toBeInTheDocument();
+      expect(screen.getByText('$150.00 USD')).toBeInTheDocument();
+      expect(screen.getByText(/€100\.00 EUR/)).toBeInTheDocument();
+      expect(screen.getAllByText('Partially Refunded')).toHaveLength(2);
       expect(screen.queryByText(/Historical refund should not display/)).not.toBeInTheDocument();
     });
 

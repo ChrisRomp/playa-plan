@@ -11,6 +11,34 @@ import { isRegistrationAccessible, getRegistrationStatusMessage, getActiveRegist
 import { formatCurrency } from '../utils/currency';
 import { PATHS } from '../routes';
 import PaymentButton from '../components/payment/PaymentButton';
+import type { Payment } from '../lib/api';
+
+interface PaymentStatusPresentation {
+  readonly className: string;
+  readonly label: string;
+}
+
+interface PaymentStatusBadgeProps {
+  readonly status: Payment['status'];
+}
+
+const PAYMENT_STATUS_PRESENTATIONS: Record<Payment['status'], PaymentStatusPresentation> = {
+  COMPLETED: { className: 'bg-green-100 text-green-800', label: 'Completed' },
+  PENDING: { className: 'bg-yellow-100 text-yellow-800', label: 'Pending' },
+  FAILED: { className: 'bg-red-100 text-red-800', label: 'Failed' },
+  PARTIALLY_REFUNDED: { className: 'bg-blue-100 text-blue-800', label: 'Partially Refunded' },
+  REFUNDED: { className: 'bg-blue-100 text-blue-800', label: 'Refunded' },
+};
+
+const PaymentStatusBadge: React.FC<PaymentStatusBadgeProps> = ({ status }) => {
+  const presentation = PAYMENT_STATUS_PRESENTATIONS[status];
+
+  return (
+    <span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${presentation.className}`}>
+      {presentation.label}
+    </span>
+  );
+};
 
 /**
  * Dashboard page component
@@ -309,21 +337,7 @@ const DashboardPage: React.FC = () => {
                                 {new Date(payment.createdAt).toLocaleDateString()}
                               </p>
                             </div>
-                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                              payment.status === 'COMPLETED' ? 'bg-green-100 text-green-800' :
-                              payment.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' :
-                              payment.status === 'FAILED' ? 'bg-red-100 text-red-800' :
-                              payment.status === 'PARTIALLY_REFUNDED' || payment.status === 'REFUNDED'
-                                ? 'bg-blue-100 text-blue-800' :
-                                'bg-gray-100 text-gray-800'
-                            }`}>
-                              {payment.status === 'COMPLETED' ? 'Completed' :
-                               payment.status === 'PENDING' ? 'Pending' :
-                               payment.status === 'FAILED' ? 'Failed' :
-                               payment.status === 'PARTIALLY_REFUNDED' ? 'Partially Refunded' :
-                               payment.status === 'REFUNDED' ? 'Refunded' :
-                               payment.status}
-                            </span>
+                            <PaymentStatusBadge status={payment.status} />
                           </div>
 
                           {(payment.refunds?.length ?? 0) > 0 && (
@@ -510,20 +524,9 @@ const DashboardPage: React.FC = () => {
                           {registration.payments.map((payment) => (
                             <div key={payment.id} className="flex items-center justify-between text-sm">
                               <span className="text-gray-600">
-                                ${payment.amount.toFixed(2)} — {new Date(payment.createdAt).toLocaleDateString()}
+                                {formatCurrency(payment.amount, payment.currency)} — {new Date(payment.createdAt).toLocaleDateString()}
                               </span>
-                              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                                payment.status === 'COMPLETED' ? 'bg-green-100 text-green-800' :
-                                payment.status === 'REFUNDED' ? 'bg-blue-100 text-blue-800' :
-                                payment.status === 'FAILED' ? 'bg-red-100 text-red-800' :
-                                'bg-gray-100 text-gray-800'
-                              }`}>
-                                {payment.status === 'COMPLETED' ? 'Completed' :
-                                 payment.status === 'REFUNDED' ? 'Refunded' :
-                                 payment.status === 'FAILED' ? 'Failed' :
-                                 payment.status === 'PENDING' ? 'Pending' :
-                                 payment.status}
-                              </span>
+                              <PaymentStatusBadge status={payment.status} />
                             </div>
                           ))}
                         </div>
