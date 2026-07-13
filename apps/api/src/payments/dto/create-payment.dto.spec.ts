@@ -39,6 +39,34 @@ describe('CreatePaymentDto', () => {
         ]),
       );
     });
+
+    it('should reject an amount with more than two decimal places (0.015)', async () => {
+      const inputDto = buildBaseDto(PaymentProvider.MANUAL);
+      inputDto.amount = 0.015;
+
+      const actualErrors = await validate(inputDto);
+
+      expect(actualErrors).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            property: 'amount',
+            constraints: expect.objectContaining({ isCentsPrecision: expect.any(String) }),
+          }),
+        ]),
+      );
+    });
+
+    it.each([0.01, 0.1, 1, 50, 100.5, 99.99])(
+      'should accept a representable amount %s',
+      async (value) => {
+        const inputDto = buildBaseDto(PaymentProvider.MANUAL);
+        inputDto.amount = value;
+
+        const actualErrors = await validate(inputDto);
+
+        expect(actualErrors.filter((e) => e.property === 'amount')).toHaveLength(0);
+      },
+    );
   });
 
   describe('externalPaymentMethod', () => {

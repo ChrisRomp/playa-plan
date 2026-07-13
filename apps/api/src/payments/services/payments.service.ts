@@ -296,9 +296,10 @@ export class PaymentsService {
   private async createRefundAudit(
     finalization: RefundFinalization,
     transactionId: string,
+    auditActorId?: string,
   ): Promise<void> {
     await this.adminAuditService.createAuditRecord({
-      adminUserId: finalization.refund.processedByUserId,
+      adminUserId: auditActorId ?? finalization.refund.processedByUserId,
       actionType: AdminAuditActionType.PAYMENT_REFUND,
       targetRecordType: AdminAuditTargetType.PAYMENT,
       targetRecordId: finalization.payment.id,
@@ -331,7 +332,7 @@ export class PaymentsService {
 
     if (finalization.payment.registration && finalization.appliedRegistrationStatus) {
       await this.adminAuditService.createAuditRecord({
-        adminUserId: finalization.refund.processedByUserId,
+        adminUserId: auditActorId ?? finalization.refund.processedByUserId,
         actionType: AdminAuditActionType.REGISTRATION_EDIT,
         targetRecordType: AdminAuditTargetType.REGISTRATION,
         targetRecordId: finalization.payment.registration.id,
@@ -344,7 +345,10 @@ export class PaymentsService {
     }
   }
 
-  private async reconcilePendingProcessorRefunds(payment: RefundablePayment): Promise<string[]> {
+  private async reconcilePendingProcessorRefunds(
+    payment: RefundablePayment,
+    reconciledByUserId: string,
+  ): Promise<string[]> {
     const pendingRefunds = payment.refunds
       .filter(
         (refund) => refund.processorRefund && refund.status === PaymentRefundStatus.PENDING,
@@ -397,7 +401,7 @@ export class PaymentsService {
         );
         continue;
       }
-      await this.createRefundAudit(finalization, `refund-reconcile-${refund.id}`);
+      await this.createRefundAudit(finalization, `refund-reconcile-${refund.id}`, reconciledByUserId);
       reconciledRefundIds.push(refund.id);
     }
 
@@ -410,9 +414,15 @@ export class PaymentsService {
    * Stripe, the persisted refund ID is reused as the idempotency key to retry that same request.
    * This brings the payment, refund, and any linked registration state back in sync.
    * @param paymentId - Payment whose pending processor refunds should be reconciled
+   * @param reconciledByUserId - ID of the admin triggering reconciliation. When provided this
+   *   user is attributed as the audit actor instead of the refund's original processedByUserId,
+   *   so a second admin reconciling is correctly reflected in the audit trail.
    * @returns The refreshed payment overview and the IDs of any refunds that were reconciled
    */
-  async reconcilePendingRefund(paymentId: string): Promise<RefundReconciliationResult> {
+  async reconcilePendingRefund(
+    paymentId: string,
+    reconciledByUserId: string,
+  ): Promise<RefundReconciliationResult> {
     const payment = await this.prisma.payment.findUnique({
       where: { id: paymentId },
       include: {
@@ -433,7 +443,7 @@ export class PaymentsService {
       throw new BadRequestException('Payment has no pending processor refund to reconcile');
     }
 
-    const reconciledRefundIds = await this.reconcilePendingProcessorRefunds(payment);
+    const reconciledRefundIds = await this.reconcilePendingProcessorRefunds(payment, reconciledByUserId);
 
     const refreshedPayment = await this.prisma.payment.findUnique({
       where: { id: paymentId },
@@ -997,7 +1007,7 @@ export class PaymentsService {
         throw new NotFoundException(`Payment with ID ${data.paymentId} not found`);
       }
 
-      await this.reconcilePendingProcessorRefunds(existingPayment);
+      await this.reconcilePendingProcessorRefunds(existingPayment, processedByUserId);
 
       const pendingRefundData = await this.prisma.$transaction(async (tx) => {
         const payment = await tx.payment.findUnique({

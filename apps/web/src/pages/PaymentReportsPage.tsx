@@ -60,8 +60,14 @@ export function PaymentReportsPage() {
       return []; // Return empty array if no payments data
     }
 
-    // Extract unique years from payment data
-    const years = [...new Set(payments.map(payment => new Date(payment.createdAt).getFullYear()))];
+    // Extract unique years from payment data, preferring registration.year over payment timestamp
+    const years = [
+      ...new Set(
+        payments.map(
+          payment => payment.registration?.year ?? new Date(payment.createdAt).getFullYear()
+        )
+      ),
+    ];
 
     return years.sort((a, b) => b - a); // Sort descending
   }, [payments]);
@@ -71,9 +77,10 @@ export function PaymentReportsPage() {
     if (!Array.isArray(payments)) return [];
 
     return payments.filter(payment => {
-      // Year filter
+      // Year filter — use the linked registration year, falling back to payment timestamp
       if (filters.year) {
-        const paymentYear = new Date(payment.createdAt).getFullYear();
+        const paymentYear =
+          payment.registration?.year ?? new Date(payment.createdAt).getFullYear();
         if (paymentYear !== filters.year) return false;
       }
 
@@ -188,7 +195,7 @@ export function PaymentReportsPage() {
     {
       id: 'providerRefId',
       header: 'Reference ID',
-      accessor: row => row.providerRefId || 'N/A',
+      accessor: row => row.externalPaymentReference || row.providerRefId || 'N/A',
       sortable: true,
       hideOnMobile: true,
       width: '26%',
@@ -228,7 +235,7 @@ export function PaymentReportsPage() {
         formatCurrency(payment.amount, payment.currency),
         payment.status,
         payment.provider,
-        payment.providerRefId || 'N/A',
+        payment.externalPaymentReference || payment.providerRefId || 'N/A',
         payment.registrationId || 'N/A',
       ];
     });

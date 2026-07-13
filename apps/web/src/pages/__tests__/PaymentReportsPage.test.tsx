@@ -3,6 +3,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { PaymentReportsPage } from '../PaymentReportsPage';
 import { reports } from '../../lib/api';
+import { downloadCsv } from '../../utils/csv';
 import { Payment } from '../../types';
 
 // Mock the api module
@@ -10,6 +11,11 @@ vi.mock('../../lib/api', () => ({
   reports: {
     getPayments: vi.fn(),
   },
+}));
+
+// Mock the csv download utility so tests can inspect what gets exported
+vi.mock('../../utils/csv', () => ({
+  downloadCsv: vi.fn(),
 }));
 
 // Mock the LoadingSpinner component
@@ -645,6 +651,160 @@ describe('PaymentReportsPage', () => {
       expect(screen.getByText('$150.00 USD')).toBeInTheDocument();
       expect(screen.getByText('€85.50 EUR')).toBeInTheDocument();
       expect(screen.queryByText('$235.50')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('Year Filter - Registration Year', () => {
+    // Payment recorded in 2026 but linked to a 2025 registration
+    const paymentForPriorYear: Payment = {
+      id: 'payment-prior-year',
+      amount: 300,
+      currency: 'USD',
+      status: 'COMPLETED',
+      provider: 'STRIPE',
+      providerRefId: 'stripe_prior',
+      createdAt: '2026-01-10T10:00:00Z',
+      updatedAt: '2026-01-10T10:00:00Z',
+      userId: 'user-a',
+      registrationId: 'reg-2025',
+      registration: { id: 'reg-2025', year: 2025 },
+      user: { id: 'user-a', firstName: 'Alice', lastName: 'Prior', email: 'alice@example.com' },
+    };
+
+    // Payment with no linked registration — must fall back to createdAt year (2026)
+    const paymentNoRegistration: Payment = {
+      id: 'payment-no-reg',
+      amount: 400,
+      currency: 'USD',
+      status: 'COMPLETED',
+      provider: 'MANUAL',
+      createdAt: '2026-03-01T10:00:00Z',
+      updatedAt: '2026-03-01T10:00:00Z',
+      userId: 'user-b',
+      registration: null,
+      user: { id: 'user-b', firstName: 'Bob', lastName: 'Noreg', email: 'bob@example.com' },
+    };
+
+    beforeEach(() => {
+      vi.mocked(reports.getPayments).mockResolvedValue([
+        paymentForPriorYear,
+        paymentNoRegistration,
+      ]);
+    });
+
+    it('should populate year dropdown from registration.year, not createdAt', async () => {
+      renderComponent();
+
+      await waitFor(() => expect(screen.getByText('Payment Reports')).toBeInTheDocument());
+
+      fireEvent.click(screen.getByText('Filters'));
+      await waitFor(() => expect(screen.getByLabelText('Year')).toBeInTheDocument());
+
+      const yearSelect = screen.getByLabelText('Year');
+      // 2025 comes from registration.year; 2026 comes from the timestamp fallback
+      expect(yearSelect).toContainElement(screen.getByRole('option', { name: '2025' }));
+      expect(yearSelect).toContainElement(screen.getByRole('option', { name: '2026' }));
+      // 2026 must NOT appear as the year for the payment linked to a 2025 registration
+      expect(screen.getAllByRole('option', { name: '2026' })).toHaveLength(1);
+    });
+
+    it('should filter by registration.year when available', async () => {
+      renderComponent();
+
+      await waitFor(() => expect(screen.getByTestId('data-table')).toBeInTheDocument());
+
+      fireEvent.click(screen.getByText('Filters'));
+      await waitFor(() => expect(screen.getByLabelText('Year')).toBeInTheDocument());
+
+      fireEvent.change(screen.getByLabelText('Year'), { target: { value: '2025' } });
+
+      // Only the payment linked to a 2025 registration should remain
+      expect(screen.getByTestId('payment-payment-prior-year')).toBeInTheDocument();
+      expect(screen.queryByTestId('payment-payment-no-reg')).not.toBeInTheDocument();
+    });
+
+    it('should fall back to createdAt year when registration is absent', async () => {
+      renderComponent();
+
+      await waitFor(() => expect(screen.getByTestId('data-table')).toBeInTheDocument());
+
+      fireEvent.click(screen.getByText('Filters'));
+      await waitFor(() => expect(screen.getByLabelText('Year')).toBeInTheDocument());
+
+      fireEvent.change(screen.getByLabelText('Year'), { target: { value: '2026' } });
+
+      // Only the no-registration payment (createdAt in 2026) should remain
+      expect(screen.getByTestId('payment-payment-no-reg')).toBeInTheDocument();
+      expect(screen.queryByTestId('payment-payment-prior-year')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('CSV Export - External Payment Reference', () => {
+    const manualPayment: Payment = {
+      id: 'payment-manual',
+      amount: 250,
+      currency: 'USD',
+      status: 'COMPLETED',
+      provider: 'MANUAL',
+      providerRefId: null,
+      externalPaymentReference: 'CHECK-9876',
+      createdAt: '2025-06-01T10:00:00Z',
+      updatedAt: '2025-06-01T10:00:00Z',
+      userId: 'user-c',
+      user: { id: 'user-c', firstName: 'Carol', lastName: 'Cash', email: 'carol@example.com' },
+    };
+
+    beforeEach(() => {
+      vi.mocked(reports.getPayments).mockResolvedValue([manualPayment]);
+      vi.mocked(downloadCsv).mockClear();
+    });
+
+    it('should export externalPaymentReference in Reference ID column when providerRefId is null', async () => {
+      renderComponent();
+
+      await waitFor(() => expect(screen.getByText('Export')).toBeInTheDocument());
+
+      fireEvent.click(screen.getByText('Export'));
+
+      expect(downloadCsv).toHaveBeenCalledOnce();
+
+      const [, rows] = vi.mocked(downloadCsv).mock.calls[0];
+      // Reference ID is the 6th field (index 5) in every data row
+      expect(rows[0][5]).toBe('CHECK-9876');
+    });
+
+    it('should prefer externalPaymentReference when both references are present', async () => {
+      vi.mocked(reports.getPayments).mockResolvedValue([
+        { ...manualPayment, providerRefId: 'stripe_abc', externalPaymentReference: 'CHECK-9876' },
+      ]);
+
+      renderComponent();
+
+      await waitFor(() => expect(screen.getByText('Export')).toBeInTheDocument());
+
+      fireEvent.click(screen.getByText('Export'));
+
+      expect(downloadCsv).toHaveBeenCalledOnce();
+
+      const [, rows] = vi.mocked(downloadCsv).mock.calls[0];
+      expect(rows[0][5]).toBe('CHECK-9876');
+    });
+
+    it('should export N/A when both providerRefId and externalPaymentReference are absent', async () => {
+      vi.mocked(reports.getPayments).mockResolvedValue([
+        { ...manualPayment, providerRefId: null, externalPaymentReference: null },
+      ]);
+
+      renderComponent();
+
+      await waitFor(() => expect(screen.getByText('Export')).toBeInTheDocument());
+
+      fireEvent.click(screen.getByText('Export'));
+
+      expect(downloadCsv).toHaveBeenCalledOnce();
+
+      const [, rows] = vi.mocked(downloadCsv).mock.calls[0];
+      expect(rows[0][5]).toBe('N/A');
     });
   });
 });

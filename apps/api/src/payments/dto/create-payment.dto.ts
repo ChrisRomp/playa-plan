@@ -2,6 +2,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator';
 import { PaymentProvider } from '@prisma/client';
 import { IsManualProviderOnlyField } from './manual-provider-only-field.validator';
+import { IsCentsPrecision } from './cents-precision.validator';
 import { PAYMENT_AMOUNT_LIMITS } from '../constants/payment-amount-limits.constants';
 
 /**
@@ -18,6 +19,7 @@ export class CreatePaymentDto {
   @IsNumber()
   @Min(0.01)
   @Max(PAYMENT_AMOUNT_LIMITS.majorUnits)
+  @IsCentsPrecision()
   amount!: number;
 
   @ApiProperty({

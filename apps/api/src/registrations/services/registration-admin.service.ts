@@ -918,7 +918,7 @@ export class RegistrationAdminService {
       ) {
         try {
           const { payment: reconciledPayment } =
-            await this.paymentsService.reconcilePendingRefund(payment.id);
+            await this.paymentsService.reconcilePendingRefund(payment.id, adminUserId);
           const pendingRefundIds = new Set(existingPendingRefunds.map(refund => refund.id));
           const reconciledRefunds = reconciledPayment.refunds.filter(
             refund => pendingRefundIds.has(refund.id),

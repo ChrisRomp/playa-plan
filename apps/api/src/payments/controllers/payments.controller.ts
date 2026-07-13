@@ -178,8 +178,11 @@ export class PaymentsController {
   @ApiResponse({ status: 400, description: 'Payment has no pending processor refund to reconcile' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 404, description: 'Payment not found' })
-  async reconcileRefund(@Param('id', ParseUUIDPipe) id: string) {
-    return this.paymentsService.reconcilePendingRefund(id);
+  async reconcileRefund(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    return this.paymentsService.reconcilePendingRefund(id, req.user.id);
   }
 
   @Post('link/:paymentId/registration/:registrationId')

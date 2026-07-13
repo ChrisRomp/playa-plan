@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator';
 import { PAYMENT_AMOUNT_LIMITS } from '../constants/payment-amount-limits.constants';
+import { IsCentsPrecision } from './cents-precision.validator';
 
 /**
  * Data Transfer Object for initiating a PayPal payment
@@ -16,6 +17,7 @@ export class CreatePaypalPaymentDto {
   @IsNumber()
   @Min(0.01)
   @Max(PAYMENT_AMOUNT_LIMITS.majorUnits)
+  @IsCentsPrecision()
   amount!: number;
 
   @ApiProperty({

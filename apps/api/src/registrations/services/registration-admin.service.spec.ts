@@ -956,7 +956,10 @@ describe('RegistrationAdminService', () => {
       const result = await (service as unknown as { processAutoRefunds: (payments: unknown[], reason: string, adminUserId: string) => Promise<RefundInfo> }).processAutoRefunds([inputPayment], 'Test refund', 'admin-123');
 
       expect(paymentsService.processRefund).not.toHaveBeenCalled();
-      expect(paymentsService.reconcilePendingRefund).toHaveBeenCalledWith('stripe-reserved');
+      expect(paymentsService.reconcilePendingRefund).toHaveBeenCalledWith(
+        'stripe-reserved',
+        'admin-123',
+      );
       expect(result.message).toContain('1 refund(s) submitted and pending processor confirmation');
       expect(result.message).not.toContain('failed');
       expect(result.refundedByCurrency).toBeUndefined();
@@ -986,7 +989,10 @@ describe('RegistrationAdminService', () => {
       const result = await (service as unknown as { processAutoRefunds: (payments: unknown[], reason: string, adminUserId: string) => Promise<RefundInfo> }).processAutoRefunds([inputPayment], 'Test refund', 'admin-123');
 
       expect(paymentsService.processRefund).not.toHaveBeenCalled();
-      expect(paymentsService.reconcilePendingRefund).toHaveBeenCalledWith('stripe-reserved');
+      expect(paymentsService.reconcilePendingRefund).toHaveBeenCalledWith(
+        'stripe-reserved',
+        'admin-123',
+      );
       expect(result.refundedByCurrency?.['USD']).toBe(100);
       expect(result.message).toContain('Automatically refunded 1 payment(s) totaling 100.00 USD');
       expect(result.message).not.toContain('failed');
@@ -1016,7 +1022,10 @@ describe('RegistrationAdminService', () => {
       const result = await (service as unknown as { processAutoRefunds: (payments: unknown[], reason: string, adminUserId: string) => Promise<RefundInfo> }).processAutoRefunds([inputPayment], 'Test refund', 'admin-123');
 
       expect(paymentsService.processRefund).not.toHaveBeenCalled();
-      expect(paymentsService.reconcilePendingRefund).toHaveBeenCalledWith('stripe-reserved');
+      expect(paymentsService.reconcilePendingRefund).toHaveBeenCalledWith(
+        'stripe-reserved',
+        'admin-123',
+      );
       expect(result.message).toContain('1 automatic refund(s) failed and require manual processing');
       expect(result.refundedByCurrency).toBeUndefined();
     });

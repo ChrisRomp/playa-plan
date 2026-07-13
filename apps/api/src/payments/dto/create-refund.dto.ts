@@ -3,6 +3,7 @@ import { IsIn, IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID, Max, Min } fr
 import { RegistrationStatus } from '@prisma/client';
 import { CAPACITY_RESERVING_STATUSES } from '../../registrations/constants/registration-status.constants';
 import { PAYMENT_AMOUNT_LIMITS } from '../constants/payment-amount-limits.constants';
+import { IsCentsPrecision } from './cents-precision.validator';
 
 /**
  * Data Transfer Object for creating a refund
@@ -28,6 +29,7 @@ export class CreateRefundDto {
   @IsNumber()
   @Min(0.01)
   @Max(PAYMENT_AMOUNT_LIMITS.majorUnits)
+  @IsCentsPrecision()
   amount?: number;
 
   @ApiProperty({

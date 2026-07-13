@@ -333,7 +333,7 @@ describe('PaymentsController', () => {
   });
 
   describe('reconcileRefund', () => {
-    it('should reconcile pending processor refunds for a payment without creating a new refund', async () => {
+    it('should reconcile pending processor refunds and pass the authenticated actor to the service', async () => {
       // Mock data
       const paymentId = 'payment-id';
       const mockResponse = {
@@ -343,15 +343,38 @@ describe('PaymentsController', () => {
         },
         reconciledRefundIds: ['refund-id'],
       };
+      const mockRequest = {
+        user: { id: 'admin-id', role: UserRole.ADMIN },
+      } as AuthenticatedRequest;
 
       // Setup mocks
       mockPaymentsService.reconcilePendingRefund.mockResolvedValue(mockResponse);
 
       // Execute
-      const result = await controller.reconcileRefund(paymentId);
+      const result = await controller.reconcileRefund(paymentId, mockRequest);
 
       // Assert
-      expect(mockPaymentsService.reconcilePendingRefund).toHaveBeenCalledWith(paymentId);
+      expect(mockPaymentsService.reconcilePendingRefund).toHaveBeenCalledWith(paymentId, 'admin-id');
+      expect(result).toEqual(mockResponse);
+    });
+
+    it('should attribute reconciliation to the second admin, not the original refund submitter', async () => {
+      // A second admin reconciles a refund originally submitted by a different admin;
+      // the service must be called with the second admin's ID, not the first admin's.
+      const paymentId = 'payment-id';
+      const mockResponse = {
+        payment: { id: paymentId, status: PaymentStatus.REFUNDED },
+        reconciledRefundIds: ['refund-id'],
+      };
+      const secondAdminRequest = {
+        user: { id: 'second-admin-id', role: UserRole.ADMIN },
+      } as AuthenticatedRequest;
+
+      mockPaymentsService.reconcilePendingRefund.mockResolvedValue(mockResponse);
+
+      const result = await controller.reconcileRefund(paymentId, secondAdminRequest);
+
+      expect(mockPaymentsService.reconcilePendingRefund).toHaveBeenCalledWith(paymentId, 'second-admin-id');
       expect(result).toEqual(mockResponse);
     });
   });
