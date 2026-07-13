@@ -1873,10 +1873,55 @@ describe('PaymentsService', () => {
         reason: 'Preflight failure',
       }, 'admin-id')).rejects.toThrow('Stripe payments are not configured');
 
-      expect(mockPrismaService.paymentRefund.update).toHaveBeenCalledWith({
-        where: { id: 'refund-id' },
+      expect(mockPrismaService.paymentRefund.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: 'refund-id',
+          status: PaymentRefundStatus.PENDING,
+          providerRefundId: null,
+        },
         data: { status: PaymentRefundStatus.FAILED },
       });
+    });
+
+    it('should not overwrite a concurrently reconciled refund when Stripe preflight fails', async () => {
+      const pendingRefund = {
+        id: 'refund-id',
+        paymentId: 'payment-id',
+        amountCents: 2500,
+        currency: 'USD',
+        status: PaymentRefundStatus.PENDING,
+        processorRefund: true,
+        providerRefundId: null,
+        reason: 'Preflight failure',
+        resultingRegistrationStatus: null,
+        processedByUserId: 'admin-id',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      mockPrismaService.payment.findUnique
+        .mockResolvedValueOnce(basePayment)
+        .mockResolvedValueOnce(basePayment);
+      mockPrismaService.paymentRefund.create.mockResolvedValueOnce(pendingRefund);
+      mockStripeService.createRefund.mockRejectedValueOnce(new StripeRefundError('Stripe payments are not configured', false));
+      // A concurrent request already reconciled this row, so no rows match the untouched attempt.
+      mockPrismaService.paymentRefund.updateMany.mockResolvedValueOnce({ count: 0 });
+
+      await expect(service.processRefund({
+        paymentId: 'payment-id',
+        amount: 25,
+        reason: 'Preflight failure',
+      }, 'admin-id')).rejects.toThrow('Stripe payments are not configured');
+
+      expect(mockPrismaService.paymentRefund.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: 'refund-id',
+          status: PaymentRefundStatus.PENDING,
+          providerRefundId: null,
+        },
+        data: { status: PaymentRefundStatus.FAILED },
+      });
+      expect(mockPrismaService.paymentRefund.update).not.toHaveBeenCalled();
     });
 
     it('should record an offline refund for externally recorded payments without processor automation', async () => {
