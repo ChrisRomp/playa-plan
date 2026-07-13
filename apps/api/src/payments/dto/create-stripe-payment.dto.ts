@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator';
+import { IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator';
 import { PAYMENT_AMOUNT_LIMITS } from '../constants/payment-amount-limits.constants';
 
 /**
@@ -14,6 +14,7 @@ export class CreateStripePaymentDto {
   })
   @IsNotEmpty()
   @IsNumber()
+  @IsInt()
   @Min(50)
   @Max(PAYMENT_AMOUNT_LIMITS.cents)
   amount!: number;

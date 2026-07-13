@@ -18,4 +18,20 @@ describe('CreateStripePaymentDto', () => {
       ]),
     );
   });
+
+  it('should reject a fractional cent amount', async () => {
+    const inputDto = new CreateStripePaymentDto();
+    inputDto.amount = 100.5;
+
+    const actualErrors = await validate(inputDto);
+
+    expect(actualErrors).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          property: 'amount',
+          constraints: expect.objectContaining({ isInt: expect.any(String) }),
+        }),
+      ]),
+    );
+  });
 });
