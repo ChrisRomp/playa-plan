@@ -419,9 +419,15 @@ export class PaymentsService {
    * @param recordedByUserId - ID of the authenticated admin recording the payment, derived
    *   from the request rather than accepted from the request body. Omit for
    *   processor/participant-initiated payments where no admin recorded it.
+   * @param initialStatus - Initial payment status. Defaults to PENDING for processor-initiated
+   *   payments; manual payments pass their final status here to create the record atomically.
    * @returns The created payment
    */
-  async create(createPaymentDto: CreatePaymentDto, recordedByUserId?: string): Promise<Payment> {
+  async create(
+    createPaymentDto: CreatePaymentDto,
+    recordedByUserId?: string,
+    initialStatus?: PaymentStatus,
+  ): Promise<Payment> {
     this.logger.log(`Creating payment record for user ${createPaymentDto.userId}`);
     
     // Verify user exists
@@ -457,7 +463,7 @@ export class PaymentsService {
       const paymentData = {
         amount: createPaymentDto.amount,
         currency: createPaymentDto.currency || 'USD',
-        status: PaymentStatus.PENDING,
+        status: initialStatus ?? PaymentStatus.PENDING,
         provider: createPaymentDto.provider,
         providerRefId: createPaymentDto.providerRefId,
         externalPaymentMethod: createPaymentDto.externalPaymentMethod,
@@ -630,6 +636,10 @@ export class PaymentsService {
     return payment;
   }
 
+  private isRefundDerivedStatus(status: PaymentStatus): boolean {
+    return status === PaymentStatus.PARTIALLY_REFUNDED || status === PaymentStatus.REFUNDED;
+  }
+
   /**
    * Update a payment
    * @param id - Payment ID
@@ -637,8 +647,16 @@ export class PaymentsService {
    * @returns The updated payment
    */
   async update(id: string, updatePaymentDto: UpdatePaymentDto): Promise<Payment> {
-    // Check if payment exists
-    await this.findOne(id);
+    const existingPayment = await this.findOne(id);
+
+    if (
+      updatePaymentDto.status !== undefined &&
+      this.isRefundDerivedStatus(existingPayment.status)
+    ) {
+      throw new BadRequestException(
+        `Cannot manually change status of a payment with refund-derived status ${existingPayment.status}`,
+      );
+    }
     
     try {
       return await this.prisma.payment.update({
@@ -720,32 +738,30 @@ export class PaymentsService {
    * @returns The created payment
    */
   async recordManualPayment(data: RecordManualPaymentDto, recordedByUserId: string): Promise<Payment> {
-    // Create payment record with appropriate status
-    const payment = await this.create({
-      amount: data.amount,
-      currency: data.currency,
-      provider: PaymentProvider.MANUAL,
-      userId: data.userId,
-      registrationId: data.registrationId,
-      externalPaymentMethod: data.externalPaymentMethod,
-      externalPaymentReference: data.reference,
-    }, recordedByUserId);
-    
-    // Update status immediately (since it's a manual payment)
-    const updateDto: UpdatePaymentDto = {
-      status: data.status || PaymentStatus.COMPLETED,
-    };
-    
-    const updatedPayment = await this.update(payment.id, updateDto);
+    const finalStatus = data.status ?? PaymentStatus.COMPLETED;
+
+    // Create the payment record with its final status in a single write so that no
+    // durable PENDING record is ever left without an audit trail if a subsequent
+    // operation fails.
+    const payment = await this.create(
+      {
+        amount: data.amount,
+        currency: data.currency,
+        provider: PaymentProvider.MANUAL,
+        userId: data.userId,
+        registrationId: data.registrationId,
+        externalPaymentMethod: data.externalPaymentMethod,
+        externalPaymentReference: data.reference,
+      },
+      recordedByUserId,
+      finalStatus,
+    );
 
     // When a manual payment is recorded as COMPLETED against a registration,
     // mark the registration paid: status CONFIRMED, paymentDeferred=false.
     // This also closes out any deferred registrations that an admin records
     // a manual payment for.
-    if (
-      data.registrationId &&
-      (data.status ?? PaymentStatus.COMPLETED) === PaymentStatus.COMPLETED
-    ) {
+    if (data.registrationId && finalStatus === PaymentStatus.COMPLETED) {
       try {
         await this.markRegistrationPaid(data.registrationId);
       } catch (error: unknown) {
@@ -765,7 +781,7 @@ export class PaymentsService {
         amount: data.amount,
         currency: data.currency ?? 'USD',
         provider: PaymentProvider.MANUAL,
-        status: data.status ?? PaymentStatus.COMPLETED,
+        status: finalStatus,
         externalPaymentMethod: data.externalPaymentMethod,
         externalPaymentReference: data.reference,
         userId: data.userId,
@@ -775,7 +791,7 @@ export class PaymentsService {
       throwOnError: false,
     });
 
-    return updatedPayment;
+    return payment;
   }
 
   /**

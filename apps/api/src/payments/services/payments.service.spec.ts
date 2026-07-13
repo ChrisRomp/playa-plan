@@ -950,6 +950,88 @@ describe('PaymentsService', () => {
     });
   });
 
+  describe('update', () => {
+    const basePayment = {
+      id: 'payment-id',
+      amount: 100,
+      currency: 'USD',
+      provider: PaymentProvider.STRIPE,
+      userId: 'user-id',
+      registrationId: null,
+      providerRefId: 'pi_stripe123',
+      refunds: [],
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    it('should update a payment when status is not refund-derived', async () => {
+      const inputPayment = { ...basePayment, status: PaymentStatus.PENDING };
+      const inputDto = { status: PaymentStatus.COMPLETED };
+      const expectedPayment = { ...inputPayment, status: PaymentStatus.COMPLETED };
+
+      mockPrismaService.payment.findUnique.mockResolvedValue(inputPayment);
+      mockPrismaService.payment.update.mockResolvedValue(expectedPayment);
+
+      const actualResult = await service.update('payment-id', inputDto);
+
+      expect(mockPrismaService.payment.update).toHaveBeenCalledWith({
+        where: { id: 'payment-id' },
+        data: inputDto,
+      });
+      expect(actualResult).toEqual(expectedPayment);
+    });
+
+    it('should update non-status fields even when payment has refund-derived status', async () => {
+      const inputPayment = { ...basePayment, status: PaymentStatus.PARTIALLY_REFUNDED };
+      const inputDto = { providerRefId: 'pi_new_ref' };
+      const expectedPayment = { ...inputPayment, ...inputDto };
+
+      mockPrismaService.payment.findUnique.mockResolvedValue(inputPayment);
+      mockPrismaService.payment.update.mockResolvedValue(expectedPayment);
+
+      const actualResult = await service.update('payment-id', inputDto);
+
+      expect(mockPrismaService.payment.update).toHaveBeenCalled();
+      expect(actualResult).toEqual(expectedPayment);
+    });
+
+    it('should throw BadRequestException when trying to change status of a PARTIALLY_REFUNDED payment', async () => {
+      const inputPayment = { ...basePayment, status: PaymentStatus.PARTIALLY_REFUNDED };
+      const inputDto = { status: PaymentStatus.COMPLETED };
+
+      mockPrismaService.payment.findUnique.mockResolvedValue(inputPayment);
+
+      await expect(service.update('payment-id', inputDto)).rejects.toThrow(BadRequestException);
+      expect(mockPrismaService.payment.update).not.toHaveBeenCalled();
+    });
+
+    it('should throw BadRequestException when trying to change status of a REFUNDED payment', async () => {
+      const inputPayment = { ...basePayment, status: PaymentStatus.REFUNDED };
+      const inputDto = { status: PaymentStatus.COMPLETED };
+
+      mockPrismaService.payment.findUnique.mockResolvedValue(inputPayment);
+
+      await expect(service.update('payment-id', inputDto)).rejects.toThrow(BadRequestException);
+      expect(mockPrismaService.payment.update).not.toHaveBeenCalled();
+    });
+
+    it('should throw BadRequestException when trying to set REFUNDED payment status to PENDING', async () => {
+      const inputPayment = { ...basePayment, status: PaymentStatus.REFUNDED };
+      const inputDto = { status: PaymentStatus.PENDING };
+
+      mockPrismaService.payment.findUnique.mockResolvedValue(inputPayment);
+
+      await expect(service.update('payment-id', inputDto)).rejects.toThrow(BadRequestException);
+      expect(mockPrismaService.payment.update).not.toHaveBeenCalled();
+    });
+
+    it('should throw NotFoundException when payment does not exist', async () => {
+      mockPrismaService.payment.findUnique.mockResolvedValue(null);
+
+      await expect(service.update('non-existent-id', { status: PaymentStatus.COMPLETED })).rejects.toThrow(NotFoundException);
+    });
+  });
+
   describe('processRefund', () => {
     const basePayment = {
       id: 'payment-id',
@@ -2255,13 +2337,13 @@ describe('PaymentsService', () => {
     it('recordManualPayment marks the registration CONFIRMED and clears paymentDeferred when status COMPLETED', async () => {
       const created = {
         id: 'payment-manual',
-        status: PaymentStatus.PENDING,
+        status: PaymentStatus.COMPLETED,
         amount: 100,
         currency: 'USD',
-        provider: PaymentProvider.STRIPE,
+        provider: PaymentProvider.MANUAL,
         userId: 'user-id',
         registrationId: 'registration-id',
-        providerRefId: 'manual:check-123',
+        providerRefId: null,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -2272,11 +2354,6 @@ describe('PaymentsService', () => {
         paymentDeferred: true,
       });
       mockPrismaService.payment.create.mockResolvedValueOnce(created);
-      mockPrismaService.payment.findUnique.mockResolvedValueOnce(created);
-      mockPrismaService.payment.update.mockResolvedValueOnce({
-        ...created,
-        status: PaymentStatus.COMPLETED,
-      });
       mockPrismaService.registration.update.mockResolvedValueOnce({
         id: 'registration-id',
         status: 'CONFIRMED',
@@ -2321,7 +2398,7 @@ describe('PaymentsService', () => {
     it('recordManualPayment preserves CANCELLED registration status', async () => {
       const created = {
         id: 'payment-manual',
-        status: PaymentStatus.PENDING,
+        status: PaymentStatus.COMPLETED,
         amount: 100,
         currency: 'USD',
         provider: PaymentProvider.MANUAL,
@@ -2337,11 +2414,6 @@ describe('PaymentsService', () => {
         status: RegistrationStatus.CANCELLED,
       });
       mockPrismaService.payment.create.mockResolvedValueOnce(created);
-      mockPrismaService.payment.findUnique.mockResolvedValueOnce(created);
-      mockPrismaService.payment.update.mockResolvedValueOnce({
-        ...created,
-        status: PaymentStatus.COMPLETED,
-      });
 
       await service.recordManualPayment({
         amount: 100,
@@ -2360,21 +2432,17 @@ describe('PaymentsService', () => {
     });
 
     it('recordManualPayment still audits and returns payment when marking the registration paid fails', async () => {
-      const created = {
+      const payment = {
         id: 'payment-manual',
-        status: PaymentStatus.PENDING,
+        status: PaymentStatus.COMPLETED,
         amount: 100,
         currency: 'USD',
         provider: PaymentProvider.MANUAL,
         userId: 'user-id',
         registrationId: 'registration-id',
-        providerRefId: 'manual:check-123',
+        providerRefId: null,
         createdAt: new Date(),
         updatedAt: new Date(),
-      };
-      const updatedPayment = {
-        ...created,
-        status: PaymentStatus.COMPLETED,
       };
       mockPrismaService.user.findUnique.mockResolvedValue({
         id: 'user-id',
@@ -2386,9 +2454,7 @@ describe('PaymentsService', () => {
         status: 'CONFIRMED',
         paymentDeferred: true,
       });
-      mockPrismaService.payment.create.mockResolvedValueOnce(created);
-      mockPrismaService.payment.findUnique.mockResolvedValueOnce(created);
-      mockPrismaService.payment.update.mockResolvedValueOnce(updatedPayment);
+      mockPrismaService.payment.create.mockResolvedValueOnce(payment);
       mockPrismaService.registration.update.mockRejectedValueOnce(new Error('transient database error'));
 
       const actualPayment = await service.recordManualPayment({
@@ -2400,7 +2466,7 @@ describe('PaymentsService', () => {
         status: PaymentStatus.COMPLETED,
       }, 'admin-id');
 
-      expect(actualPayment).toEqual(updatedPayment);
+      expect(actualPayment).toEqual(payment);
       expect(mockPrismaService.registration.update).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { id: 'registration-id' },
@@ -2421,13 +2487,13 @@ describe('PaymentsService', () => {
     it('recordManualPayment does NOT touch the registration when status is not COMPLETED', async () => {
       const created = {
         id: 'payment-manual',
-        status: PaymentStatus.PENDING,
+        status: PaymentStatus.FAILED,
         amount: 100,
         currency: 'USD',
-        provider: PaymentProvider.STRIPE,
+        provider: PaymentProvider.MANUAL,
         userId: 'user-id',
         registrationId: 'registration-id',
-        providerRefId: 'manual',
+        providerRefId: null,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -2438,11 +2504,6 @@ describe('PaymentsService', () => {
         paymentDeferred: false,
       });
       mockPrismaService.payment.create.mockResolvedValueOnce(created);
-      mockPrismaService.payment.findUnique.mockResolvedValueOnce(created);
-      mockPrismaService.payment.update.mockResolvedValueOnce({
-        ...created,
-        status: PaymentStatus.FAILED,
-      });
 
       await service.recordManualPayment({
         amount: 100,
@@ -2459,22 +2520,17 @@ describe('PaymentsService', () => {
     it('recordManualPayment does NOT touch the registration when registrationId is absent', async () => {
       const created = {
         id: 'payment-manual',
-        status: PaymentStatus.PENDING,
+        status: PaymentStatus.COMPLETED,
         amount: 100,
         currency: 'USD',
-        provider: PaymentProvider.STRIPE,
+        provider: PaymentProvider.MANUAL,
         userId: 'user-id',
         registrationId: null,
-        providerRefId: 'manual',
+        providerRefId: null,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
       mockPrismaService.payment.create.mockResolvedValueOnce(created);
-      mockPrismaService.payment.findUnique.mockResolvedValueOnce(created);
-      mockPrismaService.payment.update.mockResolvedValueOnce({
-        ...created,
-        status: PaymentStatus.COMPLETED,
-      });
 
       await service.recordManualPayment({
         amount: 100,
@@ -2485,6 +2541,37 @@ describe('PaymentsService', () => {
       }, 'admin-id');
 
       expect(mockPrismaService.registration.update).not.toHaveBeenCalled();
+    });
+
+    it('recordManualPayment creates the payment atomically with its final status without a separate update call', async () => {
+      const finalStatus = PaymentStatus.COMPLETED;
+      const created = {
+        id: 'payment-manual',
+        status: finalStatus,
+        amount: 150,
+        currency: 'USD',
+        provider: PaymentProvider.MANUAL,
+        userId: 'user-id',
+        registrationId: null,
+        providerRefId: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      mockPrismaService.payment.create.mockResolvedValueOnce(created);
+
+      const result = await service.recordManualPayment({
+        amount: 150,
+        currency: 'USD',
+        userId: 'user-id',
+        status: finalStatus,
+      }, 'admin-id');
+
+      // The payment was created with the final status directly — no update step needed.
+      expect(mockPrismaService.payment.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ status: finalStatus }) }),
+      );
+      expect(mockPrismaService.payment.update).not.toHaveBeenCalled();
+      expect(result.status).toBe(finalStatus);
     });
   });
 });
