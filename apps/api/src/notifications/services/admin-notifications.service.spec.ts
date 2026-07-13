@@ -355,11 +355,13 @@ describe('AdminNotificationsService', () => {
           status: 'CANCELLED',
         },
         reason: 'Automatic cancellation due to payment failure',
-        refundInfo: {
-          amount: 150.00, // $150.00 in dollars (as stored in database)
-          currency: 'USD',
-          processed: true,
-        },
+        refundInfo: [
+          {
+            amount: 150.00, // $150.00 in dollars (as stored in database)
+            currency: 'USD',
+            processed: true,
+          },
+        ],
       };
 
       coreConfigService.findCurrent.mockResolvedValue(mockCoreConfig as CoreConfig);
@@ -378,7 +380,7 @@ describe('AdminNotificationsService', () => {
     it.each([
       { amount: 600.00, expected: '$600.00' },
       { amount: 75.50, expected: '$75.50' },
-      { amount: 1234.99, expected: '$1234.99' },
+      { amount: 1234.99, expected: '$1,234.99' },
       { amount: 25.00, expected: '$25.00' },
     ])('should display correct refund amounts for various dollar values: %o', async ({ amount, expected }) => {
       const notificationData: AdminNotificationData = {
@@ -389,11 +391,13 @@ describe('AdminNotificationsService', () => {
           status: 'CANCELLED',
         },
         reason: `Test refund amount formatting for ${expected}`,
-        refundInfo: {
-          amount,
-          currency: 'USD',
-          processed: true,
-        },
+        refundInfo: [
+          {
+            amount,
+            currency: 'USD',
+            processed: true,
+          },
+        ],
       };
 
       coreConfigService.findCurrent.mockResolvedValue(mockCoreConfig as CoreConfig);
@@ -404,6 +408,68 @@ describe('AdminNotificationsService', () => {
       const [, , templateData] = notificationsService.sendNotification.mock.calls[notificationsService.sendNotification.mock.calls.length - 1] as [string, NotificationType, TemplateData];
       expect(templateData.customText).toContain(`A refund of ${expected} has been processed`);
       expect(templateData.customHtml).toContain(`A refund of ${expected} has been processed`);
+    });
+
+    it('should format each processed refund using its currency', async () => {
+      const notificationData: AdminNotificationData = {
+        adminUser: mockAdminUser,
+        targetUser: mockTargetUser,
+        registration: {
+          ...mockRegistration,
+          status: 'CANCELLED',
+        },
+        reason: 'Multi-currency refund',
+        refundInfo: [
+          { amount: 100, currency: 'USD', processed: true },
+          { amount: 50, currency: 'EUR', processed: true },
+        ],
+      };
+
+      coreConfigService.findCurrent.mockResolvedValue(mockCoreConfig as CoreConfig);
+      notificationsService.sendNotification.mockResolvedValue(true);
+
+      await service.sendRegistrationCancellationNotification(notificationData);
+
+      const [, , templateData] = notificationsService.sendNotification.mock.calls[0] as [
+        string,
+        NotificationType,
+        TemplateData,
+      ];
+      expect(templateData.customText).toContain('A refund of $100.00 has been processed');
+      expect(templateData.customText).toContain('A refund of €50.00 has been processed');
+      expect(templateData.customHtml).toContain(
+        '<p style="margin: 0;">A refund of $100.00 has been processed',
+      );
+      expect(templateData.customHtml).toContain(
+        '<p style="margin: 1em 0 0;">A refund of €50.00 has been processed',
+      );
+    });
+
+    it('should fall back safely when a stored currency code is invalid', async () => {
+      const notificationData: AdminNotificationData = {
+        adminUser: mockAdminUser,
+        targetUser: mockTargetUser,
+        registration: {
+          ...mockRegistration,
+          status: 'CANCELLED',
+        },
+        reason: 'Legacy currency refund',
+        refundInfo: [
+          { amount: 25, currency: 'US', processed: true },
+        ],
+      };
+
+      coreConfigService.findCurrent.mockResolvedValue(mockCoreConfig as CoreConfig);
+      notificationsService.sendNotification.mockResolvedValue(true);
+
+      await service.sendRegistrationCancellationNotification(notificationData);
+
+      const [, , templateData] = notificationsService.sendNotification.mock.calls[0] as [
+        string,
+        NotificationType,
+        TemplateData,
+      ];
+      expect(templateData.customText).toContain('A refund of 25.00 US has been processed');
     });
 
     it('should not include refund information when no refund is processed', async () => {

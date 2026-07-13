@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID, Min } from 'class-validator';
 import { PaymentProvider } from '@prisma/client';
+import { IsManualProviderOnlyField } from './manual-provider-only-field.validator';
 
 /**
  * Data Transfer Object for creating a new payment
@@ -48,6 +49,7 @@ export class CreatePaymentDto {
     example: 'Check',
     required: false,
   })
+  @IsManualProviderOnlyField()
   @IsOptional()
   @IsString()
   externalPaymentMethod?: string;
@@ -57,6 +59,7 @@ export class CreatePaymentDto {
     example: 'Check #1234',
     required: false,
   })
+  @IsManualProviderOnlyField()
   @IsOptional()
   @IsString()
   externalPaymentReference?: string;

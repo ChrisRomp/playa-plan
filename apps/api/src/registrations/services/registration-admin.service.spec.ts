@@ -518,7 +518,7 @@ describe('RegistrationAdminService', () => {
         reason: 'Registration cancellation: User request',
         resultingRegistrationStatus: RegistrationStatus.CANCELLED,
       }, 'admin-123', { allowRegistrationCancellation: true });
-      expect(result.refundInfo).toContain('Automatically refunded 1 payment(s) totaling $75.00');
+      expect(result.refundInfo).toContain('Automatically refunded 1 payment(s) totaling 75.00 USD');
     });
 
     // Task 5.2.8: Test error handling for invalid registration IDs and unauthorized access
@@ -640,9 +640,9 @@ describe('RegistrationAdminService', () => {
       }, 'admin-123', { allowRegistrationCancellation: true });
 
       expect(result.processed).toBe(true);
-      expect(result.refundAmount).toBe(100.00);
-      expect(result.message).toContain('Automatically refunded 1 payment(s) totaling $100.00');
-      expect(result.message).toContain('1 manual payment(s) totaling $5000.00 require manual refund processing');
+      expect(result.refundedByCurrency?.['USD']).toBe(100.00);
+      expect(result.message).toContain('Automatically refunded 1 payment(s) totaling 100.00 USD');
+      expect(result.message).toContain('1 manual payment(s) totaling 5000.00 USD require manual refund processing');
     });
 
     // Task 5.2.10: Test processAutoRefunds() skips MANUAL payments and includes them in manual processing message
@@ -681,8 +681,8 @@ describe('RegistrationAdminService', () => {
         resultingRegistrationStatus: RegistrationStatus.CANCELLED,
       }, 'admin-123', { allowRegistrationCancellation: true });
 
-      expect(result.message).toContain('Automatically refunded 1 payment(s) totaling $50.00');
-      expect(result.message).toContain('1 manual payment(s) totaling $10000.00 require manual refund processing');
+      expect(result.message).toContain('Automatically refunded 1 payment(s) totaling 50.00 USD');
+      expect(result.message).toContain('1 manual payment(s) totaling 10000.00 USD require manual refund processing');
     });
 
     it('should report remaining refundable amount for partially refunded MANUAL payments', async () => {
@@ -709,7 +709,7 @@ describe('RegistrationAdminService', () => {
       const result = await (service as unknown as { processAutoRefunds: (payments: unknown[], reason: string, adminUserId: string) => Promise<RefundInfo> }).processAutoRefunds(payments, 'Test refund', 'admin-123');
 
       expect(paymentsService.processRefund).not.toHaveBeenCalled();
-      expect(result.message).toContain('1 manual payment(s) totaling $50.00 require manual refund processing');
+      expect(result.message).toContain('1 manual payment(s) totaling 50.00 USD require manual refund processing');
     });
 
     it('should report only the remaining refundable balance for a partially refunded Stripe payment', async () => {
@@ -739,10 +739,10 @@ describe('RegistrationAdminService', () => {
 
       const result = await (service as unknown as { processAutoRefunds: (payments: unknown[], reason: string, adminUserId: string) => Promise<RefundInfo> }).processAutoRefunds(payments, 'Test refund', 'admin-123');
 
-      expect(result.refundAmount).toBe(75.00);
-      // The already-refunded $25 must not be counted again: totalAmount should reflect
+      expect(result.refundedByCurrency?.['USD']).toBe(75.00);
+      // The already-refunded $25 must not be counted again: totalsByCurrency should reflect
       // only the remaining $75 balance, not the original $100 gross payment.
-      expect(result.totalAmount).toBe(75);
+      expect(result.totalsByCurrency['USD']).toBe(75);
     });
 
     // Task 5.2.11: Test processAutoRefunds() handles partial refund failures gracefully
@@ -770,8 +770,8 @@ describe('RegistrationAdminService', () => {
 
       const result = await (service as unknown as { processAutoRefunds: (payments: unknown[], reason: string, adminUserId: string) => Promise<RefundInfo> }).processAutoRefunds(payments, 'Test refund', 'admin-123');
 
-      expect(result.refundAmount).toBe(100.00);
-      expect(result.message).toContain('Automatically refunded 1 payment(s) totaling $100.00');
+      expect(result.refundedByCurrency?.['USD']).toBe(100.00);
+      expect(result.message).toContain('Automatically refunded 1 payment(s) totaling 100.00 USD');
       expect(result.message).toContain('1 automatic refund(s) failed and require manual processing');
     });
 
@@ -796,7 +796,7 @@ describe('RegistrationAdminService', () => {
 
       const result = await (service as unknown as { processAutoRefunds: (payments: unknown[], reason: string, adminUserId: string) => Promise<RefundInfo> }).processAutoRefunds(payments, 'Test refund', 'admin-123');
 
-      expect(result.refundAmount).toBe(0);
+      expect(result.refundedByCurrency).toBeUndefined();
       expect(result.message).toContain('1 refund(s) submitted and pending processor confirmation');
       expect(result.message).not.toContain('Automatically refunded');
     });
@@ -823,8 +823,43 @@ describe('RegistrationAdminService', () => {
 
       const result = await (service as unknown as { processAutoRefunds: (payments: unknown[], reason: string, adminUserId: string) => Promise<RefundInfo> }).processAutoRefunds(payments, 'Test refund', 'admin-123');
 
-      expect(result.refundAmount).toBe(150.00);
-      expect(result.message).toContain('$150.00');
+      expect(result.refundedByCurrency?.['USD']).toBe(150.00);
+      expect(result.message).toContain('150.00 USD');
+    });
+    it('should keep totals separate for unlike currencies and not sum them together', async () => {
+      const payments = [
+        {
+          id: 'usd-payment',
+          amount: 100,
+          currency: 'USD',
+          status: PaymentStatus.COMPLETED,
+          provider: PaymentProvider.STRIPE,
+          providerRefId: 'pi_usd123',
+        },
+        {
+          id: 'eur-payment',
+          amount: 200,
+          currency: 'eur',
+          status: PaymentStatus.COMPLETED,
+          provider: PaymentProvider.STRIPE,
+          providerRefId: 'pi_eur123',
+        },
+      ];
+
+      paymentsService.processRefund
+        .mockResolvedValueOnce({ paymentId: 'usd-payment', refundAmount: 100.00, providerRefundId: 'refund-1', success: true, refundStatus: PaymentRefundStatus.SUCCEEDED })
+        .mockResolvedValueOnce({ paymentId: 'eur-payment', refundAmount: 200.00, providerRefundId: 'refund-2', success: true, refundStatus: PaymentRefundStatus.SUCCEEDED });
+
+      const result = await (service as unknown as { processAutoRefunds: (payments: unknown[], reason: string, adminUserId: string) => Promise<RefundInfo> }).processAutoRefunds(payments, 'Test refund', 'admin-123');
+
+      expect(result.refundedByCurrency?.['USD']).toBe(100.00);
+      expect(result.refundedByCurrency?.['EUR']).toBe(200.00);
+      expect(result.totalsByCurrency['USD']).toBe(100);
+      expect(result.totalsByCurrency['EUR']).toBe(200);
+      // Should NOT have a combined total field — currencies remain separate
+      expect(Object.keys(result.totalsByCurrency)).toHaveLength(2);
+      expect(result.message).toContain('100.00 USD');
+      expect(result.message).toContain('200.00 EUR');
     });
   });
 
@@ -1176,9 +1211,9 @@ describe('RegistrationAdminService', () => {
       const result = (service as unknown as { calculateRefundInfo: (payments: unknown[]) => RefundInfo }).calculateRefundInfo(payments);
 
       expect(result.hasPayments).toBe(true);
-      expect(result.totalAmount).toBe(15000); // Only COMPLETED and PENDING
+      expect(result.totalsByCurrency['USD']).toBe(15000); // Only COMPLETED and PENDING
       expect(result.paymentIds).toEqual(['payment-1', 'payment-2']);
-      expect(result.message).toContain('Refund of $15000.00 needs to be processed manually for 2 payment(s)');
+      expect(result.message).toContain('Refund of 15000.00 USD needs to be processed manually for 2 payment(s)');
     });
 
     it('should handle no eligible payments', async () => {
@@ -1189,7 +1224,7 @@ describe('RegistrationAdminService', () => {
       const result = (service as unknown as { calculateRefundInfo: (payments: unknown[]) => RefundInfo }).calculateRefundInfo(payments);
 
       expect(result.hasPayments).toBe(false);
-      expect(result.totalAmount).toBe(0);
+      expect(result.totalsByCurrency).toEqual({});
       expect(result.paymentIds).toEqual([]);
       expect(result.message).toBe('No payments to refund');
     });

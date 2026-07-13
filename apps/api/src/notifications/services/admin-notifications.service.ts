@@ -43,12 +43,12 @@ export interface AdminNotificationData {
   };
   /** Reason for the change provided by admin */
   reason: string;
-  /** Optional refund information for cancellations */
-  refundInfo?: {
+  /** Refund entries for cancellations, one per currency. */
+  refundInfo?: Array<{
     amount: number;
     currency: string;
     processed: boolean;
-  };
+  }>;
 }
 
 interface AdminInfo {
@@ -57,7 +57,7 @@ interface AdminInfo {
   reason: string;
 }
 
-interface RefundInfo {
+interface RefundEntry {
   amount: number;
   currency: string;
   processed: boolean;
@@ -231,11 +231,20 @@ export class AdminNotificationsService {
     // In a full implementation, this would use a dedicated cancellation template
     const greeting = this.getGreeting(templateData.name, templateData.playaName);
     const adminInfo = templateData.adminInfo as AdminInfo;
-    const refundInfo = templateData.refundInfo as RefundInfo | undefined;
-    
-    const refundMessage = refundInfo?.processed 
-      ? `A refund of $${refundInfo.amount.toFixed(2)} has been processed. If paid by credit card, your refund will appear on your payment method within 5-10 business days.`
-      : '';
+    const refundEntries = templateData.refundInfo as Array<RefundEntry> | undefined;
+    const processedRefunds = refundEntries?.filter(r => r.processed) ?? [];
+    const refundMessages = processedRefunds.map(
+      r =>
+        `A refund of ${this.formatCurrencyAmount(r.amount, r.currency)} has been processed. If paid by credit card, your refund will appear on your payment method within 5-10 business days.`,
+    );
+
+    const refundMessage = refundMessages.join('\n\n');
+    const refundHtml = refundMessages
+      .map(
+        (message, index) =>
+          `<p style="margin: ${index === 0 ? '0' : '1em 0 0'};">${message}</p>`,
+      )
+      .join('');
 
     const subject = `Registration Cancelled - ${templateData.campName} ${templateData.registrationDetails?.year}`;
     
@@ -280,10 +289,10 @@ ${templateData.campName} Team`;
           <p style="margin: 0;">${adminInfo?.reason}</p>
         </div>
         
-        ${refundMessage ? `
+        ${refundHtml ? `
         <div style="background-color: #dcfce7; padding: 15px; border-radius: 5px; margin: 20px 0;">
           <h3 style="margin-top: 0; color: #166534;">Refund Information</h3>
-          <p style="margin: 0;">${refundMessage}</p>
+          ${refundHtml}
         </div>
         ` : ''}
         
@@ -301,6 +310,25 @@ ${templateData.campName} Team`;
       customText: text,
       customHtml: html,
     });
+  }
+
+  /**
+   * Format a monetary amount using the given ISO currency code.
+   */
+  private formatCurrencyAmount(amount: number, currency: string): string {
+    const currencyCode = (currency || 'USD').toUpperCase();
+
+    try {
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: currencyCode,
+      }).format(amount);
+    } catch (error) {
+      if (error instanceof RangeError) {
+        return `${amount.toFixed(2)} ${currencyCode}`;
+      }
+      throw error;
+    }
   }
 
   /**

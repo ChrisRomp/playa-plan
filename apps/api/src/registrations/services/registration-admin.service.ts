@@ -32,11 +32,13 @@ import { APPLICATION_STATUSES } from '../constants/registration-status.constants
 
 export interface RefundInfo {
   hasPayments: boolean;
-  totalAmount: number;
+  /** Remaining refundable amounts keyed by ISO currency code (e.g. { USD: 100 }). */
+  totalsByCurrency: Record<string, number>;
   paymentIds: string[];
   message: string;
   processed?: boolean;
-  refundAmount?: number;
+  /** Amounts actually refunded this run, keyed by ISO currency code. */
+  refundedByCurrency?: Record<string, number>;
 }
 
 export interface ExternalPaymentRegistrationSearchResult {
@@ -808,11 +810,13 @@ export class RegistrationAdminService {
                 status: 'CANCELLED',
               },
               reason: cancelData.reason,
-              refundInfo: actualRefundInfo?.processed ? {
-                amount: actualRefundInfo.refundAmount || 0,
-                currency: 'USD',
-                processed: true,
-              } : undefined,
+              refundInfo: actualRefundInfo?.processed && actualRefundInfo.refundedByCurrency
+                ? Object.entries(actualRefundInfo.refundedByCurrency).map(([currency, amount]) => ({
+                    amount,
+                    currency,
+                    processed: true,
+                  }))
+                : undefined,
             };
 
             const success = await this.adminNotificationsService.sendRegistrationCancellationNotification(notificationData);
@@ -855,6 +859,10 @@ export class RegistrationAdminService {
     return amountCents / 100;
   }
 
+  private normalizeCurrency(currency?: string): string {
+    return (currency || 'USD').toUpperCase();
+  }
+
   private getRemainingRefundableAmount(payment: { amount: number; refunds?: Array<{ amountCents: number; status: PaymentRefundStatus }> }): number {
     const refundedCents = payment.refunds
       ?.filter(refund => refund.status === PaymentRefundStatus.SUCCEEDED || refund.status === PaymentRefundStatus.PENDING)
@@ -870,7 +878,7 @@ export class RegistrationAdminService {
    * @returns Updated refund information
    */
   private async processAutoRefunds(
-    payments: Array<{ id: string; amount: number; status: PaymentStatus; provider: PaymentProvider; providerRefId: string | null; refunds?: Array<{ amountCents: number; status: PaymentRefundStatus }> }>,
+    payments: Array<{ id: string; amount: number; currency?: string; status: PaymentStatus; provider: PaymentProvider; providerRefId: string | null; refunds?: Array<{ amountCents: number; status: PaymentRefundStatus }> }>,
     reason: string,
     adminUserId: string,
   ): Promise<RefundInfo> {
@@ -888,13 +896,14 @@ export class RegistrationAdminService {
         )
     );
 
-    let totalRefunded = 0;
+    const refundedByCurrency: Record<string, number> = {};
     let refundedCount = 0;
     let pendingRefunds = 0;
     let failedRefunds: string[] = [];
 
     // Process automatic refunds for payment processor payments
     for (const payment of eligiblePayments) {
+      const currency = this.normalizeCurrency(payment.currency);
       try {
         const refundResult = await this.paymentsService.processRefund({
           paymentId: payment.id,
@@ -903,9 +912,9 @@ export class RegistrationAdminService {
         }, adminUserId, { allowRegistrationCancellation: true });
 
         if (refundResult.success) {
-          totalRefunded += refundResult.refundAmount;
+          refundedByCurrency[currency] = (refundedByCurrency[currency] ?? 0) + refundResult.refundAmount;
           refundedCount++;
-          this.logger.log(`Successfully refunded payment ${payment.id}: $${refundResult.refundAmount}`);
+          this.logger.log(`Successfully refunded payment ${payment.id}: ${refundResult.refundAmount} ${currency}`);
         } else if (refundResult.refundStatus === PaymentRefundStatus.PENDING) {
           pendingRefunds++;
           this.logger.log(`Refund submitted for payment ${payment.id} and is pending processor confirmation`);
@@ -919,16 +928,34 @@ export class RegistrationAdminService {
       }
     }
 
-    // Calculate total amounts based on remaining refundable balance (not gross payment amount),
-    // so partially-refunded Stripe payments only count their remaining balance.
-    const totalEligible = eligiblePayments.reduce((sum, p) => sum + this.getRemainingRefundableAmount(p), 0);
-    const totalManual = manualPayments.reduce((sum, p) => sum + this.getRemainingRefundableAmount(p), 0);
+    // Calculate total amounts by currency based on remaining refundable balance (not gross
+    // payment amount), so partially-refunded Stripe payments only count their remaining balance.
+    const eligibleTotalsByCurrency: Record<string, number> = {};
+    for (const p of eligiblePayments) {
+      const cur = this.normalizeCurrency(p.currency);
+      eligibleTotalsByCurrency[cur] = (eligibleTotalsByCurrency[cur] ?? 0) + this.getRemainingRefundableAmount(p);
+    }
+
+    const manualsByCurrency: Record<string, number> = {};
+    for (const p of manualPayments) {
+      const cur = this.normalizeCurrency(p.currency);
+      manualsByCurrency[cur] = (manualsByCurrency[cur] ?? 0) + this.getRemainingRefundableAmount(p);
+    }
+
+    const totalsByCurrency: Record<string, number> = { ...eligibleTotalsByCurrency };
+    for (const [cur, amt] of Object.entries(manualsByCurrency)) {
+      totalsByCurrency[cur] = (totalsByCurrency[cur] ?? 0) + amt;
+    }
+
     const allPayments = [...eligiblePayments, ...manualPayments];
 
     // Build result message
     let message = '';
     if (refundedCount > 0) {
-      message += `Automatically refunded ${refundedCount} payment(s) totaling $${totalRefunded.toFixed(2)}.`;
+      const refundedStr = Object.entries(refundedByCurrency)
+        .map(([cur, amt]) => `${amt.toFixed(2)} ${cur}`)
+        .join(', ');
+      message += `Automatically refunded ${refundedCount} payment(s) totaling ${refundedStr}.`;
     }
     if (pendingRefunds > 0) {
       message += ` ${pendingRefunds} refund(s) submitted and pending processor confirmation.`;
@@ -937,7 +964,10 @@ export class RegistrationAdminService {
       message += ` ${failedRefunds.length} automatic refund(s) failed and require manual processing.`;
     }
     if (manualPayments.length > 0) {
-      message += ` ${manualPayments.length} manual payment(s) totaling $${totalManual.toFixed(2)} require manual refund processing.`;
+      const manualStr = Object.entries(manualsByCurrency)
+        .map(([cur, amt]) => `${amt.toFixed(2)} ${cur}`)
+        .join(', ');
+      message += ` ${manualPayments.length} manual payment(s) totaling ${manualStr} require manual refund processing.`;
     }
     if (message === '') {
       message = 'No payments required refunding.';
@@ -945,11 +975,11 @@ export class RegistrationAdminService {
 
     return {
       hasPayments: allPayments.length > 0,
-      totalAmount: totalEligible + totalManual,
+      totalsByCurrency,
       paymentIds: allPayments.map(p => p.id),
       message: message.trim(),
       processed: refundedCount > 0,
-      refundAmount: totalRefunded,
+      refundedByCurrency: Object.keys(refundedByCurrency).length > 0 ? refundedByCurrency : undefined,
     };
   }
 
@@ -1094,21 +1124,34 @@ export class RegistrationAdminService {
    * @param payments - Array of payments
    * @returns Refund information
    */
-  private calculateRefundInfo(payments: Array<{ id: string; amount: number; status: PaymentStatus; refunds?: Array<{ amountCents: number; status: PaymentRefundStatus }> }>): RefundInfo {
+  private calculateRefundInfo(payments: Array<{ id: string; amount: number; currency?: string; status: PaymentStatus; refunds?: Array<{ amountCents: number; status: PaymentRefundStatus }> }>): RefundInfo {
     const eligiblePayments = payments.filter(
       p => p.status === PaymentStatus.PENDING || this.isRefundablePaymentStatus(p.status)
     );
 
-    const totalAmount = eligiblePayments.reduce((sum, payment) => sum + this.getRemainingRefundableAmount(payment), 0);
+    const totalsByCurrency: Record<string, number> = {};
+    for (const payment of eligiblePayments) {
+      const cur = this.normalizeCurrency(payment.currency);
+      totalsByCurrency[cur] = (totalsByCurrency[cur] ?? 0) + this.getRemainingRefundableAmount(payment);
+    }
+
     const paymentIds = eligiblePayments.map(p => p.id);
+
+    let message: string;
+    if (eligiblePayments.length > 0) {
+      const totalStr = Object.entries(totalsByCurrency)
+        .map(([cur, amt]) => `${amt.toFixed(2)} ${cur}`)
+        .join(', ');
+      message = `Refund of ${totalStr} needs to be processed manually for ${eligiblePayments.length} payment(s)`;
+    } else {
+      message = 'No payments to refund';
+    }
 
     return {
       hasPayments: eligiblePayments.length > 0,
-      totalAmount,
+      totalsByCurrency,
       paymentIds,
-      message: eligiblePayments.length > 0 
-        ? `Refund of $${totalAmount.toFixed(2)} needs to be processed manually for ${eligiblePayments.length} payment(s)`
-        : 'No payments to refund',
+      message,
     };
   }
 } 

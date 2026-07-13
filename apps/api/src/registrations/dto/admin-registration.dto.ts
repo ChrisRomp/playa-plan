@@ -115,6 +115,7 @@ export class AdminRegistrationQueryDto {
   @Type(() => Number)
   @IsInt({ message: 'Year must be an integer' })
   @Min(2020, { message: 'Year must be 2020 or later' })
+  @Max(2100, { message: 'Year must be 2100 or earlier' })
   year?: number;
 
   @ApiPropertyOptional({
@@ -201,6 +202,7 @@ export class ExternalPaymentRegistrationSearchQueryDto {
   @Type(() => Number)
   @IsInt({ message: 'Year must be an integer' })
   @Min(2020, { message: 'Year must be 2020 or later' })
+  @Max(2100, { message: 'Year must be 2100 or earlier' })
   year!: number;
 
   @ApiPropertyOptional({
@@ -410,6 +412,7 @@ export class AdminCampingOptionQueryDto {
   @Type(() => Number)
   @IsInt({ message: 'Year must be an integer' })
   @Min(2020, { message: 'Year must be 2020 or later' })
+  @Max(2100, { message: 'Year must be 2100 or earlier' })
   year?: number;
 
   @ApiPropertyOptional({

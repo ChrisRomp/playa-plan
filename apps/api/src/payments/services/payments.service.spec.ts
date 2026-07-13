@@ -2108,6 +2108,103 @@ describe('PaymentsService', () => {
       expect(mockAdminAuditService.createAuditRecord).not.toHaveBeenCalled();
       expect(result.reconciledRefundIds).toEqual([]);
     });
+
+    it('should process multiple pending refunds in createdAt ascending order so the newest requested registration status wins', async () => {
+      // Given: two pending refunds with different resultingRegistrationStatus values.
+      // newerRefund is placed first in the array (reversed) to prove the sort is applied;
+      // without the sort, retrieveRefund would be called for 're_newer' first and the
+      // older WAITLISTED status would win as the final registration state.
+      const olderDate = new Date('2024-01-01T10:00:00Z');
+      const newerDate = new Date('2024-01-01T11:00:00Z');
+
+      const olderRefund = {
+        id: 'refund-older',
+        paymentId: 'payment-id',
+        amountCents: 2000,
+        currency: 'USD',
+        status: PaymentRefundStatus.PENDING,
+        processorRefund: true,
+        providerRefundId: 're_older',
+        reason: 'Partial refund',
+        resultingRegistrationStatus: RegistrationStatus.WAITLISTED,
+        processedByUserId: 'admin-id',
+        createdAt: olderDate,
+        updatedAt: olderDate,
+      };
+      const newerRefund = {
+        id: 'refund-newer',
+        paymentId: 'payment-id',
+        amountCents: 3000,
+        currency: 'USD',
+        status: PaymentRefundStatus.PENDING,
+        processorRefund: true,
+        providerRefundId: 're_newer',
+        reason: 'Additional partial refund',
+        resultingRegistrationStatus: RegistrationStatus.CANCELLED,
+        processedByUserId: 'admin-id',
+        createdAt: newerDate,
+        updatedAt: newerDate,
+      };
+      const succeededOlderRefund = { ...olderRefund, status: PaymentRefundStatus.SUCCEEDED };
+      const succeededNewerRefund = { ...newerRefund, status: PaymentRefundStatus.SUCCEEDED };
+
+      // payment.findUnique call sequence:
+      // 1. Initial fetch — refunds in reverse order (newerRefund first) to exercise sort
+      // 2. Inside tx for olderRefund (processed first after sort) — registration CONFIRMED
+      // 3. Inside tx for newerRefund (processed second) — registration WAITLISTED
+      // 4. Final refresh
+      mockPrismaService.payment.findUnique
+        .mockResolvedValueOnce({
+          ...basePayment,
+          refunds: [newerRefund, olderRefund],
+        })
+        .mockResolvedValueOnce({
+          ...basePayment,
+          refunds: [succeededOlderRefund, newerRefund],
+          registration: { id: 'registration-id', userId: 'user-id', status: RegistrationStatus.CONFIRMED },
+        })
+        .mockResolvedValueOnce({
+          ...basePayment,
+          refunds: [succeededOlderRefund, succeededNewerRefund],
+          registration: { id: 'registration-id', userId: 'user-id', status: RegistrationStatus.WAITLISTED },
+        })
+        .mockResolvedValueOnce({
+          ...basePayment,
+          status: PaymentStatus.PARTIALLY_REFUNDED,
+          refunds: [succeededOlderRefund, succeededNewerRefund],
+          registration: { id: 'registration-id', userId: 'user-id', status: RegistrationStatus.CANCELLED },
+        });
+
+      mockStripeService.retrieveRefund
+        .mockResolvedValueOnce({ id: 're_older', status: 'succeeded' })
+        .mockResolvedValueOnce({ id: 're_newer', status: 'succeeded' });
+
+      mockPrismaService.paymentRefund.update
+        .mockResolvedValueOnce(succeededOlderRefund)
+        .mockResolvedValueOnce(succeededNewerRefund);
+
+      // When
+      const result = await service.reconcilePendingRefund('payment-id');
+
+      // Then: olderRefund is processed first (sorted ascending by createdAt)
+      expect(mockStripeService.retrieveRefund).toHaveBeenNthCalledWith(1, 're_older');
+      expect(mockStripeService.retrieveRefund).toHaveBeenNthCalledWith(2, 're_newer');
+
+      // The registration was updated twice; olderRefund's WAITLISTED status came first,
+      // then newerRefund's CANCELLED status overwrote it — newest wins.
+      const registrationUpdateCalls = mockPrismaService.registration.update.mock.calls;
+      expect(registrationUpdateCalls).toHaveLength(2);
+      expect(registrationUpdateCalls[0][0]).toMatchObject({
+        where: { id: 'registration-id' },
+        data: { status: RegistrationStatus.WAITLISTED },
+      });
+      expect(registrationUpdateCalls[1][0]).toMatchObject({
+        where: { id: 'registration-id' },
+        data: { status: RegistrationStatus.CANCELLED },
+      });
+
+      expect(result.reconciledRefundIds).toEqual(['refund-older', 'refund-newer']);
+    });
   });
 
   describe('deferred-payment side effects', () => {

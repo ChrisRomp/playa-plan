@@ -313,9 +313,11 @@ export class PaymentsService {
   }
 
   private async reconcilePendingProcessorRefunds(payment: RefundablePayment): Promise<string[]> {
-    const pendingRefunds = payment.refunds.filter(
-      (refund) => refund.processorRefund && refund.status === PaymentRefundStatus.PENDING,
-    );
+    const pendingRefunds = payment.refunds
+      .filter(
+        (refund) => refund.processorRefund && refund.status === PaymentRefundStatus.PENDING,
+      )
+      .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
 
     if (pendingRefunds.length === 0) {
       return [];
