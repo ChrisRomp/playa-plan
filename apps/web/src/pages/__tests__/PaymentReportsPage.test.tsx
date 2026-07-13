@@ -724,7 +724,7 @@ describe('PaymentReportsPage', () => {
     });
 
     it('should fall back to createdAt year when registration is absent', async () => {
-      const getFullYearSpy = vi.spyOn(Date.prototype, 'getFullYear').mockReturnValue(2025);
+      const getUTCFullYearSpy = vi.spyOn(Date.prototype, 'getUTCFullYear');
       renderComponent();
 
       await waitFor(() => expect(screen.getByTestId('data-table')).toBeInTheDocument());
@@ -737,7 +737,8 @@ describe('PaymentReportsPage', () => {
       // Only the no-registration payment (createdAt in 2026) should remain
       expect(screen.getByTestId('payment-payment-no-reg')).toBeInTheDocument();
       expect(screen.queryByTestId('payment-payment-prior-year')).not.toBeInTheDocument();
-      getFullYearSpy.mockRestore();
+      expect(getUTCFullYearSpy).toHaveBeenCalled();
+      getUTCFullYearSpy.mockRestore();
     });
   });
 

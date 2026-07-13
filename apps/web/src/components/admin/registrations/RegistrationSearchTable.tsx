@@ -81,7 +81,7 @@ const getNetPaymentAmountsByCurrency = (
     )
     .reduce<Record<string, number>>((amounts, payment) => {
       const refundedAmount = (payment.refunds ?? [])
-        .filter(refund => refund.status === 'SUCCEEDED')
+        .filter(refund => refund.status === 'SUCCEEDED' || refund.status === 'PENDING')
         .reduce((refundSum, refund) => refundSum + refund.amountCents / 100, 0);
       const netAmount = payment.netAmount ?? Math.max(0, payment.amount - refundedAmount);
       const currency = (payment.currency || 'USD').toUpperCase();

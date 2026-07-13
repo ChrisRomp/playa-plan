@@ -432,7 +432,10 @@ describe('RegistrationSearchTable', () => {
               id: 'payment-4',
               amount: 80,
               status: 'PARTIALLY_REFUNDED',
-              refunds: [{ amountCents: 2000, status: 'SUCCEEDED' }],
+              refunds: [
+                { amountCents: 2000, status: 'SUCCEEDED' },
+                { amountCents: 1000, status: 'PENDING' },
+              ],
             },
           ],
         },
@@ -442,8 +445,8 @@ describe('RegistrationSearchTable', () => {
         <RegistrationSearchTable {...defaultProps} registrations={registrationWithMixedPayments} />
       );
 
-      // Should count completed and partially refunded net payments.
-      expect(screen.getByText('$160.00 USD')).toBeInTheDocument();
+      // Should count completed payments minus succeeded and pending refunds.
+      expect(screen.getByText('$150.00 USD')).toBeInTheDocument();
     });
 
     it('should render separate totals per currency without summing unlike currencies', () => {
