@@ -1,6 +1,7 @@
 import { PaymentProvider } from '@prisma/client';
 import { validate } from 'class-validator';
 import { CreatePaymentDto } from './create-payment.dto';
+import { PAYMENT_AMOUNT_LIMITS } from '../constants/payment-amount-limits.constants';
 
 const VALID_USER_ID = '5f8d0d55-e0a3-4cf0-a620-2412acd4361c';
 
@@ -13,6 +14,33 @@ function buildBaseDto(provider: PaymentProvider): CreatePaymentDto {
 }
 
 describe('CreatePaymentDto', () => {
+  describe('amount', () => {
+    it('should accept the maximum representable payment amount', async () => {
+      const inputDto = buildBaseDto(PaymentProvider.MANUAL);
+      inputDto.amount = PAYMENT_AMOUNT_LIMITS.majorUnits;
+
+      const actualErrors = await validate(inputDto);
+
+      expect(actualErrors.filter((error) => error.property === 'amount')).toHaveLength(0);
+    });
+
+    it('should reject an amount above the refund cents representation', async () => {
+      const inputDto = buildBaseDto(PaymentProvider.MANUAL);
+      inputDto.amount = PAYMENT_AMOUNT_LIMITS.majorUnits + 0.01;
+
+      const actualErrors = await validate(inputDto);
+
+      expect(actualErrors).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            property: 'amount',
+            constraints: expect.objectContaining({ max: expect.any(String) }),
+          }),
+        ]),
+      );
+    });
+  });
+
   describe('externalPaymentMethod', () => {
     it('should accept externalPaymentMethod when provider is MANUAL', async () => {
       const inputDto = buildBaseDto(PaymentProvider.MANUAL);

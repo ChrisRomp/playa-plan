@@ -19,6 +19,7 @@ import { StripeRefundError, StripeService } from './stripe.service';
 import { PaypalService } from './paypal.service';
 import { isApplicationStatus } from '../../registrations/constants/registration-status.constants';
 import { AdminAuditService } from '../../admin-audit/services/admin-audit.service';
+import { PAYMENT_AMOUNT_LIMITS } from '../constants/payment-amount-limits.constants';
 
 // Create an extended Payment type that includes registration relationship
 type PaymentWithRelations = Payment & {
@@ -98,6 +99,14 @@ export class PaymentsService {
 
   private toCents(amount: number): number {
     return Math.round(amount * 100);
+  }
+
+  private validateSupportedAmountCents(amountCents: number, label: string): void {
+    if (amountCents > PAYMENT_AMOUNT_LIMITS.cents) {
+      throw new BadRequestException(
+        `${label} amount exceeds the supported maximum of ${PAYMENT_AMOUNT_LIMITS.majorUnits}`,
+      );
+    }
   }
 
   private toDollars(amountCents: number): number {
@@ -460,6 +469,10 @@ export class PaymentsService {
     initialStatus?: PaymentStatus,
   ): Promise<Payment> {
     this.logger.log(`Creating payment record for user ${createPaymentDto.userId}`);
+    this.validateSupportedAmountCents(
+      this.toCents(createPaymentDto.amount),
+      'Payment',
+    );
     
     // Verify user exists
     const user = await this.prisma.user.findUnique({
@@ -1044,6 +1057,8 @@ export class PaymentsService {
         if (refundAmountCents > remainingCents) {
           throw new BadRequestException('Refund amount exceeds remaining refundable balance');
         }
+
+        this.validateSupportedAmountCents(refundAmountCents, 'Refund');
 
         const processorRefund = this.isProcessorRefundProvider(payment.provider);
         const refund = await tx.paymentRefund.create({

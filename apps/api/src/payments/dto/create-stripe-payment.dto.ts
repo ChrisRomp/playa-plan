@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID, Min } from 'class-validator';
+import { IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator';
+import { PAYMENT_AMOUNT_LIMITS } from '../constants/payment-amount-limits.constants';
 
 /**
  * Data Transfer Object for initiating a Stripe payment
@@ -9,10 +10,12 @@ export class CreateStripePaymentDto {
     description: 'The payment amount in cents (Stripe uses integer amounts)',
     example: 10000, // $100.00
     minimum: 50, // $0.50 minimum
+    maximum: PAYMENT_AMOUNT_LIMITS.cents,
   })
   @IsNotEmpty()
   @IsNumber()
   @Min(50)
+  @Max(PAYMENT_AMOUNT_LIMITS.cents)
   amount!: number;
 
   @ApiProperty({

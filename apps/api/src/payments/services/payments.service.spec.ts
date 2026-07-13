@@ -7,6 +7,7 @@ import { NotificationsService } from '../../notifications/services/notifications
 import { AdminAuditService } from '../../admin-audit/services/admin-audit.service';
 import { PaymentProvider, PaymentRefundStatus, PaymentStatus, RegistrationStatus } from '@prisma/client';
 import { NotFoundException, BadRequestException } from '@nestjs/common';
+import { PAYMENT_AMOUNT_LIMITS } from '../constants/payment-amount-limits.constants';
 
 // Mock implementations
 const mockPrismaService = {
@@ -167,6 +168,22 @@ describe('PaymentsService', () => {
   });
 
   describe('create', () => {
+    it('should reject payment amounts that cannot be represented by refund cents', async () => {
+      const inputPaymentDto = {
+        amount: PAYMENT_AMOUNT_LIMITS.majorUnits + 0.01,
+        currency: 'USD',
+        provider: PaymentProvider.MANUAL,
+        userId: 'user-id',
+      };
+
+      await expect(service.create(inputPaymentDto)).rejects.toThrow(
+        `Payment amount exceeds the supported maximum of ${PAYMENT_AMOUNT_LIMITS.majorUnits}`,
+      );
+
+      expect(mockPrismaService.user.findUnique).not.toHaveBeenCalled();
+      expect(mockPrismaService.payment.create).not.toHaveBeenCalled();
+    });
+
     it('should create a payment record', async () => {
       // Mock data
       const mockPaymentDto = {
@@ -1851,6 +1868,27 @@ describe('PaymentsService', () => {
       }, 'admin-id')).rejects.toThrow('Refund amount exceeds remaining refundable balance');
 
       expect(mockStripeService.createRefund).not.toHaveBeenCalled();
+      expect(mockPrismaService.paymentRefund.create).not.toHaveBeenCalled();
+    });
+
+    it('should reject a full refund that cannot be represented by refund cents', async () => {
+      const oversizedPayment = {
+        ...basePayment,
+        amount: PAYMENT_AMOUNT_LIMITS.majorUnits + 0.01,
+        provider: PaymentProvider.MANUAL,
+        providerRefId: 'manual-external',
+        refunds: [],
+      };
+      mockPrismaService.payment.findUnique
+        .mockResolvedValueOnce(oversizedPayment)
+        .mockResolvedValueOnce(oversizedPayment);
+
+      await expect(service.processRefund({
+        paymentId: 'payment-id',
+      }, 'admin-id')).rejects.toThrow(
+        `Refund amount exceeds the supported maximum of ${PAYMENT_AMOUNT_LIMITS.majorUnits}`,
+      );
+
       expect(mockPrismaService.paymentRefund.create).not.toHaveBeenCalled();
     });
 

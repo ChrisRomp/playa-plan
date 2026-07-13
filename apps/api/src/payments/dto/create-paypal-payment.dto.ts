@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID, Min } from 'class-validator';
+import { IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator';
+import { PAYMENT_AMOUNT_LIMITS } from '../constants/payment-amount-limits.constants';
 
 /**
  * Data Transfer Object for initiating a PayPal payment
@@ -9,10 +10,12 @@ export class CreatePaypalPaymentDto {
     description: 'The payment amount',
     example: 100.00,
     minimum: 0.01,
+    maximum: PAYMENT_AMOUNT_LIMITS.majorUnits,
   })
   @IsNotEmpty()
   @IsNumber()
   @Min(0.01)
+  @Max(PAYMENT_AMOUNT_LIMITS.majorUnits)
   amount!: number;
 
   @ApiProperty({

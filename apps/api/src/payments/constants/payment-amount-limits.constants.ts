@@ -1,0 +1,6 @@
+const MAX_PAYMENT_AMOUNT_CENTS = 2_147_483_647;
+
+export const PAYMENT_AMOUNT_LIMITS = {
+  cents: MAX_PAYMENT_AMOUNT_CENTS,
+  majorUnits: MAX_PAYMENT_AMOUNT_CENTS / 100,
+} as const;

@@ -1,7 +1,8 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID, Min } from 'class-validator';
+import { IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator';
 import { PaymentProvider } from '@prisma/client';
 import { IsManualProviderOnlyField } from './manual-provider-only-field.validator';
+import { PAYMENT_AMOUNT_LIMITS } from '../constants/payment-amount-limits.constants';
 
 /**
  * Data Transfer Object for creating a new payment
@@ -11,10 +12,12 @@ export class CreatePaymentDto {
     description: 'The payment amount',
     example: 100.00,
     minimum: 0.01,
+    maximum: PAYMENT_AMOUNT_LIMITS.majorUnits,
   })
   @IsNotEmpty()
   @IsNumber()
   @Min(0.01)
+  @Max(PAYMENT_AMOUNT_LIMITS.majorUnits)
   amount!: number;
 
   @ApiProperty({

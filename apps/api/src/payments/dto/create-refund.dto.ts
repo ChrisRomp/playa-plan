@@ -2,6 +2,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { IsIn, IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator';
 import { RegistrationStatus } from '@prisma/client';
 import { CAPACITY_RESERVING_STATUSES } from '../../registrations/constants/registration-status.constants';
+import { PAYMENT_AMOUNT_LIMITS } from '../constants/payment-amount-limits.constants';
 
 /**
  * Data Transfer Object for creating a refund
@@ -20,11 +21,13 @@ export class CreateRefundDto {
     description: 'The refund amount (optional, defaults to full amount)',
     example: 50.00,
     minimum: 0.01,
+    maximum: PAYMENT_AMOUNT_LIMITS.majorUnits,
     required: false,
   })
   @IsOptional()
   @IsNumber()
   @Min(0.01)
+  @Max(PAYMENT_AMOUNT_LIMITS.majorUnits)
   amount?: number;
 
   @ApiProperty({

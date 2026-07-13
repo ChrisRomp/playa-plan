@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsIn, IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID, Min } from 'class-validator';
+import { IsIn, IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator';
 import { PaymentStatus } from '@prisma/client';
+import { PAYMENT_AMOUNT_LIMITS } from '../constants/payment-amount-limits.constants';
 
 const RECORDABLE_PAYMENT_STATUSES = [
   PaymentStatus.PENDING,
@@ -18,10 +19,12 @@ export class RecordManualPaymentDto {
     description: 'The payment amount',
     example: 100.00,
     minimum: 0.01,
+    maximum: PAYMENT_AMOUNT_LIMITS.majorUnits,
   })
   @IsNotEmpty()
   @IsNumber()
   @Min(0.01)
+  @Max(PAYMENT_AMOUNT_LIMITS.majorUnits)
   amount!: number;
 
   @ApiProperty({

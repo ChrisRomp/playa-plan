@@ -1,6 +1,7 @@
 import { RegistrationStatus } from '@prisma/client';
 import { validate } from 'class-validator';
 import { CreateRefundDto } from './create-refund.dto';
+import { PAYMENT_AMOUNT_LIMITS } from '../constants/payment-amount-limits.constants';
 
 describe('CreateRefundDto', () => {
   const buildValidDto = (): CreateRefundDto => {
@@ -9,6 +10,22 @@ describe('CreateRefundDto', () => {
     dto.amount = 50;
     return dto;
   };
+
+  it('should reject an amount above the cents representation', async () => {
+    const inputDto = buildValidDto();
+    inputDto.amount = PAYMENT_AMOUNT_LIMITS.majorUnits + 0.01;
+
+    const actualErrors = await validate(inputDto);
+
+    expect(actualErrors).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          property: 'amount',
+          constraints: expect.objectContaining({ max: expect.any(String) }),
+        }),
+      ]),
+    );
+  });
 
   it('should accept the post-application registration statuses', async () => {
     for (const status of [
