@@ -505,6 +505,111 @@ describe('PaymentsService', () => {
     });
   });
 
+  describe('findAllForParticipant', () => {
+    it('should return payments with only participant-safe refund fields', async () => {
+      // Given: payment with refunds containing only the participant-safe fields (as Prisma select returns)
+      const inputRefund = {
+        id: 'refund-1',
+        paymentId: 'payment-1',
+        amountCents: 5000,
+        currency: 'USD',
+        status: PaymentRefundStatus.SUCCEEDED,
+        reason: 'Customer request',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      const mockPayments = [
+        {
+          id: 'payment-1',
+          amount: 100,
+          status: PaymentStatus.PARTIALLY_REFUNDED,
+          provider: PaymentProvider.STRIPE,
+          providerRefId: 'pi_test_123',
+          refunds: [inputRefund],
+        },
+      ];
+
+      mockPrismaService.payment.findMany.mockResolvedValue(mockPayments);
+      mockPrismaService.payment.count.mockResolvedValue(1);
+
+      // When
+      const result = await service.findAllForParticipant('user-id');
+
+      // Then: computed overview fields are present
+      expect(result.total).toBe(1);
+      const actualPayment = result.payments[0];
+      expect(actualPayment).toMatchObject({
+        id: 'payment-1',
+        refundedAmount: 50,
+        netAmount: 50,
+      });
+
+      // Then: refund array contains only participant-safe fields
+      expect(actualPayment.refunds).toHaveLength(1);
+      const actualRefund = actualPayment.refunds[0];
+      expect(actualRefund).toMatchObject({
+        id: 'refund-1',
+        paymentId: 'payment-1',
+        amountCents: 5000,
+        currency: 'USD',
+        status: PaymentRefundStatus.SUCCEEDED,
+        reason: 'Customer request',
+      });
+
+      // Internal admin-only fields must not be present
+      expect(actualRefund).not.toHaveProperty('processedByUserId');
+      expect(actualRefund).not.toHaveProperty('providerRefundId');
+      expect(actualRefund).not.toHaveProperty('processorRefund');
+      expect(actualRefund).not.toHaveProperty('resultingRegistrationStatus');
+    });
+
+    it('should use a restricted Prisma select for refunds (not include all fields)', async () => {
+      // Given
+      mockPrismaService.payment.findMany.mockResolvedValue([]);
+      mockPrismaService.payment.count.mockResolvedValue(0);
+
+      // When
+      await service.findAllForParticipant('user-id');
+
+      // Then: the Prisma query uses select (not include) for refunds
+      const findManyCall = mockPrismaService.payment.findMany.mock.calls[0][0];
+      expect(findManyCall.include.refunds).toHaveProperty('select');
+      expect(findManyCall.include.refunds.select).toMatchObject({
+        id: true,
+        paymentId: true,
+        amountCents: true,
+        currency: true,
+        status: true,
+        reason: true,
+        createdAt: true,
+        updatedAt: true,
+      });
+      // Internal fields must not be selected
+      expect(findManyCall.include.refunds.select).not.toHaveProperty('processedByUserId');
+      expect(findManyCall.include.refunds.select).not.toHaveProperty('providerRefundId');
+      expect(findManyCall.include.refunds.select).not.toHaveProperty('processorRefund');
+      expect(findManyCall.include.refunds.select).not.toHaveProperty('resultingRegistrationStatus');
+    });
+
+    it('should filter by userId and optional status', async () => {
+      // Given
+      mockPrismaService.payment.findMany.mockResolvedValue([]);
+      mockPrismaService.payment.count.mockResolvedValue(0);
+
+      // When
+      await service.findAllForParticipant('user-id', 0, 10, PaymentStatus.COMPLETED);
+
+      // Then
+      expect(mockPrismaService.payment.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { userId: 'user-id', status: PaymentStatus.COMPLETED },
+          skip: 0,
+          take: 10,
+        }),
+      );
+    });
+  });
+
   describe('findOne', () => {
     it('should return a payment by ID', async () => {
       // Mock data
@@ -1618,7 +1723,7 @@ describe('PaymentsService', () => {
       expect(mockAdminAuditService.createAuditRecord).not.toHaveBeenCalled();
     });
 
-    it('should not mark a processor-submitted refund failed after an ambiguous Stripe error', async () => {
+    it('should return a PENDING result after an ambiguous Stripe error (possiblySubmitted=true)', async () => {
       const pendingRefund = {
         id: 'refund-id',
         paymentId: 'payment-id',
@@ -1640,12 +1745,19 @@ describe('PaymentsService', () => {
       mockPrismaService.paymentRefund.create.mockResolvedValueOnce(pendingRefund);
       mockStripeService.createRefund.mockRejectedValue(new StripeRefundError('network timeout', true));
 
-      await expect(service.processRefund({
+      const actualResult = await service.processRefund({
         paymentId: 'payment-id',
         amount: 25,
         reason: 'Ambiguous refund',
-      }, 'admin-id')).rejects.toThrow('network timeout');
+      }, 'admin-id');
 
+      expect(actualResult).toEqual({
+        paymentId: 'payment-id',
+        refundAmount: 25,
+        providerRefundId: 'refund-id',
+        success: false,
+        refundStatus: PaymentRefundStatus.PENDING,
+      });
       expect(mockStripeService.createRefund).toHaveBeenCalledWith(
         'pi_stripe123',
         2500,
@@ -2610,7 +2722,7 @@ describe('PaymentsService', () => {
     });
 
     it('recordManualPayment marks the registration CONFIRMED and clears paymentDeferred when status COMPLETED', async () => {
-      const created = {
+      const createdPayment = {
         id: 'payment-manual',
         status: PaymentStatus.COMPLETED,
         amount: 100,
@@ -2622,13 +2734,14 @@ describe('PaymentsService', () => {
         createdAt: new Date(),
         updatedAt: new Date(),
       };
+      mockPrismaService.user.findUnique.mockResolvedValueOnce({ id: 'user-id', name: 'Test User' });
       mockPrismaService.registration.findUnique.mockResolvedValue({
         id: 'registration-id',
         userId: 'user-id',
         status: 'CONFIRMED',
         paymentDeferred: true,
       });
-      mockPrismaService.payment.create.mockResolvedValueOnce(created);
+      mockPrismaService.payment.create.mockResolvedValueOnce(createdPayment);
       mockPrismaService.registration.update.mockResolvedValueOnce({
         id: 'registration-id',
         status: 'CONFIRMED',
@@ -2671,7 +2784,7 @@ describe('PaymentsService', () => {
     });
 
     it('recordManualPayment preserves CANCELLED registration status', async () => {
-      const created = {
+      const createdPayment = {
         id: 'payment-manual',
         status: PaymentStatus.COMPLETED,
         amount: 100,
@@ -2683,12 +2796,18 @@ describe('PaymentsService', () => {
         createdAt: new Date(),
         updatedAt: new Date(),
       };
+      mockPrismaService.user.findUnique.mockResolvedValueOnce({ id: 'user-id', name: 'Test User' });
       mockPrismaService.registration.findUnique.mockResolvedValue({
         id: 'registration-id',
         userId: 'user-id',
         status: RegistrationStatus.CANCELLED,
       });
-      mockPrismaService.payment.create.mockResolvedValueOnce(created);
+      mockPrismaService.payment.create.mockResolvedValueOnce(createdPayment);
+      mockPrismaService.registration.update.mockResolvedValueOnce({
+        id: 'registration-id',
+        status: RegistrationStatus.CANCELLED,
+        paymentDeferred: false,
+      });
 
       await service.recordManualPayment({
         amount: 100,
@@ -2706,8 +2825,15 @@ describe('PaymentsService', () => {
       });
     });
 
-    it('recordManualPayment still audits and returns payment when marking the registration paid fails', async () => {
-      const payment = {
+    it('recordManualPayment throws and rolls back when the registration update fails inside the transaction', async () => {
+      mockPrismaService.user.findUnique.mockResolvedValueOnce({ id: 'user-id', name: 'Test User' });
+      mockPrismaService.registration.findUnique.mockResolvedValue({
+        id: 'registration-id',
+        userId: 'user-id',
+        status: 'CONFIRMED',
+        paymentDeferred: true,
+      });
+      mockPrismaService.payment.create.mockResolvedValueOnce({
         id: 'payment-manual',
         status: PaymentStatus.COMPLETED,
         amount: 100,
@@ -2718,49 +2844,26 @@ describe('PaymentsService', () => {
         providerRefId: null,
         createdAt: new Date(),
         updatedAt: new Date(),
-      };
-      mockPrismaService.user.findUnique.mockResolvedValue({
-        id: 'user-id',
-        name: 'Test User',
       });
-      mockPrismaService.registration.findUnique.mockResolvedValue({
-        id: 'registration-id',
-        userId: 'user-id',
-        status: 'CONFIRMED',
-        paymentDeferred: true,
-      });
-      mockPrismaService.payment.create.mockResolvedValueOnce(payment);
       mockPrismaService.registration.update.mockRejectedValueOnce(new Error('transient database error'));
 
-      const actualPayment = await service.recordManualPayment({
-        amount: 100,
-        currency: 'USD',
-        userId: 'user-id',
-        registrationId: 'registration-id',
-        reference: 'check-123',
-        status: PaymentStatus.COMPLETED,
-      }, 'admin-id');
+      await expect(
+        service.recordManualPayment({
+          amount: 100,
+          currency: 'USD',
+          userId: 'user-id',
+          registrationId: 'registration-id',
+          reference: 'check-123',
+          status: PaymentStatus.COMPLETED,
+        }, 'admin-id'),
+      ).rejects.toThrow('transient database error');
 
-      expect(actualPayment).toEqual(payment);
-      expect(mockPrismaService.registration.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { id: 'registration-id' },
-          data: { status: 'CONFIRMED', paymentDeferred: false },
-        }),
-      );
-      expect(mockAdminAuditService.createAuditRecord).toHaveBeenCalledWith(
-        expect.objectContaining({
-          adminUserId: 'admin-id',
-          actionType: 'PAYMENT_RECORD',
-          targetRecordType: 'PAYMENT',
-          targetRecordId: 'payment-manual',
-          throwOnError: false,
-        }),
-      );
+      // Audit must not be written because the transaction failed and the payment was rolled back.
+      expect(mockAdminAuditService.createAuditRecord).not.toHaveBeenCalled();
     });
 
     it('recordManualPayment does NOT touch the registration when status is not COMPLETED', async () => {
-      const created = {
+      const createdPayment = {
         id: 'payment-manual',
         status: PaymentStatus.FAILED,
         amount: 100,
@@ -2772,13 +2875,14 @@ describe('PaymentsService', () => {
         createdAt: new Date(),
         updatedAt: new Date(),
       };
-      mockPrismaService.registration.findUnique.mockResolvedValue({
+      mockPrismaService.user.findUnique.mockResolvedValueOnce({ id: 'user-id', name: 'Test User' });
+      mockPrismaService.registration.findUnique.mockResolvedValueOnce({
         id: 'registration-id',
         userId: 'user-id',
         status: 'PENDING',
         paymentDeferred: false,
       });
-      mockPrismaService.payment.create.mockResolvedValueOnce(created);
+      mockPrismaService.payment.create.mockResolvedValueOnce(createdPayment);
 
       await service.recordManualPayment({
         amount: 100,
@@ -2793,7 +2897,7 @@ describe('PaymentsService', () => {
     });
 
     it('recordManualPayment does NOT touch the registration when registrationId is absent', async () => {
-      const created = {
+      const createdPayment = {
         id: 'payment-manual',
         status: PaymentStatus.COMPLETED,
         amount: 100,
@@ -2805,7 +2909,8 @@ describe('PaymentsService', () => {
         createdAt: new Date(),
         updatedAt: new Date(),
       };
-      mockPrismaService.payment.create.mockResolvedValueOnce(created);
+      mockPrismaService.user.findUnique.mockResolvedValueOnce({ id: 'user-id', name: 'Test User' });
+      mockPrismaService.payment.create.mockResolvedValueOnce(createdPayment);
 
       await service.recordManualPayment({
         amount: 100,
@@ -2820,7 +2925,7 @@ describe('PaymentsService', () => {
 
     it('recordManualPayment creates the payment atomically with its final status without a separate update call', async () => {
       const finalStatus = PaymentStatus.COMPLETED;
-      const created = {
+      const createdPayment = {
         id: 'payment-manual',
         status: finalStatus,
         amount: 150,
@@ -2832,7 +2937,8 @@ describe('PaymentsService', () => {
         createdAt: new Date(),
         updatedAt: new Date(),
       };
-      mockPrismaService.payment.create.mockResolvedValueOnce(created);
+      mockPrismaService.user.findUnique.mockResolvedValueOnce({ id: 'user-id', name: 'Test User' });
+      mockPrismaService.payment.create.mockResolvedValueOnce(createdPayment);
 
       const result = await service.recordManualPayment({
         amount: 150,
@@ -2841,7 +2947,8 @@ describe('PaymentsService', () => {
         status: finalStatus,
       }, 'admin-id');
 
-      // The payment was created with the final status directly — no update step needed.
+      // Payment is created with the final status directly inside a transaction — no separate update call.
+      expect(mockPrismaService.$transaction).toHaveBeenCalledWith(expect.any(Function));
       expect(mockPrismaService.payment.create).toHaveBeenCalledWith(
         expect.objectContaining({ data: expect.objectContaining({ status: finalStatus }) }),
       );

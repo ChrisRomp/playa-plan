@@ -76,10 +76,10 @@ export class PaymentsController {
     @Query('status') status?: PaymentStatus,
   ) {
     const userId = req.user.id;
-    return this.paymentsService.findAll(
+    return this.paymentsService.findAllForParticipant(
+      userId,
       skip ? parseInt(skip, 10) : undefined,
       take ? parseInt(take, 10) : undefined,
-      userId, // Force filter to current user
       status,
     );
   }

@@ -39,6 +39,7 @@ describe('PaymentsController Security', () => {
           provide: PaymentsService,
           useValue: {
             findAll: jest.fn(),
+            findAllForParticipant: jest.fn(),
             findOneWithOwnershipCheck: jest.fn(),
           },
         },
@@ -90,12 +91,18 @@ describe('PaymentsController Security', () => {
         user: { id: 'user-123', role: UserRole.PARTICIPANT } 
       } as unknown as Parameters<typeof controller.findMyPayments>[0];
       
-      jest.spyOn(paymentsService, 'findAll').mockResolvedValue(mockResult);
+      jest.spyOn(paymentsService, 'findAllForParticipant').mockResolvedValue(mockResult);
 
       const result = await controller.findMyPayments(mockRequest);
 
       expect(result).toEqual(mockResult);
-      expect(paymentsService.findAll).toHaveBeenCalledWith(undefined, undefined, 'user-123', undefined);
+      expect(paymentsService.findAllForParticipant).toHaveBeenCalledWith(
+        'user-123',
+        undefined,
+        undefined,
+        undefined,
+      );
+      expect(paymentsService.findAll).not.toHaveBeenCalled();
     });
   });
 

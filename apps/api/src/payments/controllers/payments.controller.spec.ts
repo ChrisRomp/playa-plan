@@ -1,13 +1,14 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { PaymentsController } from './payments.controller';
 import { PaymentsService, StripeService, PaypalService } from '../services';
-import { PaymentStatus, PaymentProvider, UserRole } from '@prisma/client';
+import { PaymentProvider, PaymentRefundStatus, PaymentStatus, UserRole } from '@prisma/client';
 import { AuthenticatedRequest } from '../../auth/types/safe-user';
 
 // Mock implementations
 const mockPaymentsService = {
   create: jest.fn(),
   findAll: jest.fn(),
+  findAllForParticipant: jest.fn(),
   findOne: jest.fn(),
   findOneWithOwnershipCheck: jest.fn(),
   update: jest.fn(),
@@ -145,6 +146,66 @@ describe('PaymentsController', () => {
       // Assert
       expect(mockPaymentsService.findAll).toHaveBeenCalledWith(0, 10, userId, status, undefined, undefined, undefined);
       expect(result).toEqual(mockResponse);
+    });
+  });
+
+  describe('findMyPayments', () => {
+    it('should call findAllForParticipant with the authenticated user ID', async () => {
+      // Given
+      const mockParticipantPayments = [
+        {
+          id: 'payment-1',
+          amount: 100,
+          refunds: [
+            {
+              id: 'refund-1',
+              paymentId: 'payment-1',
+              amountCents: 5000,
+              currency: 'USD',
+              status: PaymentRefundStatus.SUCCEEDED,
+              reason: 'Test refund',
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            },
+          ],
+        },
+      ];
+      const mockResponse = { payments: mockParticipantPayments, total: 1 };
+      const mockRequest = { user: { id: 'participant-user-id', role: UserRole.PARTICIPANT } } as AuthenticatedRequest;
+
+      mockPaymentsService.findAllForParticipant.mockResolvedValue(mockResponse);
+
+      // When
+      const result = await controller.findMyPayments(mockRequest);
+
+      // Then
+      expect(mockPaymentsService.findAllForParticipant).toHaveBeenCalledWith(
+        'participant-user-id',
+        undefined,
+        undefined,
+        undefined,
+      );
+      expect(mockPaymentsService.findAll).not.toHaveBeenCalled();
+      expect(result).toEqual(mockResponse);
+    });
+
+    it('should forward pagination and status filter parameters', async () => {
+      // Given
+      const mockResponse = { payments: [], total: 0 };
+      const mockRequest = { user: { id: 'participant-user-id', role: UserRole.PARTICIPANT } } as AuthenticatedRequest;
+
+      mockPaymentsService.findAllForParticipant.mockResolvedValue(mockResponse);
+
+      // When
+      await controller.findMyPayments(mockRequest, '5', '20', PaymentStatus.COMPLETED);
+
+      // Then
+      expect(mockPaymentsService.findAllForParticipant).toHaveBeenCalledWith(
+        'participant-user-id',
+        5,
+        20,
+        PaymentStatus.COMPLETED,
+      );
     });
   });
 

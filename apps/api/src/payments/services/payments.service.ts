@@ -32,6 +32,19 @@ type RefundablePayment = Payment & {
   refunds: PaymentRefund[];
 };
 
+type RefundAmounts = Pick<PaymentRefund, 'status' | 'amountCents'>;
+
+const PARTICIPANT_REFUND_SELECT = {
+  id: true,
+  paymentId: true,
+  amountCents: true,
+  currency: true,
+  status: true,
+  reason: true,
+  createdAt: true,
+  updatedAt: true,
+} as const;
+
 // Interface for PayPal link object
 interface PayPalLink {
   rel: string;
@@ -46,6 +59,21 @@ export interface PaymentOverview extends Payment {
   processorRefundAvailable: boolean;
   refunds: PaymentRefund[];
 }
+
+export interface ParticipantRefundView {
+  readonly id: string;
+  readonly paymentId: string;
+  readonly amountCents: number;
+  readonly currency: string;
+  readonly status: PaymentRefundStatus;
+  readonly reason: string | null;
+  readonly createdAt: Date;
+  readonly updatedAt: Date;
+}
+
+export type ParticipantPaymentOverview = Omit<PaymentOverview, 'refunds'> & {
+  readonly refunds: readonly ParticipantRefundView[];
+};
 
 // Interface for refund result
 export interface RefundResult {
@@ -113,13 +141,13 @@ export class PaymentsService {
     return amountCents / 100;
   }
 
-  private getSucceededRefundCents(refunds: PaymentRefund[] = []): number {
+  private getSucceededRefundCents(refunds: RefundAmounts[] = []): number {
     return refunds
       .filter((refund) => refund.status === PaymentRefundStatus.SUCCEEDED)
       .reduce((sum, refund) => sum + refund.amountCents, 0);
   }
 
-  private getReservedRefundCents(refunds: PaymentRefund[] = []): number {
+  private getReservedRefundCents(refunds: RefundAmounts[] = []): number {
     return refunds
       .filter((refund) => refund.status === PaymentRefundStatus.SUCCEEDED || refund.status === PaymentRefundStatus.PENDING)
       .reduce((sum, refund) => sum + refund.amountCents, 0);
@@ -181,7 +209,10 @@ export class PaymentsService {
     return PaymentRefundStatus.PENDING;
   }
 
-  private getPaymentOverview<T extends Payment & { refunds?: PaymentRefund[] }>(payment: T): T & PaymentOverview {
+  private getPaymentOverview<
+    TRefund extends RefundAmounts,
+    TPayment extends Payment & { refunds?: TRefund[] },
+  >(payment: TPayment): TPayment & Omit<PaymentOverview, 'refunds'> & { refunds: TRefund[] } {
     const amountCents = this.toCents(payment.amount);
     const succeededRefundCents = this.getSucceededRefundCents(payment.refunds ?? []);
     const reservedRefundCents = this.getReservedRefundCents(payment.refunds ?? []);
@@ -622,6 +653,60 @@ export class PaymentsService {
   }
 
   /**
+   * Find payments for the authenticated participant, with restricted refund field projection.
+   * Only user-facing refund fields are returned; internal fields (processedByUserId,
+   * providerRefundId, processorRefund, resultingRegistrationStatus) are excluded.
+   * Use this instead of findAll when the caller is a non-admin participant.
+   * @param userId - ID of the authenticated participant (must be pre-validated from the request)
+   * @param skip - Number of records to skip (pagination)
+   * @param take - Number of records to take (pagination)
+   * @param status - Filter by payment status
+   * @returns Paginated list of participant-scoped payments with restricted refund fields
+   */
+  async findAllForParticipant(
+    userId: string,
+    skip = 0,
+    take = 10,
+    status?: PaymentStatus,
+  ): Promise<{ payments: ParticipantPaymentOverview[]; total: number }> {
+    const where: Prisma.PaymentWhereInput = { userId };
+
+    if (status) {
+      where.status = status;
+    }
+
+    const [payments, total] = await Promise.all([
+      this.prisma.payment.findMany({
+        where,
+        skip,
+        take,
+        include: {
+          user: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+            },
+          },
+          registration: true,
+          refunds: {
+            select: PARTICIPANT_REFUND_SELECT,
+            orderBy: { createdAt: 'desc' },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.payment.count({ where }),
+    ]);
+
+    return {
+      payments: payments.map((payment) => this.getPaymentOverview(payment)),
+      total,
+    };
+  }
+
+  /**
    * Find one payment by ID
    * @param id - Payment ID
    * @returns The payment, if found
@@ -787,44 +872,69 @@ export class PaymentsService {
   }
 
   /**
-   * Record a manual payment (e.g., cash, check)
+   * Record a manual payment (e.g., cash, check).
    * @param data - Manual payment data
+   * @param recordedByUserId - ID of the admin recording the payment
    * @returns The created payment
    */
   async recordManualPayment(data: RecordManualPaymentDto, recordedByUserId: string): Promise<Payment> {
     const finalStatus = data.status ?? PaymentStatus.COMPLETED;
 
-    // Create the payment record with its final status in a single write so that no
-    // durable PENDING record is ever left without an audit trail if a subsequent
-    // operation fails.
-    const payment = await this.create(
-      {
-        amount: data.amount,
-        currency: data.currency,
-        provider: PaymentProvider.MANUAL,
-        userId: data.userId,
-        registrationId: data.registrationId,
-        externalPaymentMethod: data.externalPaymentMethod,
-        externalPaymentReference: data.reference,
-      },
-      recordedByUserId,
-      finalStatus,
-    );
+    this.validateSupportedAmountCents(this.toCents(data.amount), 'Payment');
 
-    // When a manual payment is recorded as COMPLETED against a registration,
-    // mark the registration paid: status CONFIRMED, paymentDeferred=false.
-    // This also closes out any deferred registrations that an admin records
-    // a manual payment for.
-    if (data.registrationId && finalStatus === PaymentStatus.COMPLETED) {
-      try {
-        await this.markRegistrationPaid(data.registrationId);
-      } catch (error: unknown) {
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        this.logger.warn(
-          `Failed to mark registration ${data.registrationId} paid after manual payment ${payment.id}: ${errorMessage}`,
+    this.logger.log(`Recording manual payment for user ${data.userId}`);
+
+    const payment = await this.prisma.$transaction(async (tx) => {
+      const user = await tx.user.findUnique({ where: { id: data.userId } });
+      if (!user) {
+        throw new NotFoundException(`User with ID ${data.userId} not found`);
+      }
+
+      const registration = data.registrationId
+        ? await tx.registration.findUnique({ where: { id: data.registrationId } })
+        : null;
+      if (data.registrationId && !registration) {
+        throw new NotFoundException(`Registration with ID ${data.registrationId} not found`);
+      }
+      if (registration && registration.userId !== data.userId) {
+        throw new BadRequestException('Registration does not belong to the specified user');
+      }
+      if (registration && isApplicationStatus(registration.status)) {
+        throw new BadRequestException(
+          'Cannot process payment for a registration that has not completed the application process',
         );
       }
-    }
+
+      const createdPayment = await tx.payment.create({
+        data: {
+          amount: data.amount,
+          currency: data.currency || 'USD',
+          status: finalStatus,
+          provider: PaymentProvider.MANUAL,
+          externalPaymentMethod: data.externalPaymentMethod,
+          externalPaymentReference: data.reference,
+          user: { connect: { id: data.userId } },
+          recordedBy: { connect: { id: recordedByUserId } },
+          ...(data.registrationId && {
+            registration: { connect: { id: data.registrationId } },
+          }),
+        },
+      });
+
+      if (registration && finalStatus === PaymentStatus.COMPLETED) {
+        const targetStatus =
+          registration.status === RegistrationStatus.WAITLISTED ||
+          registration.status === RegistrationStatus.CANCELLED
+            ? registration.status
+            : RegistrationStatus.CONFIRMED;
+        await tx.registration.update({
+          where: { id: registration.id },
+          data: { status: targetStatus, paymentDeferred: false },
+        });
+      }
+
+      return createdPayment;
+    });
 
     await this.adminAuditService.createAuditRecord({
       adminUserId: recordedByUserId,
@@ -846,39 +956,6 @@ export class PaymentsService {
     });
 
     return payment;
-  }
-
-  /**
-   * Mark a registration as paid: clear `paymentDeferred` and set status
-   * to CONFIRMED — UNLESS the registration is currently WAITLISTED or
-   * CANCELLED, in which case its status is preserved. Payment does not buy
-   * a slot the user can't have or reactivate a cancelled registration.
-   * The WAITLISTED case is
-   * unreachable for participants through normal UI but possible via
-   * direct API call or a TOCTOU race against capacity; mirrors the same
-   * guard in `verifyStripeSession`.
-   *
-   * Idempotent — safe to call multiple times. Called from every
-   * successful payment-completion path (today: Stripe verification path
-   * and `recordManualPayment`; any future payment provider should call
-   * this too) so the registration is always brought to a consistent
-   * paid state when a payment lands.
-   */
-  private async markRegistrationPaid(registrationId: string): Promise<void> {
-    const current = await this.prisma.registration.findUnique({
-      where: { id: registrationId },
-      select: { status: true },
-    });
-    if (!current) return;
-    const targetStatus =
-      current.status === RegistrationStatus.WAITLISTED ||
-      current.status === RegistrationStatus.CANCELLED
-        ? current.status
-        : RegistrationStatus.CONFIRMED;
-    await this.prisma.registration.update({
-      where: { id: registrationId },
-      data: { status: targetStatus, paymentDeferred: false },
-    });
   }
 
   /**
@@ -1148,7 +1225,18 @@ export class PaymentsService {
           );
           processorRefundSubmitted = true;
         } catch (error: unknown) {
-          processorRefundSubmitted = error instanceof StripeRefundError && error.possiblySubmitted;
+          if (error instanceof StripeRefundError && error.possiblySubmitted) {
+            this.logger.warn(
+              `Stripe refund submission outcome is ambiguous for refund ${pendingRefund.id}; leaving it PENDING for reconciliation: ${error.message}`,
+            );
+            return {
+              paymentId: paymentForProcessor.id,
+              refundAmount: this.toDollars(pendingRefund.amountCents),
+              providerRefundId: pendingRefund.id,
+              success: false,
+              refundStatus: PaymentRefundStatus.PENDING,
+            };
+          }
           throw error;
         }
 
