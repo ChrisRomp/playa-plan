@@ -1215,4 +1215,37 @@ describe('AdminPaymentsPage', () => {
       expect(screen.getAllByText('€85.50 EUR').length).toBeGreaterThan(0);
     });
   });
+
+  describe('Year classification for unlinked payments', () => {
+    it('should use UTC year not local year for year dropdown and client-side filtering', async () => {
+      const getFullYearSpy = vi.spyOn(Date.prototype, 'getFullYear').mockReturnValue(2024);
+
+      const newYearPayment: Payment = {
+        ...mockPayments[0],
+        registrationId: null,
+        registration: null,
+        createdAt: '2025-01-01T00:30:00Z',
+      };
+
+      vi.mocked(reports.getPayments).mockResolvedValue([newYearPayment]);
+      renderComponent();
+
+      await screen.findByTestId('payment-payment1');
+
+      fireEvent.click(screen.getByText('Filters'));
+      const yearSelect = await screen.findByLabelText('Year');
+      const yearOptions = Array.from((yearSelect as HTMLSelectElement).options)
+        .map(opt => opt.value)
+        .filter(v => v !== '');
+
+      expect(yearOptions).toContain('2025');
+      expect(yearOptions).not.toContain('2024');
+
+      fireEvent.change(yearSelect, { target: { value: '2025' } });
+      expect(screen.getByTestId('payment-payment1')).toBeInTheDocument();
+
+      getFullYearSpy.mockRestore();
+    });
+  });
+
 });

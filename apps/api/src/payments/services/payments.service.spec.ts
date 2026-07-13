@@ -5,7 +5,7 @@ import { PaypalService } from './paypal.service';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { NotificationsService } from '../../notifications/services/notifications.service';
 import { AdminAuditService } from '../../admin-audit/services/admin-audit.service';
-import { PaymentProvider, PaymentRefundStatus, PaymentStatus, RegistrationStatus } from '@prisma/client';
+import { PaymentProvider, PaymentRefundStatus, PaymentStatus, RegistrationStatus, UserRole } from '@prisma/client';
 import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { PAYMENT_AMOUNT_LIMITS } from '../constants/payment-amount-limits.constants';
 
@@ -643,6 +643,80 @@ describe('PaymentsService', () => {
 
       // Execute & Assert
       await expect(service.findOne(paymentId)).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('findOneWithOwnershipCheck', () => {
+    const paymentId = 'payment-id';
+    const ownerId = 'owner-user-id';
+    const participantRefund = {
+      id: 'refund-1',
+      paymentId,
+      amountCents: 5000,
+      currency: 'USD',
+      status: PaymentRefundStatus.SUCCEEDED,
+      reason: 'Customer request',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    const paymentWithInternalRefund = {
+      id: paymentId,
+      amount: 100,
+      status: PaymentStatus.PARTIALLY_REFUNDED,
+      provider: PaymentProvider.STRIPE,
+      providerRefId: 'pi_test_123',
+      userId: ownerId,
+      refunds: [{
+        ...participantRefund,
+        processedByUserId: 'admin-id',
+        providerRefundId: 're_stripe_123',
+        processorRefund: true,
+        resultingRegistrationStatus: null,
+      }],
+      registration: null,
+      user: { id: ownerId, firstName: 'Alice', lastName: 'Smith', email: 'alice@example.com' },
+    };
+
+    it('should remove internal refund fields from a participant-owned payment', async () => {
+      mockPrismaService.payment.findUnique.mockResolvedValue(paymentWithInternalRefund);
+
+      const actualPayment = await service.findOneWithOwnershipCheck(
+        paymentId,
+        ownerId,
+        UserRole.PARTICIPANT,
+      );
+
+      expect(actualPayment.refunds).toEqual([participantRefund]);
+    });
+
+    it('should retain internal refund fields for an admin', async () => {
+      mockPrismaService.payment.findUnique.mockResolvedValue(paymentWithInternalRefund);
+
+      const actualPayment = await service.findOneWithOwnershipCheck(
+        paymentId,
+        'admin-user-id',
+        UserRole.ADMIN,
+      );
+
+      expect(actualPayment.refunds?.[0]).toHaveProperty('providerRefundId');
+      expect(actualPayment.refunds?.[0]).toHaveProperty('processedByUserId');
+    });
+
+    it('should conceal another user\'s payment from a participant', async () => {
+      mockPrismaService.payment.findUnique.mockResolvedValue(paymentWithInternalRefund);
+
+      await expect(
+        service.findOneWithOwnershipCheck(paymentId, 'other-user-id', UserRole.PARTICIPANT),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should reject a missing payment', async () => {
+      mockPrismaService.payment.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.findOneWithOwnershipCheck(paymentId, ownerId, UserRole.PARTICIPANT),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 

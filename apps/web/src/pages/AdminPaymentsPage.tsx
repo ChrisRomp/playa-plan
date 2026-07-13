@@ -76,7 +76,7 @@ const getPendingRefundAmount = (payment: Payment): number =>
     .reduce((sum, refund) => sum + refund.amountCents / 100, 0);
 
 const getPaymentReportYear = (payment: Payment): number =>
-  payment.registration?.year ?? new Date(payment.createdAt).getFullYear();
+  payment.registration?.year ?? new Date(payment.createdAt).getUTCFullYear();
 
 const canSubmitRefund = (payment: Payment): boolean =>
   getRefundableAmount(payment) > 0 &&

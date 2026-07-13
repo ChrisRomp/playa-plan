@@ -99,7 +99,7 @@ export class PaymentsController {
 
   @Put(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('ADMIN')
+  @Roles(UserRole.ADMIN)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update payment' })
   @ApiParam({ name: 'id', required: true, description: 'Payment ID' })
@@ -115,7 +115,7 @@ export class PaymentsController {
 
   @Post('manual')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('ADMIN')
+  @Roles(UserRole.ADMIN)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Record a manual payment (e.g., cash, check)' })
   @ApiResponse({ status: 201, description: 'Manual payment recorded successfully' })
@@ -152,7 +152,7 @@ export class PaymentsController {
 
   @Post('refund')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('ADMIN')
+  @Roles(UserRole.ADMIN)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Process a refund' })
   @ApiResponse({ status: 201, description: 'Refund processed successfully' })
@@ -167,7 +167,7 @@ export class PaymentsController {
 
   @Post(':id/reconcile-refund')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('ADMIN')
+  @Roles(UserRole.ADMIN)
   @ApiBearerAuth()
   @ApiOperation({
     summary:
@@ -187,7 +187,7 @@ export class PaymentsController {
 
   @Post('link/:paymentId/registration/:registrationId')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('ADMIN')
+  @Roles(UserRole.ADMIN)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Link a payment to a registration' })
   @ApiParam({ name: 'paymentId', required: true, description: 'Payment ID' })

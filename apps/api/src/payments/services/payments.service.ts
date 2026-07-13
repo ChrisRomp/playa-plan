@@ -75,6 +75,12 @@ export type ParticipantPaymentOverview = Omit<PaymentOverview, 'refunds'> & {
   readonly refunds: readonly ParticipantRefundView[];
 };
 
+export type ParticipantPaymentDetail = Payment & {
+  user?: { id: string; firstName: string; lastName: string; email: string } | null;
+  registration?: Registration | null;
+  refunds: readonly ParticipantRefundView[];
+};
+
 // Interface for refund result
 export interface RefundResult {
   paymentId: string;
@@ -744,7 +750,13 @@ export class PaymentsService {
    * @param userRole - Current user role
    * @returns The payment, if found and user has access
    */
-  async findOneWithOwnershipCheck(id: string, userId: string, userRole: UserRole): Promise<PaymentWithRelations> {
+  async findOneWithOwnershipCheck(
+    id: string,
+    userId: string,
+    userRole: UserRole,
+  ): Promise<PaymentWithRelations | ParticipantPaymentDetail> {
+    const isPrivileged = userRole === UserRole.ADMIN || userRole === UserRole.STAFF;
+
     const payment = await this.prisma.payment.findUnique({
       where: { id },
       include: {
@@ -766,13 +778,28 @@ export class PaymentsService {
     if (!payment) {
       throw new NotFoundException(`Payment with ID ${id} not found`);
     }
-    
-    // Check ownership - only admins/staff can view any payment, others can only view their own
-    if (userRole !== UserRole.ADMIN && userRole !== UserRole.STAFF && payment.userId !== userId) {
+
+    if (!isPrivileged && payment.userId !== userId) {
       throw new NotFoundException(`Payment with ID ${id} not found`); // Don't reveal that payment exists
     }
-    
-    return payment;
+
+    if (isPrivileged) {
+      return payment;
+    }
+
+    return {
+      ...payment,
+      refunds: payment.refunds.map((refund) => ({
+        id: refund.id,
+        paymentId: refund.paymentId,
+        amountCents: refund.amountCents,
+        currency: refund.currency,
+        status: refund.status,
+        reason: refund.reason,
+        createdAt: refund.createdAt,
+        updatedAt: refund.updatedAt,
+      })),
+    };
   }
 
   private isRefundDerivedStatus(status: PaymentStatus): boolean {
