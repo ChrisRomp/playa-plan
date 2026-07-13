@@ -200,18 +200,41 @@ export class PaymentsService {
   private async finalizeProcessorRefund(
     refund: PaymentRefund,
     providerRefund: ProviderRefund,
-  ): Promise<RefundFinalization> {
+  ): Promise<RefundFinalization | null> {
     const previousRefundStatus = refund.status;
     const providerRefundStatus = this.getRefundStatusFromProviderStatus(providerRefund.status);
+    const pendingRefundWhere: Prisma.PaymentRefundWhereInput = {
+      id: refund.id,
+      status: PaymentRefundStatus.PENDING,
+      ...(providerRefundStatus === PaymentRefundStatus.PENDING && {
+        OR: [
+          { providerRefundId: null },
+          { providerRefundId: { not: providerRefund.id } },
+        ],
+      }),
+    };
 
     return this.prisma.$transaction(async (tx) => {
-      const finalizedRefund = await tx.paymentRefund.update({
-        where: { id: refund.id },
+      const { count } = await tx.paymentRefund.updateMany({
+        where: pendingRefundWhere,
         data: {
           status: providerRefundStatus,
           providerRefundId: providerRefund.id,
         },
       });
+
+      if (count === 0) {
+        // Another request already finalized this refund or recorded the same pending
+        // provider state, so do not duplicate side effects or audit records.
+        return null;
+      }
+
+      const finalizedRefund: PaymentRefund = {
+        ...refund,
+        status: providerRefundStatus,
+        providerRefundId: providerRefund.id,
+      };
+
       const payment = await tx.payment.findUnique({
         where: { id: refund.paymentId },
         include: {
@@ -359,6 +382,12 @@ export class PaymentsService {
       }
 
       const finalization = await this.finalizeProcessorRefund(refund, providerRefund);
+      if (finalization === null) {
+        this.logger.debug(
+          `Refund state for ${refund.id} was already applied; skipping audit`,
+        );
+        continue;
+      }
       await this.createRefundAudit(finalization, `refund-reconcile-${refund.id}`);
       reconciledRefundIds.push(refund.id);
     }
@@ -1098,7 +1127,7 @@ export class PaymentsService {
           throw error;
         }
 
-        let finalization: RefundFinalization;
+        let finalization: RefundFinalization | null;
         try {
           finalization = await this.finalizeProcessorRefund(pendingRefund, providerRefund);
         } catch (error: unknown) {
@@ -1106,6 +1135,19 @@ export class PaymentsService {
           this.logger.error(
             `Stripe refund ${providerRefund.id} was submitted but local finalization failed: ${errorMessage}`,
             error instanceof Error ? error.stack : undefined,
+          );
+          return {
+            paymentId: paymentForProcessor.id,
+            refundAmount: this.toDollars(pendingRefund.amountCents),
+            providerRefundId: providerRefund.id,
+            success: false,
+            refundStatus: PaymentRefundStatus.PENDING,
+          };
+        }
+
+        if (finalization === null) {
+          this.logger.warn(
+            `Refund state for ${pendingRefund.id} was already applied`,
           );
           return {
             paymentId: paymentForProcessor.id,

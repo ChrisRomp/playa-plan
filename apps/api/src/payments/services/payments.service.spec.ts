@@ -21,6 +21,7 @@ const mockPrismaService = {
   paymentRefund: {
     create: jest.fn(),
     update: jest.fn(),
+    updateMany: jest.fn(),
   },
   user: {
     findUnique: jest.fn(),
@@ -158,6 +159,7 @@ describe('PaymentsService', () => {
       createdAt: new Date(),
       updatedAt: new Date(),
     }));
+    mockPrismaService.paymentRefund.updateMany.mockResolvedValue({ count: 1 });
   });
 
   it('should be defined', () => {
@@ -1084,7 +1086,7 @@ describe('PaymentsService', () => {
         providerRefundId: null,
       });
       mockStripeService.createRefund.mockResolvedValue({ id: 're_stripe123', status: 'succeeded' });
-      mockPrismaService.paymentRefund.update.mockResolvedValueOnce(succeededRefund);
+      mockPrismaService.paymentRefund.updateMany.mockResolvedValueOnce({ count: 1 });
 
       const result = await service.processRefund({
         paymentId: 'payment-id',
@@ -1178,7 +1180,7 @@ describe('PaymentsService', () => {
         providerRefundId: null,
       });
       mockStripeService.createRefund.mockResolvedValue({ id: 're_stripe123', status: 'pending' });
-      mockPrismaService.paymentRefund.update.mockResolvedValueOnce(pendingRefund);
+      mockPrismaService.paymentRefund.updateMany.mockResolvedValueOnce({ count: 1 });
 
       const result = await service.processRefund({
         paymentId: 'payment-id',
@@ -1186,8 +1188,15 @@ describe('PaymentsService', () => {
         reason: 'Pending refund',
       }, 'admin-id');
 
-      expect(mockPrismaService.paymentRefund.update).toHaveBeenCalledWith({
-        where: { id: 'refund-id' },
+      expect(mockPrismaService.paymentRefund.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: 'refund-id',
+          status: PaymentRefundStatus.PENDING,
+          OR: [
+            { providerRefundId: null },
+            { providerRefundId: { not: 're_stripe123' } },
+          ],
+        },
         data: {
           status: PaymentRefundStatus.PENDING,
           providerRefundId: 're_stripe123',
@@ -1255,7 +1264,7 @@ describe('PaymentsService', () => {
           refunds: [succeededRefund],
         });
       mockStripeService.findRefundByMetadata.mockResolvedValueOnce({ id: 're_reconciled', status: 'succeeded' });
-      mockPrismaService.paymentRefund.update.mockResolvedValueOnce(succeededRefund);
+      mockPrismaService.paymentRefund.updateMany.mockResolvedValueOnce({ count: 1 });
 
       await expect(service.processRefund({
         paymentId: 'payment-id',
@@ -1268,8 +1277,8 @@ describe('PaymentsService', () => {
         'pending-refund-id',
       );
       expect(mockStripeService.createRefund).not.toHaveBeenCalled();
-      expect(mockPrismaService.paymentRefund.update).toHaveBeenCalledWith({
-        where: { id: 'pending-refund-id' },
+      expect(mockPrismaService.paymentRefund.updateMany).toHaveBeenCalledWith({
+        where: { id: 'pending-refund-id', status: PaymentRefundStatus.PENDING },
         data: {
           status: PaymentRefundStatus.SUCCEEDED,
           providerRefundId: 're_reconciled',
@@ -1322,7 +1331,7 @@ describe('PaymentsService', () => {
         });
       mockStripeService.findRefundByMetadata.mockResolvedValueOnce(null);
       mockStripeService.createRefund.mockResolvedValueOnce({ id: 're_retried', status: 'succeeded' });
-      mockPrismaService.paymentRefund.update.mockResolvedValueOnce(reconciledRefund);
+      mockPrismaService.paymentRefund.updateMany.mockResolvedValueOnce({ count: 1 });
 
       await expect(service.processRefund({
         paymentId: 'payment-id',
@@ -1344,8 +1353,8 @@ describe('PaymentsService', () => {
           paymentId: 'payment-id',
         },
       );
-      expect(mockPrismaService.paymentRefund.update).toHaveBeenCalledWith({
-        where: { id: 'pending-refund-id' },
+      expect(mockPrismaService.paymentRefund.updateMany).toHaveBeenCalledWith({
+        where: { id: 'pending-refund-id', status: PaymentRefundStatus.PENDING },
         data: {
           status: PaymentRefundStatus.SUCCEEDED,
           providerRefundId: 're_retried',
@@ -1448,7 +1457,7 @@ describe('PaymentsService', () => {
           refunds: [priorSucceededRefund, reconciledRefund],
         });
       mockStripeService.retrieveRefund.mockResolvedValueOnce({ id: 're_pending', status: 'succeeded' });
-      mockPrismaService.paymentRefund.update.mockResolvedValueOnce(reconciledRefund);
+      mockPrismaService.paymentRefund.updateMany.mockResolvedValueOnce({ count: 1 });
 
       await expect(service.processRefund({
         paymentId: 'payment-id',
@@ -1457,8 +1466,8 @@ describe('PaymentsService', () => {
       }, 'admin-id')).rejects.toThrow('Refund amount exceeds remaining refundable balance');
 
       expect(mockStripeService.retrieveRefund).toHaveBeenCalledWith('re_pending');
-      expect(mockPrismaService.paymentRefund.update).toHaveBeenCalledWith({
-        where: { id: 'pending-refund-id' },
+      expect(mockPrismaService.paymentRefund.updateMany).toHaveBeenCalledWith({
+        where: { id: 'pending-refund-id', status: PaymentRefundStatus.PENDING },
         data: {
           status: PaymentRefundStatus.SUCCEEDED,
           providerRefundId: 're_pending',
@@ -1501,7 +1510,7 @@ describe('PaymentsService', () => {
         providerRefundId: null,
       });
       mockStripeService.createRefund.mockResolvedValue({ id: 're_stripe123', status: 'failed' });
-      mockPrismaService.paymentRefund.update.mockResolvedValueOnce(failedRefund);
+      mockPrismaService.paymentRefund.updateMany.mockResolvedValueOnce({ count: 1 });
 
       const result = await service.processRefund({
         paymentId: 'payment-id',
@@ -1510,8 +1519,8 @@ describe('PaymentsService', () => {
         resultingRegistrationStatus: RegistrationStatus.WAITLISTED,
       }, 'admin-id');
 
-      expect(mockPrismaService.paymentRefund.update).toHaveBeenCalledWith({
-        where: { id: 'refund-id' },
+      expect(mockPrismaService.paymentRefund.updateMany).toHaveBeenCalledWith({
+        where: { id: 'refund-id', status: PaymentRefundStatus.PENDING },
         data: {
           status: PaymentRefundStatus.FAILED,
           providerRefundId: 're_stripe123',
@@ -1874,7 +1883,7 @@ describe('PaymentsService', () => {
         providerRefundId: null,
       });
       mockStripeService.createRefund.mockResolvedValue({ id: 're_stripe123', status: 'succeeded' });
-      mockPrismaService.paymentRefund.update.mockResolvedValueOnce(succeededRefund);
+      mockPrismaService.paymentRefund.updateMany.mockResolvedValueOnce({ count: 1 });
 
       await service.processRefund({
         paymentId: 'payment-id',
@@ -2028,15 +2037,15 @@ describe('PaymentsService', () => {
           refunds: [succeededRefund],
         });
       mockStripeService.retrieveRefund.mockResolvedValueOnce({ id: 're_stripe123', status: 'succeeded' });
-      mockPrismaService.paymentRefund.update.mockResolvedValueOnce(succeededRefund);
+      mockPrismaService.paymentRefund.updateMany.mockResolvedValueOnce({ count: 1 });
 
       const result = await service.reconcilePendingRefund('payment-id');
 
       expect(mockStripeService.retrieveRefund).toHaveBeenCalledWith('re_stripe123');
       expect(mockStripeService.createRefund).not.toHaveBeenCalled();
       expect(mockPrismaService.paymentRefund.create).not.toHaveBeenCalled();
-      expect(mockPrismaService.paymentRefund.update).toHaveBeenCalledWith({
-        where: { id: 'pending-refund-id' },
+      expect(mockPrismaService.paymentRefund.updateMany).toHaveBeenCalledWith({
+        where: { id: 'pending-refund-id', status: PaymentRefundStatus.PENDING },
         data: {
           status: PaymentRefundStatus.SUCCEEDED,
           providerRefundId: 're_stripe123',
@@ -2105,7 +2114,55 @@ describe('PaymentsService', () => {
       const result = await service.reconcilePendingRefund('payment-id');
 
       expect(mockPrismaService.paymentRefund.update).not.toHaveBeenCalled();
+      expect(mockPrismaService.paymentRefund.updateMany).not.toHaveBeenCalled();
       expect(mockAdminAuditService.createAuditRecord).not.toHaveBeenCalled();
+      expect(result.reconciledRefundIds).toEqual([]);
+    });
+
+    it('should not audit a pending provider state that was already recorded', async () => {
+      const pendingRefund = {
+        id: 'pending-refund-id',
+        paymentId: 'payment-id',
+        amountCents: 10000,
+        currency: 'USD',
+        status: PaymentRefundStatus.PENDING,
+        processorRefund: true,
+        providerRefundId: 're_stripe123',
+        reason: 'Full refund',
+        resultingRegistrationStatus: null,
+        processedByUserId: 'admin-id',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      mockPrismaService.payment.findUnique
+        .mockResolvedValueOnce({ ...basePayment, refunds: [pendingRefund] })
+        .mockResolvedValueOnce({ ...basePayment, refunds: [pendingRefund] });
+      mockStripeService.retrieveRefund.mockResolvedValueOnce({
+        id: 're_stripe123',
+        status: 'pending',
+      });
+      mockPrismaService.paymentRefund.updateMany.mockResolvedValueOnce({ count: 0 });
+
+      const result = await service.reconcilePendingRefund('payment-id');
+
+      expect(mockPrismaService.paymentRefund.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: 'pending-refund-id',
+          status: PaymentRefundStatus.PENDING,
+          OR: [
+            { providerRefundId: null },
+            { providerRefundId: { not: 're_stripe123' } },
+          ],
+        },
+        data: {
+          status: PaymentRefundStatus.PENDING,
+          providerRefundId: 're_stripe123',
+        },
+      });
+      expect(mockAdminAuditService.createAuditRecord).not.toHaveBeenCalled();
+      expect(mockPrismaService.payment.update).not.toHaveBeenCalled();
+      expect(mockPrismaService.registration.update).not.toHaveBeenCalled();
       expect(result.reconciledRefundIds).toEqual([]);
     });
 
@@ -2179,9 +2236,9 @@ describe('PaymentsService', () => {
         .mockResolvedValueOnce({ id: 're_older', status: 'succeeded' })
         .mockResolvedValueOnce({ id: 're_newer', status: 'succeeded' });
 
-      mockPrismaService.paymentRefund.update
-        .mockResolvedValueOnce(succeededOlderRefund)
-        .mockResolvedValueOnce(succeededNewerRefund);
+      mockPrismaService.paymentRefund.updateMany
+        .mockResolvedValueOnce({ count: 1 })
+        .mockResolvedValueOnce({ count: 1 });
 
       // When
       const result = await service.reconcilePendingRefund('payment-id');
@@ -2204,6 +2261,46 @@ describe('PaymentsService', () => {
       });
 
       expect(result.reconciledRefundIds).toEqual(['refund-older', 'refund-newer']);
+    });
+
+    it('should skip finalization and audit when a concurrent request already finalized the refund', async () => {
+      // Given: a pending refund that Stripe reports as succeeded, but by the time the
+      // updateMany runs inside the transaction, another request has already moved it out
+      // of PENDING (count === 0).
+      const pendingRefund = {
+        id: 'pending-refund-id',
+        paymentId: 'payment-id',
+        amountCents: 10000,
+        currency: 'USD',
+        status: PaymentRefundStatus.PENDING,
+        processorRefund: true,
+        providerRefundId: 're_stripe123',
+        reason: 'Full refund',
+        resultingRegistrationStatus: null,
+        processedByUserId: 'admin-id',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      mockPrismaService.payment.findUnique
+        .mockResolvedValueOnce({ ...basePayment, refunds: [pendingRefund] })
+        .mockResolvedValueOnce({
+          ...basePayment,
+          status: PaymentStatus.REFUNDED,
+          refunds: [{ ...pendingRefund, status: PaymentRefundStatus.SUCCEEDED }],
+        });
+      mockStripeService.retrieveRefund.mockResolvedValueOnce({ id: 're_stripe123', status: 'succeeded' });
+      // Simulate another concurrent request winning: updateMany matches 0 rows
+      mockPrismaService.paymentRefund.updateMany.mockResolvedValueOnce({ count: 0 });
+
+      // When
+      const result = await service.reconcilePendingRefund('payment-id');
+
+      // Then: no audit is written and the refund is not in the reconciled list
+      expect(mockAdminAuditService.createAuditRecord).not.toHaveBeenCalled();
+      expect(mockPrismaService.payment.update).not.toHaveBeenCalled();
+      expect(mockPrismaService.registration.update).not.toHaveBeenCalled();
+      expect(result.reconciledRefundIds).toEqual([]);
     });
   });
 

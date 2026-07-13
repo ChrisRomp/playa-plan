@@ -9,11 +9,14 @@ export class FindPaymentsQueryDto {
   @IsOptional()
   @Type(() => Number)
   @IsInt()
+  @Min(0)
   skip?: number;
 
   @IsOptional()
   @Type(() => Number)
   @IsInt()
+  @Min(1)
+  @Max(10000)
   take?: number;
 
   @IsOptional()
