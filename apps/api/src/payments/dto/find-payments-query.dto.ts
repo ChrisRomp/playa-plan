@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsEnum, IsInt, IsOptional, IsString } from 'class-validator';
+import { IsEnum, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 import { PaymentProvider, PaymentStatus } from '@prisma/client';
 
 /**
@@ -35,5 +35,7 @@ export class FindPaymentsQueryDto {
   @IsOptional()
   @Type(() => Number)
   @IsInt({ message: 'Year must be an integer' })
+  @Min(2000)
+  @Max(2100)
   year?: number;
 }

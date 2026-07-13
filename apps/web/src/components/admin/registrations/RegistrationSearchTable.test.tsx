@@ -7,6 +7,7 @@ interface MockColumn {
   id: string;
   header: string;
   accessor: (row: unknown) => React.ReactNode;
+  Cell?: (props: { value: React.ReactNode; row: unknown }) => React.ReactNode;
 }
 
 // Mock the DataTable component
@@ -43,11 +44,14 @@ vi.mock('../../common/DataTable/DataTable', () => ({
                 onClick={() => onRowClick?.(row)}
                 data-testid={`table-row-${rowIndex}`}
               >
-                {columns.map((col, colIndex: number) => (
-                  <td key={colIndex} data-testid={`cell-${rowIndex}-${col.id}`}>
-                    <div>{col.accessor(row)}</div>
-                  </td>
-                ))}
+                {columns.map((col, colIndex: number) => {
+                  const value = col.accessor(row);
+                  return (
+                    <td key={colIndex} data-testid={`cell-${rowIndex}-${col.id}`}>
+                      <div>{col.Cell ? col.Cell({ value, row }) : value}</div>
+                    </td>
+                  );
+                })}
               </tr>
             ))}
           </tbody>
@@ -244,7 +248,7 @@ describe('RegistrationSearchTable', () => {
       render(<RegistrationSearchTable {...defaultProps} />);
 
       // First registration has payments totaling $200
-      expect(screen.getByText('$200.00')).toBeInTheDocument();
+      expect(screen.getByText('$200.00 USD')).toBeInTheDocument();
 
       // Second and third registrations have no payments - use getAllByText to handle multiple instances
       const noPaymentsElements = screen.getAllByText('No payments');
@@ -439,7 +443,31 @@ describe('RegistrationSearchTable', () => {
       );
 
       // Should count completed and partially refunded net payments.
-      expect(screen.getByText('$160.00')).toBeInTheDocument();
+      expect(screen.getByText('$160.00 USD')).toBeInTheDocument();
+    });
+
+    it('should render separate totals per currency without summing unlike currencies', () => {
+      const registrationWithMultipleCurrencies = [
+        {
+          ...mockRegistrations[0],
+          payments: [
+            { id: 'payment-1', amount: 100, currency: 'USD', status: 'COMPLETED' },
+            { id: 'payment-2', amount: 50, currency: 'EUR', status: 'COMPLETED' },
+          ],
+        },
+      ];
+
+      render(
+        <RegistrationSearchTable
+          {...defaultProps}
+          registrations={registrationWithMultipleCurrencies}
+        />
+      );
+
+      // Each currency should be displayed as its own total, not combined.
+      expect(screen.getByText('$100.00 USD')).toBeInTheDocument();
+      expect(screen.getByText('€50.00 EUR')).toBeInTheDocument();
+      expect(screen.queryByText('$150.00')).not.toBeInTheDocument();
     });
 
     it('should handle registrations with zero payment amounts', () => {
@@ -454,7 +482,7 @@ describe('RegistrationSearchTable', () => {
         <RegistrationSearchTable {...defaultProps} registrations={registrationWithZeroPayments} />
       );
 
-      expect(screen.getByText('$0.00')).toBeInTheDocument();
+      expect(screen.getByText('$0.00 USD')).toBeInTheDocument();
     });
 
     it('should handle users without playa names', () => {
@@ -560,7 +588,7 @@ describe('RegistrationSearchTable', () => {
       );
 
       // 123.45 + 67.89 = 191.34
-      expect(screen.getByText('$191.34')).toBeInTheDocument();
+      expect(screen.getByText('$191.34 USD')).toBeInTheDocument();
     });
 
     it('should handle different year values correctly', () => {

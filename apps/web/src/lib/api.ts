@@ -497,6 +497,11 @@ export interface RefundResult {
   refundStatus?: 'PENDING' | 'SUCCEEDED' | 'FAILED';
 }
 
+export interface ReconcileRefundResult {
+  payment: Payment;
+  reconciledRefundIds: string[];
+}
+
 // Registration interface
 export interface Registration {
   id: string;
@@ -1393,6 +1398,21 @@ export const reports = {
       return response.data;
     } catch (error) {
       console.error('Error processing payment refund:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Reconcile a payment's pending processor (Stripe) refund(s) against the payment provider
+   * without creating another local refund. Use when a refund was left pending locally but may
+   * have since succeeded or failed at the processor.
+   */
+  reconcileRefund: async (paymentId: string): Promise<ReconcileRefundResult> => {
+    try {
+      const response = await api.post<ReconcileRefundResult>(`/payments/${paymentId}/reconcile-refund`);
+      return response.data;
+    } catch (error) {
+      console.error('Error reconciling payment refund:', error);
       throw error;
     }
   },

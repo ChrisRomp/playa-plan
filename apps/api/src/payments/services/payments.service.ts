@@ -71,6 +71,14 @@ interface RefundFinalization {
   readonly nextStatus: PaymentStatus;
   readonly previousRefundedCents: number;
   readonly appliedRegistrationStatus?: RegistrationStatus;
+  /** Refund lifecycle status prior to this finalization, when one existed (e.g. PENDING). */
+  readonly previousRefundStatus?: PaymentRefundStatus;
+}
+
+// Result of reconciling pending processor refunds without submitting a new refund.
+export interface RefundReconciliationResult {
+  readonly payment: PaymentOverview;
+  readonly reconciledRefundIds: readonly string[];
 }
 
 /**
@@ -193,6 +201,7 @@ export class PaymentsService {
     refund: PaymentRefund,
     providerRefund: ProviderRefund,
   ): Promise<RefundFinalization> {
+    const previousRefundStatus = refund.status;
     const providerRefundStatus = this.getRefundStatusFromProviderStatus(providerRefund.status);
 
     return this.prisma.$transaction(async (tx) => {
@@ -245,6 +254,7 @@ export class PaymentsService {
         nextStatus,
         previousRefundedCents,
         appliedRegistrationStatus,
+        previousRefundStatus,
       };
     }, {
       isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
@@ -263,12 +273,19 @@ export class PaymentsService {
       oldValues: {
         status: finalization.payment.status,
         refundedAmount: this.toDollars(finalization.previousRefundedCents),
+        ...(finalization.previousRefundStatus !== undefined && {
+          refundStatus: finalization.previousRefundStatus,
+        }),
       },
       newValues: {
         status: finalization.nextStatus,
         refundId: finalization.refund.id,
         refundAmount: this.toDollars(finalization.refund.amountCents),
         refundAmountCents: finalization.refund.amountCents,
+        // Lifecycle status of this specific refund (PENDING/SUCCEEDED/FAILED), distinct from
+        // the payment-level status above, so pending, succeeded, and failed submissions are
+        // distinguishable in the audit trail.
+        refundStatus: finalization.refund.status,
         providerRefundId:
           finalization.refund.providerRefundId ??
           (finalization.refund.processorRefund ? undefined : finalization.refund.id),
@@ -295,18 +312,20 @@ export class PaymentsService {
     }
   }
 
-  private async reconcilePendingProcessorRefunds(payment: RefundablePayment): Promise<void> {
+  private async reconcilePendingProcessorRefunds(payment: RefundablePayment): Promise<string[]> {
     const pendingRefunds = payment.refunds.filter(
       (refund) => refund.processorRefund && refund.status === PaymentRefundStatus.PENDING,
     );
 
     if (pendingRefunds.length === 0) {
-      return;
+      return [];
     }
 
     if (payment.provider !== PaymentProvider.STRIPE || !payment.providerRefId) {
-      return;
+      return [];
     }
+
+    const reconciledRefundIds: string[] = [];
 
     for (const refund of pendingRefunds) {
       let providerRefund = refund.providerRefundId
@@ -339,7 +358,59 @@ export class PaymentsService {
 
       const finalization = await this.finalizeProcessorRefund(refund, providerRefund);
       await this.createRefundAudit(finalization, `refund-reconcile-${refund.id}`);
+      reconciledRefundIds.push(refund.id);
     }
+
+    return reconciledRefundIds;
+  }
+
+  /**
+   * Reconcile any pending processor (Stripe) refunds for a payment against the payment
+   * provider without creating another local refund. If an ambiguous submission never reached
+   * Stripe, the persisted refund ID is reused as the idempotency key to retry that same request.
+   * This brings the payment, refund, and any linked registration state back in sync.
+   * @param paymentId - Payment whose pending processor refunds should be reconciled
+   * @returns The refreshed payment overview and the IDs of any refunds that were reconciled
+   */
+  async reconcilePendingRefund(paymentId: string): Promise<RefundReconciliationResult> {
+    const payment = await this.prisma.payment.findUnique({
+      where: { id: paymentId },
+      include: {
+        registration: true,
+        refunds: true,
+      },
+    });
+
+    if (!payment) {
+      throw new NotFoundException(`Payment with ID ${paymentId} not found`);
+    }
+
+    const hasPendingProcessorRefund = payment.refunds.some(
+      (refund) => refund.processorRefund && refund.status === PaymentRefundStatus.PENDING,
+    );
+
+    if (!hasPendingProcessorRefund) {
+      throw new BadRequestException('Payment has no pending processor refund to reconcile');
+    }
+
+    const reconciledRefundIds = await this.reconcilePendingProcessorRefunds(payment);
+
+    const refreshedPayment = await this.prisma.payment.findUnique({
+      where: { id: paymentId },
+      include: {
+        registration: true,
+        refunds: true,
+      },
+    });
+
+    if (!refreshedPayment) {
+      throw new NotFoundException(`Payment with ID ${paymentId} not found`);
+    }
+
+    return {
+      payment: this.getPaymentOverview(refreshedPayment),
+      reconciledRefundIds,
+    };
   }
 
   /**

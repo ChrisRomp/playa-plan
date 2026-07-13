@@ -100,6 +100,11 @@ const getRefundUnavailableMessage = (payment: Payment): string | undefined => {
   return undefined;
 };
 
+// A pending refund is only ever created for a processor (Stripe) refund submission, so its
+// presence means Stripe may have since finalized it without our record being updated.
+const hasPendingProcessorRefund = (payment: Payment): boolean =>
+  payment.provider === 'STRIPE' && getPendingRefundAmount(payment) > 0;
+
 /**
  * Payment administration page.
  * Supports externally recorded payments and full or partial refunds.
@@ -135,6 +140,7 @@ export function AdminPaymentsPage() {
   const [refundForm, setRefundForm] = useState<RefundFormState | null>(null);
   const [mutationError, setMutationError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [reconcilingPaymentId, setReconcilingPaymentId] = useState<string | null>(null);
   const hasLoadedPaymentsRef = useRef(false);
   const paymentsRequestIdRef = useRef(0);
   const externalPaymentRegistrationYear =
@@ -396,6 +402,25 @@ export function AdminPaymentsPage() {
     }
   };
 
+  const handleReconcileRefund = async (payment: Payment) => {
+    if (!hasPendingProcessorRefund(payment) || submitting || reconcilingPaymentId) {
+      return;
+    }
+
+    setReconcilingPaymentId(payment.id);
+    setMutationError(null);
+
+    try {
+      await reports.reconcileRefund(payment.id);
+      await fetchPayments();
+    } catch (err) {
+      setMutationError('Failed to reconcile pending refund');
+      console.error('Error reconciling refund:', err);
+    } finally {
+      setReconcilingPaymentId(null);
+    }
+  };
+
   // Define table columns
   const columns: DataTableColumn<Payment>[] = [
     {
@@ -516,9 +541,13 @@ export function AdminPaymentsPage() {
       header: 'Actions',
       accessor: () => '',
       Cell: ({ row }) => {
-        const refundDisabled = !canSubmitRefund(row) || submitting;
+        const refundDisabled =
+          !canSubmitRefund(row) || submitting || reconcilingPaymentId !== null;
         const refundUnavailableMessage = getRefundUnavailableMessage(row);
         const refundUnavailableMessageId = `refund-unavailable-${row.id}`;
+        const showReconcile = hasPendingProcessorRefund(row);
+        const reconcileDisabled = submitting || reconcilingPaymentId !== null;
+        const isReconcilingThisRow = reconcilingPaymentId === row.id;
         return (
           <div>
             <button
@@ -532,6 +561,17 @@ export function AdminPaymentsPage() {
             >
               Refund
             </button>
+            {showReconcile && (
+              <button
+                type="button"
+                onClick={() => handleReconcileRefund(row)}
+                disabled={reconcileDisabled}
+                title="Check Stripe for the current status of this existing pending refund without creating another local refund."
+                className="mt-1 block rounded-md border border-blue-700 px-3 py-1 text-sm font-medium text-blue-800 hover:bg-blue-50 disabled:cursor-not-allowed disabled:border-gray-200 disabled:text-gray-400"
+              >
+                {isReconcilingThisRow ? 'Reconciling...' : 'Reconcile'}
+              </button>
+            )}
             {refundUnavailableMessage && (
               <p id={refundUnavailableMessageId} className="mt-1 text-xs text-gray-600">
                 {refundUnavailableMessage}

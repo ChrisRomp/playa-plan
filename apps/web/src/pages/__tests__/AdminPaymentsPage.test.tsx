@@ -14,6 +14,7 @@ vi.mock('../../lib/api', () => ({
     getPayments: vi.fn(),
     recordExternalPayment: vi.fn(),
     processRefund: vi.fn(),
+    reconcileRefund: vi.fn(),
   },
 }));
 
@@ -660,6 +661,104 @@ describe('AdminPaymentsPage', () => {
       expect(refundButton).toBeDisabled();
       expect(refundButton).toHaveAttribute('aria-describedby', 'refund-unavailable-payment1');
       expect(screen.getByText('Stripe refunds are unavailable for this payment.')).toBeInTheDocument();
+    });
+
+    it('should not show a Reconcile action when there is no pending processor refund', async () => {
+      renderComponent();
+
+      await waitFor(() => {
+        expect(screen.getByTestId('payment-payment1')).toBeInTheDocument();
+      });
+
+      expect(screen.queryByRole('button', { name: /Reconcile/ })).not.toBeInTheDocument();
+    });
+
+    it('should show a Reconcile action for a Stripe payment with a pending processor refund', async () => {
+      vi.mocked(reports.getPayments).mockResolvedValue([
+        {
+          ...mockPayments[0],
+          refunds: [
+            {
+              id: 'refund-1',
+              paymentId: 'payment1',
+              amountCents: 15000,
+              currency: 'USD',
+              status: 'PENDING',
+              processorRefund: true,
+              createdAt: '2024-01-15T10:00:00Z',
+              updatedAt: '2024-01-15T10:00:00Z',
+            },
+          ],
+        },
+      ]);
+
+      renderComponent();
+
+      expect(await screen.findByRole('button', { name: 'Reconcile' })).toBeInTheDocument();
+    });
+
+    it('should reconcile a pending refund and refresh the payment list', async () => {
+      const pendingPayment: Payment = {
+        ...mockPayments[0],
+        refunds: [
+          {
+            id: 'refund-1',
+            paymentId: 'payment1',
+            amountCents: 15000,
+            currency: 'USD',
+            status: 'PENDING',
+            processorRefund: true,
+            createdAt: '2024-01-15T10:00:00Z',
+            updatedAt: '2024-01-15T10:00:00Z',
+          },
+        ],
+      };
+      vi.mocked(reports.getPayments).mockResolvedValue([pendingPayment]);
+      vi.mocked(reports.reconcileRefund).mockResolvedValue({
+        payment: { ...pendingPayment, refunds: [] },
+        reconciledRefundIds: ['refund-1'],
+      });
+
+      renderComponent();
+
+      const reconcileButton = await screen.findByRole('button', { name: 'Reconcile' });
+      fireEvent.click(reconcileButton);
+
+      await waitFor(() => {
+        expect(reports.reconcileRefund).toHaveBeenCalledWith('payment1');
+      });
+      await waitFor(() => {
+        expect(reports.getPayments).toHaveBeenCalledTimes(2);
+      });
+    });
+
+    it('should surface an error when reconciling a pending refund fails', async () => {
+      const pendingPayment: Payment = {
+        ...mockPayments[0],
+        refunds: [
+          {
+            id: 'refund-1',
+            paymentId: 'payment1',
+            amountCents: 15000,
+            currency: 'USD',
+            status: 'PENDING',
+            processorRefund: true,
+            createdAt: '2024-01-15T10:00:00Z',
+            updatedAt: '2024-01-15T10:00:00Z',
+          },
+        ],
+      };
+      vi.mocked(reports.getPayments).mockResolvedValue([pendingPayment]);
+      vi.mocked(reports.reconcileRefund).mockRejectedValue(new Error('Reconcile failed'));
+
+      renderComponent();
+
+      const reconcileButton = await screen.findByRole('button', { name: 'Reconcile' });
+      fireEvent.click(reconcileButton);
+
+      await waitFor(() => {
+        expect(screen.getByText('Failed to reconcile pending refund')).toBeInTheDocument();
+      });
     });
 
     it('should submit an explicit registration status change with a refund', async () => {

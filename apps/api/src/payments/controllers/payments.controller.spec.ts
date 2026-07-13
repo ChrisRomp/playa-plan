@@ -15,6 +15,7 @@ const mockPaymentsService = {
   initiateStripePayment: jest.fn(),
   initiatePaypalPayment: jest.fn(),
   processRefund: jest.fn(),
+  reconcilePendingRefund: jest.fn(),
   linkToRegistration: jest.fn(),
   handlePaypalWebhook: jest.fn(),
 };
@@ -327,6 +328,30 @@ describe('PaymentsController', () => {
 
       // Assert
       expect(mockPaymentsService.processRefund).toHaveBeenCalledWith(mockRefundDto, 'admin-id');
+      expect(result).toEqual(mockResponse);
+    });
+  });
+
+  describe('reconcileRefund', () => {
+    it('should reconcile pending processor refunds for a payment without creating a new refund', async () => {
+      // Mock data
+      const paymentId = 'payment-id';
+      const mockResponse = {
+        payment: {
+          id: paymentId,
+          status: PaymentStatus.REFUNDED,
+        },
+        reconciledRefundIds: ['refund-id'],
+      };
+
+      // Setup mocks
+      mockPaymentsService.reconcilePendingRefund.mockResolvedValue(mockResponse);
+
+      // Execute
+      const result = await controller.reconcileRefund(paymentId);
+
+      // Assert
+      expect(mockPaymentsService.reconcilePendingRefund).toHaveBeenCalledWith(paymentId);
       expect(result).toEqual(mockResponse);
     });
   });

@@ -48,7 +48,13 @@ interface Registration {
   payments: Array<{
     id: string;
     amount: number;
+    currency?: string;
     status: string;
+    netAmount?: number;
+    refunds?: Array<{
+      amountCents: number;
+      status: string;
+    }>;
   }>;
 }
 

@@ -165,6 +165,23 @@ export class PaymentsController {
     return this.paymentsService.processRefund(createRefundDto, req.user.id);
   }
 
+  @Post(':id/reconcile-refund')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary:
+      'Reconcile a payment\'s existing pending processor refund(s) against Stripe',
+  })
+  @ApiParam({ name: 'id', required: true, description: 'Payment ID' })
+  @ApiResponse({ status: 201, description: 'Reconciliation completed; refreshed payment returned' })
+  @ApiResponse({ status: 400, description: 'Payment has no pending processor refund to reconcile' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 404, description: 'Payment not found' })
+  async reconcileRefund(@Param('id', ParseUUIDPipe) id: string) {
+    return this.paymentsService.reconcilePendingRefund(id);
+  }
+
   @Post('link/:paymentId/registration/:registrationId')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')

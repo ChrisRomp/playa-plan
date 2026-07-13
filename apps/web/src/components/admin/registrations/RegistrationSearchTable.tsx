@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { CreditCard, Edit, Trash2, Eye } from 'lucide-react';
 import { DataTable, DataTableColumn } from '../../common/DataTable/DataTable';
 import { formatRegistrationStatus } from '../../../utils/registrationUtils';
+import { formatCurrency } from '../../../utils/currency';
 
 // TODO: Replace with actual API types when implemented
 interface Registration {
@@ -42,6 +43,7 @@ interface Registration {
   payments: Array<{
     id: string;
     amount: number;
+    currency?: string;
     status: string;
     netAmount?: number;
     refunds?: Array<{
@@ -69,6 +71,23 @@ interface RegistrationSearchTableProps {
   /** Custom empty message */
   emptyMessage?: string;
 }
+
+const getNetPaymentAmountsByCurrency = (
+  payments: Registration['payments'],
+): Record<string, number> =>
+  payments
+    .filter(payment =>
+      payment.status === 'COMPLETED' || payment.status === 'PARTIALLY_REFUNDED'
+    )
+    .reduce<Record<string, number>>((amounts, payment) => {
+      const refundedAmount = (payment.refunds ?? [])
+        .filter(refund => refund.status === 'SUCCEEDED')
+        .reduce((refundSum, refund) => refundSum + refund.amountCents / 100, 0);
+      const netAmount = payment.netAmount ?? Math.max(0, payment.amount - refundedAmount);
+      const currency = (payment.currency || 'USD').toUpperCase();
+      amounts[currency] = (amounts[currency] ?? 0) + netAmount;
+      return amounts;
+    }, {});
 
 /**
  * Reusable table component for displaying and managing registrations
@@ -165,17 +184,24 @@ export function RegistrationSearchTable({
         id: 'payments',
         header: 'Payment',
         accessor: (row) => {
-          const paidPayments = row.payments.filter(p => p.status === 'COMPLETED' || p.status === 'PARTIALLY_REFUNDED');
-          
-          if (paidPayments.length === 0) return 'No payments';
-          
-          const totalPaid = paidPayments.reduce((sum, p) => {
-            const refundedAmount = (p.refunds ?? [])
-              .filter(refund => refund.status === 'SUCCEEDED')
-              .reduce((refundSum, refund) => refundSum + (refund.amountCents / 100), 0);
-            return sum + (p.netAmount ?? Math.max(0, p.amount - refundedAmount));
-          }, 0);
-          return `$${totalPaid.toFixed(2)}`;
+          const amounts = Object.entries(getNetPaymentAmountsByCurrency(row.payments));
+          return amounts.length === 0
+            ? 'No payments'
+            : amounts
+                .map(([currency, amount]) => formatCurrency(amount, currency))
+                .join(', ');
+        },
+        Cell: ({ row }) => {
+          const amounts = Object.entries(getNetPaymentAmountsByCurrency(row.payments));
+          if (amounts.length === 0) return 'No payments';
+
+          return (
+            <div>
+              {amounts.map(([currency, amount]) => (
+                <div key={currency}>{formatCurrency(amount, currency)}</div>
+              ))}
+            </div>
+          );
         },
         sortable: false,
         hideOnMobile: true,
