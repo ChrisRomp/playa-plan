@@ -479,14 +479,14 @@ export interface RecordExternalPaymentRequest {
   registrationId?: string;
   externalPaymentMethod?: string;
   reference?: string;
-  status?: Payment['status'];
+  status?: 'PENDING' | 'COMPLETED' | 'FAILED';
 }
 
 export interface CreateRefundRequest {
   paymentId: string;
   amount?: number;
   reason?: string;
-  resultingRegistrationStatus?: Registration['status'];
+  resultingRegistrationStatus?: 'PENDING' | 'CONFIRMED' | 'WAITLISTED';
 }
 
 export interface RefundResult {

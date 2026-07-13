@@ -228,14 +228,14 @@ export interface RecordExternalPaymentRequest {
   registrationId?: string;
   externalPaymentMethod?: string;
   reference?: string;
-  status?: PaymentStatus;
+  status?: 'PENDING' | 'COMPLETED' | 'FAILED';
 }
 
 export interface CreateRefundRequest {
   paymentId: string;
   amount?: number;
   reason?: string;
-  resultingRegistrationStatus?: RegistrationStatus;
+  resultingRegistrationStatus?: 'PENDING' | 'CONFIRMED' | 'WAITLISTED';
 }
 
 export interface RefundResult {

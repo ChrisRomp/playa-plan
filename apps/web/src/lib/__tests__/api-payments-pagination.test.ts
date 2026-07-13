@@ -131,7 +131,7 @@ describe('reports.getPayments pagination fix', () => {
       paymentId: 'payment-1',
       amount: 42.5,
       reason: 'Camp fee adjustment',
-      resultingRegistrationStatus: 'CANCELLED' as const,
+      resultingRegistrationStatus: 'WAITLISTED' as const,
     };
 
     mockAxiosInstance.post.mockResolvedValue({ data: mockRefundResult });

@@ -64,7 +64,7 @@ export function PaymentReportsPage() {
     const years = [
       ...new Set(
         payments.map(
-          payment => payment.registration?.year ?? new Date(payment.createdAt).getFullYear()
+          payment => payment.registration?.year ?? new Date(payment.createdAt).getUTCFullYear()
         )
       ),
     ];
@@ -80,7 +80,7 @@ export function PaymentReportsPage() {
       // Year filter — use the linked registration year, falling back to payment timestamp
       if (filters.year) {
         const paymentYear =
-          payment.registration?.year ?? new Date(payment.createdAt).getFullYear();
+          payment.registration?.year ?? new Date(payment.createdAt).getUTCFullYear();
         if (paymentYear !== filters.year) return false;
       }
 

@@ -42,9 +42,7 @@ Monorepo layout:
 
 - **Do not work on `main`.** Create a task-specific branch.
 - **Sign all commits.** Do not bypass signing even if signing errors out — stop and ask.
-- **Do not push without explicit user authorization.** A request that expressly
-  includes pushing, including review-fix or CI workflows, counts as
-  authorization; otherwise leave pushing to the user.
+- **Do not push.** The user pushes.
 - When working from a checklist doc, check items off as you go and commit after each item.
 - Fix lint errors before committing.
 
