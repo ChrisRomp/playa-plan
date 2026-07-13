@@ -1139,7 +1139,8 @@ export function AdminPaymentsPage() {
                   className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
                 />
               </div>
-              {refundForm.payment.registrationId && (
+              {refundForm.payment.registrationId &&
+                refundForm.payment.registration?.status !== 'CANCELLED' && (
                 <div>
                   <label
                     htmlFor="refund-registration-status"

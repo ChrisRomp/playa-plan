@@ -125,6 +125,7 @@ describe('RegistrationAdminService', () => {
 
     const mockPaymentsService = {
       processRefund: jest.fn(),
+      reconcilePendingRefund: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -860,6 +861,136 @@ describe('RegistrationAdminService', () => {
       expect(Object.keys(result.totalsByCurrency)).toHaveLength(2);
       expect(result.message).toContain('100.00 USD');
       expect(result.message).toContain('200.00 EUR');
+    });
+
+    const buildExistingRefund = (status: PaymentRefundStatus) => ({
+      id: 'existing-refund-id',
+      paymentId: 'stripe-reserved',
+      amountCents: 10000,
+      currency: 'USD',
+      status,
+      processorRefund: true,
+      providerRefundId: 're_existing',
+      reason: 'Existing refund',
+      resultingRegistrationStatus: RegistrationStatus.CANCELLED,
+      processedByUserId: 'admin-123',
+      createdAt: new Date('2026-07-12T12:00:00Z'),
+      updatedAt: new Date('2026-07-12T12:00:00Z'),
+    });
+
+    const buildReconciledPayment = (
+      status: PaymentStatus,
+      refundStatus: PaymentRefundStatus,
+      refundableAmount: number,
+      refundedAmount: number,
+    ) => ({
+      id: 'stripe-reserved',
+      amount: 100,
+      currency: 'USD',
+      status,
+      provider: PaymentProvider.STRIPE,
+      providerRefId: 'pi_reserved123',
+      externalPaymentMethod: null,
+      externalPaymentReference: null,
+      recordedByUserId: null,
+      userId: 'user-123',
+      registrationId: 'reg-123',
+      createdAt: new Date('2026-07-12T11:00:00Z'),
+      updatedAt: new Date('2026-07-12T12:00:00Z'),
+      refundableAmount,
+      refundedAmount,
+      netAmount: 100 - refundedAmount,
+      processorRefundAvailable: refundableAmount > 0,
+      refunds: [buildExistingRefund(refundStatus)],
+    });
+
+    it('should reconcile an existing fully-reserved pending refund that remains pending without calling processRefund', async () => {
+      const inputPayment = {
+        id: 'stripe-reserved',
+        amount: 100,
+        currency: 'USD',
+        status: PaymentStatus.COMPLETED,
+        provider: PaymentProvider.STRIPE,
+        providerRefId: 'pi_reserved123',
+        refunds: [buildExistingRefund(PaymentRefundStatus.PENDING)],
+      };
+
+      paymentsService.reconcilePendingRefund.mockResolvedValue({
+        payment: buildReconciledPayment(
+          PaymentStatus.COMPLETED,
+          PaymentRefundStatus.PENDING,
+          0,
+          0,
+        ),
+        reconciledRefundIds: ['existing-refund-id'],
+      });
+
+      const result = await (service as unknown as { processAutoRefunds: (payments: unknown[], reason: string, adminUserId: string) => Promise<RefundInfo> }).processAutoRefunds([inputPayment], 'Test refund', 'admin-123');
+
+      expect(paymentsService.processRefund).not.toHaveBeenCalled();
+      expect(paymentsService.reconcilePendingRefund).toHaveBeenCalledWith('stripe-reserved');
+      expect(result.message).toContain('1 refund(s) submitted and pending processor confirmation');
+      expect(result.message).not.toContain('failed');
+      expect(result.refundedByCurrency).toBeUndefined();
+    });
+
+    it('should count as refunded when an existing fully-reserved pending refund is reconciled as succeeded', async () => {
+      const inputPayment = {
+        id: 'stripe-reserved',
+        amount: 100,
+        currency: 'USD',
+        status: PaymentStatus.COMPLETED,
+        provider: PaymentProvider.STRIPE,
+        providerRefId: 'pi_reserved123',
+        refunds: [buildExistingRefund(PaymentRefundStatus.PENDING)],
+      };
+
+      paymentsService.reconcilePendingRefund.mockResolvedValue({
+        payment: buildReconciledPayment(
+          PaymentStatus.REFUNDED,
+          PaymentRefundStatus.SUCCEEDED,
+          0,
+          100,
+        ),
+        reconciledRefundIds: ['existing-refund-id'],
+      });
+
+      const result = await (service as unknown as { processAutoRefunds: (payments: unknown[], reason: string, adminUserId: string) => Promise<RefundInfo> }).processAutoRefunds([inputPayment], 'Test refund', 'admin-123');
+
+      expect(paymentsService.processRefund).not.toHaveBeenCalled();
+      expect(paymentsService.reconcilePendingRefund).toHaveBeenCalledWith('stripe-reserved');
+      expect(result.refundedByCurrency?.['USD']).toBe(100);
+      expect(result.message).toContain('Automatically refunded 1 payment(s) totaling 100.00 USD');
+      expect(result.message).not.toContain('failed');
+    });
+
+    it('should report as failed when an existing fully-reserved pending refund is reconciled as failed', async () => {
+      const inputPayment = {
+        id: 'stripe-reserved',
+        amount: 100,
+        currency: 'USD',
+        status: PaymentStatus.COMPLETED,
+        provider: PaymentProvider.STRIPE,
+        providerRefId: 'pi_reserved123',
+        refunds: [buildExistingRefund(PaymentRefundStatus.PENDING)],
+      };
+
+      paymentsService.reconcilePendingRefund.mockResolvedValue({
+        payment: buildReconciledPayment(
+          PaymentStatus.COMPLETED,
+          PaymentRefundStatus.FAILED,
+          100,
+          0,
+        ),
+        reconciledRefundIds: ['existing-refund-id'],
+      });
+
+      const result = await (service as unknown as { processAutoRefunds: (payments: unknown[], reason: string, adminUserId: string) => Promise<RefundInfo> }).processAutoRefunds([inputPayment], 'Test refund', 'admin-123');
+
+      expect(paymentsService.processRefund).not.toHaveBeenCalled();
+      expect(paymentsService.reconcilePendingRefund).toHaveBeenCalledWith('stripe-reserved');
+      expect(result.message).toContain('1 automatic refund(s) failed and require manual processing');
+      expect(result.refundedByCurrency).toBeUndefined();
     });
   });
 

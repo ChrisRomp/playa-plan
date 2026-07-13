@@ -878,7 +878,7 @@ export class RegistrationAdminService {
    * @returns Updated refund information
    */
   private async processAutoRefunds(
-    payments: Array<{ id: string; amount: number; currency?: string; status: PaymentStatus; provider: PaymentProvider; providerRefId: string | null; refunds?: Array<{ amountCents: number; status: PaymentRefundStatus }> }>,
+    payments: Array<{ id: string; amount: number; currency?: string; status: PaymentStatus; provider: PaymentProvider; providerRefId: string | null; refunds?: Array<{ id: string; amountCents: number; status: PaymentRefundStatus }> }>,
     reason: string,
     adminUserId: string,
   ): Promise<RefundInfo> {
@@ -904,6 +904,68 @@ export class RegistrationAdminService {
     // Process automatic refunds for payment processor payments
     for (const payment of eligiblePayments) {
       const currency = this.normalizeCurrency(payment.currency);
+
+      const existingPendingRefunds = (payment.refunds ?? []).filter(
+        refund => refund.status === PaymentRefundStatus.PENDING,
+      );
+
+      // If existing pending refunds reserve the full remaining balance, reconcile those rows
+      // instead of attempting a second refund.
+      if (
+        existingPendingRefunds.length > 0 &&
+        this.getRemainingRefundableAmount(payment) === 0
+      ) {
+        try {
+          const { payment: reconciledPayment } =
+            await this.paymentsService.reconcilePendingRefund(payment.id);
+          const pendingRefundIds = new Set(existingPendingRefunds.map(refund => refund.id));
+          const reconciledRefunds = reconciledPayment.refunds.filter(
+            refund => pendingRefundIds.has(refund.id),
+          );
+          const succeededRefunds = reconciledRefunds.filter(
+            refund => refund.status === PaymentRefundStatus.SUCCEEDED,
+          );
+          const remainingPendingRefunds = reconciledRefunds.filter(
+            refund => refund.status === PaymentRefundStatus.PENDING,
+          );
+          const failedReconciliations = reconciledRefunds.filter(
+            refund => refund.status === PaymentRefundStatus.FAILED,
+          );
+          const missingRefundCount =
+            existingPendingRefunds.length - reconciledRefunds.length;
+          const succeededAmount = this.toDollars(
+            succeededRefunds.reduce((sum, refund) => sum + refund.amountCents, 0),
+          );
+
+          if (succeededRefunds.length > 0) {
+            refundedByCurrency[currency] =
+              (refundedByCurrency[currency] ?? 0) + succeededAmount;
+            refundedCount++;
+            this.logger.log(
+              `Reconciled pending refund for payment ${payment.id}: ${succeededAmount} ${currency}`,
+            );
+          }
+          if (remainingPendingRefunds.length > 0 || missingRefundCount > 0) {
+            pendingRefunds += remainingPendingRefunds.length + missingRefundCount;
+            this.logger.log(
+              `Existing pending refund for payment ${payment.id} is still awaiting processor confirmation`,
+            );
+          }
+          if (failedReconciliations.length > 0) {
+            failedRefunds.push(payment.id);
+            this.logger.warn(
+              `Pending refund for payment ${payment.id} was reconciled as failed; manual processing required`,
+            );
+          }
+        } catch (reconcileError) {
+          // Could not reconcile (e.g., network error); treat as still pending.
+          pendingRefunds += existingPendingRefunds.length;
+          const errorMessage = reconcileError instanceof Error ? reconcileError.message : 'Unknown error';
+          this.logger.warn(`Could not reconcile pending refund for payment ${payment.id}: ${errorMessage}`);
+        }
+        continue;
+      }
+
       try {
         const refundResult = await this.paymentsService.processRefund({
           paymentId: payment.id,

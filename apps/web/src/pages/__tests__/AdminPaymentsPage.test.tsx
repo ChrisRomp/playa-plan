@@ -815,6 +815,46 @@ describe('AdminPaymentsPage', () => {
       expect(screen.queryByLabelText('Registration status change')).not.toBeInTheDocument();
     });
 
+    it('should hide registration status selector for a payment linked to a cancelled registration', async () => {
+      vi.mocked(reports.processRefund).mockResolvedValue({
+        paymentId: 'payment1',
+        refundAmount: 150,
+        providerRefundId: 'refund-1',
+        success: true,
+        refundStatus: 'SUCCEEDED',
+      });
+      vi.mocked(reports.getPayments).mockResolvedValue([
+        {
+          ...mockPayments[0],
+          registrationId: 'reg1',
+          registration: { id: 'reg1', status: 'CANCELLED' },
+        },
+      ]);
+
+      renderComponent();
+
+      await waitFor(() => {
+        expect(screen.getByTestId('payment-payment1')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByRole('button', { name: 'Refund' }));
+
+      expect(screen.queryByLabelText('Registration status change')).not.toBeInTheDocument();
+      fireEvent.change(screen.getByLabelText('Refund amount'), {
+        target: { value: '150' },
+      });
+      fireEvent.click(screen.getByText('Submit refund'));
+
+      await waitFor(() => {
+        expect(reports.processRefund).toHaveBeenCalledWith({
+          paymentId: 'payment1',
+          amount: 150,
+          reason: undefined,
+          resultingRegistrationStatus: undefined,
+        });
+      });
+    });
+
     it('should only offer post-application registration statuses in the refund status dropdown', async () => {
       renderComponent();
 
