@@ -806,9 +806,44 @@ describe('AdminPaymentsPage', () => {
     });
 
     it('should close the refund form when refund processing is pending processor confirmation', async () => {
+      const pendingPayment: Payment = {
+        ...mockPayments[0],
+        status: 'PARTIALLY_REFUNDED',
+        refundedAmount: 25,
+        netAmount: 125,
+        refundableAmount: 0,
+        processorRefundAvailable: false,
+        refunds: [
+          {
+            id: 'succeeded-refund',
+            paymentId: 'payment1',
+            amountCents: 2500,
+            currency: 'USD',
+            status: 'SUCCEEDED',
+            processorRefund: true,
+            processedByUserId: 'admin1',
+            createdAt: '2024-01-16T10:00:00Z',
+            updatedAt: '2024-01-16T10:00:00Z',
+          },
+          {
+            id: 'pending-refund',
+            paymentId: 'payment1',
+            amountCents: 12500,
+            currency: 'USD',
+            status: 'PENDING',
+            processorRefund: true,
+            processedByUserId: 'admin1',
+            createdAt: '2024-01-17T10:00:00Z',
+            updatedAt: '2024-01-17T10:00:00Z',
+          },
+        ],
+      };
+      vi.mocked(reports.getPayments)
+        .mockResolvedValueOnce([mockPayments[0]])
+        .mockResolvedValueOnce([pendingPayment]);
       vi.mocked(reports.processRefund).mockResolvedValue({
         paymentId: 'payment1',
-        refundAmount: 50,
+        refundAmount: 125,
         providerRefundId: 'refund-1',
         success: false,
         refundStatus: 'PENDING',
@@ -821,13 +856,23 @@ describe('AdminPaymentsPage', () => {
       });
 
       fireEvent.click(screen.getAllByText('Refund')[0]);
-      fireEvent.change(screen.getByLabelText('Refund amount'), { target: { value: '50.00' } });
+      fireEvent.change(screen.getByLabelText('Refund amount'), { target: { value: '125.00' } });
       fireEvent.click(screen.getByText('Submit refund'));
 
       await waitFor(() => {
-        expect(screen.queryByText('Submit refund')).not.toBeInTheDocument();
+        expect(screen.getByText('REFUND PENDING')).toBeInTheDocument();
       });
+      expect(screen.queryByText('Submit refund')).not.toBeInTheDocument();
       expect(screen.queryByText('Failed to process refund')).not.toBeInTheDocument();
+      expect(screen.getByText('Pending refund $125.00 USD')).toBeInTheDocument();
+      expect(screen.getByText('Refunded $25.00 USD')).toBeInTheDocument();
+      expect(screen.getByText('Net $125.00 USD')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Refund' })).toBeDisabled();
+      expect(
+        screen.getByText(
+          'A refund of $125.00 USD is pending Stripe confirmation and has reserved the remaining balance.'
+        )
+      ).toBeInTheDocument();
     });
   });
 

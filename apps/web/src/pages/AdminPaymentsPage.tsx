@@ -69,6 +69,12 @@ const getRefundableAmount = (payment: Payment): number => {
   return Math.max(payment.amount - refundedAmount, 0);
 };
 
+// Pending processor refunds reserve funds without changing succeeded refund totals.
+const getPendingRefundAmount = (payment: Payment): number =>
+  (payment.refunds ?? [])
+    .filter(refund => refund.status === 'PENDING')
+    .reduce((sum, refund) => sum + refund.amountCents / 100, 0);
+
 const getPaymentReportYear = (payment: Payment): number =>
   payment.registration?.year ?? new Date(payment.createdAt).getFullYear();
 
@@ -80,6 +86,11 @@ const canSubmitRefund = (payment: Payment): boolean =>
 const getRefundUnavailableMessage = (payment: Payment): string | undefined => {
   if (payment.provider === 'PAYPAL') {
     return 'PayPal refunds must be handled outside PlayaPlan.';
+  }
+
+  const pendingRefundAmount = getPendingRefundAmount(payment);
+  if (pendingRefundAmount > 0 && getRefundableAmount(payment) <= 0) {
+    return `A refund of ${formatCurrency(pendingRefundAmount, payment.currency)} is pending Stripe confirmation and has reserved the remaining balance.`;
   }
 
   if (payment.provider === 'STRIPE' && payment.processorRefundAvailable !== true) {
@@ -419,6 +430,11 @@ export function AdminPaymentsPage() {
           <div className="text-xs text-gray-500">
             Net {formatCurrency(row.netAmount ?? row.amount, row.currency)}
           </div>
+          {getPendingRefundAmount(row) > 0 && (
+            <div className="text-xs font-medium text-amber-700">
+              Pending refund {formatCurrency(getPendingRefundAmount(row), row.currency)}
+            </div>
+          )}
         </div>
       ),
       sortable: true,
@@ -428,23 +444,31 @@ export function AdminPaymentsPage() {
       id: 'status',
       header: 'Status',
       accessor: row => row.status,
-      Cell: ({ row }) => (
-        <span
-          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-            row.status === 'COMPLETED'
-              ? 'bg-green-100 text-green-800'
-              : row.status === 'PARTIALLY_REFUNDED'
-                ? 'bg-amber-100 text-amber-800'
-                : row.status === 'PENDING'
-                  ? 'bg-yellow-100 text-yellow-800'
-                  : row.status === 'FAILED'
-                    ? 'bg-red-100 text-red-800'
-                    : 'bg-gray-100 text-gray-800'
-          }`}
-        >
-          {row.status.replace(/_/g, ' ')}
-        </span>
-      ),
+      Cell: ({ row }) => {
+        const pendingRefundAmount = getPendingRefundAmount(row);
+        return (
+          <div className="space-y-1">
+            <span
+              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                row.status === 'COMPLETED'
+                  ? 'bg-green-100 text-green-800'
+                  : row.status === 'PARTIALLY_REFUNDED'
+                    ? 'bg-amber-100 text-amber-800'
+                    : row.status === 'PENDING'
+                      ? 'bg-yellow-100 text-yellow-800'
+                      : row.status === 'FAILED'
+                        ? 'bg-red-100 text-red-800'
+                        : 'bg-gray-100 text-gray-800'
+              }`}
+            >
+              {row.status.replace(/_/g, ' ')}
+            </span>
+            {pendingRefundAmount > 0 && (
+              <div className="text-xs font-semibold text-amber-700">REFUND PENDING</div>
+            )}
+          </div>
+        );
+      },
       sortable: true,
       width: '12%',
     },

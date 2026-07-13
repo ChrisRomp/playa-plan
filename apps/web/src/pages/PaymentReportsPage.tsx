@@ -7,6 +7,7 @@ import { Payment } from '../types';
 import { PATHS } from '../routes';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import { downloadCsv } from '../utils/csv';
+import { formatCurrency } from '../utils/currency';
 
 interface PaymentReportFilters {
   year?: number;
@@ -101,7 +102,7 @@ export function PaymentReportsPage() {
         failed: 0,
         refunded: 0,
         partiallyRefunded: 0,
-        totalAmount: 0,
+        netAmountsByCurrency: {},
       };
     }
 
@@ -113,14 +114,20 @@ export function PaymentReportsPage() {
     const partiallyRefunded = filteredPayments.filter(
       payment => payment.status === 'PARTIALLY_REFUNDED'
     ).length;
-    const totalAmount = filteredPayments
+    // Group net revenue by currency instead of summing unlike currencies together,
+    // which would otherwise produce an invalid combined figure.
+    const netAmountsByCurrency = filteredPayments
       .filter(
         payment =>
           payment.status === 'COMPLETED' || payment.status === 'PARTIALLY_REFUNDED'
       )
-      .reduce((sum, payment) => sum + (payment.netAmount ?? payment.amount), 0);
+      .reduce<Record<string, number>>((amounts, payment) => {
+        const currency = (payment.currency || 'USD').toUpperCase();
+        amounts[currency] = (amounts[currency] ?? 0) + (payment.netAmount ?? payment.amount);
+        return amounts;
+      }, {});
 
-    return { total, completed, pending, failed, refunded, partiallyRefunded, totalAmount };
+    return { total, completed, pending, failed, refunded, partiallyRefunded, netAmountsByCurrency };
   }, [filteredPayments]);
 
   // Define table columns
@@ -145,7 +152,7 @@ export function PaymentReportsPage() {
     {
       id: 'amount',
       header: 'Amount',
-      accessor: row => `$${row.amount.toFixed(2)}`,
+      accessor: row => formatCurrency(row.amount, row.currency),
       sortable: true,
       width: '12%',
     },
@@ -218,7 +225,7 @@ export function PaymentReportsPage() {
       return [
         payment.user ? `${payment.user.firstName} ${payment.user.lastName}` : 'Unknown',
         dateTime,
-        `$${payment.amount.toFixed(2)}`,
+        formatCurrency(payment.amount, payment.currency),
         payment.status,
         payment.provider,
         payment.providerRefId || 'N/A',
@@ -353,7 +360,13 @@ export function PaymentReportsPage() {
               <div className="flex items-center">
                 <div className="flex-shrink-0">
                   <div className="text-lg font-medium text-gray-900">
-                    ${summaryStats.totalAmount.toFixed(2)}
+                    {Object.entries(summaryStats.netAmountsByCurrency).length > 0 ? (
+                      Object.entries(summaryStats.netAmountsByCurrency).map(([currency, amount]) => (
+                        <div key={currency}>{formatCurrency(amount, currency)}</div>
+                      ))
+                    ) : (
+                      formatCurrency(0)
+                    )}
                   </div>
                 </div>
               </div>

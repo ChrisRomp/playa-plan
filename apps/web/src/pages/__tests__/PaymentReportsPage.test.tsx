@@ -205,7 +205,7 @@ describe('PaymentReportsPage', () => {
       expect(screen.getByText('Failed')).toBeInTheDocument();
       expect(screen.getByText('Refunded')).toBeInTheDocument();
       expect(screen.getByText('Total Revenue')).toBeInTheDocument();
-      expect(screen.getByText('$150.00')).toBeInTheDocument();
+      expect(screen.getByText('$150.00 USD')).toBeInTheDocument();
     });
 
     it('should include partially refunded payments in total revenue', async () => {
@@ -224,7 +224,7 @@ describe('PaymentReportsPage', () => {
       renderComponent();
 
       await waitFor(() => {
-        expect(screen.getByText('$200.00')).toBeInTheDocument();
+        expect(screen.getByText('$200.00 USD')).toBeInTheDocument();
       });
       expect(screen.getByText('Refunded').parentElement).toHaveTextContent('Refunded / Partial: 1');
     });
@@ -529,7 +529,7 @@ describe('PaymentReportsPage', () => {
       expect(screen.getByText('Failed')).toBeInTheDocument();
       expect(screen.getByText('Refunded')).toBeInTheDocument();
       expect(screen.getByText('Total Revenue')).toBeInTheDocument();
-      expect(screen.getByText('$0.00')).toBeInTheDocument();
+      expect(screen.getByText('$0.00 USD')).toBeInTheDocument();
     });
   });
 
@@ -601,9 +601,50 @@ describe('PaymentReportsPage', () => {
         expect(screen.getByTestId('payment-payment-eur')).toBeInTheDocument();
       });
 
-      // Should handle different currencies in summary (component shows amount in dollars regardless)
+      // Net revenue is grouped and formatted per currency rather than summed as dollars
       expect(screen.getByText('Total Revenue')).toBeInTheDocument();
-      expect(screen.getByText('$85.50')).toBeInTheDocument();
+      expect(screen.getByText('€85.50 EUR')).toBeInTheDocument();
+    });
+
+    it('should group total revenue by currency instead of summing unlike currencies', async () => {
+      const paymentsWithMixedCurrencies: Payment[] = [
+        {
+          id: 'payment-usd',
+          amount: 150,
+          currency: 'USD',
+          status: 'COMPLETED',
+          provider: 'STRIPE',
+          createdAt: '2024-01-15T10:00:00Z',
+          updatedAt: '2024-01-15T10:00:00Z',
+          userId: 'user1',
+          user: { id: 'user1', firstName: 'Dollar', lastName: 'User', email: 'usd@example.com' },
+        },
+        {
+          id: 'payment-eur',
+          amount: 85.5,
+          currency: 'EUR',
+          status: 'COMPLETED',
+          provider: 'STRIPE',
+          createdAt: '2024-01-15T10:00:00Z',
+          updatedAt: '2024-01-15T10:00:00Z',
+          userId: 'user2',
+          user: { id: 'user2', firstName: 'Euro', lastName: 'User', email: 'eur@example.com' },
+        },
+      ];
+
+      const mockGetPayments = vi.mocked(reports.getPayments);
+      mockGetPayments.mockResolvedValue(paymentsWithMixedCurrencies);
+
+      renderComponent();
+
+      await waitFor(() => {
+        expect(screen.getByTestId('payment-payment-usd')).toBeInTheDocument();
+      });
+
+      // Each currency's total should be shown separately, not combined into a single figure
+      expect(screen.getByText('$150.00 USD')).toBeInTheDocument();
+      expect(screen.getByText('€85.50 EUR')).toBeInTheDocument();
+      expect(screen.queryByText('$235.50')).not.toBeInTheDocument();
     });
   });
 });
