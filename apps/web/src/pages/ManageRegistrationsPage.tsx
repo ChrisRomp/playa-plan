@@ -114,7 +114,6 @@ export function ManageRegistrationsPage() {
     try {
       const data: PaginatedRegistrationsResponse =
         await adminRegistrationsApi.getRegistrations(filters);
-      console.log('API response:', data); // Debug log
       // Extract registrations array from the response object
       const registrationsArray = data?.registrations || [];
       setRegistrations(Array.isArray(registrationsArray) ? registrationsArray : []);
