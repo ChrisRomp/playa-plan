@@ -258,14 +258,27 @@ export class StripeService {
     try {
       const stripe = await this.getStripe();
       const paymentIntentId = await this.resolvePaymentIntentId(providerRefId);
-      const refunds = await stripe.refunds.list({
-        payment_intent: paymentIntentId,
-        limit: 100,
-      });
+      let startingAfter: string | undefined;
 
-      return refunds.data.find(
-        (refund) => refund.metadata?.playaPlanRefundId === refundId,
-      ) ?? null;
+      while (true) {
+        const refunds = await stripe.refunds.list({
+          payment_intent: paymentIntentId,
+          limit: 100,
+          ...(startingAfter && { starting_after: startingAfter }),
+        });
+        const matchingRefund = refunds.data.find(
+          (refund) => refund.metadata?.playaPlanRefundId === refundId,
+        );
+
+        if (matchingRefund) {
+          return matchingRefund;
+        }
+        if (!refunds.has_more || refunds.data.length === 0) {
+          return null;
+        }
+
+        startingAfter = refunds.data[refunds.data.length - 1].id;
+      }
     } catch (error: unknown) {
       const sanitizedMessage = this.sanitizeErrorMessage(error);
       this.logger.error(`Failed to find refund by metadata: ${sanitizedMessage}`);

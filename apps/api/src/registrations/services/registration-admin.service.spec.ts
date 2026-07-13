@@ -6,6 +6,7 @@ import { AdminAuditService } from '../../admin-audit/services/admin-audit.servic
 import { AdminNotificationsService } from '../../notifications/services/admin-notifications.service';
 import { RegistrationCleanupService } from './registration-cleanup.service';
 import { PaymentsService } from '../../payments/services/payments.service';
+import { StripeRefundError } from '../../payments/services/stripe.service';
 import { 
   RegistrationStatus, 
   AdminAuditActionType, 
@@ -800,6 +801,33 @@ describe('RegistrationAdminService', () => {
       expect(result.refundedByCurrency).toBeUndefined();
       expect(result.message).toContain('1 refund(s) submitted and pending processor confirmation');
       expect(result.message).not.toContain('Automatically refunded');
+    });
+
+    it('should report ambiguous Stripe refund submissions as pending', async () => {
+      const payments = [
+        {
+          id: 'ambiguous-payment',
+          amount: 100,
+          status: PaymentStatus.COMPLETED,
+          provider: PaymentProvider.STRIPE,
+          providerRefId: 'pi_ambiguous123',
+        },
+      ];
+      paymentsService.processRefund.mockRejectedValue(
+        new StripeRefundError('Connection closed after submission', true),
+      );
+
+      const result = await (service as unknown as {
+        processAutoRefunds: (
+          payments: unknown[],
+          reason: string,
+          adminUserId: string,
+        ) => Promise<RefundInfo>;
+      }).processAutoRefunds(payments, 'Test refund', 'admin-123');
+
+      expect(result.refundedByCurrency).toBeUndefined();
+      expect(result.message).toContain('1 refund(s) submitted and pending processor confirmation');
+      expect(result.message).not.toContain('failed and require manual processing');
     });
 
     // Task 5.2.12: Test processAutoRefunds() formats refund amounts correctly (no division by 100)

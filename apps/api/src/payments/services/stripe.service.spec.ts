@@ -465,6 +465,37 @@ describe('StripeService', () => {
       expect(result).toBeNull();
       expect(mockStripeInstance.refunds.create).not.toHaveBeenCalled();
     });
+
+    it('should search later pages for the correlated local refund ID', async () => {
+      const matchingRefund = {
+        id: 're_matching',
+        metadata: {
+          playaPlanRefundId: 'refund-id',
+        },
+      };
+      mockStripeInstance.refunds.list
+        .mockResolvedValueOnce({
+          data: [{ id: 're_page_one', metadata: {} }],
+          has_more: true,
+        })
+        .mockResolvedValueOnce({
+          data: [matchingRefund],
+          has_more: false,
+        });
+
+      const result = await service.findRefundByMetadata('pi_123', 'refund-id');
+
+      expect(mockStripeInstance.refunds.list).toHaveBeenNthCalledWith(1, {
+        payment_intent: 'pi_123',
+        limit: 100,
+      });
+      expect(mockStripeInstance.refunds.list).toHaveBeenNthCalledWith(2, {
+        payment_intent: 'pi_123',
+        limit: 100,
+        starting_after: 're_page_one',
+      });
+      expect(result).toEqual(matchingRefund);
+    });
   });
   
   describe('getPaymentIntent', () => {

@@ -10,6 +10,7 @@ import { AdminAuditService, CreateAuditRecordDto } from '../../admin-audit/servi
 import { AdminNotificationsService, AdminNotificationData } from '../../notifications/services/admin-notifications.service';
 import { RegistrationCleanupService } from './registration-cleanup.service';
 import { PaymentsService } from '../../payments/services/payments.service';
+import { StripeRefundError } from '../../payments/services/stripe.service';
 import { 
   Registration, 
   RegistrationStatus, 
@@ -984,6 +985,14 @@ export class RegistrationAdminService {
           failedRefunds.push(payment.id);
         }
       } catch (refundError) {
+        if (refundError instanceof StripeRefundError && refundError.possiblySubmitted) {
+          pendingRefunds++;
+          this.logger.warn(
+            `Refund submission outcome is unknown for payment ${payment.id}; leaving it pending for reconciliation`,
+          );
+          continue;
+        }
+
         const errorMessage = refundError instanceof Error ? refundError.message : 'Unknown error';
         this.logger.error(`Failed to refund payment ${payment.id}: ${errorMessage}`);
         failedRefunds.push(payment.id);
