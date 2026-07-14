@@ -37,6 +37,7 @@ export enum RegistrationStatus {
 export enum PaymentStatus {
   PENDING = 'PENDING',
   COMPLETED = 'COMPLETED',
+  PARTIALLY_REFUNDED = 'PARTIALLY_REFUNDED',
   FAILED = 'FAILED',
   REFUNDED = 'REFUNDED'
 }
