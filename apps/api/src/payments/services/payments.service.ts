@@ -1,8 +1,34 @@
-import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { NotificationsService } from '../../notifications/services/notifications.service';
-import { CreatePaymentDto, UpdatePaymentDto, CreateRefundDto, CreateExternalPaymentDto, CreateStripePaymentDto, CreatePaypalPaymentDto } from '../dto';
-import { AdminAuditActionType, AdminAuditTargetType, ExternalPaymentMethod, Payment, PaymentProvider, PaymentStatus, Prisma, Registration, RegistrationStatus, UserRole } from '@prisma/client';
+import {
+  CreatePaymentDto,
+  UpdatePaymentDto,
+  CreateRefundDto,
+  CreateExternalPaymentDto,
+  CreateStripePaymentDto,
+  CreatePaypalPaymentDto,
+} from '../dto';
+import {
+  AdminAuditActionType,
+  AdminAuditTargetType,
+  ExternalPaymentMethod,
+  Payment,
+  PaymentProvider,
+  PaymentRefundStatus,
+  PaymentStatus,
+  Prisma,
+  RefundExecutionMode,
+  Registration,
+  RegistrationStatus,
+  UserRole,
+} from '@prisma/client';
 import { StripeService } from './stripe.service';
 import { PaypalService } from './paypal.service';
 import { isApplicationStatus } from '../../registrations/constants/registration-status.constants';
@@ -48,6 +74,25 @@ const sharedPaymentSelect = {
   registration: true,
 } satisfies Prisma.PaymentSelect;
 
+const adminRefundSelect = {
+  id: true,
+  amountCents: true,
+  currency: true,
+  executionMode: true,
+  status: true,
+  reason: true,
+  externalReference: true,
+  resultingRegistrationStatus: true,
+  createdAt: true,
+  updatedAt: true,
+} satisfies Prisma.PaymentRefundSelect;
+
+const internalRefundSelect = {
+  ...adminRefundSelect,
+  paymentId: true,
+  idempotencyKey: true,
+} satisfies Prisma.PaymentRefundSelect;
+
 const adminPaymentSelect = {
   id: true,
   amount: true,
@@ -75,6 +120,10 @@ const adminPaymentSelect = {
       status: true,
     },
   },
+  refunds: {
+    select: adminRefundSelect,
+    orderBy: { createdAt: 'asc' as const },
+  },
 } satisfies Prisma.PaymentSelect;
 
 const externalPaymentSelect = {
@@ -82,16 +131,13 @@ const externalPaymentSelect = {
   idempotencyKey: true,
 } satisfies Prisma.PaymentSelect;
 
-type SharedPayment = Omit<
-  Payment,
-  'externalMethod' | 'externalReference' | 'idempotencyKey'
->;
+type SharedPayment = Omit<Payment, 'externalMethod' | 'externalReference' | 'idempotencyKey'>;
 
 type SharedPaymentWithRelations = SharedPayment & {
   registration?: Registration | null;
 };
 
-export type AdminPayment = Prisma.PaymentGetPayload<{
+type AdminPaymentRecord = Prisma.PaymentGetPayload<{
   select: typeof adminPaymentSelect;
 }>;
 
@@ -99,12 +145,50 @@ type ExternalPaymentRecord = Prisma.PaymentGetPayload<{
   select: typeof externalPaymentSelect;
 }>;
 
+export type AdminRefund = Prisma.PaymentRefundGetPayload<{
+  select: typeof adminRefundSelect;
+}>;
+
+type InternalRefundRecord = Prisma.PaymentRefundGetPayload<{
+  select: typeof internalRefundSelect;
+}>;
+
+interface RefundTotals {
+  paymentAmountCents: number;
+  successfulRefundCents: number;
+  pendingRefundCents: number;
+  availableRefundCents: number;
+}
+
+export type AdminPayment = AdminPaymentRecord & RefundTotals;
+
+export interface ManualRefundResult extends RefundTotals {
+  payment: AdminPayment;
+  refund: AdminRefund;
+}
+
 interface CanonicalExternalPayment {
   registrationId: string;
   amountCents: number;
   currency: string;
   externalMethod: ExternalPaymentMethod;
   externalReference: string | null;
+}
+
+interface CanonicalManualRefund {
+  amountCents?: number;
+  fullRefund: boolean;
+  executionMode: RefundExecutionMode;
+  reason: string | null;
+  externalReference: string | null;
+  resultingRegistrationStatus: RegistrationStatus | null;
+}
+
+interface LegacyRefundRequest {
+  paymentId: string;
+  amount?: number;
+  percentageOfOriginal?: number;
+  reason?: string;
 }
 
 const DEFAULT_ADMIN_PAYMENT_PAGE_SIZE = 25;
@@ -134,7 +218,7 @@ export class PaymentsService {
     private readonly prisma: PrismaService,
     private readonly stripeService: StripeService,
     private readonly paypalService: PaypalService,
-    private readonly notificationsService: NotificationsService,
+    private readonly notificationsService: NotificationsService
   ) {}
 
   /**
@@ -144,36 +228,40 @@ export class PaymentsService {
    */
   async create(createPaymentDto: CreatePaymentDto): Promise<Payment> {
     this.logger.log(`Creating payment record for user ${createPaymentDto.userId}`);
-    
+
     // Verify user exists
     const user = await this.prisma.user.findUnique({
       where: { id: createPaymentDto.userId },
     });
-    
+
     if (!user) {
       throw new NotFoundException(`User with ID ${createPaymentDto.userId} not found`);
     }
-    
+
     // If registration ID provided, verify it exists and belongs to the user
     if (createPaymentDto.registrationId) {
       const registration = await this.prisma.registration.findUnique({
         where: { id: createPaymentDto.registrationId },
       });
-      
+
       if (!registration) {
-        throw new NotFoundException(`Registration with ID ${createPaymentDto.registrationId} not found`);
+        throw new NotFoundException(
+          `Registration with ID ${createPaymentDto.registrationId} not found`
+        );
       }
-      
+
       if (registration.userId !== createPaymentDto.userId) {
         throw new BadRequestException('Registration does not belong to the specified user');
       }
 
       // Prevent payments for registrations still in application phase
       if (isApplicationStatus(registration.status)) {
-        throw new BadRequestException('Cannot process payment for a registration that has not completed the application process');
+        throw new BadRequestException(
+          'Cannot process payment for a registration that has not completed the application process'
+        );
       }
     }
-    
+
     try {
       const paymentData = {
         amount: createPaymentDto.amount,
@@ -183,7 +271,7 @@ export class PaymentsService {
         providerRefId: createPaymentDto.providerRefId,
         user: { connect: { id: createPaymentDto.userId } },
         ...(createPaymentDto.registrationId && {
-          registration: { connect: { id: createPaymentDto.registrationId } }
+          registration: { connect: { id: createPaymentDto.registrationId } },
         }),
       };
 
@@ -192,7 +280,10 @@ export class PaymentsService {
       });
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      this.logger.error(`Failed to create payment record: ${errorMessage}`, error instanceof Error ? error.stack : undefined);
+      this.logger.error(
+        `Failed to create payment record: ${errorMessage}`,
+        error instanceof Error ? error.stack : undefined
+      );
       throw error;
     }
   }
@@ -205,17 +296,22 @@ export class PaymentsService {
    * @param status - Filter by payment status
    * @returns Paginated list of payments
    */
-  async findAll(skip = 0, take = 10, userId?: string, status?: PaymentStatus): Promise<{ payments: SharedPayment[]; total: number }> {
+  async findAll(
+    skip = 0,
+    take = 10,
+    userId?: string,
+    status?: PaymentStatus
+  ): Promise<{ payments: SharedPayment[]; total: number }> {
     const where: PaymentWhereClause = {};
-    
+
     if (userId) {
       where.userId = userId;
     }
-    
+
     if (status) {
       where.status = status;
     }
-    
+
     const [payments, total] = await Promise.all([
       this.prisma.payment.findMany({
         where,
@@ -226,7 +322,7 @@ export class PaymentsService {
       }),
       this.prisma.payment.count({ where }),
     ]);
-    
+
     return { payments, total };
   }
 
@@ -235,19 +331,15 @@ export class PaymentsService {
    */
   async findAllForAdmin(
     skip = 0,
-    take = DEFAULT_ADMIN_PAYMENT_PAGE_SIZE,
+    take = DEFAULT_ADMIN_PAYMENT_PAGE_SIZE
   ): Promise<{ payments: AdminPayment[]; total: number }> {
     if (!Number.isInteger(skip) || skip < 0) {
       throw new BadRequestException('Skip must be a non-negative integer');
     }
 
-    if (
-      !Number.isInteger(take) ||
-      take < 1 ||
-      take > MAX_ADMIN_PAYMENT_PAGE_SIZE
-    ) {
+    if (!Number.isInteger(take) || take < 1 || take > MAX_ADMIN_PAYMENT_PAGE_SIZE) {
       throw new BadRequestException(
-        `Take must be an integer between 1 and ${MAX_ADMIN_PAYMENT_PAGE_SIZE}`,
+        `Take must be an integer between 1 and ${MAX_ADMIN_PAYMENT_PAGE_SIZE}`
       );
     }
 
@@ -261,7 +353,10 @@ export class PaymentsService {
       this.prisma.payment.count(),
     ]);
 
-    return { payments, total };
+    return {
+      payments: payments.map(payment => this.toAdminPayment(payment)),
+      total,
+    };
   }
 
   /**
@@ -284,11 +379,11 @@ export class PaymentsService {
         registration: true,
       },
     });
-    
+
     if (!payment) {
       throw new NotFoundException(`Payment with ID ${id} not found`);
     }
-    
+
     return payment;
   }
 
@@ -299,21 +394,25 @@ export class PaymentsService {
    * @param userRole - Current user role
    * @returns The payment, if found and user has access
    */
-  async findOneWithOwnershipCheck(id: string, userId: string, userRole: UserRole): Promise<SharedPaymentWithRelations> {
+  async findOneWithOwnershipCheck(
+    id: string,
+    userId: string,
+    userRole: UserRole
+  ): Promise<SharedPaymentWithRelations> {
     const payment = await this.prisma.payment.findUnique({
       where: { id },
       select: sharedPaymentSelect,
     });
-    
+
     if (!payment) {
       throw new NotFoundException(`Payment with ID ${id} not found`);
     }
-    
+
     // Check ownership - only admins/staff can view any payment, others can only view their own
     if (userRole !== UserRole.ADMIN && userRole !== UserRole.STAFF && payment.userId !== userId) {
       throw new NotFoundException(`Payment with ID ${id} not found`); // Don't reveal that payment exists
     }
-    
+
     return payment;
   }
 
@@ -326,7 +425,7 @@ export class PaymentsService {
   async update(id: string, updatePaymentDto: UpdatePaymentDto): Promise<Payment> {
     // Check if payment exists
     await this.findOne(id);
-    
+
     try {
       return await this.prisma.payment.update({
         where: { id },
@@ -334,7 +433,10 @@ export class PaymentsService {
       });
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      this.logger.error(`Failed to update payment ${id}: ${errorMessage}`, error instanceof Error ? error.stack : undefined);
+      this.logger.error(
+        `Failed to update payment ${id}: ${errorMessage}`,
+        error instanceof Error ? error.stack : undefined
+      );
       throw error;
     }
   }
@@ -348,43 +450,48 @@ export class PaymentsService {
   async linkToRegistration(paymentId: string, registrationId: string): Promise<Payment> {
     // Check if payment exists
     const payment = await this.findOne(paymentId);
-    
+
     // Check if registration exists
     const registration = await this.prisma.registration.findUnique({
       where: { id: registrationId },
       include: { payments: true },
     });
-    
+
     if (!registration) {
       throw new NotFoundException(`Registration with ID ${registrationId} not found`);
     }
-    
+
     // Prevent linking payments to registrations in application phase
     if (isApplicationStatus(registration.status)) {
-      throw new BadRequestException('Cannot link payment to a registration that has not completed the application process');
+      throw new BadRequestException(
+        'Cannot link payment to a registration that has not completed the application process'
+      );
     }
 
     // Check if registration belongs to the same user as the payment
     if (registration.userId !== payment.userId) {
       throw new BadRequestException('Registration does not belong to the same user as the payment');
     }
-    
+
     // Check if payment is already linked to this registration
     if (payment.registrationId === registrationId) {
       throw new BadRequestException(`Payment is already linked to registration ${registrationId}`);
     }
-    
+
     try {
       // Update payment to link it to the registration
       const updatedPayment = await this.prisma.payment.update({
         where: { id: paymentId },
         data: { registrationId },
       });
-      
+
       return updatedPayment;
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      this.logger.error(`Failed to link payment to registration: ${errorMessage}`, error instanceof Error ? error.stack : undefined);
+      this.logger.error(
+        `Failed to link payment to registration: ${errorMessage}`,
+        error instanceof Error ? error.stack : undefined
+      );
       throw error;
     }
   }
@@ -406,23 +513,20 @@ export class PaymentsService {
    */
   async recordExternalPayment(
     data: CreateExternalPaymentDto,
-    adminUserId: string,
+    adminUserId: string
   ): Promise<AdminPayment> {
     const canonicalRequest = this.canonicalizeExternalPayment(data);
     const transactionId = randomUUID();
 
     try {
-      return await this.prisma.$transaction(async (tx) => {
+      return await this.prisma.$transaction(async tx => {
         const existingPayment = await tx.payment.findUnique({
           where: { idempotencyKey: data.idempotencyKey },
           select: externalPaymentSelect,
         });
 
         if (existingPayment) {
-          return this.resolveExternalPaymentReplay(
-            existingPayment,
-            canonicalRequest,
-          );
+          return this.resolveExternalPaymentReplay(existingPayment, canonicalRequest);
         }
 
         const registration = await tx.registration.findUnique({
@@ -435,9 +539,7 @@ export class PaymentsService {
         });
 
         if (!registration) {
-          throw new NotFoundException(
-            `Registration with ID ${data.registrationId} not found`,
-          );
+          throw new NotFoundException(`Registration with ID ${data.registrationId} not found`);
         }
 
         this.validateExternalPaymentRegistration(registration.status);
@@ -464,14 +566,11 @@ export class PaymentsService {
           });
 
           if (concurrentPayment) {
-            return this.resolveExternalPaymentReplay(
-              concurrentPayment,
-              canonicalRequest,
-            );
+            return this.resolveExternalPaymentReplay(concurrentPayment, canonicalRequest);
           }
 
           throw new ConflictException(
-            'Registration changed while recording payment; refresh and retry',
+            'Registration changed while recording payment; refresh and retry'
           );
         }
 
@@ -528,16 +627,11 @@ export class PaymentsService {
         throw error;
       }
 
-      return this.resolveExternalPaymentReplay(
-        existingPayment,
-        canonicalRequest,
-      );
+      return this.resolveExternalPaymentReplay(existingPayment, canonicalRequest);
     }
   }
 
-  private canonicalizeExternalPayment(
-    data: CreateExternalPaymentDto,
-  ): CanonicalExternalPayment {
+  private canonicalizeExternalPayment(data: CreateExternalPaymentDto): CanonicalExternalPayment {
     try {
       return {
         registrationId: data.registrationId,
@@ -557,7 +651,7 @@ export class PaymentsService {
 
   private resolveExternalPaymentReplay(
     existingPayment: ExternalPaymentRecord,
-    canonicalRequest: CanonicalExternalPayment,
+    canonicalRequest: CanonicalExternalPayment
   ): AdminPayment {
     const existingCanonicalRequest: CanonicalExternalPayment = {
       registrationId: existingPayment.registrationId ?? '',
@@ -568,24 +662,27 @@ export class PaymentsService {
     };
 
     if (
-      existingCanonicalRequest.registrationId !==
-        canonicalRequest.registrationId ||
+      existingCanonicalRequest.registrationId !== canonicalRequest.registrationId ||
       existingCanonicalRequest.amountCents !== canonicalRequest.amountCents ||
       existingCanonicalRequest.currency !== canonicalRequest.currency ||
-      existingCanonicalRequest.externalMethod !==
-        canonicalRequest.externalMethod ||
-      existingCanonicalRequest.externalReference !==
-        canonicalRequest.externalReference
+      existingCanonicalRequest.externalMethod !== canonicalRequest.externalMethod ||
+      existingCanonicalRequest.externalReference !== canonicalRequest.externalReference
     ) {
       throw new ConflictException(
-        'Idempotency key has already been used with different payment data',
+        'Idempotency key has already been used with different payment data'
       );
     }
 
     return this.toAdminPayment(existingPayment);
   }
 
-  private toAdminPayment(payment: ExternalPaymentRecord): AdminPayment {
+  private toAdminPayment(payment: AdminPaymentRecord | ExternalPaymentRecord): AdminPayment {
+    const totals = this.calculateRefundTotals(
+      dollarsToCents(payment.amount),
+      payment.refunds,
+      payment.status === PaymentStatus.REFUNDED
+    );
+
     return {
       id: payment.id,
       amount: payment.amount,
@@ -600,32 +697,429 @@ export class PaymentsService {
       registrationId: payment.registrationId,
       user: payment.user,
       registration: payment.registration,
+      refunds: payment.refunds,
+      ...totals,
     };
   }
 
-  private validateExternalPaymentRegistration(
-    status: RegistrationStatus,
-  ): void {
+  private calculateRefundTotals(
+    paymentAmountCents: number,
+    refunds: ReadonlyArray<{
+      amountCents: number;
+      status: PaymentRefundStatus;
+    }>,
+    forceFullyRefunded = false
+  ): RefundTotals {
+    if (forceFullyRefunded) {
+      return {
+        paymentAmountCents,
+        successfulRefundCents: paymentAmountCents,
+        pendingRefundCents: 0,
+        availableRefundCents: 0,
+      };
+    }
+
+    const successfulRefundCents = refunds
+      .filter(refund => refund.status === PaymentRefundStatus.SUCCEEDED)
+      .reduce((total, refund) => total + refund.amountCents, 0);
+    const pendingRefundCents = refunds
+      .filter(refund => refund.status === PaymentRefundStatus.PENDING)
+      .reduce((total, refund) => total + refund.amountCents, 0);
+
+    return {
+      paymentAmountCents,
+      successfulRefundCents,
+      pendingRefundCents,
+      availableRefundCents: paymentAmountCents - successfulRefundCents - pendingRefundCents,
+    };
+  }
+
+  private validateExternalPaymentRegistration(status: RegistrationStatus): void {
     if (isApplicationStatus(status)) {
       throw new BadRequestException(
-        'Cannot record payment for a registration in the application phase',
+        'Cannot record payment for a registration in the application phase'
       );
     }
 
     if (status === RegistrationStatus.CANCELLED) {
-      throw new BadRequestException(
-        'Cannot record payment for a cancelled registration',
-      );
+      throw new BadRequestException('Cannot record payment for a cancelled registration');
     }
   }
 
   private isUniqueConstraintError(error: unknown): boolean {
-    return (
-      typeof error === 'object' &&
-      error !== null &&
-      'code' in error &&
-      error.code === 'P2002'
+    return typeof error === 'object' && error !== null && 'code' in error && error.code === 'P2002';
+  }
+
+  /**
+   * Records a manual refund that already completed outside PlayaPlan.
+   */
+  async createManualRefund(
+    paymentId: string,
+    data: CreateRefundDto,
+    adminUserId: string
+  ): Promise<ManualRefundResult> {
+    const canonicalRequest = this.canonicalizeManualRefund(data);
+
+    try {
+      return await this.prisma.$transaction(
+        async tx => {
+          const existingRefund = await tx.paymentRefund.findUnique({
+            where: { idempotencyKey: data.idempotencyKey },
+            select: internalRefundSelect,
+          });
+
+          if (existingRefund && existingRefund.paymentId !== paymentId) {
+            throw new ConflictException(
+              'Idempotency key has already been used with different refund data'
+            );
+          }
+
+          const payment = await tx.payment.findUnique({
+            where: { id: paymentId },
+            select: adminPaymentSelect,
+          });
+
+          if (!payment) {
+            throw new NotFoundException(`Payment with ID ${paymentId} not found`);
+          }
+
+          if (existingRefund) {
+            const replayAudit = await tx.adminAudit.findFirst({
+              where: {
+                transactionId: data.idempotencyKey,
+                actionType: AdminAuditActionType.PAYMENT_REFUND,
+                targetRecordType: AdminAuditTargetType.PAYMENT,
+                targetRecordId: paymentId,
+              },
+              select: { newValues: true },
+            });
+
+            return this.resolveManualRefundReplay(
+              payment,
+              existingRefund,
+              replayAudit?.newValues,
+              canonicalRequest
+            );
+          }
+
+          this.validateManualRefundPayment(payment.status);
+          this.validateManualRefundRegistration(
+            payment.registrationId,
+            canonicalRequest.resultingRegistrationStatus
+          );
+
+          const paymentAmountCents = this.getPaymentAmountCents(payment.amount);
+          const currentTotals = this.calculateRefundTotals(paymentAmountCents, payment.refunds);
+          if (currentTotals.availableRefundCents <= 0) {
+            throw new BadRequestException('Payment has no refundable balance available');
+          }
+
+          const refundAmountCents = canonicalRequest.fullRefund
+            ? currentTotals.availableRefundCents
+            : canonicalRequest.amountCents;
+          if (
+            refundAmountCents === undefined ||
+            refundAmountCents > currentTotals.availableRefundCents
+          ) {
+            throw new BadRequestException(
+              `Refund amount exceeds available balance of ${currentTotals.availableRefundCents} cents`
+            );
+          }
+
+          const createdRefund = await tx.paymentRefund.create({
+            data: {
+              paymentId,
+              amountCents: refundAmountCents,
+              currency: normalizeCurrency(payment.currency),
+              executionMode: RefundExecutionMode.MANUAL,
+              status: PaymentRefundStatus.SUCCEEDED,
+              reason: canonicalRequest.reason,
+              externalReference: canonicalRequest.externalReference,
+              idempotencyKey: data.idempotencyKey,
+              processedByUserId: adminUserId,
+              resultingRegistrationStatus: canonicalRequest.resultingRegistrationStatus,
+            },
+            select: internalRefundSelect,
+          });
+
+          const successfulRefundCents = currentTotals.successfulRefundCents + refundAmountCents;
+          const resultingPaymentStatus =
+            successfulRefundCents === paymentAmountCents
+              ? PaymentStatus.REFUNDED
+              : PaymentStatus.PARTIALLY_REFUNDED;
+
+          await tx.payment.update({
+            where: { id: paymentId },
+            data: { status: resultingPaymentStatus },
+          });
+
+          if (payment.registrationId && canonicalRequest.resultingRegistrationStatus) {
+            await tx.registration.update({
+              where: { id: payment.registrationId },
+              data: {
+                status: canonicalRequest.resultingRegistrationStatus,
+              },
+            });
+          }
+
+          await tx.adminAudit.create({
+            data: {
+              adminUserId,
+              actionType: AdminAuditActionType.PAYMENT_REFUND,
+              targetRecordType: AdminAuditTargetType.PAYMENT,
+              targetRecordId: paymentId,
+              transactionId: data.idempotencyKey,
+              newValues: {
+                outcome: PaymentRefundStatus.SUCCEEDED,
+                paymentId,
+                refundId: createdRefund.id,
+                registrationId: payment.registrationId,
+                amountCents: refundAmountCents,
+                currency: normalizeCurrency(payment.currency),
+                executionMode: RefundExecutionMode.MANUAL,
+                reason: canonicalRequest.reason,
+                externalReference: canonicalRequest.externalReference,
+                resultingRegistrationStatus: canonicalRequest.resultingRegistrationStatus,
+                requestedFullRefund: canonicalRequest.fullRefund,
+              },
+              reason: canonicalRequest.reason,
+            },
+          });
+
+          const updatedPayment = await tx.payment.findUnique({
+            where: { id: paymentId },
+            select: adminPaymentSelect,
+          });
+          if (!updatedPayment) {
+            throw new NotFoundException(`Payment with ID ${paymentId} not found after refund`);
+          }
+
+          return this.buildManualRefundResult(updatedPayment, createdRefund);
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+      );
+    } catch (error: unknown) {
+      if (this.isSerializationConflict(error)) {
+        throw new ConflictException(
+          'Refund balance changed concurrently; refresh the payment and retry'
+        );
+      }
+
+      if (!this.isUniqueConstraintError(error)) {
+        throw error;
+      }
+
+      const replay = await this.findManualRefundReplay(
+        paymentId,
+        data.idempotencyKey,
+        canonicalRequest
+      );
+      if (!replay) {
+        throw error;
+      }
+
+      return replay;
+    }
+  }
+
+  private canonicalizeManualRefund(data: CreateRefundDto): CanonicalManualRefund {
+    if (data.executionMode !== RefundExecutionMode.MANUAL) {
+      throw new BadRequestException(
+        'Only MANUAL executionMode is supported for this refund command'
+      );
+    }
+
+    const hasAmount = data.amountCents !== undefined;
+    const hasFullRefund = data.fullRefund !== undefined;
+    if (
+      hasAmount === hasFullRefund ||
+      (hasAmount && (!Number.isSafeInteger(data.amountCents) || (data.amountCents ?? 0) <= 0)) ||
+      (hasFullRefund && data.fullRefund !== true)
+    ) {
+      throw new BadRequestException(
+        'Provide exactly one of a positive integer amountCents or fullRefund: true'
+      );
+    }
+
+    this.validateResultingRegistrationStatus(data.resultingRegistrationStatus);
+
+    return {
+      amountCents: data.amountCents,
+      fullRefund: data.fullRefund === true,
+      executionMode: RefundExecutionMode.MANUAL,
+      reason: data.reason?.trim() || null,
+      externalReference: data.externalReference?.trim() || null,
+      resultingRegistrationStatus: data.resultingRegistrationStatus ?? null,
+    };
+  }
+
+  private validateManualRefundPayment(status: PaymentStatus): void {
+    if (status !== PaymentStatus.COMPLETED && status !== PaymentStatus.PARTIALLY_REFUNDED) {
+      throw new BadRequestException(`Cannot refund payment with status ${status}`);
+    }
+  }
+
+  private validateManualRefundRegistration(
+    registrationId: string | null,
+    resultingStatus: RegistrationStatus | null
+  ): void {
+    if (resultingStatus && !registrationId) {
+      throw new BadRequestException(
+        'Cannot apply a registration status to a payment without a registration'
+      );
+    }
+  }
+
+  private validateResultingRegistrationStatus(status: RegistrationStatus | undefined): void {
+    if (
+      status === undefined ||
+      status === RegistrationStatus.PENDING ||
+      status === RegistrationStatus.CONFIRMED ||
+      status === RegistrationStatus.WAITLISTED
+    ) {
+      return;
+    }
+
+    throw new BadRequestException(
+      'resultingRegistrationStatus must be PENDING, CONFIRMED, or WAITLISTED; use the cancellation workflow to cancel a registration'
     );
+  }
+
+  private getPaymentAmountCents(amount: number): number {
+    try {
+      return dollarsToCents(amount);
+    } catch (error: unknown) {
+      if (error instanceof RangeError) {
+        throw new BadRequestException(error.message);
+      }
+
+      throw error;
+    }
+  }
+
+  private resolveManualRefundReplay(
+    payment: AdminPaymentRecord,
+    existingRefund: InternalRefundRecord,
+    auditValues: Prisma.JsonValue | null | undefined,
+    canonicalRequest: CanonicalManualRefund
+  ): ManualRefundResult {
+    const requestedFullRefund = this.getRequestedFullRefundFromAudit(auditValues);
+    const amountMatches = canonicalRequest.fullRefund
+      ? existingRefund.amountCents ===
+        this.calculateRefundTotals(
+          this.getPaymentAmountCents(payment.amount),
+          payment.refunds.filter(refund => refund.id !== existingRefund.id)
+        ).availableRefundCents
+      : existingRefund.amountCents === canonicalRequest.amountCents;
+
+    if (
+      requestedFullRefund === null ||
+      requestedFullRefund !== canonicalRequest.fullRefund ||
+      !amountMatches ||
+      existingRefund.executionMode !== canonicalRequest.executionMode ||
+      existingRefund.reason !== canonicalRequest.reason ||
+      existingRefund.externalReference !== canonicalRequest.externalReference ||
+      existingRefund.resultingRegistrationStatus !== canonicalRequest.resultingRegistrationStatus
+    ) {
+      throw new ConflictException(
+        'Idempotency key has already been used with different refund data'
+      );
+    }
+
+    return this.buildManualRefundResult(payment, existingRefund);
+  }
+
+  private getRequestedFullRefundFromAudit(
+    auditValues: Prisma.JsonValue | null | undefined
+  ): boolean | null {
+    if (
+      typeof auditValues !== 'object' ||
+      auditValues === null ||
+      Array.isArray(auditValues) ||
+      !('requestedFullRefund' in auditValues) ||
+      typeof auditValues.requestedFullRefund !== 'boolean'
+    ) {
+      return null;
+    }
+
+    return auditValues.requestedFullRefund;
+  }
+
+  private buildManualRefundResult(
+    payment: AdminPaymentRecord,
+    refund: InternalRefundRecord
+  ): ManualRefundResult {
+    const adminPayment = this.toAdminPayment(payment);
+
+    return {
+      payment: adminPayment,
+      refund: {
+        id: refund.id,
+        amountCents: refund.amountCents,
+        currency: refund.currency,
+        executionMode: refund.executionMode,
+        status: refund.status,
+        reason: refund.reason,
+        externalReference: refund.externalReference,
+        resultingRegistrationStatus: refund.resultingRegistrationStatus,
+        createdAt: refund.createdAt,
+        updatedAt: refund.updatedAt,
+      },
+      paymentAmountCents: adminPayment.paymentAmountCents,
+      successfulRefundCents: adminPayment.successfulRefundCents,
+      pendingRefundCents: adminPayment.pendingRefundCents,
+      availableRefundCents: adminPayment.availableRefundCents,
+    };
+  }
+
+  private async findManualRefundReplay(
+    paymentId: string,
+    idempotencyKey: string,
+    canonicalRequest: CanonicalManualRefund
+  ): Promise<ManualRefundResult | null> {
+    const existingRefund = await this.prisma.paymentRefund.findUnique({
+      where: { idempotencyKey },
+      select: internalRefundSelect,
+    });
+    if (!existingRefund) {
+      return null;
+    }
+
+    if (existingRefund.paymentId !== paymentId) {
+      throw new ConflictException(
+        'Idempotency key has already been used with different refund data'
+      );
+    }
+
+    const [payment, replayAudit] = await Promise.all([
+      this.prisma.payment.findUnique({
+        where: { id: paymentId },
+        select: adminPaymentSelect,
+      }),
+      this.prisma.adminAudit.findFirst({
+        where: {
+          transactionId: idempotencyKey,
+          actionType: AdminAuditActionType.PAYMENT_REFUND,
+          targetRecordType: AdminAuditTargetType.PAYMENT,
+          targetRecordId: paymentId,
+        },
+        select: { newValues: true },
+      }),
+    ]);
+    if (!payment) {
+      throw new NotFoundException(`Payment with ID ${paymentId} not found`);
+    }
+
+    return this.resolveManualRefundReplay(
+      payment,
+      existingRefund,
+      replayAudit?.newValues,
+      canonicalRequest
+    );
+  }
+
+  private isSerializationConflict(error: unknown): boolean {
+    return typeof error === 'object' && error !== null && 'code' in error && error.code === 'P2034';
   }
 
   /**
@@ -633,13 +1127,17 @@ export class PaymentsService {
    * @param data - Stripe payment data
    * @returns Payment intent or checkout session information
    */
-  async initiateStripePayment(data: CreateStripePaymentDto): Promise<{ paymentId: string; clientSecret?: string; url?: string }> {
+  async initiateStripePayment(
+    data: CreateStripePaymentDto
+  ): Promise<{ paymentId: string; clientSecret?: string; url?: string }> {
     try {
-      this.logger.log(`Initiating Stripe payment for user ${data.userId}, registrationId: ${data.registrationId || 'none'}, amount: ${data.amount}`);
-      
+      this.logger.log(
+        `Initiating Stripe payment for user ${data.userId}, registrationId: ${data.registrationId || 'none'}, amount: ${data.amount}`
+      );
+
       // Create checkout session
       const session = await this.stripeService.createCheckoutSession(data);
-      
+
       // Create payment record
       const payment = await this.create({
         amount: data.amount / 100, // Convert from cents
@@ -649,14 +1147,17 @@ export class PaymentsService {
         registrationId: data.registrationId,
         providerRefId: session.id,
       });
-      
+
       return {
         paymentId: payment.id,
         url: session.url || undefined,
       };
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      this.logger.error(`Failed to initiate Stripe payment: ${errorMessage}`, error instanceof Error ? error.stack : undefined);
+      this.logger.error(
+        `Failed to initiate Stripe payment: ${errorMessage}`,
+        error instanceof Error ? error.stack : undefined
+      );
       throw error;
     }
   }
@@ -666,18 +1167,20 @@ export class PaymentsService {
    * @param data - PayPal payment data
    * @returns PayPal order information with approval URL
    */
-  async initiatePaypalPayment(data: CreatePaypalPaymentDto): Promise<{ paymentId: string; orderId: string; approvalUrl: string }> {
+  async initiatePaypalPayment(
+    data: CreatePaypalPaymentDto
+  ): Promise<{ paymentId: string; orderId: string; approvalUrl: string }> {
     try {
       // Create PayPal order
       const order = await this.paypalService.createOrder(data);
-      
+
       // Find approval URL
       const approvalUrl = order.links.find((link: PayPalLink) => link.rel === 'approve')?.href;
-      
+
       if (!approvalUrl) {
         throw new BadRequestException('PayPal order missing approval URL');
       }
-      
+
       // Create payment record
       const payment = await this.create({
         amount: data.amount,
@@ -687,7 +1190,7 @@ export class PaymentsService {
         registrationId: data.registrationId,
         providerRefId: order.id,
       });
-      
+
       return {
         paymentId: payment.id,
         orderId: order.id,
@@ -695,7 +1198,10 @@ export class PaymentsService {
       };
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      this.logger.error(`Failed to initiate PayPal payment: ${errorMessage}`, error instanceof Error ? error.stack : undefined);
+      this.logger.error(
+        `Failed to initiate PayPal payment: ${errorMessage}`,
+        error instanceof Error ? error.stack : undefined
+      );
       throw error;
     }
   }
@@ -704,12 +1210,14 @@ export class PaymentsService {
    * Process a PayPal webhook event
    * Not yet implemented - would be similar to Stripe webhook handling
    */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  async handlePaypalWebhook(_payload: Record<string, unknown>): Promise<{ received: boolean; type: string }> {
+  async handlePaypalWebhook(
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _payload: Record<string, unknown>
+  ): Promise<{ received: boolean; type: string }> {
     // Implementation would be similar to Stripe webhook handling
     // PayPal webhooks have their own format and verification methods
     this.logger.log('PayPal webhook received, but handling not yet implemented');
-    
+
     return { received: true, type: 'paypal.webhook' };
   }
 
@@ -718,65 +1226,65 @@ export class PaymentsService {
    * @param data - Refund data
    * @returns Refund processing result
    */
-  async processRefund(data: CreateRefundDto): Promise<RefundResult> {
+  async processRefund(data: LegacyRefundRequest): Promise<RefundResult> {
     // Check if payment exists
     const payment = await this.findOne(data.paymentId);
-    
+
     // Can only refund completed payments
     if (payment.status !== PaymentStatus.COMPLETED) {
       throw new BadRequestException(`Cannot refund payment with status ${payment.status}`);
     }
-    
+
     try {
       // Calculate refund amount
       let refundAmount = data.amount;
-      
+
       if (!refundAmount && data.percentageOfOriginal) {
         refundAmount = (payment.amount * data.percentageOfOriginal) / 100;
       }
-      
+
       if (!refundAmount) {
         refundAmount = payment.amount; // Full refund
       }
-      
+
       // Process refund with payment provider
       let providerRefund: ProviderRefund;
-      
+
       if (payment.provider === PaymentProvider.STRIPE) {
         if (!payment.providerRefId) {
           throw new BadRequestException('Payment has no provider reference ID');
         }
-        
+
         // Convert from dollars (database) to cents (Stripe expects cents)
         const refundAmountCents = Math.round(refundAmount * 100);
-        
+
         providerRefund = await this.stripeService.createRefund(
           payment.providerRefId,
           refundAmountCents,
-          data.reason,
+          data.reason
         );
       } else if (payment.provider === PaymentProvider.PAYPAL) {
         if (!payment.providerRefId) {
           throw new BadRequestException('Payment has no provider reference ID');
         }
-        
+
         // Use dollar amount as-is since PayPal expects dollar amounts and database stores in dollars
         providerRefund = await this.paypalService.createRefund(
           payment.providerRefId,
           refundAmount,
-          data.reason,
+          data.reason
         );
       } else {
         // Manual refund (just update the database)
         providerRefund = { id: `manual-refund-${Date.now()}` };
       }
-      
+
       // Update payment status
       await this.update(payment.id, {
         status: PaymentStatus.REFUNDED,
         // notes field removed as it's not in the Prisma schema
       });
-      
+
       // If there's a registration, update its status
       if (payment.registration) {
         await this.prisma.registration.update({
@@ -784,7 +1292,7 @@ export class PaymentsService {
           data: { status: 'CANCELLED' },
         });
       }
-      
+
       return {
         paymentId: payment.id,
         refundAmount,
@@ -793,7 +1301,10 @@ export class PaymentsService {
       };
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      this.logger.error(`Failed to process refund: ${errorMessage}`, error instanceof Error ? error.stack : undefined);
+      this.logger.error(
+        `Failed to process refund: ${errorMessage}`,
+        error instanceof Error ? error.stack : undefined
+      );
       throw error;
     }
   }
@@ -813,30 +1324,34 @@ export class PaymentsService {
   }> {
     try {
       // Find payment with this session ID
-      const payment = await this.prisma.payment.findFirst({
+      const payment = (await this.prisma.payment.findFirst({
         where: { providerRefId: sessionId },
         include: { registration: true },
-      }) as PaymentWithRelations;
-      
+      })) as PaymentWithRelations;
+
       if (!payment) {
         throw new NotFoundException(`Payment not found for Stripe session ${sessionId}`);
       }
 
-      this.logger.log(`Found payment ${payment.id} for session ${sessionId}, registration: ${payment.registration?.id || 'none'}, registration status: ${payment.registration?.status || 'none'}`);
+      this.logger.log(
+        `Found payment ${payment.id} for session ${sessionId}, registration: ${payment.registration?.id || 'none'}, registration status: ${payment.registration?.status || 'none'}`
+      );
 
       // Get the actual session status from Stripe
       const stripeSession = await this.stripeService.getCheckoutSession(sessionId);
-      
-      this.logger.log(`Stripe session ${sessionId} status: ${stripeSession.status}, payment_status: ${stripeSession.payment_status}`);
-      
+
+      this.logger.log(
+        `Stripe session ${sessionId} status: ${stripeSession.status}, payment_status: ${stripeSession.payment_status}`
+      );
+
       // Determine the payment status based on Stripe session
       let updatedPaymentStatus = payment.status;
       let updatedRegistrationStatus = payment.registration?.status;
-      
+
       if (stripeSession.payment_status === 'paid') {
         // Payment was successful - mark payment and registration as complete
         updatedPaymentStatus = PaymentStatus.COMPLETED;
-        
+
         if (payment.registration) {
           // Capacity beats payment: a WAITLISTED registration must NOT be
           // promoted to CONFIRMED just because the user paid. The
@@ -872,8 +1387,10 @@ export class PaymentsService {
             payment.registration.paymentDeferred
           ) {
             try {
-              this.logger.log(`Updating payment ${payment.id} to COMPLETED and registration ${payment.registration.id} to ${targetStatus} (paymentDeferred cleared)`);
-              
+              this.logger.log(
+                `Updating payment ${payment.id} to COMPLETED and registration ${payment.registration.id} to ${targetStatus} (paymentDeferred cleared)`
+              );
+
               try {
                 // Use transaction to ensure atomicity between payment and registration updates
                 const transactionResults = await this.prisma.$transaction([
@@ -886,12 +1403,14 @@ export class PaymentsService {
                     data: { status: targetStatus, paymentDeferred: false },
                   }),
                 ]);
-                
+
                 this.logger.log(`Successfully updated payment and registration statuses`);
-                this.logger.debug(`Transaction results: ${JSON.stringify({
-                  payment: transactionResults[0].id,
-                  registration: transactionResults[1].id
-                })}`);
+                this.logger.debug(
+                  `Transaction results: ${JSON.stringify({
+                    payment: transactionResults[0].id,
+                    registration: transactionResults[1].id,
+                  })}`
+                );
 
                 // Send registration confirmation email with the updated
                 // status — but skip it for a deferred → paid transition,
@@ -900,33 +1419,47 @@ export class PaymentsService {
                 // deferred" notice). Sending it again would duplicate.
                 const wasDeferred = payment.registration.paymentDeferred === true;
                 if (!wasDeferred) {
-                  this.sendRegistrationConfirmationEmailAfterPayment(payment.registration.id)
-                    .catch(emailError => {
-                      this.logger.warn(`Failed to send registration confirmation email: ${emailError instanceof Error ? emailError.message : 'Unknown error'}`);
-                    });
+                  this.sendRegistrationConfirmationEmailAfterPayment(payment.registration.id).catch(
+                    emailError => {
+                      this.logger.warn(
+                        `Failed to send registration confirmation email: ${emailError instanceof Error ? emailError.message : 'Unknown error'}`
+                      );
+                    }
+                  );
                 }
               } catch (transactionError) {
                 // If the transaction fails, at least try to update the payment status
                 // This ensures we record the successful Stripe payment even if registration update fails
-                this.logger.warn(`Transaction failed, falling back to payment-only update: ${transactionError instanceof Error ? transactionError.message : 'Unknown error'}`);
-                
+                this.logger.warn(
+                  `Transaction failed, falling back to payment-only update: ${transactionError instanceof Error ? transactionError.message : 'Unknown error'}`
+                );
+
                 if (payment.status !== PaymentStatus.COMPLETED) {
                   await this.prisma.payment.update({
                     where: { id: payment.id },
-                    data: { 
-                      status: PaymentStatus.COMPLETED
+                    data: {
+                      status: PaymentStatus.COMPLETED,
                     },
                   });
-                  this.logger.log(`Updated payment ${payment.id} to COMPLETED (registration update failed: ${transactionError instanceof Error ? transactionError.message : 'Unknown error'})`);
+                  this.logger.log(
+                    `Updated payment ${payment.id} to COMPLETED (registration update failed: ${transactionError instanceof Error ? transactionError.message : 'Unknown error'})`
+                  );
                 }
               }
             } catch (error) {
               const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-              this.logger.error(`Failed to update statuses: ${errorMessage}`, error instanceof Error ? error.stack : undefined);
-              throw new BadRequestException(`Failed to update payment or registration status: ${errorMessage}`);
+              this.logger.error(
+                `Failed to update statuses: ${errorMessage}`,
+                error instanceof Error ? error.stack : undefined
+              );
+              throw new BadRequestException(
+                `Failed to update payment or registration status: ${errorMessage}`
+              );
             }
           } else {
-            this.logger.log(`Both payment and registration already have correct statuses, no update needed`);
+            this.logger.log(
+              `Both payment and registration already have correct statuses, no update needed`
+            );
           }
         } else {
           // No registration linked, just update the payment if needed
@@ -939,20 +1472,25 @@ export class PaymentsService {
             this.logger.log(`Payment ${payment.id} already marked as COMPLETED (no registration)`);
           }
         }
-      } else if (stripeSession.payment_status === 'unpaid' && payment.status === PaymentStatus.PENDING) {
+      } else if (
+        stripeSession.payment_status === 'unpaid' &&
+        payment.status === PaymentStatus.PENDING
+      ) {
         // Payment is still pending or failed
         if (stripeSession.status === 'expired') {
-          this.logger.log(`Updating payment ${payment.id} status to FAILED based on expired Stripe session`);
-          
+          this.logger.log(
+            `Updating payment ${payment.id} status to FAILED based on expired Stripe session`
+          );
+
           await this.update(payment.id, {
             status: PaymentStatus.FAILED,
             // notes field removed as it's not in the Prisma schema
           });
-          
+
           updatedPaymentStatus = PaymentStatus.FAILED;
         }
       }
-      
+
       return {
         sessionId,
         paymentStatus: updatedPaymentStatus,
@@ -965,7 +1503,10 @@ export class PaymentsService {
         throw error;
       }
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      this.logger.error(`Failed to verify Stripe session: ${errorMessage}`, error instanceof Error ? error.stack : undefined);
+      this.logger.error(
+        `Failed to verify Stripe session: ${errorMessage}`,
+        error instanceof Error ? error.stack : undefined
+      );
       throw new BadRequestException('Failed to verify Stripe session');
     }
   }
@@ -974,7 +1515,9 @@ export class PaymentsService {
    * Send registration confirmation email after payment completion
    * @param registrationId - The registration ID
    */
-  private async sendRegistrationConfirmationEmailAfterPayment(registrationId: string): Promise<void> {
+  private async sendRegistrationConfirmationEmailAfterPayment(
+    registrationId: string
+  ): Promise<void> {
     try {
       // Get the updated registration with all necessary data
       const registration = await this.prisma.registration.findUnique({
@@ -1022,17 +1565,18 @@ export class PaymentsService {
       }));
 
       // Format jobs from registration
-      const jobs = registration.jobs?.map((regJob) => ({
-        name: regJob.job?.name || 'Unknown Job',
-        category: regJob.job?.category?.name || 'Unknown Category',
-        shift: {
-          name: regJob.job?.shift?.name || 'Unknown Shift',
-          startTime: regJob.job?.shift?.startTime || '',
-          endTime: regJob.job?.shift?.endTime || '',
-          dayOfWeek: regJob.job?.shift?.dayOfWeek || '',
-        },
-        location: regJob.job?.location || 'TBD',
-      })) || [];
+      const jobs =
+        registration.jobs?.map(regJob => ({
+          name: regJob.job?.name || 'Unknown Job',
+          category: regJob.job?.category?.name || 'Unknown Category',
+          shift: {
+            name: regJob.job?.shift?.name || 'Unknown Shift',
+            startTime: regJob.job?.shift?.startTime || '',
+            endTime: regJob.job?.shift?.endTime || '',
+            dayOfWeek: regJob.job?.shift?.dayOfWeek || '',
+          },
+          location: regJob.job?.location || 'TBD',
+        })) || [];
 
       const registrationDetails = {
         id: registration.id,
@@ -1045,9 +1589,10 @@ export class PaymentsService {
       };
 
       // Build user name for email personalization
-      const userName = registration.user.firstName && registration.user.lastName 
-        ? `${registration.user.firstName} ${registration.user.lastName}` 
-        : undefined;
+      const userName =
+        registration.user.firstName && registration.user.lastName
+          ? `${registration.user.firstName} ${registration.user.lastName}`
+          : undefined;
 
       await this.notificationsService.sendRegistrationConfirmationEmail(
         registration.user.email,
@@ -1057,10 +1602,15 @@ export class PaymentsService {
         registration.user.playaName || undefined
       );
 
-      this.logger.log(`Registration confirmation email sent to ${registration.user.email} with status ${registration.status}`);
+      this.logger.log(
+        `Registration confirmation email sent to ${registration.user.email} with status ${registration.status}`
+      );
     } catch (error: unknown) {
       const err = error as Error;
-      this.logger.error(`Error sending registration confirmation email after payment: ${err.message}`, err.stack);
+      this.logger.error(
+        `Error sending registration confirmation email after payment: ${err.message}`,
+        err.stack
+      );
       // Don't throw - email failures should not block payment processing
     }
   }
