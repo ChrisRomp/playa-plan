@@ -20,7 +20,8 @@ vi.mock('../../lib/api/admin-payments', async () => {
     adminPaymentsApi: {
       getPayments: vi.fn(),
       recordExternalPayment: vi.fn(),
-      createManualRefund: vi.fn(),
+      createRefund: vi.fn(),
+      retryStripeRefund: vi.fn(),
     },
   };
 });
@@ -28,7 +29,8 @@ vi.mock('../../lib/api/admin-payments', async () => {
 const mockGetRegistrations = vi.mocked(adminRegistrationsApi.getRegistrations);
 const mockGetPayments = vi.mocked(adminPaymentsApi.getPayments);
 const mockRecordExternalPayment = vi.mocked(adminPaymentsApi.recordExternalPayment);
-const mockCreateManualRefund = vi.mocked(adminPaymentsApi.createManualRefund);
+const mockCreateRefund = vi.mocked(adminPaymentsApi.createRefund);
+const mockRetryStripeRefund = vi.mocked(adminPaymentsApi.retryStripeRefund);
 
 const registration = {
   id: '6adf7e80-3035-4d12-a2d4-45c591bb2441',
@@ -71,6 +73,7 @@ const payment = {
   pendingRefundCents: 0,
   availableRefundCents: 12550,
   refundUnavailableReason: null,
+  stripeRefundEligible: false,
 };
 
 function renderPage(): void {
@@ -213,7 +216,10 @@ describe('AdminPaymentsPage', () => {
         status: 409,
       },
     });
-    mockCreateManualRefund.mockRejectedValueOnce(axiosError).mockResolvedValueOnce(refundResult);
+    mockCreateRefund.mockRejectedValueOnce(axiosError).mockResolvedValueOnce({
+      ...refundResult,
+      outcome: 'SUCCEEDED',
+    });
     renderPage();
 
     fireEvent.click(await screen.findByRole('button', { name: 'Refund' }));
@@ -242,9 +248,9 @@ describe('AdminPaymentsPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Record manual refund' }));
 
     expect(await screen.findByText('Manual refund recorded: USD 50.50.')).toBeInTheDocument();
-    expect(mockCreateManualRefund).toHaveBeenCalledTimes(2);
-    const firstRequest = mockCreateManualRefund.mock.calls[0]?.[1];
-    const secondRequest = mockCreateManualRefund.mock.calls[1]?.[1];
+    expect(mockCreateRefund).toHaveBeenCalledTimes(2);
+    const firstRequest = mockCreateRefund.mock.calls[0]?.[1];
+    const secondRequest = mockCreateRefund.mock.calls[1]?.[1];
     expect(firstRequest).toEqual(
       expect.objectContaining({
         amountCents: 5050,
@@ -283,7 +289,7 @@ describe('AdminPaymentsPage', () => {
         payments: [fullyRefundedPayment, legacyRefundedPayment],
         total: 2,
       });
-    mockCreateManualRefund.mockResolvedValue({
+    mockCreateRefund.mockResolvedValue({
       payment: fullyRefundedPayment,
       refund: {
         id: 'full-refund',
@@ -302,6 +308,7 @@ describe('AdminPaymentsPage', () => {
       pendingRefundCents: 0,
       availableRefundCents: 0,
       refundUnavailableReason: null,
+      outcome: 'SUCCEEDED',
     });
     renderPage();
 
@@ -313,14 +320,14 @@ describe('AdminPaymentsPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Record manual refund' }));
 
     await screen.findByText('Manual refund recorded: USD 125.50.');
-    expect(mockCreateManualRefund).toHaveBeenCalledWith(
+    expect(mockCreateRefund).toHaveBeenCalledWith(
       'payment-id',
       expect.objectContaining({
         fullRefund: true,
         executionMode: 'MANUAL',
       })
     );
-    expect(mockCreateManualRefund.mock.calls[0]?.[1]).not.toHaveProperty('amountCents');
+    expect(mockCreateRefund.mock.calls[0]?.[1]).not.toHaveProperty('amountCents');
   });
 
   it('should show a legacy precision reason without rounding or offering a refund action', async () => {
@@ -382,7 +389,7 @@ describe('AdminPaymentsPage', () => {
       },
     });
     mockGetPayments.mockResolvedValue({ payments: [payment], total: 1 });
-    mockCreateManualRefund.mockRejectedValue(axiosError);
+    mockCreateRefund.mockRejectedValue(axiosError);
     renderPage();
 
     fireEvent.click(await screen.findByRole('button', { name: 'Refund' }));
@@ -409,7 +416,158 @@ describe('AdminPaymentsPage', () => {
       expect(
         await screen.findByText(/Enter a positive amount with at most two decimals/)
       ).toBeInTheDocument();
-      expect(mockCreateManualRefund).not.toHaveBeenCalled();
+      expect(mockCreateRefund).not.toHaveBeenCalled();
     }
   );
+
+  it('should offer Stripe mode only for an eligible Stripe payment with distinct copy', async () => {
+    const stripePayment = {
+      ...payment,
+      provider: 'STRIPE',
+      externalMethod: null,
+      externalReference: null,
+      stripeRefundEligible: true,
+    };
+    mockGetPayments.mockResolvedValue({ payments: [stripePayment], total: 1 });
+    renderPage();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Refund' }));
+    expect(screen.getByLabelText('Initiate Stripe refund')).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText('Initiate Stripe refund'));
+
+    expect(screen.getByText(/Stripe mode initiates a processor refund/)).toBeInTheDocument();
+    expect(screen.queryByLabelText('Manual refund reference')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Initiate Stripe refund' })).toBeInTheDocument();
+    expect(screen.getByText(/A full refund does not cancel the registration/)).toBeInTheDocument();
+  });
+
+  it('should keep an ambiguous Stripe refund reserved and retry it from history', async () => {
+    const pendingRefund = {
+      id: 'pending-refund',
+      amountCents: 2500,
+      currency: 'USD',
+      executionMode: 'STRIPE' as const,
+      status: 'PENDING' as const,
+      reason: 'customer request',
+      externalReference: null,
+      resultingRegistrationStatus: null,
+      createdAt: '2026-07-14T01:00:00.000Z',
+      updatedAt: '2026-07-14T01:00:00.000Z',
+    };
+    const stripePayment = {
+      ...payment,
+      provider: 'STRIPE',
+      externalMethod: null,
+      externalReference: null,
+      stripeRefundEligible: true,
+    };
+    const pendingPayment = {
+      ...stripePayment,
+      refunds: [pendingRefund],
+      pendingRefundCents: 2500,
+      availableRefundCents: 10050,
+    };
+    const succeededPayment = {
+      ...pendingPayment,
+      status: 'PARTIALLY_REFUNDED',
+      refunds: [{ ...pendingRefund, status: 'SUCCEEDED' as const }],
+      successfulRefundCents: 2500,
+      pendingRefundCents: 0,
+    };
+    mockGetPayments
+      .mockResolvedValueOnce({ payments: [stripePayment], total: 1 })
+      .mockResolvedValueOnce({ payments: [pendingPayment], total: 1 })
+      .mockResolvedValue({ payments: [succeededPayment], total: 1 });
+    mockCreateRefund.mockResolvedValue({
+      payment: pendingPayment,
+      refund: pendingRefund,
+      paymentAmountCents: 12550,
+      successfulRefundCents: 0,
+      pendingRefundCents: 2500,
+      availableRefundCents: 10050,
+      refundUnavailableReason: null,
+      outcome: 'PENDING_UNKNOWN',
+    });
+    mockRetryStripeRefund.mockResolvedValue({
+      payment: succeededPayment,
+      refund: succeededPayment.refunds[0],
+      paymentAmountCents: 12550,
+      successfulRefundCents: 2500,
+      pendingRefundCents: 0,
+      availableRefundCents: 10050,
+      refundUnavailableReason: null,
+      outcome: 'SUCCEEDED',
+    });
+    renderPage();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Refund' }));
+    fireEvent.click(screen.getByLabelText('Initiate Stripe refund'));
+    fireEvent.change(screen.getByLabelText('Partial refund amount'), {
+      target: { value: '25.00' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Initiate Stripe refund' }));
+
+    expect(await screen.findByText(/Stripe outcome is pending or unknown/)).toBeInTheDocument();
+    expect(mockCreateRefund.mock.calls[0]?.[1]).toEqual(
+      expect.objectContaining({
+        amountCents: 2500,
+        executionMode: 'STRIPE',
+      })
+    );
+    expect(mockCreateRefund.mock.calls[0]?.[1]).not.toHaveProperty('externalReference');
+    fireEvent.click(await screen.findByRole('button', { name: 'Retry' }));
+
+    await screen.findByText('Stripe refund reconciliation succeeded.');
+    expect(mockRetryStripeRefund).toHaveBeenCalledWith('payment-id', 'pending-refund');
+    expect(mockGetPayments).toHaveBeenLastCalledWith(0, 25);
+  });
+
+  it('should show a definite Stripe failure and released reservation', async () => {
+    const failedRefund = {
+      id: 'failed-refund',
+      amountCents: 2500,
+      currency: 'USD',
+      executionMode: 'STRIPE' as const,
+      status: 'FAILED' as const,
+      reason: null,
+      externalReference: null,
+      resultingRegistrationStatus: null,
+      createdAt: '2026-07-14T01:00:00.000Z',
+      updatedAt: '2026-07-14T01:00:00.000Z',
+    };
+    const stripePayment = {
+      ...payment,
+      provider: 'STRIPE',
+      stripeRefundEligible: true,
+    };
+    const failedPayment = {
+      ...stripePayment,
+      refunds: [failedRefund],
+    };
+    mockGetPayments
+      .mockResolvedValueOnce({ payments: [stripePayment], total: 1 })
+      .mockResolvedValue({ payments: [failedPayment], total: 1 });
+    mockCreateRefund.mockResolvedValue({
+      payment: failedPayment,
+      refund: failedRefund,
+      paymentAmountCents: 12550,
+      successfulRefundCents: 0,
+      pendingRefundCents: 0,
+      availableRefundCents: 12550,
+      refundUnavailableReason: null,
+      outcome: 'FAILED',
+    });
+    renderPage();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Refund' }));
+    fireEvent.click(screen.getByLabelText('Initiate Stripe refund'));
+    fireEvent.change(screen.getByLabelText('Partial refund amount'), {
+      target: { value: '25.00' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Initiate Stripe refund' }));
+
+    expect(await screen.findByText(/Stripe rejected the refund/)).toBeInTheDocument();
+    expect(await screen.findByText(/USD 25.00 FAILED \/ STRIPE/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
+  });
 });

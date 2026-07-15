@@ -76,11 +76,37 @@ describe('adminPaymentsApi', () => {
     };
     mockApiPost.mockResolvedValue({ data: mockResult });
 
-    const actualResult = await adminPaymentsApi.createManualRefund('payment-id', inputRequest);
+    const actualResult = await adminPaymentsApi.createRefund('payment-id', inputRequest);
 
     expect(mockApiPost).toHaveBeenCalledWith('/payments/payment-id/refunds', inputRequest);
     expect(mockApiPost.mock.calls[0]?.[1]).not.toHaveProperty('currency');
     expect(mockApiPost.mock.calls[0]?.[1]).not.toHaveProperty('availableRefundCents');
     expect(actualResult).toEqual(mockResult);
+  });
+
+  it('should send Stripe mode without manual or derived fields', async () => {
+    const inputRequest = {
+      fullRefund: true as const,
+      executionMode: 'STRIPE' as const,
+      reason: 'customer request',
+      idempotencyKey: '43ea4b84-1f0d-413d-bc1c-9c91b435d66d',
+    };
+    mockApiPost.mockResolvedValue({ data: { outcome: 'PENDING_UNKNOWN' } });
+
+    await adminPaymentsApi.createRefund('payment-id', inputRequest);
+
+    expect(mockApiPost).toHaveBeenCalledWith('/payments/payment-id/refunds', inputRequest);
+    expect(mockApiPost.mock.calls[0]?.[1]).not.toHaveProperty('externalReference');
+    expect(mockApiPost.mock.calls[0]?.[1]).not.toHaveProperty('currency');
+  });
+
+  it('should retry the exact nested refund route without mutable data', async () => {
+    mockApiPost.mockResolvedValue({ data: { outcome: 'PENDING_UNKNOWN' } });
+
+    await adminPaymentsApi.retryStripeRefund('payment-id', 'refund-id');
+
+    expect(mockApiPost).toHaveBeenCalledWith(
+      '/payments/payment-id/refunds/refund-id/retry'
+    );
   });
 });
