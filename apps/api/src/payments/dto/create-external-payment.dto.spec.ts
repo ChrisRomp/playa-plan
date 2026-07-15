@@ -56,6 +56,15 @@ describe('CreateExternalPaymentDto', () => {
     },
   );
 
+  it('should leave safe-cent range enforcement to service canonicalization', async () => {
+    const actualErrors = await validateRequest({
+      ...validRequest,
+      amount: Number.MAX_SAFE_INTEGER,
+    });
+
+    expect(actualErrors).toHaveLength(0);
+  });
+
   it('should reject invalid currency, method, reference, and UUID values', async () => {
     const actualErrors = await validateRequest({
       ...validRequest,

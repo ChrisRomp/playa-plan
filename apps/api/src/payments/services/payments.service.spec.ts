@@ -2526,6 +2526,29 @@ describe('PaymentsService', () => {
       });
     });
 
+    it('should return bad request for an amount outside the safe cent range', async () => {
+      let actualError: unknown;
+
+      try {
+        await service.recordExternalPayment(
+          { ...inputRequest, amount: Number.MAX_SAFE_INTEGER },
+          'admin-id',
+        );
+      } catch (error: unknown) {
+        actualError = error;
+      }
+
+      expect(actualError).toBeInstanceOf(BadRequestException);
+      if (!(actualError instanceof BadRequestException)) {
+        throw actualError;
+      }
+      expect(actualError.getStatus()).toBe(400);
+      expect(actualError.message).toBe(
+        'Dollar amount exceeds the supported range',
+      );
+      expect(mockPrismaService.$transaction).not.toHaveBeenCalled();
+    });
+
     it('should atomically derive the owner, create the payment, update registration, and audit', async () => {
       const actualPayment = await service.recordExternalPayment(
         inputRequest,

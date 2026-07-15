@@ -538,13 +538,21 @@ export class PaymentsService {
   private canonicalizeExternalPayment(
     data: CreateExternalPaymentDto,
   ): CanonicalExternalPayment {
-    return {
-      registrationId: data.registrationId,
-      amountCents: dollarsToCents(data.amount),
-      currency: normalizeCurrency(data.currency),
-      externalMethod: data.externalMethod,
-      externalReference: data.externalReference?.trim() || null,
-    };
+    try {
+      return {
+        registrationId: data.registrationId,
+        amountCents: dollarsToCents(data.amount),
+        currency: normalizeCurrency(data.currency),
+        externalMethod: data.externalMethod,
+        externalReference: data.externalReference?.trim() || null,
+      };
+    } catch (error: unknown) {
+      if (error instanceof RangeError) {
+        throw new BadRequestException(error.message);
+      }
+
+      throw error;
+    }
   }
 
   private resolveExternalPaymentReplay(
