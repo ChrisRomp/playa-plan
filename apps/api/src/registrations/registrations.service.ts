@@ -39,6 +39,19 @@ interface JobRegistrationWithJobs extends Registration {
   }>;
 }
 
+const participantPaymentSelect = {
+  id: true,
+  amount: true,
+  currency: true,
+  status: true,
+  provider: true,
+  providerRefId: true,
+  createdAt: true,
+  updatedAt: true,
+  userId: true,
+  registrationId: true,
+} satisfies Prisma.PaymentSelect;
+
 @Injectable()
 export class RegistrationsService {
   private readonly logger = new Logger(RegistrationsService.name);
@@ -336,7 +349,9 @@ export class RegistrationsService {
             },
           },
         },
-        payments: true,
+        payments: {
+          select: participantPaymentSelect,
+        },
       },
       orderBy: {
         year: 'desc',
@@ -387,7 +402,9 @@ export class RegistrationsService {
             },
           },
         },
-        payments: true,
+        payments: {
+          select: participantPaymentSelect,
+        },
       },
       orderBy: {
         createdAt: 'desc', // Get the most recent registration if multiple exist
@@ -446,7 +463,9 @@ export class RegistrationsService {
             },
           },
         },
-        payments: true,
+        payments: {
+          select: participantPaymentSelect,
+        },
       },
     });
 
@@ -1656,7 +1675,9 @@ export class RegistrationsService {
             },
           },
         },
-        payments: true,
+        payments: {
+          select: participantPaymentSelect,
+        },
       },
     });
 
