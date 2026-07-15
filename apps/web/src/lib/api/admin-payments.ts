@@ -10,6 +10,23 @@ export type ExternalPaymentMethod =
   | 'BANK_TRANSFER'
   | 'OTHER';
 
+export type RefundExecutionMode = 'MANUAL' | 'STRIPE';
+export type PaymentRefundStatus = 'PENDING' | 'SUCCEEDED' | 'FAILED';
+export type RefundRegistrationStatus = 'PENDING' | 'CONFIRMED' | 'WAITLISTED';
+
+export interface AdminPaymentRefund {
+  id: string;
+  amountCents: number;
+  currency: string;
+  executionMode: RefundExecutionMode;
+  status: PaymentRefundStatus;
+  reason: string | null;
+  externalReference: string | null;
+  resultingRegistrationStatus: RefundRegistrationStatus | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface AdminPayment {
   id: string;
   amount: number;
@@ -33,6 +50,11 @@ export interface AdminPayment {
     year: number;
     status: string;
   } | null;
+  refunds: AdminPaymentRefund[];
+  paymentAmountCents: number;
+  successfulRefundCents: number;
+  pendingRefundCents: number;
+  availableRefundCents: number;
 }
 
 export interface AdminPaymentPage {
@@ -49,11 +71,27 @@ export interface CreateExternalPaymentRequest {
   idempotencyKey: string;
 }
 
+export interface CreateManualRefundRequest {
+  amountCents?: number;
+  fullRefund?: true;
+  executionMode: 'MANUAL';
+  reason?: string;
+  externalReference?: string;
+  resultingRegistrationStatus?: RefundRegistrationStatus;
+  idempotencyKey: string;
+}
+
+export interface ManualRefundResult {
+  payment: AdminPayment;
+  refund: AdminPaymentRefund;
+  paymentAmountCents: number;
+  successfulRefundCents: number;
+  pendingRefundCents: number;
+  availableRefundCents: number;
+}
+
 export const adminPaymentsApi = {
-  getPayments: async (
-    skip = 0,
-    take = ADMIN_PAYMENT_PAGE_SIZE,
-  ): Promise<AdminPaymentPage> => {
+  getPayments: async (skip = 0, take = ADMIN_PAYMENT_PAGE_SIZE): Promise<AdminPaymentPage> => {
     const params = new URLSearchParams({
       skip: skip.toString(),
       take: take.toString(),
@@ -62,10 +100,16 @@ export const adminPaymentsApi = {
     return response.data;
   },
 
-  recordExternalPayment: async (
-    request: CreateExternalPaymentRequest,
-  ): Promise<AdminPayment> => {
+  recordExternalPayment: async (request: CreateExternalPaymentRequest): Promise<AdminPayment> => {
     const response = await api.post('/payments/external', request);
+    return response.data;
+  },
+
+  createManualRefund: async (
+    paymentId: string,
+    request: CreateManualRefundRequest
+  ): Promise<ManualRefundResult> => {
+    const response = await api.post(`/payments/${paymentId}/refunds`, request);
     return response.data;
   },
 };
