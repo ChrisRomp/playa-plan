@@ -72,6 +72,7 @@ describe('adminPaymentsApi', () => {
       successfulRefundCents: 5050,
       pendingRefundCents: 0,
       availableRefundCents: 4950,
+      refundUnavailableReason: null,
     };
     mockApiPost.mockResolvedValue({ data: mockResult });
 

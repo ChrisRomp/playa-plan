@@ -154,10 +154,11 @@ type InternalRefundRecord = Prisma.PaymentRefundGetPayload<{
 }>;
 
 interface RefundTotals {
-  paymentAmountCents: number;
+  paymentAmountCents: number | null;
   successfulRefundCents: number;
   pendingRefundCents: number;
   availableRefundCents: number;
+  refundUnavailableReason: string | null;
 }
 
 export type AdminPayment = AdminPaymentRecord & RefundTotals;
@@ -193,6 +194,8 @@ interface LegacyRefundRequest {
 
 const DEFAULT_ADMIN_PAYMENT_PAGE_SIZE = 25;
 const MAX_ADMIN_PAYMENT_PAGE_SIZE = 100;
+const UNSUPPORTED_PAYMENT_PRECISION_REASON =
+  'Refund unavailable because the stored payment amount has unsupported precision.';
 
 // Interface for refund result
 export interface RefundResult {
@@ -677,11 +680,7 @@ export class PaymentsService {
   }
 
   private toAdminPayment(payment: AdminPaymentRecord | ExternalPaymentRecord): AdminPayment {
-    const totals = this.calculateRefundTotals(
-      dollarsToCents(payment.amount),
-      payment.refunds,
-      payment.status === PaymentStatus.REFUNDED
-    );
+    const totals = this.getAdminRefundTotals(payment);
 
     return {
       id: payment.id,
@@ -702,6 +701,30 @@ export class PaymentsService {
     };
   }
 
+  private getAdminRefundTotals(
+    payment: AdminPaymentRecord | ExternalPaymentRecord
+  ): RefundTotals {
+    try {
+      return this.calculateRefundTotals(
+        dollarsToCents(payment.amount),
+        payment.refunds,
+        payment.status === PaymentStatus.REFUNDED
+      );
+    } catch (error: unknown) {
+      if (!(error instanceof RangeError)) {
+        throw error;
+      }
+
+      const ledgerTotals = this.calculateRefundLedgerTotals(payment.refunds);
+      return {
+        paymentAmountCents: null,
+        ...ledgerTotals,
+        availableRefundCents: 0,
+        refundUnavailableReason: UNSUPPORTED_PAYMENT_PRECISION_REASON,
+      };
+    }
+  }
+
   private calculateRefundTotals(
     paymentAmountCents: number,
     refunds: ReadonlyArray<{
@@ -716,9 +739,29 @@ export class PaymentsService {
         successfulRefundCents: paymentAmountCents,
         pendingRefundCents: 0,
         availableRefundCents: 0,
+        refundUnavailableReason: null,
       };
     }
 
+    const ledgerTotals = this.calculateRefundLedgerTotals(refunds);
+
+    return {
+      paymentAmountCents,
+      ...ledgerTotals,
+      availableRefundCents:
+        paymentAmountCents -
+        ledgerTotals.successfulRefundCents -
+        ledgerTotals.pendingRefundCents,
+      refundUnavailableReason: null,
+    };
+  }
+
+  private calculateRefundLedgerTotals(
+    refunds: ReadonlyArray<{
+      amountCents: number;
+      status: PaymentRefundStatus;
+    }>
+  ): Pick<RefundTotals, 'successfulRefundCents' | 'pendingRefundCents'> {
     const successfulRefundCents = refunds
       .filter(refund => refund.status === PaymentRefundStatus.SUCCEEDED)
       .reduce((total, refund) => total + refund.amountCents, 0);
@@ -727,10 +770,8 @@ export class PaymentsService {
       .reduce((total, refund) => total + refund.amountCents, 0);
 
     return {
-      paymentAmountCents,
       successfulRefundCents,
       pendingRefundCents,
-      availableRefundCents: paymentAmountCents - successfulRefundCents - pendingRefundCents,
     };
   }
 
@@ -805,6 +846,7 @@ export class PaymentsService {
           this.validateManualRefundPayment(payment.status);
           this.validateManualRefundRegistration(
             payment.registrationId,
+            payment.registration?.status ?? null,
             canonicalRequest.resultingRegistrationStatus
           );
 
@@ -961,11 +1003,22 @@ export class PaymentsService {
 
   private validateManualRefundRegistration(
     registrationId: string | null,
+    currentStatus: RegistrationStatus | null,
     resultingStatus: RegistrationStatus | null
   ): void {
-    if (resultingStatus && !registrationId) {
+    if (!resultingStatus) {
+      return;
+    }
+
+    if (!registrationId || !currentStatus) {
       throw new BadRequestException(
         'Cannot apply a registration status to a payment without a registration'
+      );
+    }
+
+    if (currentStatus === RegistrationStatus.CANCELLED || isApplicationStatus(currentStatus)) {
+      throw new BadRequestException(
+        `Cannot change a registration from ${currentStatus} during a refund; use the cancellation workflow when cancellation is intended`
       );
     }
   }
@@ -1069,6 +1122,7 @@ export class PaymentsService {
       successfulRefundCents: adminPayment.successfulRefundCents,
       pendingRefundCents: adminPayment.pendingRefundCents,
       availableRefundCents: adminPayment.availableRefundCents,
+      refundUnavailableReason: adminPayment.refundUnavailableReason,
     };
   }
 

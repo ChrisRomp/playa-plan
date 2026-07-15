@@ -65,8 +65,16 @@ function formatCents(currency: string, amountCents: number): string {
   return `${currency} ${(amountCents / 100).toFixed(2)}`;
 }
 
+function formatPaymentAmount(payment: AdminPayment): string {
+  return payment.paymentAmountCents === null
+    ? `${payment.currency} ${String(payment.amount)}`
+    : formatCents(payment.currency, payment.paymentAmountCents);
+}
+
 function canRefundPayment(payment: AdminPayment): boolean {
   return (
+    payment.paymentAmountCents !== null &&
+    payment.refundUnavailableReason === null &&
     (payment.status === 'COMPLETED' || payment.status === 'PARTIALLY_REFUNDED') &&
     payment.availableRefundCents > 0
   );
@@ -84,8 +92,34 @@ function getRegistrationEffect(registration: Registration): string {
   return `The registration will remain ${registration.status} and payment deferral will be cleared.`;
 }
 
+function getBoundedServerMessage(error: unknown): string | null {
+  if (typeof error !== 'object' || error === null || !('response' in error)) {
+    return null;
+  }
+
+  const response = error.response;
+  if (typeof response !== 'object' || response === null || !('data' in response)) {
+    return null;
+  }
+
+  const data = response.data;
+  if (typeof data !== 'object' || data === null || Array.isArray(data) || !('message' in data)) {
+    return null;
+  }
+
+  const message = data.message;
+  const normalizedMessage =
+    typeof message === 'string'
+      ? message.trim()
+      : Array.isArray(message) && message.every(item => typeof item === 'string')
+        ? message.map(item => item.trim()).filter(Boolean).join('; ')
+        : '';
+
+  return normalizedMessage ? normalizedMessage.slice(0, 500) : null;
+}
+
 function getErrorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error ? error.message : fallback;
+  return getBoundedServerMessage(error) ?? (error instanceof Error ? error.message : fallback);
 }
 
 /**
@@ -576,7 +610,7 @@ export default function AdminPaymentsPage() {
                       {new Date(payment.createdAt).toLocaleDateString()}
                     </td>
                     <td className="px-3 py-3">
-                      {payment.currency} {payment.amount.toFixed(2)}
+                      {formatPaymentAmount(payment)}
                     </td>
                     <td className="px-3 py-3">{payment.status}</td>
                     <td className="px-3 py-3">{payment.provider}</td>
@@ -596,6 +630,11 @@ export default function AdminPaymentsPage() {
                       <div className="font-medium">
                         Available: {formatCents(payment.currency, payment.availableRefundCents)}
                       </div>
+                      {payment.refundUnavailableReason && (
+                        <div className="mt-1 max-w-xs text-red-700">
+                          {payment.refundUnavailableReason}
+                        </div>
+                      )}
                     </td>
                     <td className="px-3 py-3 text-sm">
                       {payment.refunds.length === 0 ? (
@@ -683,10 +722,7 @@ export default function AdminPaymentsPage() {
               <div className="mt-4 grid gap-3 rounded border border-gray-200 p-4 text-sm md:grid-cols-4">
                 <div>
                   <span className="block text-gray-500">Original amount</span>
-                  {formatCents(
-                    selectedRefundPayment.currency,
-                    selectedRefundPayment.paymentAmountCents
-                  )}
+                  {formatPaymentAmount(selectedRefundPayment)}
                 </div>
                 <div>
                   <span className="block text-gray-500">Successful refunds</span>

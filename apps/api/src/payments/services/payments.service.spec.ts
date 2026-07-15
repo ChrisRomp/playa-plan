@@ -425,6 +425,7 @@ describe('PaymentsService', () => {
               successfulRefundCents: 2500,
               pendingRefundCents: 1000,
               availableRefundCents: 9000,
+              refundUnavailableReason: null,
             },
           ],
           total: 1,
@@ -435,6 +436,49 @@ describe('PaymentsService', () => {
         expect(actualResult.payments[0]?.refunds[0]).not.toHaveProperty('processedByUserId');
         expect(actualResult.payments[0]?.refunds[0]).not.toHaveProperty('providerRefundId');
         expect(actualResult.payments[0]?.refunds[0]).not.toHaveProperty('failureMessage');
+      });
+
+      it('should keep a legacy sub-cent payment visible but unavailable for refunds', async () => {
+        const mockPayment = {
+          id: 'legacy-precision-payment',
+          amount: 10.001,
+          currency: 'USD',
+          status: PaymentStatus.COMPLETED,
+          provider: PaymentProvider.PAYPAL,
+          externalMethod: null,
+          externalReference: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          userId: 'user-id',
+          registrationId: null,
+          user: {
+            id: 'user-id',
+            firstName: 'Legacy',
+            lastName: 'Payment',
+            email: 'legacy@example.com',
+          },
+          registration: null,
+          refunds: [],
+        };
+        mockPrismaService.payment.findMany.mockResolvedValue([mockPayment]);
+        mockPrismaService.payment.count.mockResolvedValue(1);
+
+        const actualResult = await service.findAllForAdmin();
+
+        expect(actualResult).toEqual({
+          payments: [
+            {
+              ...mockPayment,
+              paymentAmountCents: null,
+              successfulRefundCents: 0,
+              pendingRefundCents: 0,
+              availableRefundCents: 0,
+              refundUnavailableReason:
+                'Refund unavailable because the stored payment amount has unsupported precision.',
+            },
+          ],
+          total: 1,
+        });
       });
 
       it('should report legacy ledgerless refunded payments as fully refunded', async () => {
@@ -3156,6 +3200,21 @@ describe('PaymentsService', () => {
       expect(mockPrismaService.adminAudit.create).not.toHaveBeenCalled();
     });
 
+    it('should reject manual refunds for a stored payment with sub-cent precision', async () => {
+      mockPrismaService.payment.findUnique
+        .mockReset()
+        .mockResolvedValue({ ...basePayment, amount: 10.001 });
+
+      await expect(
+        service.createManualRefund(paymentId, inputRequest, 'admin-id')
+      ).rejects.toThrow('Dollar amount must not have sub-cent precision');
+
+      expect(mockPrismaService.paymentRefund.create).not.toHaveBeenCalled();
+      expect(mockPrismaService.payment.update).not.toHaveBeenCalled();
+      expect(mockPrismaService.registration.update).not.toHaveBeenCalled();
+      expect(mockPrismaService.adminAudit.create).not.toHaveBeenCalled();
+    });
+
     it('should allow a payment without registration but reject a requested registration status', async () => {
       const unlinkedPayment = {
         ...basePayment,
@@ -3213,6 +3272,69 @@ describe('PaymentsService', () => {
         )
       ).rejects.toThrow('use the cancellation workflow');
       expect(mockPrismaService.$transaction).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      RegistrationStatus.CANCELLED,
+      RegistrationStatus.APPLICATION_SUBMITTED,
+      RegistrationStatus.APPLICATION_APPROVED,
+      RegistrationStatus.APPLICATION_DECLINED,
+    ])(
+      'should reject a registration status change when the current status is %s',
+      async currentStatus => {
+        mockPrismaService.payment.findUnique.mockReset().mockResolvedValue({
+          ...basePayment,
+          registration: {
+            ...basePayment.registration,
+            status: currentStatus,
+          },
+        });
+
+        await expect(
+          service.createManualRefund(
+            paymentId,
+            {
+              ...inputRequest,
+              resultingRegistrationStatus: RegistrationStatus.WAITLISTED,
+            },
+            'admin-id'
+          )
+        ).rejects.toThrow('use the cancellation workflow');
+
+        expect(mockPrismaService.paymentRefund.create).not.toHaveBeenCalled();
+        expect(mockPrismaService.payment.update).not.toHaveBeenCalled();
+        expect(mockPrismaService.registration.update).not.toHaveBeenCalled();
+        expect(mockPrismaService.adminAudit.create).not.toHaveBeenCalled();
+      }
+    );
+
+    it('should preserve a cancelled registration when no resulting status is requested', async () => {
+      const cancelledPayment = {
+        ...basePayment,
+        registration: {
+          ...basePayment.registration,
+          status: RegistrationStatus.CANCELLED,
+        },
+      };
+      mockPrismaService.payment.findUnique
+        .mockReset()
+        .mockResolvedValueOnce(cancelledPayment)
+        .mockResolvedValueOnce(
+          buildUpdatedPayment(
+            PaymentStatus.PARTIALLY_REFUNDED,
+            [publicCreatedRefund],
+            RegistrationStatus.CANCELLED
+          )
+        );
+
+      const actualResult = await service.createManualRefund(
+        paymentId,
+        inputRequest,
+        'admin-id'
+      );
+
+      expect(mockPrismaService.registration.update).not.toHaveBeenCalled();
+      expect(actualResult.payment.registration?.status).toBe(RegistrationStatus.CANCELLED);
     });
 
     it('should return an identical replay without duplicate writes', async () => {

@@ -51,10 +51,11 @@ export interface AdminPayment {
     status: string;
   } | null;
   refunds: AdminPaymentRefund[];
-  paymentAmountCents: number;
+  paymentAmountCents: number | null;
   successfulRefundCents: number;
   pendingRefundCents: number;
   availableRefundCents: number;
+  refundUnavailableReason: string | null;
 }
 
 export interface AdminPaymentPage {
@@ -84,10 +85,11 @@ export interface CreateManualRefundRequest {
 export interface ManualRefundResult {
   payment: AdminPayment;
   refund: AdminPaymentRefund;
-  paymentAmountCents: number;
+  paymentAmountCents: number | null;
   successfulRefundCents: number;
   pendingRefundCents: number;
   availableRefundCents: number;
+  refundUnavailableReason: string | null;
 }
 
 export const adminPaymentsApi = {

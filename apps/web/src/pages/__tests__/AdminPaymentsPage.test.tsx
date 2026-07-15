@@ -70,6 +70,7 @@ const payment = {
   successfulRefundCents: 0,
   pendingRefundCents: 0,
   availableRefundCents: 12550,
+  refundUnavailableReason: null,
 };
 
 function renderPage(): void {
@@ -203,9 +204,16 @@ describe('AdminPaymentsPage', () => {
     mockGetPayments
       .mockResolvedValueOnce({ payments: [payment], total: 1 })
       .mockResolvedValue({ payments: [refundedPayment], total: 1 });
-    mockCreateManualRefund
-      .mockRejectedValueOnce(new Error('Temporary refund failure'))
-      .mockResolvedValueOnce(refundResult);
+    const axiosError = Object.assign(new Error('Request failed with status code 409'), {
+      response: {
+        data: {
+          message: 'Refund balance changed concurrently; refresh the payment and retry',
+          internalDetails: 'do not expose this payload',
+        },
+        status: 409,
+      },
+    });
+    mockCreateManualRefund.mockRejectedValueOnce(axiosError).mockResolvedValueOnce(refundResult);
     renderPage();
 
     fireEvent.click(await screen.findByRole('button', { name: 'Refund' }));
@@ -227,7 +235,10 @@ describe('AdminPaymentsPage', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: 'Record manual refund' }));
 
-    expect(await screen.findByText('Temporary refund failure')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Refund balance changed concurrently; refresh the payment and retry')
+    ).toBeInTheDocument();
+    expect(screen.queryByText('do not expose this payload')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Record manual refund' }));
 
     expect(await screen.findByText('Manual refund recorded: USD 50.50.')).toBeInTheDocument();
@@ -290,6 +301,7 @@ describe('AdminPaymentsPage', () => {
       successfulRefundCents: 12550,
       pendingRefundCents: 0,
       availableRefundCents: 0,
+      refundUnavailableReason: null,
     });
     renderPage();
 
@@ -309,6 +321,32 @@ describe('AdminPaymentsPage', () => {
       })
     );
     expect(mockCreateManualRefund.mock.calls[0]?.[1]).not.toHaveProperty('amountCents');
+  });
+
+  it('should show a legacy precision reason without rounding or offering a refund action', async () => {
+    const legacyPrecisionPayment = {
+      ...payment,
+      id: 'legacy-precision-payment',
+      amount: 10.001,
+      paymentAmountCents: null,
+      availableRefundCents: 0,
+      refundUnavailableReason:
+        'Refund unavailable because the stored payment amount has unsupported precision.',
+    };
+    mockGetPayments.mockResolvedValue({
+      payments: [legacyPrecisionPayment],
+      total: 1,
+    });
+
+    renderPage();
+
+    expect(await screen.findByText('USD 10.001')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Refund unavailable because the stored payment amount has unsupported precision.'
+      )
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Refund' })).not.toBeInTheDocument();
   });
 
   it.each(['1.001', '125.51'])(
