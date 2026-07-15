@@ -2,7 +2,7 @@ import { BadRequestException, Injectable, Logger, NotFoundException } from '@nes
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { NotificationsService } from '../../notifications/services/notifications.service';
 import { CreatePaymentDto, UpdatePaymentDto, CreateRefundDto, RecordManualPaymentDto, CreateStripePaymentDto, CreatePaypalPaymentDto } from '../dto';
-import { Payment, PaymentProvider, PaymentStatus, Registration, UserRole } from '@prisma/client';
+import { Payment, PaymentProvider, PaymentStatus, Prisma, Registration, UserRole } from '@prisma/client';
 import { StripeService } from './stripe.service';
 import { PaypalService } from './paypal.service';
 import { isApplicationStatus } from '../../registrations/constants/registration-status.constants';
@@ -23,6 +23,37 @@ interface PaymentWhereClause {
   userId?: string;
   status?: PaymentStatus;
 }
+
+const sharedPaymentSelect = {
+  id: true,
+  amount: true,
+  currency: true,
+  status: true,
+  provider: true,
+  providerRefId: true,
+  createdAt: true,
+  updatedAt: true,
+  userId: true,
+  registrationId: true,
+  user: {
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      email: true,
+    },
+  },
+  registration: true,
+} satisfies Prisma.PaymentSelect;
+
+type SharedPayment = Omit<
+  Payment,
+  'externalMethod' | 'externalReference' | 'idempotencyKey'
+>;
+
+type SharedPaymentWithRelations = SharedPayment & {
+  registration?: Registration | null;
+};
 
 // Interface for refund result
 export interface RefundResult {
@@ -119,7 +150,7 @@ export class PaymentsService {
    * @param status - Filter by payment status
    * @returns Paginated list of payments
    */
-  async findAll(skip = 0, take = 10, userId?: string, status?: PaymentStatus): Promise<{ payments: Payment[]; total: number }> {
+  async findAll(skip = 0, take = 10, userId?: string, status?: PaymentStatus): Promise<{ payments: SharedPayment[]; total: number }> {
     const where: PaymentWhereClause = {};
     
     if (userId) {
@@ -135,17 +166,7 @@ export class PaymentsService {
         where,
         skip,
         take,
-        include: {
-          user: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-              email: true,
-            },
-          },
-          registration: true,
-        },
+        select: sharedPaymentSelect,
         orderBy: { createdAt: 'desc' },
       }),
       this.prisma.payment.count({ where }),
@@ -189,20 +210,10 @@ export class PaymentsService {
    * @param userRole - Current user role
    * @returns The payment, if found and user has access
    */
-  async findOneWithOwnershipCheck(id: string, userId: string, userRole: UserRole): Promise<PaymentWithRelations> {
+  async findOneWithOwnershipCheck(id: string, userId: string, userRole: UserRole): Promise<SharedPaymentWithRelations> {
     const payment = await this.prisma.payment.findUnique({
       where: { id },
-      include: {
-        user: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-          },
-        },
-        registration: true,
-      },
+      select: sharedPaymentSelect,
     });
     
     if (!payment) {
