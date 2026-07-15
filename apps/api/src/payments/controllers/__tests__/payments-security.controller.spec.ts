@@ -34,7 +34,9 @@ describe('PaymentsController Security', () => {
           provide: PaymentsService,
           useValue: {
             findAll: jest.fn(),
+            findAllForAdmin: jest.fn(),
             findOneWithOwnershipCheck: jest.fn(),
+            recordExternalPayment: jest.fn(),
           },
         },
         {
@@ -61,6 +63,30 @@ describe('PaymentsController Security', () => {
 
       expect(result).toEqual(mockResult);
       expect(paymentsService.findAll).toHaveBeenCalledWith(undefined, undefined, undefined, undefined);
+    });
+
+    describe('admin payment routes', () => {
+      it('should restrict the dedicated payment list to admins', () => {
+        const actualRoles = Reflect.getMetadata(
+          'roles',
+          PaymentsController.prototype.findAllForAdmin,
+        );
+
+        expect(actualRoles).toEqual([UserRole.ADMIN]);
+        expect(actualRoles).not.toContain(UserRole.STAFF);
+        expect(actualRoles).not.toContain(UserRole.PARTICIPANT);
+      });
+
+      it('should restrict external payment recording to admins', () => {
+        const actualRoles = Reflect.getMetadata(
+          'roles',
+          PaymentsController.prototype.recordExternalPayment,
+        );
+
+        expect(actualRoles).toEqual([UserRole.ADMIN]);
+        expect(actualRoles).not.toContain(UserRole.STAFF);
+        expect(actualRoles).not.toContain(UserRole.PARTICIPANT);
+      });
     });
 
     it('should allow filtering by userId for reports', async () => {

@@ -1,7 +1,7 @@
-import { Controller, Post, Body, Get, Param, Query, UseGuards, ParseUUIDPipe, Put, HttpCode, HttpStatus, Request } from '@nestjs/common';
+import { Controller, Post, Body, Get, Param, Query, UseGuards, ParseUUIDPipe, Put, HttpCode, HttpStatus, Request, DefaultValuePipe, ParseIntPipe } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiParam, ApiBearerAuth } from '@nestjs/swagger';
 import { PaymentsService, StripeService, PaypalService } from '../services';
-import { CreatePaymentDto, CreateStripePaymentDto, CreatePaypalPaymentDto, CreateRefundDto, RecordManualPaymentDto, UpdatePaymentDto } from '../dto';
+import { CreatePaymentDto, CreateStripePaymentDto, CreatePaypalPaymentDto, CreateRefundDto, CreateExternalPaymentDto, UpdatePaymentDto } from '../dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
@@ -53,6 +53,24 @@ export class PaymentsController {
       userId,
       status,
     );
+  }
+
+  @Get('admin')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get a bounded admin-safe payment list' })
+  @ApiQuery({ name: 'skip', required: false, type: Number })
+  @ApiQuery({ name: 'take', required: false, type: Number })
+  @ApiResponse({ status: 200, description: 'Admin payment list retrieved successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid pagination' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Admin access required' })
+  async findAllForAdmin(
+    @Query('skip', new DefaultValuePipe(0), ParseIntPipe) skip: number,
+    @Query('take', new DefaultValuePipe(25), ParseIntPipe) take: number,
+  ) {
+    return this.paymentsService.findAllForAdmin(skip, take);
   }
 
   @Get('my-payments')
@@ -108,16 +126,25 @@ export class PaymentsController {
     return this.paymentsService.update(id, updatePaymentDto);
   }
 
-  @Post('manual')
+  @Post('external')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('ADMIN')
+  @Roles(UserRole.ADMIN)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Record a manual payment (e.g., cash, check)' })
-  @ApiResponse({ status: 201, description: 'Manual payment recorded successfully' })
+  @ApiOperation({ summary: 'Record a completed external payment' })
+  @ApiResponse({ status: 201, description: 'External payment recorded successfully' })
   @ApiResponse({ status: 400, description: 'Invalid input data' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async recordManualPayment(@Body() recordManualPaymentDto: RecordManualPaymentDto) {
-    return this.paymentsService.recordManualPayment(recordManualPaymentDto);
+  @ApiResponse({ status: 403, description: 'Forbidden - Admin access required' })
+  @ApiResponse({ status: 404, description: 'Registration not found' })
+  @ApiResponse({ status: 409, description: 'Idempotency key reused with different input' })
+  async recordExternalPayment(
+    @Body() createExternalPaymentDto: CreateExternalPaymentDto,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    return this.paymentsService.recordExternalPayment(
+      createExternalPaymentDto,
+      req.user.id,
+    );
   }
 
   @Post('stripe')

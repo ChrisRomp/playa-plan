@@ -4,8 +4,20 @@ import { StripeService } from './stripe.service';
 import { PaypalService } from './paypal.service';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { NotificationsService } from '../../notifications/services/notifications.service';
-import { PaymentProvider, PaymentStatus, UserRole } from '@prisma/client';
-import { NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  AdminAuditActionType,
+  AdminAuditTargetType,
+  ExternalPaymentMethod,
+  PaymentProvider,
+  PaymentStatus,
+  RegistrationStatus,
+  UserRole,
+} from '@prisma/client';
+import {
+  NotFoundException,
+  BadRequestException,
+  ConflictException,
+} from '@nestjs/common';
 
 // Mock implementations
 const mockPrismaService = {
@@ -23,6 +35,9 @@ const mockPrismaService = {
   registration: {
     findUnique: jest.fn(),
     update: jest.fn(),
+  },
+  adminAudit: {
+    create: jest.fn(),
   },
   $transaction: jest.fn((operations) => {
     if (Array.isArray(operations)) {
@@ -102,6 +117,40 @@ const expectedSharedPaymentSelect = {
     },
   },
   registration: true,
+};
+
+const expectedAdminPaymentSelect = {
+  id: true,
+  amount: true,
+  currency: true,
+  status: true,
+  provider: true,
+  externalMethod: true,
+  externalReference: true,
+  createdAt: true,
+  updatedAt: true,
+  userId: true,
+  registrationId: true,
+  user: {
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      email: true,
+    },
+  },
+  registration: {
+    select: {
+      id: true,
+      year: true,
+      status: true,
+    },
+  },
+};
+
+const expectedExternalPaymentSelect = {
+  ...expectedAdminPaymentSelect,
+  idempotencyKey: true,
 };
 
 describe('PaymentsService', () => {
@@ -271,6 +320,63 @@ describe('PaymentsService', () => {
       expect(mockPrismaService.payment.findMany).toHaveBeenCalled();
       expect(mockPrismaService.payment.count).toHaveBeenCalled();
       expect(result).toEqual({ payments: mockPayments, total: mockTotal });
+    });
+
+    describe('findAllForAdmin', () => {
+      it('should return a bounded admin-safe projection', async () => {
+        const mockPayment = {
+          id: 'payment-id',
+          amount: 125,
+          currency: 'USD',
+          status: PaymentStatus.COMPLETED,
+          provider: PaymentProvider.MANUAL,
+          externalMethod: ExternalPaymentMethod.CHECK,
+          externalReference: 'check-123',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          userId: 'user-id',
+          registrationId: 'registration-id',
+          user: {
+            id: 'user-id',
+            firstName: 'Test',
+            lastName: 'User',
+            email: 'test@example.com',
+          },
+          registration: {
+            id: 'registration-id',
+            year: 2026,
+            status: RegistrationStatus.CONFIRMED,
+          },
+        };
+        mockPrismaService.payment.findMany.mockResolvedValue([mockPayment]);
+        mockPrismaService.payment.count.mockResolvedValue(1);
+
+        const actualResult = await service.findAllForAdmin(25, 25);
+
+        expect(mockPrismaService.payment.findMany).toHaveBeenCalledWith({
+          skip: 25,
+          take: 25,
+          select: expectedAdminPaymentSelect,
+          orderBy: { createdAt: 'desc' },
+        });
+        expect(actualResult).toEqual({ payments: [mockPayment], total: 1 });
+        expect(actualResult.payments[0]).not.toHaveProperty('idempotencyKey');
+        expect(actualResult.payments[0]).not.toHaveProperty('providerRefId');
+        expect(actualResult.payments[0]).not.toHaveProperty('refunds');
+      });
+
+      it.each([
+        [-1, 25],
+        [0.5, 25],
+        [0, 0],
+        [0, 101],
+        [0, 1.5],
+      ])('should reject invalid pagination skip=%s take=%s', async (skip, take) => {
+        await expect(service.findAllForAdmin(skip, take)).rejects.toThrow(
+          BadRequestException,
+        );
+        expect(mockPrismaService.payment.findMany).not.toHaveBeenCalled();
+      });
     });
 
     it('should select only pre-foundation payment fields and relations', async () => {
@@ -2193,8 +2299,7 @@ describe('PaymentsService', () => {
    *  - `verifyStripeSession` now clears `paymentDeferred` on the
    *    registration when the payment completes, even if status was
    *    already CONFIRMED (which is the deferred case).
-   *  - `recordManualPayment` now marks the registration CONFIRMED +
-   *    paymentDeferred=false when the manual payment lands COMPLETED.
+   *  - external payments transactionally update registration state.
    */
   describe('deferred-payment side effects', () => {
     beforeEach(() => {
@@ -2364,119 +2469,232 @@ describe('PaymentsService', () => {
       );
     });
 
-    it('recordManualPayment marks the registration CONFIRMED and clears paymentDeferred when status COMPLETED', async () => {
-      const created = {
-        id: 'payment-manual',
-        status: PaymentStatus.PENDING,
-        amount: 100,
-        currency: 'USD',
-        provider: PaymentProvider.STRIPE,
-        userId: 'user-id',
-        registrationId: 'registration-id',
-        providerRefId: 'manual:check-123',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-      mockPrismaService.registration.findUnique.mockResolvedValue({
-        id: 'registration-id',
-        userId: 'user-id',
-        status: 'CONFIRMED',
-        paymentDeferred: true,
-      });
-      mockPrismaService.payment.create.mockResolvedValueOnce(created);
-      mockPrismaService.payment.findUnique.mockResolvedValueOnce(created);
-      mockPrismaService.payment.update.mockResolvedValueOnce({
-        ...created,
-        status: PaymentStatus.COMPLETED,
-      });
-      mockPrismaService.registration.update.mockResolvedValueOnce({
-        id: 'registration-id',
-        status: 'CONFIRMED',
-        paymentDeferred: false,
-      });
+  });
 
-      await service.recordManualPayment({
-        amount: 100,
-        currency: 'USD',
-        userId: 'user-id',
-        registrationId: 'registration-id',
-        reference: 'check-123',
-      });
+  describe('recordExternalPayment', () => {
+    const inputRequest = {
+      registrationId: '6adf7e80-3035-4d12-a2d4-45c591bb2441',
+      amount: 125.5,
+      currency: 'usd',
+      externalMethod: ExternalPaymentMethod.CHECK,
+      externalReference: ' check-123 ',
+      idempotencyKey: '43ea4b84-1f0d-413d-bc1c-9c91b435d66d',
+    };
 
-      expect(mockPrismaService.registration.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { id: 'registration-id' },
-          data: { status: 'CONFIRMED', paymentDeferred: false },
-        }),
+    const mockCreatedPayment = {
+      id: 'payment-id',
+      amount: 125.5,
+      currency: 'USD',
+      status: PaymentStatus.COMPLETED,
+      provider: PaymentProvider.MANUAL,
+      externalMethod: ExternalPaymentMethod.CHECK,
+      externalReference: 'check-123',
+      idempotencyKey: inputRequest.idempotencyKey,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      userId: 'registration-owner-id',
+      registrationId: inputRequest.registrationId,
+      user: {
+        id: 'registration-owner-id',
+        firstName: 'Pat',
+        lastName: 'Participant',
+        email: 'pat@example.com',
+      },
+      registration: {
+        id: inputRequest.registrationId,
+        year: 2026,
+        status: RegistrationStatus.CONFIRMED,
+      },
+    };
+
+    beforeEach(() => {
+      mockPrismaService.$transaction.mockImplementation(
+        async (callback: (tx: typeof mockPrismaService) => Promise<unknown>) =>
+          callback(mockPrismaService),
       );
-    });
-
-    it('recordManualPayment does NOT touch the registration when status is not COMPLETED', async () => {
-      const created = {
-        id: 'payment-manual',
-        status: PaymentStatus.PENDING,
-        amount: 100,
-        currency: 'USD',
-        provider: PaymentProvider.STRIPE,
-        userId: 'user-id',
-        registrationId: 'registration-id',
-        providerRefId: 'manual',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
+      mockPrismaService.payment.findUnique.mockResolvedValue(null);
       mockPrismaService.registration.findUnique.mockResolvedValue({
-        id: 'registration-id',
-        userId: 'user-id',
-        status: 'PENDING',
-        paymentDeferred: false,
+        id: inputRequest.registrationId,
+        userId: 'registration-owner-id',
+        status: RegistrationStatus.PENDING,
       });
-      mockPrismaService.payment.create.mockResolvedValueOnce(created);
-      mockPrismaService.payment.findUnique.mockResolvedValueOnce(created);
-      mockPrismaService.payment.update.mockResolvedValueOnce({
-        ...created,
-        status: PaymentStatus.FAILED,
+      mockPrismaService.registration.update.mockResolvedValue({
+        id: inputRequest.registrationId,
       });
-
-      await service.recordManualPayment({
-        amount: 100,
-        currency: 'USD',
-        userId: 'user-id',
-        registrationId: 'registration-id',
-        reference: undefined,
-        status: PaymentStatus.FAILED,
+      mockPrismaService.payment.create.mockResolvedValue(mockCreatedPayment);
+      mockPrismaService.adminAudit.create.mockResolvedValue({
+        id: 'audit-id',
       });
-
-      expect(mockPrismaService.registration.update).not.toHaveBeenCalled();
     });
 
-    it('recordManualPayment does NOT touch the registration when registrationId is absent', async () => {
-      const created = {
-        id: 'payment-manual',
-        status: PaymentStatus.PENDING,
-        amount: 100,
-        currency: 'USD',
-        provider: PaymentProvider.STRIPE,
-        userId: 'user-id',
-        registrationId: null,
-        providerRefId: 'manual',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-      mockPrismaService.payment.create.mockResolvedValueOnce(created);
-      mockPrismaService.payment.findUnique.mockResolvedValueOnce(created);
-      mockPrismaService.payment.update.mockResolvedValueOnce({
-        ...created,
-        status: PaymentStatus.COMPLETED,
+    it('should atomically derive the owner, create the payment, update registration, and audit', async () => {
+      const actualPayment = await service.recordExternalPayment(
+        inputRequest,
+        'admin-id',
+      );
+
+      expect(mockPrismaService.$transaction).toHaveBeenCalledTimes(1);
+      expect(mockPrismaService.registration.findUnique).toHaveBeenCalledWith({
+        where: { id: inputRequest.registrationId },
+        select: { id: true, userId: true, status: true },
+      });
+      expect(mockPrismaService.registration.update).toHaveBeenCalledWith({
+        where: { id: inputRequest.registrationId },
+        data: {
+          status: RegistrationStatus.CONFIRMED,
+          paymentDeferred: false,
+        },
+      });
+      expect(mockPrismaService.payment.create).toHaveBeenCalledWith({
+        data: {
+          amount: 125.5,
+          currency: 'USD',
+          status: PaymentStatus.COMPLETED,
+          provider: PaymentProvider.MANUAL,
+          externalMethod: ExternalPaymentMethod.CHECK,
+          externalReference: 'check-123',
+          idempotencyKey: inputRequest.idempotencyKey,
+          userId: 'registration-owner-id',
+          registrationId: inputRequest.registrationId,
+        },
+        select: expectedExternalPaymentSelect,
+      });
+      expect(mockPrismaService.adminAudit.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          adminUserId: 'admin-id',
+          actionType: AdminAuditActionType.PAYMENT_EXTERNAL,
+          targetRecordType: AdminAuditTargetType.PAYMENT,
+          targetRecordId: 'payment-id',
+          newValues: expect.objectContaining({
+            registrationId: inputRequest.registrationId,
+            amount: 125.5,
+            currency: 'USD',
+            externalMethod: ExternalPaymentMethod.CHECK,
+            externalReference: 'check-123',
+            previousRegistrationStatus: RegistrationStatus.PENDING,
+            resultingRegistrationStatus: RegistrationStatus.CONFIRMED,
+          }),
+        }),
+      });
+      expect(actualPayment).not.toHaveProperty('idempotencyKey');
+    });
+
+    it.each([
+      RegistrationStatus.WAITLISTED,
+      RegistrationStatus.CONFIRMED,
+    ])('should preserve %s registration status', async (inputStatus) => {
+      mockPrismaService.registration.findUnique.mockResolvedValue({
+        id: inputRequest.registrationId,
+        userId: 'registration-owner-id',
+        status: inputStatus,
       });
 
-      await service.recordManualPayment({
-        amount: 100,
-        currency: 'USD',
-        userId: 'user-id',
-        reference: undefined,
+      await service.recordExternalPayment(inputRequest, 'admin-id');
+
+      expect(mockPrismaService.registration.update).toHaveBeenCalledWith({
+        where: { id: inputRequest.registrationId },
+        data: {
+          status: inputStatus,
+          paymentDeferred: false,
+        },
+      });
+    });
+
+    it.each([
+      RegistrationStatus.APPLICATION_SUBMITTED,
+      RegistrationStatus.APPLICATION_APPROVED,
+      RegistrationStatus.APPLICATION_DECLINED,
+      RegistrationStatus.CANCELLED,
+    ])('should reject ineligible registration status %s', async (inputStatus) => {
+      mockPrismaService.registration.findUnique.mockResolvedValue({
+        id: inputRequest.registrationId,
+        userId: 'registration-owner-id',
+        status: inputStatus,
       });
 
+      await expect(
+        service.recordExternalPayment(inputRequest, 'admin-id'),
+      ).rejects.toThrow(BadRequestException);
+      expect(mockPrismaService.payment.create).not.toHaveBeenCalled();
+      expect(mockPrismaService.adminAudit.create).not.toHaveBeenCalled();
+    });
+
+    it('should reject a missing registration', async () => {
+      mockPrismaService.registration.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.recordExternalPayment(inputRequest, 'admin-id'),
+      ).rejects.toThrow(NotFoundException);
+      expect(mockPrismaService.payment.create).not.toHaveBeenCalled();
+    });
+
+    it('should propagate an audit failure from the transaction', async () => {
+      mockPrismaService.adminAudit.create.mockRejectedValue(
+        new Error('Audit write failed'),
+      );
+
+      await expect(
+        service.recordExternalPayment(inputRequest, 'admin-id'),
+      ).rejects.toThrow('Audit write failed');
+      expect(mockPrismaService.$transaction).toHaveBeenCalledTimes(1);
+    });
+
+    it('should return an identical retry without duplicate writes', async () => {
+      mockPrismaService.payment.findUnique.mockResolvedValue(mockCreatedPayment);
+
+      const actualPayment = await service.recordExternalPayment(
+        inputRequest,
+        'admin-id',
+      );
+
+      expect(actualPayment.id).toBe('payment-id');
+      expect(actualPayment).not.toHaveProperty('idempotencyKey');
       expect(mockPrismaService.registration.update).not.toHaveBeenCalled();
+      expect(mockPrismaService.payment.create).not.toHaveBeenCalled();
+      expect(mockPrismaService.adminAudit.create).not.toHaveBeenCalled();
+    });
+
+    it('should return conflict when a key is reused with different input', async () => {
+      mockPrismaService.payment.findUnique.mockResolvedValue(mockCreatedPayment);
+
+      await expect(
+        service.recordExternalPayment(
+          { ...inputRequest, amount: 126 },
+          'admin-id',
+        ),
+      ).rejects.toThrow(ConflictException);
+      expect(mockPrismaService.payment.create).not.toHaveBeenCalled();
+    });
+
+    it('should resolve an identical concurrent unique-key race', async () => {
+      mockPrismaService.$transaction.mockRejectedValue({
+        code: 'P2002',
+        meta: { target: ['idempotencyKey'] },
+      });
+      mockPrismaService.payment.findUnique.mockResolvedValue(mockCreatedPayment);
+
+      const actualPayment = await service.recordExternalPayment(
+        inputRequest,
+        'admin-id',
+      );
+
+      expect(actualPayment.id).toBe('payment-id');
+      expect(actualPayment).not.toHaveProperty('idempotencyKey');
+    });
+
+    it('should return conflict for a mismatched concurrent unique-key race', async () => {
+      mockPrismaService.$transaction.mockRejectedValue({
+        code: 'P2002',
+        meta: { target: ['idempotencyKey'] },
+      });
+      mockPrismaService.payment.findUnique.mockResolvedValue(mockCreatedPayment);
+
+      await expect(
+        service.recordExternalPayment(
+          { ...inputRequest, externalReference: 'different' },
+          'admin-id',
+        ),
+      ).rejects.toThrow(ConflictException);
     });
   });
 });

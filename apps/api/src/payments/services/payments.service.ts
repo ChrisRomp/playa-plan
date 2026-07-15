@@ -1,11 +1,13 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { NotificationsService } from '../../notifications/services/notifications.service';
-import { CreatePaymentDto, UpdatePaymentDto, CreateRefundDto, RecordManualPaymentDto, CreateStripePaymentDto, CreatePaypalPaymentDto } from '../dto';
-import { Payment, PaymentProvider, PaymentStatus, Prisma, Registration, UserRole } from '@prisma/client';
+import { CreatePaymentDto, UpdatePaymentDto, CreateRefundDto, CreateExternalPaymentDto, CreateStripePaymentDto, CreatePaypalPaymentDto } from '../dto';
+import { AdminAuditActionType, AdminAuditTargetType, ExternalPaymentMethod, Payment, PaymentProvider, PaymentStatus, Prisma, Registration, RegistrationStatus, UserRole } from '@prisma/client';
 import { StripeService } from './stripe.service';
 import { PaypalService } from './paypal.service';
 import { isApplicationStatus } from '../../registrations/constants/registration-status.constants';
+import { dollarsToCents, normalizeCurrency } from '../utils/money.utils';
+import { randomUUID } from 'crypto';
 
 // Create an extended Payment type that includes registration relationship
 type PaymentWithRelations = Payment & {
@@ -46,6 +48,40 @@ const sharedPaymentSelect = {
   registration: true,
 } satisfies Prisma.PaymentSelect;
 
+const adminPaymentSelect = {
+  id: true,
+  amount: true,
+  currency: true,
+  status: true,
+  provider: true,
+  externalMethod: true,
+  externalReference: true,
+  createdAt: true,
+  updatedAt: true,
+  userId: true,
+  registrationId: true,
+  user: {
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      email: true,
+    },
+  },
+  registration: {
+    select: {
+      id: true,
+      year: true,
+      status: true,
+    },
+  },
+} satisfies Prisma.PaymentSelect;
+
+const externalPaymentSelect = {
+  ...adminPaymentSelect,
+  idempotencyKey: true,
+} satisfies Prisma.PaymentSelect;
+
 type SharedPayment = Omit<
   Payment,
   'externalMethod' | 'externalReference' | 'idempotencyKey'
@@ -54,6 +90,25 @@ type SharedPayment = Omit<
 type SharedPaymentWithRelations = SharedPayment & {
   registration?: Registration | null;
 };
+
+export type AdminPayment = Prisma.PaymentGetPayload<{
+  select: typeof adminPaymentSelect;
+}>;
+
+type ExternalPaymentRecord = Prisma.PaymentGetPayload<{
+  select: typeof externalPaymentSelect;
+}>;
+
+interface CanonicalExternalPayment {
+  registrationId: string;
+  amountCents: number;
+  currency: string;
+  externalMethod: ExternalPaymentMethod;
+  externalReference: string | null;
+}
+
+const DEFAULT_ADMIN_PAYMENT_PAGE_SIZE = 25;
+const MAX_ADMIN_PAYMENT_PAGE_SIZE = 100;
 
 // Interface for refund result
 export interface RefundResult {
@@ -172,6 +227,40 @@ export class PaymentsService {
       this.prisma.payment.count({ where }),
     ]);
     
+    return { payments, total };
+  }
+
+  /**
+   * Returns a bounded payment list containing only fields needed by admins.
+   */
+  async findAllForAdmin(
+    skip = 0,
+    take = DEFAULT_ADMIN_PAYMENT_PAGE_SIZE,
+  ): Promise<{ payments: AdminPayment[]; total: number }> {
+    if (!Number.isInteger(skip) || skip < 0) {
+      throw new BadRequestException('Skip must be a non-negative integer');
+    }
+
+    if (
+      !Number.isInteger(take) ||
+      take < 1 ||
+      take > MAX_ADMIN_PAYMENT_PAGE_SIZE
+    ) {
+      throw new BadRequestException(
+        `Take must be an integer between 1 and ${MAX_ADMIN_PAYMENT_PAGE_SIZE}`,
+      );
+    }
+
+    const [payments, total] = await Promise.all([
+      this.prisma.payment.findMany({
+        skip,
+        take,
+        select: adminPaymentSelect,
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.payment.count(),
+    ]);
+
     return { payments, total };
   }
 
@@ -313,80 +402,201 @@ export class PaymentsService {
   }
 
   /**
-   * Record a manual payment (e.g., cash, check)
-   * @param data - Manual payment data
-   * @returns The created payment
+   * Records an already-completed external payment and its registration effects.
    */
-  async recordManualPayment(data: RecordManualPaymentDto): Promise<Payment> {
-    // Create payment record with appropriate status
-    const payment = await this.create({
-      amount: data.amount,
-      currency: data.currency,
-      provider: PaymentProvider.STRIPE, // Use Stripe as default for manual
-      userId: data.userId,
-      registrationId: data.registrationId,
-      providerRefId: data.reference ? `manual:${data.reference}` : 'manual',
-    });
-    
-    // Update status immediately (since it's a manual payment)
-    const updateDto: UpdatePaymentDto = {
-      status: data.status || PaymentStatus.COMPLETED,
-    };
-    
-    // Note: Previous code stored a reference as notes, but notes field is not present in schema
-    // if (data.reference) {
-    //   updateDto.notes = data.reference;
-    // }
-    
-    const updatedPayment = await this.update(payment.id, updateDto);
+  async recordExternalPayment(
+    data: CreateExternalPaymentDto,
+    adminUserId: string,
+  ): Promise<AdminPayment> {
+    const canonicalRequest = this.canonicalizeExternalPayment(data);
+    const transactionId = randomUUID();
 
-    // When a manual payment is recorded as COMPLETED against a registration,
-    // mark the registration paid: status CONFIRMED, paymentDeferred=false.
-    // This also closes out any deferred registrations that an admin records
-    // a manual payment for.
-    if (
-      data.registrationId &&
-      (data.status ?? PaymentStatus.COMPLETED) === PaymentStatus.COMPLETED
-    ) {
-      try {
-        await this.markRegistrationPaid(data.registrationId);
-      } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : 'Unknown error';
-        this.logger.warn(
-          `Manual payment ${payment.id} recorded, but failed to mark registration ${data.registrationId} paid: ${message}`,
-        );
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        const existingPayment = await tx.payment.findUnique({
+          where: { idempotencyKey: data.idempotencyKey },
+          select: externalPaymentSelect,
+        });
+
+        if (existingPayment) {
+          return this.resolveExternalPaymentReplay(
+            existingPayment,
+            canonicalRequest,
+          );
+        }
+
+        const registration = await tx.registration.findUnique({
+          where: { id: data.registrationId },
+          select: {
+            id: true,
+            userId: true,
+            status: true,
+          },
+        });
+
+        if (!registration) {
+          throw new NotFoundException(
+            `Registration with ID ${data.registrationId} not found`,
+          );
+        }
+
+        this.validateExternalPaymentRegistration(registration.status);
+        const resultingStatus =
+          registration.status === RegistrationStatus.PENDING
+            ? RegistrationStatus.CONFIRMED
+            : registration.status;
+
+        await tx.registration.update({
+          where: { id: registration.id },
+          data: {
+            status: resultingStatus,
+            paymentDeferred: false,
+          },
+        });
+
+        const createdPayment = await tx.payment.create({
+          data: {
+            amount: data.amount,
+            currency: canonicalRequest.currency,
+            status: PaymentStatus.COMPLETED,
+            provider: PaymentProvider.MANUAL,
+            externalMethod: data.externalMethod,
+            externalReference: canonicalRequest.externalReference,
+            idempotencyKey: data.idempotencyKey,
+            userId: registration.userId,
+            registrationId: registration.id,
+          },
+          select: externalPaymentSelect,
+        });
+
+        await tx.adminAudit.create({
+          data: {
+            adminUserId,
+            actionType: AdminAuditActionType.PAYMENT_EXTERNAL,
+            targetRecordType: AdminAuditTargetType.PAYMENT,
+            targetRecordId: createdPayment.id,
+            transactionId,
+            newValues: {
+              outcome: 'COMPLETED',
+              paymentId: createdPayment.id,
+              registrationId: registration.id,
+              amount: data.amount,
+              currency: canonicalRequest.currency,
+              externalMethod: data.externalMethod,
+              externalReference: canonicalRequest.externalReference,
+              previousRegistrationStatus: registration.status,
+              resultingRegistrationStatus: resultingStatus,
+            },
+            reason: 'Recorded completed external payment',
+          },
+        });
+
+        return this.toAdminPayment(createdPayment);
+      });
+    } catch (error: unknown) {
+      if (!this.isUniqueConstraintError(error)) {
+        throw error;
       }
-    }
 
-    return updatedPayment;
+      const existingPayment = await this.prisma.payment.findUnique({
+        where: { idempotencyKey: data.idempotencyKey },
+        select: externalPaymentSelect,
+      });
+
+      if (!existingPayment) {
+        throw error;
+      }
+
+      return this.resolveExternalPaymentReplay(
+        existingPayment,
+        canonicalRequest,
+      );
+    }
   }
 
-  /**
-   * Mark a registration as paid: clear `paymentDeferred` and set status
-   * to CONFIRMED — UNLESS the registration is currently WAITLISTED, in
-   * which case status stays WAITLISTED (capacity beats payment). Payment
-   * does not buy a slot the user can't have. The WAITLISTED case is
-   * unreachable for participants through normal UI but possible via
-   * direct API call or a TOCTOU race against capacity; mirrors the same
-   * guard in `verifyStripeSession`.
-   *
-   * Idempotent — safe to call multiple times. Called from every
-   * successful payment-completion path (today: Stripe verification path
-   * and `recordManualPayment`; any future payment provider should call
-   * this too) so the registration is always brought to a consistent
-   * paid state when a payment lands.
-   */
-  private async markRegistrationPaid(registrationId: string): Promise<void> {
-    const current = await this.prisma.registration.findUnique({
-      where: { id: registrationId },
-      select: { status: true },
-    });
-    if (!current) return;
-    const targetStatus = current.status === 'WAITLISTED' ? 'WAITLISTED' : 'CONFIRMED';
-    await this.prisma.registration.update({
-      where: { id: registrationId },
-      data: { status: targetStatus, paymentDeferred: false },
-    });
+  private canonicalizeExternalPayment(
+    data: CreateExternalPaymentDto,
+  ): CanonicalExternalPayment {
+    return {
+      registrationId: data.registrationId,
+      amountCents: dollarsToCents(data.amount),
+      currency: normalizeCurrency(data.currency),
+      externalMethod: data.externalMethod,
+      externalReference: data.externalReference?.trim() || null,
+    };
+  }
+
+  private resolveExternalPaymentReplay(
+    existingPayment: ExternalPaymentRecord,
+    canonicalRequest: CanonicalExternalPayment,
+  ): AdminPayment {
+    const existingCanonicalRequest: CanonicalExternalPayment = {
+      registrationId: existingPayment.registrationId ?? '',
+      amountCents: dollarsToCents(existingPayment.amount),
+      currency: normalizeCurrency(existingPayment.currency),
+      externalMethod: existingPayment.externalMethod as ExternalPaymentMethod,
+      externalReference: existingPayment.externalReference?.trim() || null,
+    };
+
+    if (
+      existingCanonicalRequest.registrationId !==
+        canonicalRequest.registrationId ||
+      existingCanonicalRequest.amountCents !== canonicalRequest.amountCents ||
+      existingCanonicalRequest.currency !== canonicalRequest.currency ||
+      existingCanonicalRequest.externalMethod !==
+        canonicalRequest.externalMethod ||
+      existingCanonicalRequest.externalReference !==
+        canonicalRequest.externalReference
+    ) {
+      throw new ConflictException(
+        'Idempotency key has already been used with different payment data',
+      );
+    }
+
+    return this.toAdminPayment(existingPayment);
+  }
+
+  private toAdminPayment(payment: ExternalPaymentRecord): AdminPayment {
+    return {
+      id: payment.id,
+      amount: payment.amount,
+      currency: payment.currency,
+      status: payment.status,
+      provider: payment.provider,
+      externalMethod: payment.externalMethod,
+      externalReference: payment.externalReference,
+      createdAt: payment.createdAt,
+      updatedAt: payment.updatedAt,
+      userId: payment.userId,
+      registrationId: payment.registrationId,
+      user: payment.user,
+      registration: payment.registration,
+    };
+  }
+
+  private validateExternalPaymentRegistration(
+    status: RegistrationStatus,
+  ): void {
+    if (isApplicationStatus(status)) {
+      throw new BadRequestException(
+        'Cannot record payment for a registration in the application phase',
+      );
+    }
+
+    if (status === RegistrationStatus.CANCELLED) {
+      throw new BadRequestException(
+        'Cannot record payment for a cancelled registration',
+      );
+    }
+  }
+
+  private isUniqueConstraintError(error: unknown): boolean {
+    return (
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      error.code === 'P2002'
+    );
   }
 
   /**
