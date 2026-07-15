@@ -316,7 +316,9 @@ export class RegistrationsService {
             },
           },
         },
-        payments: true,
+        payments: {
+          select: participantPaymentSelect,
+        },
       },
     });
   }
@@ -433,7 +435,9 @@ export class RegistrationsService {
         registration: {
           include: {
             user: true,
-            payments: true,
+            payments: {
+              select: participantPaymentSelect,
+            },
           },
         },
       },
@@ -751,7 +755,9 @@ export class RegistrationsService {
                   },
                 },
               },
-              payments: true,
+              payments: {
+                select: participantPaymentSelect,
+              },
             },
           });
 
@@ -977,7 +983,9 @@ export class RegistrationsService {
               },
             },
           },
-          payments: true,
+          payments: {
+            select: participantPaymentSelect,
+          },
         },
       });
       if (!updatedRegistration) {
@@ -1206,7 +1214,9 @@ export class RegistrationsService {
                   job: { include: { category: true, shift: true } },
                 },
               },
-              payments: true,
+              payments: {
+                select: participantPaymentSelect,
+              },
             },
           });
 

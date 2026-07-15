@@ -515,15 +515,42 @@ describe('RegistrationsService', () => {
   describe('findAll', () => {
     it('should return an array of registrations', async () => {
       const expectedRegistrations = [
-        { id: '1', userId: 'user1', year: 2024, jobs: [], payments: [] },
+        {
+          id: '1',
+          userId: 'user1',
+          year: 2024,
+          jobs: [],
+          payments: [{ id: 'payment-1', amount: 100 }],
+        },
         { id: '2', userId: 'user2', year: 2024, jobs: [], payments: [] },
       ];
       mockPrismaService.registration.findMany.mockResolvedValue(expectedRegistrations);
 
       const result = await service.findAll();
       
-      expect(mockPrismaService.registration.findMany).toHaveBeenCalled();
+      expect(mockPrismaService.registration.findMany).toHaveBeenCalledWith({
+        include: {
+          user: true,
+          jobs: {
+            include: {
+              job: {
+                include: {
+                  category: true,
+                  shift: true,
+                },
+              },
+            },
+          },
+          payments: {
+            select: expectedParticipantPaymentSelect,
+          },
+        },
+      });
       expect(result).toEqual(expectedRegistrations);
+      expect(result[0]).not.toHaveProperty('payments.0.externalMethod');
+      expect(result[0]).not.toHaveProperty('payments.0.externalReference');
+      expect(result[0]).not.toHaveProperty('payments.0.idempotencyKey');
+      expect(result[0]).not.toHaveProperty('payments.0.refunds');
     });
   });
 
@@ -636,7 +663,15 @@ describe('RegistrationsService', () => {
     
     it('should return registrations for a specific job', async () => {
       const expectedRegistrationJobs = [
-        { registration: { id: '1', userId: 'user1', year: 2024, user: {}, payments: [] } },
+        {
+          registration: {
+            id: '1',
+            userId: 'user1',
+            year: 2024,
+            user: {},
+            payments: [{ id: 'payment-1', amount: 100 }],
+          },
+        },
         { registration: { id: '2', userId: 'user2', year: 2024, user: {}, payments: [] } },
       ];
       
@@ -654,12 +689,18 @@ describe('RegistrationsService', () => {
           registration: {
             include: {
               user: true,
-              payments: true,
+              payments: {
+                select: expectedParticipantPaymentSelect,
+              },
             },
           },
         },
       });
       expect(result).toEqual(expectedRegistrationJobs.map(rj => rj.registration));
+      expect(result[0]).not.toHaveProperty('payments.0.externalMethod');
+      expect(result[0]).not.toHaveProperty('payments.0.externalReference');
+      expect(result[0]).not.toHaveProperty('payments.0.idempotencyKey');
+      expect(result[0]).not.toHaveProperty('payments.0.refunds');
     });
 
     it('should throw NotFoundException if job does not exist', async () => {
@@ -734,7 +775,7 @@ describe('RegistrationsService', () => {
           lastName: 'User',
         },
         jobs: [],
-        payments: [],
+        payments: [{ id: 'payment-id', amount: 100 }],
       };
       const updatedRegistration = {
         ...existingRegistration,
@@ -912,6 +953,22 @@ describe('RegistrationsService', () => {
             year: applicationYear,
             user: { connect: { id: userId } },
           }),
+          include: {
+            user: true,
+            jobs: {
+              include: {
+                job: {
+                  include: {
+                    category: true,
+                    shift: true,
+                  },
+                },
+              },
+            },
+            payments: {
+              select: expectedParticipantPaymentSelect,
+            },
+          },
         }),
       );
       expect(mockPrismaService.campingOptionFieldValue.create).toHaveBeenCalledWith({
@@ -935,6 +992,16 @@ describe('RegistrationsService', () => {
       );
       expect(result.message).toBe('Application submitted successfully');
       expect(result.registration.status).toBe(RegistrationStatus.APPLICATION_SUBMITTED);
+      expect(result).not.toHaveProperty(
+        'registration.payments.0.externalMethod',
+      );
+      expect(result).not.toHaveProperty(
+        'registration.payments.0.externalReference',
+      );
+      expect(result).not.toHaveProperty(
+        'registration.payments.0.idempotencyKey',
+      );
+      expect(result).not.toHaveProperty('registration.payments.0.refunds');
     });
 
     it('should auto-approve eligible users and send the approved notification', async () => {
@@ -1040,7 +1107,7 @@ describe('RegistrationsService', () => {
       user: baseUser,
       jobs: [],
       campingOptionRegistrations: approvedRegistration.campingOptionRegistrations,
-      payments: [],
+      payments: [{ id: 'payment-id', amount: 100 }],
     };
 
     beforeEach(() => {
@@ -1099,15 +1166,48 @@ describe('RegistrationsService', () => {
         data: [{ registrationId: approvedRegistration.id, jobId: 'job-1' }],
         skipDuplicates: true,
       });
-      expect(mockPrismaService.registration.findUnique).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { id: approvedRegistration.id },
-        }),
-      );
+      expect(mockPrismaService.registration.findUnique).toHaveBeenCalledWith({
+        where: { id: approvedRegistration.id },
+        include: {
+          user: true,
+          jobs: {
+            include: {
+              job: {
+                include: {
+                  category: true,
+                  shift: true,
+                },
+              },
+            },
+          },
+          campingOptionRegistrations: {
+            include: {
+              campingOption: {
+                include: {
+                  fields: true,
+                },
+              },
+            },
+          },
+          payments: {
+            select: expectedParticipantPaymentSelect,
+          },
+        },
+      });
       expect(result).toEqual({
         registration: updatedRegistration,
         message: 'Registration completed successfully',
       });
+      expect(result).not.toHaveProperty(
+        'registration.payments.0.externalMethod',
+      );
+      expect(result).not.toHaveProperty(
+        'registration.payments.0.externalReference',
+      );
+      expect(result).not.toHaveProperty(
+        'registration.payments.0.idempotencyKey',
+      );
+      expect(result).not.toHaveProperty('registration.payments.0.refunds');
     });
 
     it('should bypass the approval gate for submitted applications when approval mode is disabled', async () => {
@@ -1240,7 +1340,7 @@ describe('RegistrationsService', () => {
       createdAt: new Date(),
       updatedAt: new Date(),
       jobs: [],
-      payments: [],
+      payments: [{ id: 'payment-id', amount: 100 }],
       user: baseUser,
     });
 
@@ -1282,8 +1382,37 @@ describe('RegistrationsService', () => {
 
       const result = await service.createCampRegistration(userId, dtoNoJobs);
 
-      expect(mockPrismaService.registration.create).toHaveBeenCalledTimes(1);
+      expect(mockPrismaService.registration.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          include: {
+            user: true,
+            jobs: {
+              include: {
+                job: {
+                  include: {
+                    category: true,
+                    shift: true,
+                  },
+                },
+              },
+            },
+            payments: {
+              select: expectedParticipantPaymentSelect,
+            },
+          },
+        }),
+      );
       expect(result.jobRegistration).toEqual(created);
+      expect(result).not.toHaveProperty(
+        'jobRegistration.payments.0.externalMethod',
+      );
+      expect(result).not.toHaveProperty(
+        'jobRegistration.payments.0.externalReference',
+      );
+      expect(result).not.toHaveProperty(
+        'jobRegistration.payments.0.idempotencyKey',
+      );
+      expect(result).not.toHaveProperty('jobRegistration.payments.0.refunds');
     });
 
     it('creates deferred registration as CONFIRMED + paymentDeferred=true when no chosen job is over capacity', async () => {
