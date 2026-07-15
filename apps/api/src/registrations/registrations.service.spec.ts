@@ -178,7 +178,7 @@ describe('RegistrationsService', () => {
       year: 2024,
       status: RegistrationStatus.PENDING,
       jobs: [],
-      payments: [],
+      payments: [{ id: 'payment-id', amount: 100 }],
     };
 
     it('should create a registration successfully', async () => {
@@ -202,8 +202,39 @@ describe('RegistrationsService', () => {
         },
       });
       expect(mockPrismaService.job.findUnique).toHaveBeenCalledTimes(2);
-      expect(mockPrismaService.registration.create).toHaveBeenCalled();
+      expect(mockPrismaService.registration.create).toHaveBeenCalledWith({
+        data: {
+          status: RegistrationStatus.PENDING,
+          year: createDto.year,
+          user: { connect: { id: createDto.userId } },
+          jobs: {
+            create: createDto.jobIds.map((jobId) => ({
+              job: { connect: { id: jobId } },
+            })),
+          },
+        },
+        include: {
+          user: true,
+          jobs: {
+            include: {
+              job: {
+                include: {
+                  category: true,
+                  shift: true,
+                },
+              },
+            },
+          },
+          payments: {
+            select: expectedParticipantPaymentSelect,
+          },
+        },
+      });
       expect(result).toEqual(mockRegistration);
+      expect(result).not.toHaveProperty('payments.0.externalMethod');
+      expect(result).not.toHaveProperty('payments.0.externalReference');
+      expect(result).not.toHaveProperty('payments.0.idempotencyKey');
+      expect(result).not.toHaveProperty('payments.0.refunds');
     });
 
     it('should allow registration when user has only cancelled registrations', async () => {
