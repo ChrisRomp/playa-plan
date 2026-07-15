@@ -446,13 +446,22 @@ export class PaymentsService {
             ? RegistrationStatus.CONFIRMED
             : registration.status;
 
-        await tx.registration.update({
-          where: { id: registration.id },
+        const registrationUpdate = await tx.registration.updateMany({
+          where: {
+            id: registration.id,
+            status: registration.status,
+          },
           data: {
             status: resultingStatus,
             paymentDeferred: false,
           },
         });
+
+        if (registrationUpdate.count !== 1) {
+          throw new ConflictException(
+            'Registration changed while recording payment; refresh and retry',
+          );
+        }
 
         const createdPayment = await tx.payment.create({
           data: {

@@ -35,6 +35,7 @@ const mockPrismaService = {
   registration: {
     findUnique: jest.fn(),
     update: jest.fn(),
+    updateMany: jest.fn(),
   },
   adminAudit: {
     create: jest.fn(),
@@ -2518,9 +2519,7 @@ describe('PaymentsService', () => {
         userId: 'registration-owner-id',
         status: RegistrationStatus.PENDING,
       });
-      mockPrismaService.registration.update.mockResolvedValue({
-        id: inputRequest.registrationId,
-      });
+      mockPrismaService.registration.updateMany.mockResolvedValue({ count: 1 });
       mockPrismaService.payment.create.mockResolvedValue(mockCreatedPayment);
       mockPrismaService.adminAudit.create.mockResolvedValue({
         id: 'audit-id',
@@ -2538,8 +2537,11 @@ describe('PaymentsService', () => {
         where: { id: inputRequest.registrationId },
         select: { id: true, userId: true, status: true },
       });
-      expect(mockPrismaService.registration.update).toHaveBeenCalledWith({
-        where: { id: inputRequest.registrationId },
+      expect(mockPrismaService.registration.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: inputRequest.registrationId,
+          status: RegistrationStatus.PENDING,
+        },
         data: {
           status: RegistrationStatus.CONFIRMED,
           paymentDeferred: false,
@@ -2591,8 +2593,11 @@ describe('PaymentsService', () => {
 
       await service.recordExternalPayment(inputRequest, 'admin-id');
 
-      expect(mockPrismaService.registration.update).toHaveBeenCalledWith({
-        where: { id: inputRequest.registrationId },
+      expect(mockPrismaService.registration.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: inputRequest.registrationId,
+          status: inputStatus,
+        },
         data: {
           status: inputStatus,
           paymentDeferred: false,
@@ -2615,6 +2620,16 @@ describe('PaymentsService', () => {
       await expect(
         service.recordExternalPayment(inputRequest, 'admin-id'),
       ).rejects.toThrow(BadRequestException);
+      expect(mockPrismaService.payment.create).not.toHaveBeenCalled();
+      expect(mockPrismaService.adminAudit.create).not.toHaveBeenCalled();
+    });
+
+    it('should return conflict when registration status changes concurrently', async () => {
+      mockPrismaService.registration.updateMany.mockResolvedValue({ count: 0 });
+
+      await expect(
+        service.recordExternalPayment(inputRequest, 'admin-id'),
+      ).rejects.toThrow(ConflictException);
       expect(mockPrismaService.payment.create).not.toHaveBeenCalled();
       expect(mockPrismaService.adminAudit.create).not.toHaveBeenCalled();
     });
