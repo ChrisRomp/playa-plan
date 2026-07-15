@@ -95,6 +95,19 @@ describe('RegistrationsService', () => {
     sendRegistrationErrorEmail: jest.fn().mockResolvedValue(true),
   };
 
+  const expectedParticipantPaymentSelect = {
+    id: true,
+    amount: true,
+    currency: true,
+    status: true,
+    provider: true,
+    providerRefId: true,
+    createdAt: true,
+    updatedAt: true,
+    userId: true,
+    registrationId: true,
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -165,7 +178,7 @@ describe('RegistrationsService', () => {
       year: 2024,
       status: RegistrationStatus.PENDING,
       jobs: [],
-      payments: [],
+      payments: [{ id: 'payment-id', amount: 100 }],
     };
 
     it('should create a registration successfully', async () => {
@@ -189,8 +202,39 @@ describe('RegistrationsService', () => {
         },
       });
       expect(mockPrismaService.job.findUnique).toHaveBeenCalledTimes(2);
-      expect(mockPrismaService.registration.create).toHaveBeenCalled();
+      expect(mockPrismaService.registration.create).toHaveBeenCalledWith({
+        data: {
+          status: RegistrationStatus.PENDING,
+          year: createDto.year,
+          user: { connect: { id: createDto.userId } },
+          jobs: {
+            create: createDto.jobIds.map((jobId) => ({
+              job: { connect: { id: jobId } },
+            })),
+          },
+        },
+        include: {
+          user: true,
+          jobs: {
+            include: {
+              job: {
+                include: {
+                  category: true,
+                  shift: true,
+                },
+              },
+            },
+          },
+          payments: {
+            select: expectedParticipantPaymentSelect,
+          },
+        },
+      });
       expect(result).toEqual(mockRegistration);
+      expect(result).not.toHaveProperty('payments.0.externalMethod');
+      expect(result).not.toHaveProperty('payments.0.externalReference');
+      expect(result).not.toHaveProperty('payments.0.idempotencyKey');
+      expect(result).not.toHaveProperty('payments.0.refunds');
     });
 
     it('should allow registration when user has only cancelled registrations', async () => {
@@ -502,15 +546,42 @@ describe('RegistrationsService', () => {
   describe('findAll', () => {
     it('should return an array of registrations', async () => {
       const expectedRegistrations = [
-        { id: '1', userId: 'user1', year: 2024, jobs: [], payments: [] },
+        {
+          id: '1',
+          userId: 'user1',
+          year: 2024,
+          jobs: [],
+          payments: [{ id: 'payment-1', amount: 100 }],
+        },
         { id: '2', userId: 'user2', year: 2024, jobs: [], payments: [] },
       ];
       mockPrismaService.registration.findMany.mockResolvedValue(expectedRegistrations);
 
       const result = await service.findAll();
       
-      expect(mockPrismaService.registration.findMany).toHaveBeenCalled();
+      expect(mockPrismaService.registration.findMany).toHaveBeenCalledWith({
+        include: {
+          user: true,
+          jobs: {
+            include: {
+              job: {
+                include: {
+                  category: true,
+                  shift: true,
+                },
+              },
+            },
+          },
+          payments: {
+            select: expectedParticipantPaymentSelect,
+          },
+        },
+      });
       expect(result).toEqual(expectedRegistrations);
+      expect(result[0]).not.toHaveProperty('payments.0.externalMethod');
+      expect(result[0]).not.toHaveProperty('payments.0.externalReference');
+      expect(result[0]).not.toHaveProperty('payments.0.idempotencyKey');
+      expect(result[0]).not.toHaveProperty('payments.0.refunds');
     });
   });
 
@@ -519,7 +590,13 @@ describe('RegistrationsService', () => {
     
     it('should return registrations for a specific user', async () => {
       const expectedRegistrations = [
-        { id: '1', userId, year: 2024, jobs: [], payments: [] },
+        {
+          id: '1',
+          userId,
+          year: 2024,
+          jobs: [],
+          payments: [{ id: 'payment-1', amount: 100 }],
+        },
         { id: '2', userId, year: 2023, jobs: [], payments: [] },
       ];
       
@@ -544,13 +621,19 @@ describe('RegistrationsService', () => {
               },
             },
           },
-          payments: true,
+          payments: {
+            select: expectedParticipantPaymentSelect,
+          },
         },
         orderBy: {
           year: 'desc',
         },
       });
       expect(result).toEqual(expectedRegistrations);
+      expect(result[0]).not.toHaveProperty('payments.0.externalMethod');
+      expect(result[0]).not.toHaveProperty('payments.0.externalReference');
+      expect(result[0]).not.toHaveProperty('payments.0.idempotencyKey');
+      expect(result[0]).not.toHaveProperty('payments.0.refunds');
     });
 
     it('should throw NotFoundException if user does not exist', async () => {
@@ -560,12 +643,66 @@ describe('RegistrationsService', () => {
     });
   });
 
+  describe('findByUserAndYear', () => {
+    it('should select only pre-foundation payment fields', async () => {
+      const userId = 'user-id';
+      const year = 2026;
+      const expectedRegistration = {
+        id: 'registration-id',
+        userId,
+        year,
+        jobs: [],
+        payments: [{ id: 'payment-id', amount: 100 }],
+      };
+      mockPrismaService.user.findUnique.mockResolvedValue({ id: userId });
+      mockPrismaService.registration.findFirst.mockResolvedValue(
+        expectedRegistration,
+      );
+
+      const result = await service.findByUserAndYear(userId, year);
+
+      expect(mockPrismaService.registration.findFirst).toHaveBeenCalledWith({
+        where: { userId, year },
+        include: {
+          jobs: {
+            include: {
+              job: {
+                include: {
+                  category: true,
+                  shift: true,
+                },
+              },
+            },
+          },
+          payments: {
+            select: expectedParticipantPaymentSelect,
+          },
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+      });
+      expect(result).not.toHaveProperty('payments.0.externalMethod');
+      expect(result).not.toHaveProperty('payments.0.externalReference');
+      expect(result).not.toHaveProperty('payments.0.idempotencyKey');
+      expect(result).not.toHaveProperty('payments.0.refunds');
+    });
+  });
+
   describe('findByJob', () => {
     const jobId = 'job-id';
     
     it('should return registrations for a specific job', async () => {
       const expectedRegistrationJobs = [
-        { registration: { id: '1', userId: 'user1', year: 2024, user: {}, payments: [] } },
+        {
+          registration: {
+            id: '1',
+            userId: 'user1',
+            year: 2024,
+            user: {},
+            payments: [{ id: 'payment-1', amount: 100 }],
+          },
+        },
         { registration: { id: '2', userId: 'user2', year: 2024, user: {}, payments: [] } },
       ];
       
@@ -583,12 +720,18 @@ describe('RegistrationsService', () => {
           registration: {
             include: {
               user: true,
-              payments: true,
+              payments: {
+                select: expectedParticipantPaymentSelect,
+              },
             },
           },
         },
       });
       expect(result).toEqual(expectedRegistrationJobs.map(rj => rj.registration));
+      expect(result[0]).not.toHaveProperty('payments.0.externalMethod');
+      expect(result[0]).not.toHaveProperty('payments.0.externalReference');
+      expect(result[0]).not.toHaveProperty('payments.0.idempotencyKey');
+      expect(result[0]).not.toHaveProperty('payments.0.refunds');
     });
 
     it('should throw NotFoundException if job does not exist', async () => {
@@ -607,7 +750,7 @@ describe('RegistrationsService', () => {
         userId: 'user-id',
         year: 2024,
         jobs: [],
-        payments: [],
+        payments: [{ id: 'payment-id', amount: 100 }],
       };
       
       mockPrismaService.registration.findUnique.mockResolvedValue(expectedRegistration);
@@ -616,9 +759,28 @@ describe('RegistrationsService', () => {
       
       expect(mockPrismaService.registration.findUnique).toHaveBeenCalledWith({
         where: { id: registrationId },
-        include: expect.any(Object),
+        include: {
+          user: true,
+          jobs: {
+            include: {
+              job: {
+                include: {
+                  category: true,
+                  shift: true,
+                },
+              },
+            },
+          },
+          payments: {
+            select: expectedParticipantPaymentSelect,
+          },
+        },
       });
       expect(result).toEqual(expectedRegistration);
+      expect(result).not.toHaveProperty('payments.0.externalMethod');
+      expect(result).not.toHaveProperty('payments.0.externalReference');
+      expect(result).not.toHaveProperty('payments.0.idempotencyKey');
+      expect(result).not.toHaveProperty('payments.0.refunds');
     });
 
     it('should throw NotFoundException if registration does not exist', async () => {
@@ -644,7 +806,7 @@ describe('RegistrationsService', () => {
           lastName: 'User',
         },
         jobs: [],
-        payments: [],
+        payments: [{ id: 'payment-id', amount: 100 }],
       };
       const updatedRegistration = {
         ...existingRegistration,
@@ -677,9 +839,28 @@ describe('RegistrationsService', () => {
       expect(mockPrismaService.registration.update).toHaveBeenCalledWith({
         where: { id: registrationId },
         data: updateDto,
-        include: expect.any(Object),
+        include: {
+          user: true,
+          jobs: {
+            include: {
+              job: {
+                include: {
+                  category: true,
+                  shift: true,
+                },
+              },
+            },
+          },
+          payments: {
+            select: expectedParticipantPaymentSelect,
+          },
+        },
       });
       expect(result).toEqual(updatedRegistration);
+      expect(result).not.toHaveProperty('payments.0.externalMethod');
+      expect(result).not.toHaveProperty('payments.0.externalReference');
+      expect(result).not.toHaveProperty('payments.0.idempotencyKey');
+      expect(result).not.toHaveProperty('payments.0.refunds');
     });
 
     it('should throw NotFoundException if registration does not exist', async () => {
@@ -822,6 +1003,22 @@ describe('RegistrationsService', () => {
             year: applicationYear,
             user: { connect: { id: userId } },
           }),
+          include: {
+            user: true,
+            jobs: {
+              include: {
+                job: {
+                  include: {
+                    category: true,
+                    shift: true,
+                  },
+                },
+              },
+            },
+            payments: {
+              select: expectedParticipantPaymentSelect,
+            },
+          },
         }),
       );
       expect(mockPrismaService.campingOptionFieldValue.create).toHaveBeenCalledWith({
@@ -845,6 +1042,16 @@ describe('RegistrationsService', () => {
       );
       expect(result.message).toBe('Application submitted successfully');
       expect(result.registration.status).toBe(RegistrationStatus.APPLICATION_SUBMITTED);
+      expect(result).not.toHaveProperty(
+        'registration.payments.0.externalMethod',
+      );
+      expect(result).not.toHaveProperty(
+        'registration.payments.0.externalReference',
+      );
+      expect(result).not.toHaveProperty(
+        'registration.payments.0.idempotencyKey',
+      );
+      expect(result).not.toHaveProperty('registration.payments.0.refunds');
     });
 
     it('should auto-approve eligible users and send the approved notification', async () => {
@@ -950,7 +1157,7 @@ describe('RegistrationsService', () => {
       user: baseUser,
       jobs: [],
       campingOptionRegistrations: approvedRegistration.campingOptionRegistrations,
-      payments: [],
+      payments: [{ id: 'payment-id', amount: 100 }],
     };
 
     beforeEach(() => {
@@ -1009,15 +1216,48 @@ describe('RegistrationsService', () => {
         data: [{ registrationId: approvedRegistration.id, jobId: 'job-1' }],
         skipDuplicates: true,
       });
-      expect(mockPrismaService.registration.findUnique).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { id: approvedRegistration.id },
-        }),
-      );
+      expect(mockPrismaService.registration.findUnique).toHaveBeenCalledWith({
+        where: { id: approvedRegistration.id },
+        include: {
+          user: true,
+          jobs: {
+            include: {
+              job: {
+                include: {
+                  category: true,
+                  shift: true,
+                },
+              },
+            },
+          },
+          campingOptionRegistrations: {
+            include: {
+              campingOption: {
+                include: {
+                  fields: true,
+                },
+              },
+            },
+          },
+          payments: {
+            select: expectedParticipantPaymentSelect,
+          },
+        },
+      });
       expect(result).toEqual({
         registration: updatedRegistration,
         message: 'Registration completed successfully',
       });
+      expect(result).not.toHaveProperty(
+        'registration.payments.0.externalMethod',
+      );
+      expect(result).not.toHaveProperty(
+        'registration.payments.0.externalReference',
+      );
+      expect(result).not.toHaveProperty(
+        'registration.payments.0.idempotencyKey',
+      );
+      expect(result).not.toHaveProperty('registration.payments.0.refunds');
     });
 
     it('should bypass the approval gate for submitted applications when approval mode is disabled', async () => {
@@ -1150,7 +1390,7 @@ describe('RegistrationsService', () => {
       createdAt: new Date(),
       updatedAt: new Date(),
       jobs: [],
-      payments: [],
+      payments: [{ id: 'payment-id', amount: 100 }],
       user: baseUser,
     });
 
@@ -1192,8 +1432,37 @@ describe('RegistrationsService', () => {
 
       const result = await service.createCampRegistration(userId, dtoNoJobs);
 
-      expect(mockPrismaService.registration.create).toHaveBeenCalledTimes(1);
+      expect(mockPrismaService.registration.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          include: {
+            user: true,
+            jobs: {
+              include: {
+                job: {
+                  include: {
+                    category: true,
+                    shift: true,
+                  },
+                },
+              },
+            },
+            payments: {
+              select: expectedParticipantPaymentSelect,
+            },
+          },
+        }),
+      );
       expect(result.jobRegistration).toEqual(created);
+      expect(result).not.toHaveProperty(
+        'jobRegistration.payments.0.externalMethod',
+      );
+      expect(result).not.toHaveProperty(
+        'jobRegistration.payments.0.externalReference',
+      );
+      expect(result).not.toHaveProperty(
+        'jobRegistration.payments.0.idempotencyKey',
+      );
+      expect(result).not.toHaveProperty('jobRegistration.payments.0.refunds');
     });
 
     it('creates deferred registration as CONFIRMED + paymentDeferred=true when no chosen job is over capacity', async () => {
@@ -1380,7 +1649,14 @@ describe('RegistrationsService', () => {
       mockPrismaService.campingOptionRegistration.findMany.mockResolvedValue([
         { id: 'cor-1', campingOption: { fields: [] }, fieldValues: [] },
       ]);
-      mockPrismaService.registration.findMany.mockResolvedValue([]);
+      mockPrismaService.registration.findMany.mockResolvedValue([
+        {
+          id: 'registration-id',
+          status: RegistrationStatus.CONFIRMED,
+          jobs: [],
+          payments: [{ id: 'payment-id', amount: 100 }],
+        },
+      ]);
 
       const result = await service.getMyCampRegistration(userId);
 
@@ -1389,7 +1665,35 @@ describe('RegistrationsService', () => {
           where: { userId, registration: { year: 2026 } },
         })
       );
+      expect(mockPrismaService.registration.findMany).toHaveBeenCalledWith({
+        where: { userId, year: 2026 },
+        include: {
+          jobs: {
+            include: {
+              job: {
+                include: {
+                  category: true,
+                  shift: true,
+                },
+              },
+            },
+          },
+          payments: {
+            select: expectedParticipantPaymentSelect,
+          },
+        },
+      });
       expect(result.campingOptions).toHaveLength(1);
+      expect(result).not.toHaveProperty(
+        'jobRegistrations.0.payments.0.externalMethod',
+      );
+      expect(result).not.toHaveProperty(
+        'jobRegistrations.0.payments.0.externalReference',
+      );
+      expect(result).not.toHaveProperty(
+        'jobRegistrations.0.payments.0.idempotencyKey',
+      );
+      expect(result).not.toHaveProperty('jobRegistrations.0.payments.0.refunds');
     });
 
     it('should return hasRegistration false when user only has prior-year registrations', async () => {

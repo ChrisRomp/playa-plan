@@ -39,6 +39,19 @@ interface JobRegistrationWithJobs extends Registration {
   }>;
 }
 
+const participantPaymentSelect = {
+  id: true,
+  amount: true,
+  currency: true,
+  status: true,
+  provider: true,
+  providerRefId: true,
+  createdAt: true,
+  updatedAt: true,
+  userId: true,
+  registrationId: true,
+} satisfies Prisma.PaymentSelect;
+
 @Injectable()
 export class RegistrationsService {
   private readonly logger = new Logger(RegistrationsService.name);
@@ -154,7 +167,9 @@ export class RegistrationsService {
             },
           },
         },
-        payments: true,
+        payments: {
+          select: participantPaymentSelect,
+        },
       },
     });
   }
@@ -303,7 +318,9 @@ export class RegistrationsService {
             },
           },
         },
-        payments: true,
+        payments: {
+          select: participantPaymentSelect,
+        },
       },
     });
   }
@@ -336,7 +353,9 @@ export class RegistrationsService {
             },
           },
         },
-        payments: true,
+        payments: {
+          select: participantPaymentSelect,
+        },
       },
       orderBy: {
         year: 'desc',
@@ -387,7 +406,9 @@ export class RegistrationsService {
             },
           },
         },
-        payments: true,
+        payments: {
+          select: participantPaymentSelect,
+        },
       },
       orderBy: {
         createdAt: 'desc', // Get the most recent registration if multiple exist
@@ -416,7 +437,9 @@ export class RegistrationsService {
         registration: {
           include: {
             user: true,
-            payments: true,
+            payments: {
+              select: participantPaymentSelect,
+            },
           },
         },
       },
@@ -446,7 +469,9 @@ export class RegistrationsService {
             },
           },
         },
-        payments: true,
+        payments: {
+          select: participantPaymentSelect,
+        },
       },
     });
 
@@ -502,7 +527,9 @@ export class RegistrationsService {
             },
           },
         },
-        payments: true,
+        payments: {
+          select: participantPaymentSelect,
+        },
       },
     });
 
@@ -732,7 +759,9 @@ export class RegistrationsService {
                   },
                 },
               },
-              payments: true,
+              payments: {
+                select: participantPaymentSelect,
+              },
             },
           });
 
@@ -958,7 +987,9 @@ export class RegistrationsService {
               },
             },
           },
-          payments: true,
+          payments: {
+            select: participantPaymentSelect,
+          },
         },
       });
       if (!updatedRegistration) {
@@ -1187,7 +1218,9 @@ export class RegistrationsService {
                   job: { include: { category: true, shift: true } },
                 },
               },
-              payments: true,
+              payments: {
+                select: participantPaymentSelect,
+              },
             },
           });
 
@@ -1656,7 +1689,9 @@ export class RegistrationsService {
             },
           },
         },
-        payments: true,
+        payments: {
+          select: participantPaymentSelect,
+        },
       },
     });
 
