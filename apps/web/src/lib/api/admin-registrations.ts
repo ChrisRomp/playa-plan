@@ -1,10 +1,20 @@
 import { api } from '../api';
 
+export type AdminRegistrationStatus =
+  | 'PENDING'
+  | 'CONFIRMED'
+  | 'CANCELLED'
+  | 'WAITLISTED'
+  | 'APPLICATION_SUBMITTED'
+  | 'APPLICATION_APPROVED'
+  | 'APPLICATION_DECLINED';
+
 // TODO: Replace with actual API types when implemented
-interface Registration {
+export interface Registration {
   id: string;
   year: number;
-  status: 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'WAITLISTED';
+  status: AdminRegistrationStatus;
+  paymentDeferred?: boolean;
   createdAt: string;
   user: {
     id: string;
@@ -77,7 +87,7 @@ interface RegistrationCancelData {
   processRefund: boolean;
 }
 
-interface RegistrationFilters {
+export interface RegistrationFilters {
   year?: number;
   status?: string;
   email?: string;
