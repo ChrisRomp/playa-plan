@@ -839,9 +839,28 @@ describe('RegistrationsService', () => {
       expect(mockPrismaService.registration.update).toHaveBeenCalledWith({
         where: { id: registrationId },
         data: updateDto,
-        include: expect.any(Object),
+        include: {
+          user: true,
+          jobs: {
+            include: {
+              job: {
+                include: {
+                  category: true,
+                  shift: true,
+                },
+              },
+            },
+          },
+          payments: {
+            select: expectedParticipantPaymentSelect,
+          },
+        },
       });
       expect(result).toEqual(updatedRegistration);
+      expect(result).not.toHaveProperty('payments.0.externalMethod');
+      expect(result).not.toHaveProperty('payments.0.externalReference');
+      expect(result).not.toHaveProperty('payments.0.idempotencyKey');
+      expect(result).not.toHaveProperty('payments.0.refunds');
     });
 
     it('should throw NotFoundException if registration does not exist', async () => {

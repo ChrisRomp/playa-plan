@@ -527,7 +527,9 @@ export class RegistrationsService {
             },
           },
         },
-        payments: true,
+        payments: {
+          select: participantPaymentSelect,
+        },
       },
     });
 
