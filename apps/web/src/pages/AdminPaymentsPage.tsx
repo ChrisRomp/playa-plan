@@ -98,7 +98,13 @@ function getBoundedServerMessage(error: unknown): string | null {
   }
 
   const response = error.response;
-  if (typeof response !== 'object' || response === null || !('data' in response)) {
+  if (
+    typeof response !== 'object' ||
+    response === null ||
+    !('status' in response) ||
+    ![400, 404, 409].includes(typeof response.status === 'number' ? response.status : -1) ||
+    !('data' in response)
+  ) {
     return null;
   }
 
@@ -119,7 +125,7 @@ function getBoundedServerMessage(error: unknown): string | null {
 }
 
 function getErrorMessage(error: unknown, fallback: string): string {
-  return getBoundedServerMessage(error) ?? (error instanceof Error ? error.message : fallback);
+  return getBoundedServerMessage(error) ?? fallback;
 }
 
 /**

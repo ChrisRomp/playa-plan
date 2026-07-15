@@ -481,6 +481,49 @@ describe('PaymentsService', () => {
         });
       });
 
+      it('should keep a malformed stored currency visible but unavailable for refunds', async () => {
+        const mockPayment = {
+          id: 'legacy-currency-payment',
+          amount: 10,
+          currency: 'usd',
+          status: PaymentStatus.COMPLETED,
+          provider: PaymentProvider.PAYPAL,
+          externalMethod: null,
+          externalReference: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          userId: 'user-id',
+          registrationId: null,
+          user: {
+            id: 'user-id',
+            firstName: 'Legacy',
+            lastName: 'Currency',
+            email: 'legacy@example.com',
+          },
+          registration: null,
+          refunds: [],
+        };
+        mockPrismaService.payment.findMany.mockResolvedValue([mockPayment]);
+        mockPrismaService.payment.count.mockResolvedValue(1);
+
+        const actualResult = await service.findAllForAdmin();
+
+        expect(actualResult).toEqual({
+          payments: [
+            {
+              ...mockPayment,
+              paymentAmountCents: 1000,
+              successfulRefundCents: 0,
+              pendingRefundCents: 0,
+              availableRefundCents: 0,
+              refundUnavailableReason:
+                'Refund unavailable because the stored payment currency is invalid.',
+            },
+          ],
+          total: 1,
+        });
+      });
+
       it('should report legacy ledgerless refunded payments as fully refunded', async () => {
         const mockPayment = {
           id: 'legacy-refunded-payment',
@@ -3208,6 +3251,21 @@ describe('PaymentsService', () => {
       await expect(
         service.createManualRefund(paymentId, inputRequest, 'admin-id')
       ).rejects.toThrow('Dollar amount must not have sub-cent precision');
+
+      expect(mockPrismaService.paymentRefund.create).not.toHaveBeenCalled();
+      expect(mockPrismaService.payment.update).not.toHaveBeenCalled();
+      expect(mockPrismaService.registration.update).not.toHaveBeenCalled();
+      expect(mockPrismaService.adminAudit.create).not.toHaveBeenCalled();
+    });
+
+    it('should reject manual refunds for an invalid stored currency before writes', async () => {
+      mockPrismaService.payment.findUnique
+        .mockReset()
+        .mockResolvedValue({ ...basePayment, currency: 'usd' });
+
+      await expect(
+        service.createManualRefund(paymentId, inputRequest, 'admin-id')
+      ).rejects.toThrow('Refund unavailable because the stored payment currency is invalid.');
 
       expect(mockPrismaService.paymentRefund.create).not.toHaveBeenCalled();
       expect(mockPrismaService.payment.update).not.toHaveBeenCalled();

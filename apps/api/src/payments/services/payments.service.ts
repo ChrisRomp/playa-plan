@@ -196,6 +196,8 @@ const DEFAULT_ADMIN_PAYMENT_PAGE_SIZE = 25;
 const MAX_ADMIN_PAYMENT_PAGE_SIZE = 100;
 const UNSUPPORTED_PAYMENT_PRECISION_REASON =
   'Refund unavailable because the stored payment amount has unsupported precision.';
+const UNSUPPORTED_PAYMENT_CURRENCY_REASON =
+  'Refund unavailable because the stored payment currency is invalid.';
 
 // Interface for refund result
 export interface RefundResult {
@@ -704,25 +706,67 @@ export class PaymentsService {
   private getAdminRefundTotals(
     payment: AdminPaymentRecord | ExternalPaymentRecord
   ): RefundTotals {
+    let paymentAmountCents: number;
     try {
-      return this.calculateRefundTotals(
-        dollarsToCents(payment.amount),
-        payment.refunds,
-        payment.status === PaymentStatus.REFUNDED
-      );
+      paymentAmountCents = dollarsToCents(payment.amount);
     } catch (error: unknown) {
       if (!(error instanceof RangeError)) {
         throw error;
       }
 
-      const ledgerTotals = this.calculateRefundLedgerTotals(payment.refunds);
-      return {
-        paymentAmountCents: null,
-        ...ledgerTotals,
-        availableRefundCents: 0,
-        refundUnavailableReason: UNSUPPORTED_PAYMENT_PRECISION_REASON,
-      };
+      return this.buildUnavailableRefundTotals(
+        null,
+        payment.refunds,
+        UNSUPPORTED_PAYMENT_PRECISION_REASON,
+        false
+      );
     }
+
+    try {
+      this.validateStoredPaymentCurrency(payment.currency);
+    } catch (error: unknown) {
+      if (!(error instanceof RangeError)) {
+        throw error;
+      }
+
+      return this.buildUnavailableRefundTotals(
+        paymentAmountCents,
+        payment.refunds,
+        UNSUPPORTED_PAYMENT_CURRENCY_REASON,
+        payment.status === PaymentStatus.REFUNDED
+      );
+    }
+
+    return this.calculateRefundTotals(
+      paymentAmountCents,
+      payment.refunds,
+      payment.status === PaymentStatus.REFUNDED
+    );
+  }
+
+  private buildUnavailableRefundTotals(
+    paymentAmountCents: number | null,
+    refunds: ReadonlyArray<{
+      amountCents: number;
+      status: PaymentRefundStatus;
+    }>,
+    refundUnavailableReason: string,
+    forceFullyRefunded: boolean
+  ): RefundTotals {
+    const ledgerTotals =
+      forceFullyRefunded && paymentAmountCents !== null
+        ? {
+            successfulRefundCents: paymentAmountCents,
+            pendingRefundCents: 0,
+          }
+        : this.calculateRefundLedgerTotals(refunds);
+
+    return {
+      paymentAmountCents,
+      ...ledgerTotals,
+      availableRefundCents: 0,
+      refundUnavailableReason,
+    };
   }
 
   private calculateRefundTotals(
@@ -850,6 +894,7 @@ export class PaymentsService {
             canonicalRequest.resultingRegistrationStatus
           );
 
+          const paymentCurrency = this.getPaymentCurrency(payment.currency);
           const paymentAmountCents = this.getPaymentAmountCents(payment.amount);
           const currentTotals = this.calculateRefundTotals(paymentAmountCents, payment.refunds);
           if (currentTotals.availableRefundCents <= 0) {
@@ -872,7 +917,7 @@ export class PaymentsService {
             data: {
               paymentId,
               amountCents: refundAmountCents,
-              currency: normalizeCurrency(payment.currency),
+              currency: paymentCurrency,
               executionMode: RefundExecutionMode.MANUAL,
               status: PaymentRefundStatus.SUCCEEDED,
               reason: canonicalRequest.reason,
@@ -917,7 +962,7 @@ export class PaymentsService {
                 refundId: createdRefund.id,
                 registrationId: payment.registrationId,
                 amountCents: refundAmountCents,
-                currency: normalizeCurrency(payment.currency),
+                currency: paymentCurrency,
                 executionMode: RefundExecutionMode.MANUAL,
                 reason: canonicalRequest.reason,
                 externalReference: canonicalRequest.externalReference,
@@ -1044,6 +1089,26 @@ export class PaymentsService {
     } catch (error: unknown) {
       if (error instanceof RangeError) {
         throw new BadRequestException(error.message);
+      }
+
+      throw error;
+    }
+  }
+
+  private validateStoredPaymentCurrency(currency: string): void {
+    const normalizedCurrency = normalizeCurrency(currency);
+    if (normalizedCurrency !== currency) {
+      throw new RangeError('Stored payment currency must already be normalized');
+    }
+  }
+
+  private getPaymentCurrency(currency: string): string {
+    try {
+      this.validateStoredPaymentCurrency(currency);
+      return currency;
+    } catch (error: unknown) {
+      if (error instanceof RangeError) {
+        throw new BadRequestException(UNSUPPORTED_PAYMENT_CURRENCY_REASON);
       }
 
       throw error;

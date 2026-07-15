@@ -157,7 +157,7 @@ describe('AdminPaymentsPage', () => {
     fireEvent.click(screen.getByLabelText('Confirm external payment'));
     fireEvent.click(screen.getByRole('button', { name: 'Record external payment' }));
 
-    expect(await screen.findByText('Temporary request failure')).toBeInTheDocument();
+    expect(await screen.findByText('Unable to record the external payment.')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Record external payment' }));
 
@@ -347,6 +347,52 @@ describe('AdminPaymentsPage', () => {
       )
     ).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Refund' })).not.toBeInTheDocument();
+  });
+
+  it('should show an invalid stored currency reason without normalizing or offering a refund', async () => {
+    const legacyCurrencyPayment = {
+      ...payment,
+      id: 'legacy-currency-payment',
+      currency: 'usd',
+      refundUnavailableReason:
+        'Refund unavailable because the stored payment currency is invalid.',
+      availableRefundCents: 0,
+    };
+    mockGetPayments.mockResolvedValue({
+      payments: [legacyCurrencyPayment],
+      total: 1,
+    });
+
+    renderPage();
+
+    expect(await screen.findByText('usd 125.50')).toBeInTheDocument();
+    expect(
+      screen.getByText('Refund unavailable because the stored payment currency is invalid.')
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Refund' })).not.toBeInTheDocument();
+  });
+
+  it('should hide an internal 500 message behind the safe refund fallback', async () => {
+    const axiosError = Object.assign(new Error('Request failed with status code 500'), {
+      response: {
+        data: {
+          message: 'Internal database connection details',
+        },
+        status: 500,
+      },
+    });
+    mockGetPayments.mockResolvedValue({ payments: [payment], total: 1 });
+    mockCreateManualRefund.mockRejectedValue(axiosError);
+    renderPage();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Refund' }));
+    fireEvent.change(screen.getByLabelText('Partial refund amount'), {
+      target: { value: '1.00' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Record manual refund' }));
+
+    expect(await screen.findByText('Unable to record the manual refund.')).toBeInTheDocument();
+    expect(screen.queryByText('Internal database connection details')).not.toBeInTheDocument();
   });
 
   it.each(['1.001', '125.51'])(
