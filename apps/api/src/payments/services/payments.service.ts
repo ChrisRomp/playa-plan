@@ -1704,11 +1704,45 @@ export class PaymentsService {
           where: { id: paymentId },
           data: { status: resultingPaymentStatus },
         });
+
+        let registrationStatusBefore: RegistrationStatus | null = null;
+        let registrationStatusAfter: RegistrationStatus | null = null;
+        let registrationStatusApplied = false;
+        let registrationStatusSkipReason: string | null = null;
         if (payment.registrationId && refund.resultingRegistrationStatus) {
-          await tx.registration.update({
+          const currentRegistration = await tx.registration.findUnique({
             where: { id: payment.registrationId },
-            data: { status: refund.resultingRegistrationStatus },
+            select: { status: true },
           });
+          if (!currentRegistration) {
+            throw new NotFoundException(
+              `Registration with ID ${payment.registrationId} not found`
+            );
+          }
+
+          registrationStatusBefore = currentRegistration.status;
+          if (
+            currentRegistration.status === RegistrationStatus.CANCELLED ||
+            isApplicationStatus(currentRegistration.status)
+          ) {
+            registrationStatusAfter = currentRegistration.status;
+            registrationStatusSkipReason = 'CONCURRENT_PROTECTED_STATE';
+          } else {
+            const registrationTransition = await tx.registration.updateMany({
+              where: {
+                id: payment.registrationId,
+                status: currentRegistration.status,
+              },
+              data: { status: refund.resultingRegistrationStatus },
+            });
+            if (registrationTransition.count !== 1) {
+              throw new ConflictException(
+                'Registration status changed concurrently; retry refund reconciliation'
+              );
+            }
+            registrationStatusAfter = refund.resultingRegistrationStatus;
+            registrationStatusApplied = true;
+          }
         }
 
         await tx.adminAudit.create({
@@ -1729,6 +1763,10 @@ export class PaymentsService {
               executionMode: RefundExecutionMode.STRIPE,
               reason: refund.reason,
               resultingRegistrationStatus: refund.resultingRegistrationStatus,
+              registrationStatusBefore,
+              registrationStatusAfter,
+              registrationStatusApplied,
+              registrationStatusSkipReason,
               providerRefundId,
             },
             reason: refund.reason,

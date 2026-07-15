@@ -482,6 +482,7 @@ describe('StripeService', () => {
 
     it('should find an existing refund by local metadata', async () => {
       mockStripeInstance.refunds.list.mockResolvedValue({
+        has_more: false,
         data: [
           {
             id: 're_other',
@@ -511,16 +512,96 @@ describe('StripeService', () => {
       });
     });
 
-    it('should report not found only after a successful inspection', async () => {
-      mockStripeInstance.refunds.list.mockResolvedValue({ data: [] });
+    it('should find a matching refund on a later page', async () => {
+      mockStripeInstance.refunds.list
+        .mockResolvedValueOnce({
+          has_more: true,
+          data: [
+            {
+              id: 're_first_page',
+              status: 'succeeded',
+              metadata: { paymentRefundId: 'other-refund' },
+            },
+          ],
+        })
+        .mockResolvedValueOnce({
+          has_more: false,
+          data: [
+            {
+              id: 're_later_match',
+              status: 'succeeded',
+              metadata: { paymentRefundId: inputRequest.localRefundId },
+            },
+          ],
+        });
+
+      await expect(
+        service.findAdminRefund(inputRequest.providerRefId, inputRequest.localRefundId)
+      ).resolves.toEqual({
+        outcome: 'FOUND',
+        providerRefundId: 're_later_match',
+      });
+      expect(mockStripeInstance.refunds.list).toHaveBeenNthCalledWith(2, {
+        payment_intent: inputRequest.providerRefId,
+        limit: 100,
+        starting_after: 're_first_page',
+      });
+    });
+
+    it('should report not found only after every page is inspected', async () => {
+      mockStripeInstance.refunds.list
+        .mockResolvedValueOnce({
+          has_more: true,
+          data: [
+            {
+              id: 're_first_page',
+              status: 'succeeded',
+              metadata: { paymentRefundId: 'other-refund' },
+            },
+          ],
+        })
+        .mockResolvedValueOnce({
+          has_more: false,
+          data: [
+            {
+              id: 're_last_page',
+              status: 'succeeded',
+              metadata: { paymentRefundId: 'another-refund' },
+            },
+          ],
+        });
 
       await expect(
         service.findAdminRefund(inputRequest.providerRefId, inputRequest.localRefundId)
       ).resolves.toEqual({ outcome: 'NOT_FOUND' });
+      expect(mockStripeInstance.refunds.list).toHaveBeenCalledTimes(2);
+    });
+
+    it('should preserve pending state when a later page cannot be inspected', async () => {
+      mockStripeInstance.refunds.list
+        .mockResolvedValueOnce({
+          has_more: true,
+          data: [
+            {
+              id: 're_first_page',
+              status: 'succeeded',
+              metadata: { paymentRefundId: 'other-refund' },
+            },
+          ],
+        })
+        .mockRejectedValueOnce({
+          type: 'StripeConnectionError',
+          message: 'Connection reset',
+        });
+
+      await expect(
+        service.findAdminRefund(inputRequest.providerRefId, inputRequest.localRefundId)
+      ).resolves.toEqual({ outcome: 'PENDING_UNKNOWN' });
     });
 
     it('should not finalize a matching non-successful inspected refund', async () => {
       mockStripeInstance.refunds.list.mockResolvedValue({
+        has_more: false,
         data: [
           {
             id: 're_pending',

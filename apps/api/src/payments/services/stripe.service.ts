@@ -234,15 +234,32 @@ export class StripeService {
     try {
       const stripe = await this.getStripe();
       const paymentIntentId = await this.resolvePaymentIntentId(stripe, providerRefId);
-      const refunds = await stripe.refunds.list({
-        payment_intent: paymentIntentId,
-        limit: 100,
-      });
-      const matchingRefund = refunds.data.find(
-        refund => refund.metadata?.[LOCAL_REFUND_METADATA_KEY] === localRefundId
-      );
+      let startingAfter: string | undefined;
 
-      return matchingRefund ? this.classifyInspectedRefund(matchingRefund) : { outcome: 'NOT_FOUND' };
+      do {
+        const refunds = await stripe.refunds.list({
+          payment_intent: paymentIntentId,
+          limit: 100,
+          ...(startingAfter ? { starting_after: startingAfter } : {}),
+        });
+        const matchingRefund = refunds.data.find(
+          refund => refund.metadata?.[LOCAL_REFUND_METADATA_KEY] === localRefundId
+        );
+        if (matchingRefund) {
+          return this.classifyInspectedRefund(matchingRefund);
+        }
+        if (!refunds.has_more) {
+          return { outcome: 'NOT_FOUND' };
+        }
+
+        startingAfter = refunds.data.at(-1)?.id;
+        if (!startingAfter) {
+          this.logger.warn('Stripe refund inspection returned an incomplete page');
+          return { outcome: 'PENDING_UNKNOWN' };
+        }
+      } while (startingAfter);
+
+      return { outcome: 'PENDING_UNKNOWN' };
     } catch {
       this.logger.warn('Unable to inspect Stripe refunds; refund remains pending');
       return { outcome: 'PENDING_UNKNOWN' };
