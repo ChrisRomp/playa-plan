@@ -38,7 +38,8 @@ describe('PaymentsController Security', () => {
             findAllForAdmin: jest.fn(),
             findOneWithOwnershipCheck: jest.fn(),
             recordExternalPayment: jest.fn(),
-            createManualRefund: jest.fn(),
+            createRefund: jest.fn(),
+            retryStripeRefund: jest.fn(),
           },
         },
         {
@@ -95,12 +96,15 @@ describe('PaymentsController Security', () => {
         expect(actualRoles).not.toContain(UserRole.PARTICIPANT);
       });
 
-      it('should expose only the nested admin manual refund route', () => {
-        const actualRoles = Reflect.getMetadata('roles', PaymentsController.prototype.createRefund);
-        const actualPath = Reflect.getMetadata(
-          PATH_METADATA,
-          PaymentsController.prototype.createRefund
+      it.each([
+        ['createRefund', ':paymentId/refunds'],
+        ['retryRefund', ':paymentId/refunds/:refundId/retry'],
+      ] as const)('should restrict the nested %s route to admins', (methodName, expectedPath) => {
+        const actualRoles = Reflect.getMetadata(
+          'roles',
+          PaymentsController.prototype[methodName]
         );
+        const actualPath = Reflect.getMetadata(PATH_METADATA, PaymentsController.prototype[methodName]);
         const controllerPrototype = PaymentsController.prototype as unknown as Record<
           string,
           unknown
@@ -109,7 +113,7 @@ describe('PaymentsController Security', () => {
         expect(actualRoles).toEqual([UserRole.ADMIN]);
         expect(actualRoles).not.toContain(UserRole.STAFF);
         expect(actualRoles).not.toContain(UserRole.PARTICIPANT);
-        expect(actualPath).toBe(':paymentId/refunds');
+        expect(actualPath).toBe(expectedPath);
         expect(controllerPrototype.processRefund).toBeUndefined();
       });
     });

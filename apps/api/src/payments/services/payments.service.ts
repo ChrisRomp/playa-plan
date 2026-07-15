@@ -91,6 +91,9 @@ const internalRefundSelect = {
   ...adminRefundSelect,
   paymentId: true,
   idempotencyKey: true,
+  providerRefundId: true,
+  processedByUserId: true,
+  failureMessage: true,
 } satisfies Prisma.PaymentRefundSelect;
 
 const adminPaymentSelect = {
@@ -99,6 +102,7 @@ const adminPaymentSelect = {
   currency: true,
   status: true,
   provider: true,
+  providerRefId: true,
   externalMethod: true,
   externalReference: true,
   createdAt: true,
@@ -161,11 +165,17 @@ interface RefundTotals {
   refundUnavailableReason: string | null;
 }
 
-export type AdminPayment = AdminPaymentRecord & RefundTotals;
+export type AdminPayment = Omit<AdminPaymentRecord, 'providerRefId'> &
+  RefundTotals & {
+    stripeRefundEligible: boolean;
+  };
+
+export type RefundCommandOutcome = 'SUCCEEDED' | 'FAILED' | 'PENDING_UNKNOWN';
 
 export interface ManualRefundResult extends RefundTotals {
   payment: AdminPayment;
   refund: AdminRefund;
+  outcome: RefundCommandOutcome;
 }
 
 interface CanonicalExternalPayment {
@@ -183,6 +193,22 @@ interface CanonicalManualRefund {
   reason: string | null;
   externalReference: string | null;
   resultingRegistrationStatus: RegistrationStatus | null;
+}
+
+interface CanonicalStripeRefund {
+  amountCents?: number;
+  fullRefund: boolean;
+  executionMode: RefundExecutionMode;
+  reason: string | null;
+  externalReference: null;
+  resultingRegistrationStatus: RegistrationStatus | null;
+}
+
+interface StripeRefundReservation {
+  payment: AdminPaymentRecord;
+  refund: InternalRefundRecord;
+  providerRefId: string;
+  shouldSubmit: boolean;
 }
 
 interface LegacyRefundRequest {
@@ -683,6 +709,14 @@ export class PaymentsService {
 
   private toAdminPayment(payment: AdminPaymentRecord | ExternalPaymentRecord): AdminPayment {
     const totals = this.getAdminRefundTotals(payment);
+    const stripeRefundEligible =
+      payment.provider === PaymentProvider.STRIPE &&
+      typeof payment.providerRefId === 'string' &&
+      payment.providerRefId.trim().length > 0 &&
+      (payment.status === PaymentStatus.COMPLETED ||
+        payment.status === PaymentStatus.PARTIALLY_REFUNDED) &&
+      totals.refundUnavailableReason === null &&
+      totals.availableRefundCents > 0;
 
     return {
       id: payment.id,
@@ -700,6 +734,7 @@ export class PaymentsService {
       registration: payment.registration,
       refunds: payment.refunds,
       ...totals,
+      stripeRefundEligible,
     };
   }
 
@@ -833,6 +868,24 @@ export class PaymentsService {
 
   private isUniqueConstraintError(error: unknown): boolean {
     return typeof error === 'object' && error !== null && 'code' in error && error.code === 'P2002';
+  }
+
+  /**
+   * Dispatches the nested admin refund command by execution mode.
+   */
+  async createRefund(
+    paymentId: string,
+    data: CreateRefundDto,
+    adminUserId: string
+  ): Promise<ManualRefundResult> {
+    if (data.executionMode === RefundExecutionMode.MANUAL) {
+      return this.createManualRefund(paymentId, data, adminUserId);
+    }
+    if (data.executionMode === RefundExecutionMode.STRIPE) {
+      return this.createStripeRefund(paymentId, data, adminUserId);
+    }
+
+    throw new BadRequestException('executionMode must be MANUAL or STRIPE');
   }
 
   /**
@@ -1122,13 +1175,8 @@ export class PaymentsService {
     canonicalRequest: CanonicalManualRefund
   ): ManualRefundResult {
     const requestedFullRefund = this.getRequestedFullRefundFromAudit(auditValues);
-    const amountMatches = canonicalRequest.fullRefund
-      ? existingRefund.amountCents ===
-        this.calculateRefundTotals(
-          this.getPaymentAmountCents(payment.amount),
-          payment.refunds.filter(refund => refund.id !== existingRefund.id)
-        ).availableRefundCents
-      : existingRefund.amountCents === canonicalRequest.amountCents;
+    const amountMatches =
+      canonicalRequest.fullRefund || existingRefund.amountCents === canonicalRequest.amountCents;
 
     if (
       requestedFullRefund === null ||
@@ -1188,6 +1236,12 @@ export class PaymentsService {
       pendingRefundCents: adminPayment.pendingRefundCents,
       availableRefundCents: adminPayment.availableRefundCents,
       refundUnavailableReason: adminPayment.refundUnavailableReason,
+      outcome:
+        refund.status === PaymentRefundStatus.SUCCEEDED
+          ? 'SUCCEEDED'
+          : refund.status === PaymentRefundStatus.FAILED
+            ? 'FAILED'
+            : 'PENDING_UNKNOWN',
     };
   }
 
@@ -1235,6 +1289,671 @@ export class PaymentsService {
       replayAudit?.newValues,
       canonicalRequest
     );
+  }
+
+  private async createStripeRefund(
+    paymentId: string,
+    data: CreateRefundDto,
+    adminUserId: string
+  ): Promise<ManualRefundResult> {
+    const canonicalRequest = this.canonicalizeStripeRefund(data);
+    let reservation: StripeRefundReservation;
+
+    try {
+      reservation = await this.reserveStripeRefund(
+        paymentId,
+        data.idempotencyKey,
+        canonicalRequest,
+        adminUserId
+      );
+    } catch (error: unknown) {
+      if (this.isSerializationConflict(error)) {
+        throw new ConflictException(
+          'Refund balance changed concurrently; refresh the payment and retry'
+        );
+      }
+      if (!this.isUniqueConstraintError(error)) {
+        throw error;
+      }
+
+      const replay = await this.findStripeRefundReplay(
+        paymentId,
+        data.idempotencyKey,
+        canonicalRequest
+      );
+      if (!replay) {
+        throw error;
+      }
+      reservation = replay;
+    }
+
+    if (!reservation.shouldSubmit) {
+      return this.buildManualRefundResult(reservation.payment, reservation.refund);
+    }
+
+    return this.submitStripeRefund(reservation, adminUserId);
+  }
+
+  private canonicalizeStripeRefund(data: CreateRefundDto): CanonicalStripeRefund {
+    if (data.executionMode !== RefundExecutionMode.STRIPE) {
+      throw new BadRequestException('Stripe refund requires STRIPE executionMode');
+    }
+    if (data.externalReference !== undefined) {
+      throw new BadRequestException('externalReference is supported only for MANUAL refunds');
+    }
+
+    const hasAmount = data.amountCents !== undefined;
+    const hasFullRefund = data.fullRefund !== undefined;
+    if (
+      hasAmount === hasFullRefund ||
+      (hasAmount && (!Number.isSafeInteger(data.amountCents) || (data.amountCents ?? 0) <= 0)) ||
+      (hasFullRefund && data.fullRefund !== true)
+    ) {
+      throw new BadRequestException(
+        'Provide exactly one of a positive integer amountCents or fullRefund: true'
+      );
+    }
+
+    this.validateResultingRegistrationStatus(data.resultingRegistrationStatus);
+
+    return {
+      amountCents: data.amountCents,
+      fullRefund: data.fullRefund === true,
+      executionMode: RefundExecutionMode.STRIPE,
+      reason: data.reason?.trim() || null,
+      externalReference: null,
+      resultingRegistrationStatus: data.resultingRegistrationStatus ?? null,
+    };
+  }
+
+  private async reserveStripeRefund(
+    paymentId: string,
+    idempotencyKey: string,
+    canonicalRequest: CanonicalStripeRefund,
+    adminUserId: string
+  ): Promise<StripeRefundReservation> {
+    return this.prisma.$transaction(
+      async tx => {
+        const existingRefund = await tx.paymentRefund.findUnique({
+          where: { idempotencyKey },
+          select: internalRefundSelect,
+        });
+        if (existingRefund && existingRefund.paymentId !== paymentId) {
+          throw new ConflictException(
+            'Idempotency key has already been used with different refund data'
+          );
+        }
+
+        const payment = await tx.payment.findUnique({
+          where: { id: paymentId },
+          select: adminPaymentSelect,
+        });
+        if (!payment) {
+          throw new NotFoundException(`Payment with ID ${paymentId} not found`);
+        }
+
+        if (existingRefund) {
+          const replayAudit = await tx.adminAudit.findFirst({
+            where: {
+              transactionId: idempotencyKey,
+              actionType: AdminAuditActionType.PAYMENT_REFUND,
+              targetRecordType: AdminAuditTargetType.PAYMENT,
+              targetRecordId: paymentId,
+              newValues: {
+                path: ['phase'],
+                equals: 'ATTEMPT',
+              },
+            },
+            select: { newValues: true },
+          });
+          this.validateStripeRefundReplay(
+            existingRefund,
+            replayAudit?.newValues,
+            canonicalRequest
+          );
+          return {
+            payment,
+            refund: existingRefund,
+            providerRefId: payment.providerRefId ?? '',
+            shouldSubmit: false,
+          };
+        }
+
+        const providerRefId = this.validateStripeRefundPayment(payment);
+        this.validateManualRefundRegistration(
+          payment.registrationId,
+          payment.registration?.status ?? null,
+          canonicalRequest.resultingRegistrationStatus
+        );
+
+        const paymentCurrency = this.getPaymentCurrency(payment.currency);
+        const paymentAmountCents = this.getPaymentAmountCents(payment.amount);
+        const currentTotals = this.calculateRefundTotals(paymentAmountCents, payment.refunds);
+        if (currentTotals.availableRefundCents <= 0) {
+          throw new BadRequestException('Payment has no refundable balance available');
+        }
+
+        const refundAmountCents = canonicalRequest.fullRefund
+          ? currentTotals.availableRefundCents
+          : canonicalRequest.amountCents;
+        if (
+          refundAmountCents === undefined ||
+          refundAmountCents > currentTotals.availableRefundCents
+        ) {
+          throw new BadRequestException(
+            `Refund amount exceeds available balance of ${currentTotals.availableRefundCents} cents`
+          );
+        }
+
+        const createdRefund = await tx.paymentRefund.create({
+          data: {
+            paymentId,
+            amountCents: refundAmountCents,
+            currency: paymentCurrency,
+            executionMode: RefundExecutionMode.STRIPE,
+            status: PaymentRefundStatus.PENDING,
+            reason: canonicalRequest.reason,
+            externalReference: null,
+            idempotencyKey,
+            processedByUserId: adminUserId,
+            resultingRegistrationStatus: canonicalRequest.resultingRegistrationStatus,
+          },
+          select: internalRefundSelect,
+        });
+
+        await tx.adminAudit.create({
+          data: {
+            adminUserId,
+            actionType: AdminAuditActionType.PAYMENT_REFUND,
+            targetRecordType: AdminAuditTargetType.PAYMENT,
+            targetRecordId: paymentId,
+            transactionId: idempotencyKey,
+            newValues: {
+              phase: 'ATTEMPT',
+              outcome: PaymentRefundStatus.PENDING,
+              paymentId,
+              refundId: createdRefund.id,
+              registrationId: payment.registrationId,
+              amountCents: refundAmountCents,
+              currency: paymentCurrency,
+              executionMode: RefundExecutionMode.STRIPE,
+              reason: canonicalRequest.reason,
+              resultingRegistrationStatus: canonicalRequest.resultingRegistrationStatus,
+              requestedFullRefund: canonicalRequest.fullRefund,
+            },
+            reason: canonicalRequest.reason,
+          },
+        });
+
+        return {
+          payment: {
+            ...payment,
+            refunds: [...payment.refunds, this.toAdminRefund(createdRefund)],
+          },
+          refund: createdRefund,
+          providerRefId,
+          shouldSubmit: true,
+        };
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+    );
+  }
+
+  private validateStripeRefundPayment(payment: AdminPaymentRecord): string {
+    this.validateManualRefundPayment(payment.status);
+    if (payment.provider !== PaymentProvider.STRIPE) {
+      throw new BadRequestException('Stripe refunds require an original STRIPE payment');
+    }
+
+    const providerRefId = payment.providerRefId?.trim();
+    if (!providerRefId) {
+      throw new BadRequestException('Stripe payment has no usable provider reference');
+    }
+    return providerRefId;
+  }
+
+  private validateStripeRefundReplay(
+    existingRefund: InternalRefundRecord,
+    auditValues: Prisma.JsonValue | null | undefined,
+    canonicalRequest: CanonicalStripeRefund
+  ): void {
+    const requestedFullRefund = this.getRequestedFullRefundFromAudit(auditValues);
+    const amountMatches = canonicalRequest.fullRefund
+      ? true
+      : existingRefund.amountCents === canonicalRequest.amountCents;
+
+    if (
+      requestedFullRefund === null ||
+      requestedFullRefund !== canonicalRequest.fullRefund ||
+      !amountMatches ||
+      existingRefund.executionMode !== RefundExecutionMode.STRIPE ||
+      existingRefund.reason !== canonicalRequest.reason ||
+      existingRefund.externalReference !== null ||
+      existingRefund.resultingRegistrationStatus !== canonicalRequest.resultingRegistrationStatus
+    ) {
+      throw new ConflictException(
+        'Idempotency key has already been used with different refund data'
+      );
+    }
+  }
+
+  private async findStripeRefundReplay(
+    paymentId: string,
+    idempotencyKey: string,
+    canonicalRequest: CanonicalStripeRefund
+  ): Promise<StripeRefundReservation | null> {
+    const existingRefund = await this.prisma.paymentRefund.findUnique({
+      where: { idempotencyKey },
+      select: internalRefundSelect,
+    });
+    if (!existingRefund) {
+      return null;
+    }
+    if (existingRefund.paymentId !== paymentId) {
+      throw new ConflictException(
+        'Idempotency key has already been used with different refund data'
+      );
+    }
+
+    const [payment, replayAudit] = await Promise.all([
+      this.prisma.payment.findUnique({
+        where: { id: paymentId },
+        select: adminPaymentSelect,
+      }),
+      this.prisma.adminAudit.findFirst({
+        where: {
+          transactionId: idempotencyKey,
+          actionType: AdminAuditActionType.PAYMENT_REFUND,
+          targetRecordType: AdminAuditTargetType.PAYMENT,
+          targetRecordId: paymentId,
+          newValues: {
+            path: ['phase'],
+            equals: 'ATTEMPT',
+          },
+        },
+        select: { newValues: true },
+      }),
+    ]);
+    if (!payment) {
+      throw new NotFoundException(`Payment with ID ${paymentId} not found`);
+    }
+    this.validateStripeRefundReplay(
+      existingRefund,
+      replayAudit?.newValues,
+      canonicalRequest
+    );
+    return {
+      payment,
+      refund: existingRefund,
+      providerRefId: payment.providerRefId ?? '',
+      shouldSubmit: false,
+    };
+  }
+
+  private async submitStripeRefund(
+    reservation: StripeRefundReservation,
+    adminUserId: string
+  ): Promise<ManualRefundResult> {
+    const stripeResult = await this.stripeService.createAdminRefund({
+      providerRefId: reservation.providerRefId,
+      amountCents: reservation.refund.amountCents,
+      reason: reservation.refund.reason,
+      idempotencyKey: reservation.refund.idempotencyKey,
+      localRefundId: reservation.refund.id,
+    });
+
+    if (stripeResult.outcome === 'PENDING_UNKNOWN') {
+      return this.buildManualRefundResult(reservation.payment, reservation.refund);
+    }
+
+    try {
+      if (stripeResult.outcome === 'SUCCEEDED') {
+        return await this.finalizeStripeRefund(
+          reservation.payment.id,
+          reservation.refund.id,
+          stripeResult.providerRefundId,
+          adminUserId
+        );
+      }
+
+      return await this.failStripeRefund(
+        reservation.payment.id,
+        reservation.refund.id,
+        stripeResult.failureMessage,
+        adminUserId
+      );
+    } catch (error: unknown) {
+      this.logger.error(
+        `Stripe refund ${reservation.refund.id} requires local reconciliation`,
+        error instanceof Error ? error.stack : undefined
+      );
+      return this.buildManualRefundResult(reservation.payment, reservation.refund);
+    }
+  }
+
+  private async finalizeStripeRefund(
+    paymentId: string,
+    refundId: string,
+    providerRefundId: string,
+    adminUserId: string
+  ): Promise<ManualRefundResult> {
+    return this.prisma.$transaction(
+      async tx => {
+        const refund = await tx.paymentRefund.findUnique({
+          where: { id: refundId },
+          select: internalRefundSelect,
+        });
+        if (!refund || refund.paymentId !== paymentId) {
+          throw new NotFoundException(`Refund with ID ${refundId} not found for payment ${paymentId}`);
+        }
+
+        const payment = await tx.payment.findUnique({
+          where: { id: paymentId },
+          select: adminPaymentSelect,
+        });
+        if (!payment) {
+          throw new NotFoundException(`Payment with ID ${paymentId} not found`);
+        }
+        if (refund.status !== PaymentRefundStatus.PENDING) {
+          return this.buildManualRefundResult(payment, refund);
+        }
+        if (refund.executionMode !== RefundExecutionMode.STRIPE) {
+          throw new BadRequestException('Only pending STRIPE refunds can be finalized');
+        }
+
+        const transition = await tx.paymentRefund.updateMany({
+          where: {
+            id: refundId,
+            paymentId,
+            status: PaymentRefundStatus.PENDING,
+            executionMode: RefundExecutionMode.STRIPE,
+          },
+          data: {
+            status: PaymentRefundStatus.SUCCEEDED,
+            providerRefundId,
+            failureMessage: null,
+          },
+        });
+        if (transition.count !== 1) {
+          const concurrentRefund = await tx.paymentRefund.findUnique({
+            where: { id: refundId },
+            select: internalRefundSelect,
+          });
+          if (!concurrentRefund) {
+            throw new NotFoundException(`Refund with ID ${refundId} not found`);
+          }
+          return this.buildManualRefundResult(payment, concurrentRefund);
+        }
+
+        const updatedLedger = payment.refunds.map(existingRefund =>
+          existingRefund.id === refundId
+            ? { ...existingRefund, status: PaymentRefundStatus.SUCCEEDED }
+            : existingRefund
+        );
+        const paymentAmountCents = this.getPaymentAmountCents(payment.amount);
+        const ledgerTotals = this.calculateRefundLedgerTotals(updatedLedger);
+        if (ledgerTotals.successfulRefundCents > paymentAmountCents) {
+          throw new ConflictException('Successful refund ledger exceeds the original payment amount');
+        }
+        const resultingPaymentStatus =
+          ledgerTotals.successfulRefundCents === paymentAmountCents
+            ? PaymentStatus.REFUNDED
+            : PaymentStatus.PARTIALLY_REFUNDED;
+
+        await tx.payment.update({
+          where: { id: paymentId },
+          data: { status: resultingPaymentStatus },
+        });
+        if (payment.registrationId && refund.resultingRegistrationStatus) {
+          await tx.registration.update({
+            where: { id: payment.registrationId },
+            data: { status: refund.resultingRegistrationStatus },
+          });
+        }
+
+        await tx.adminAudit.create({
+          data: {
+            adminUserId,
+            actionType: AdminAuditActionType.PAYMENT_REFUND,
+            targetRecordType: AdminAuditTargetType.PAYMENT,
+            targetRecordId: paymentId,
+            transactionId: refund.idempotencyKey,
+            newValues: {
+              phase: 'RESULT',
+              outcome: PaymentRefundStatus.SUCCEEDED,
+              paymentId,
+              refundId,
+              registrationId: payment.registrationId,
+              amountCents: refund.amountCents,
+              currency: refund.currency,
+              executionMode: RefundExecutionMode.STRIPE,
+              reason: refund.reason,
+              resultingRegistrationStatus: refund.resultingRegistrationStatus,
+              providerRefundId,
+            },
+            reason: refund.reason,
+          },
+        });
+
+        const [updatedPayment, updatedRefund] = await Promise.all([
+          tx.payment.findUnique({
+            where: { id: paymentId },
+            select: adminPaymentSelect,
+          }),
+          tx.paymentRefund.findUnique({
+            where: { id: refundId },
+            select: internalRefundSelect,
+          }),
+        ]);
+        if (!updatedPayment || !updatedRefund) {
+          throw new NotFoundException('Refund result could not be reloaded');
+        }
+
+        return this.buildManualRefundResult(updatedPayment, updatedRefund);
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+    );
+  }
+
+  private async failStripeRefund(
+    paymentId: string,
+    refundId: string,
+    failureMessage: string,
+    adminUserId: string
+  ): Promise<ManualRefundResult> {
+    return this.prisma.$transaction(
+      async tx => {
+        const refund = await tx.paymentRefund.findUnique({
+          where: { id: refundId },
+          select: internalRefundSelect,
+        });
+        if (!refund || refund.paymentId !== paymentId) {
+          throw new NotFoundException(`Refund with ID ${refundId} not found for payment ${paymentId}`);
+        }
+        const payment = await tx.payment.findUnique({
+          where: { id: paymentId },
+          select: adminPaymentSelect,
+        });
+        if (!payment) {
+          throw new NotFoundException(`Payment with ID ${paymentId} not found`);
+        }
+        if (refund.status !== PaymentRefundStatus.PENDING) {
+          return this.buildManualRefundResult(payment, refund);
+        }
+        if (refund.executionMode !== RefundExecutionMode.STRIPE) {
+          throw new BadRequestException('Only pending STRIPE refunds can be failed');
+        }
+
+        const boundedFailureMessage = failureMessage.slice(0, 500);
+        const transition = await tx.paymentRefund.updateMany({
+          where: {
+            id: refundId,
+            paymentId,
+            status: PaymentRefundStatus.PENDING,
+            executionMode: RefundExecutionMode.STRIPE,
+          },
+          data: {
+            status: PaymentRefundStatus.FAILED,
+            failureMessage: boundedFailureMessage,
+          },
+        });
+        if (transition.count !== 1) {
+          const concurrentRefund = await tx.paymentRefund.findUnique({
+            where: { id: refundId },
+            select: internalRefundSelect,
+          });
+          if (!concurrentRefund) {
+            throw new NotFoundException(`Refund with ID ${refundId} not found`);
+          }
+          return this.buildManualRefundResult(payment, concurrentRefund);
+        }
+
+        await tx.adminAudit.create({
+          data: {
+            adminUserId,
+            actionType: AdminAuditActionType.PAYMENT_REFUND,
+            targetRecordType: AdminAuditTargetType.PAYMENT,
+            targetRecordId: paymentId,
+            transactionId: refund.idempotencyKey,
+            newValues: {
+              phase: 'RESULT',
+              outcome: PaymentRefundStatus.FAILED,
+              paymentId,
+              refundId,
+              registrationId: payment.registrationId,
+              amountCents: refund.amountCents,
+              currency: refund.currency,
+              executionMode: RefundExecutionMode.STRIPE,
+              reason: refund.reason,
+              resultingRegistrationStatus: refund.resultingRegistrationStatus,
+            },
+            reason: refund.reason,
+          },
+        });
+
+        const [updatedPayment, updatedRefund] = await Promise.all([
+          tx.payment.findUnique({
+            where: { id: paymentId },
+            select: adminPaymentSelect,
+          }),
+          tx.paymentRefund.findUnique({
+            where: { id: refundId },
+            select: internalRefundSelect,
+          }),
+        ]);
+        if (!updatedPayment || !updatedRefund) {
+          throw new NotFoundException('Refund result could not be reloaded');
+        }
+
+        return this.buildManualRefundResult(updatedPayment, updatedRefund);
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+    );
+  }
+
+  /**
+   * Reconciles one pending Stripe refund without accepting mutable refund data.
+   */
+  async retryStripeRefund(
+    paymentId: string,
+    refundId: string,
+    adminUserId: string
+  ): Promise<ManualRefundResult> {
+    const refund = await this.prisma.paymentRefund.findUnique({
+      where: { id: refundId },
+      select: internalRefundSelect,
+    });
+    if (!refund || refund.paymentId !== paymentId) {
+      throw new NotFoundException(`Refund with ID ${refundId} not found for payment ${paymentId}`);
+    }
+
+    const payment = await this.prisma.payment.findUnique({
+      where: { id: paymentId },
+      select: adminPaymentSelect,
+    });
+    if (!payment) {
+      throw new NotFoundException(`Payment with ID ${paymentId} not found`);
+    }
+    if (refund.status !== PaymentRefundStatus.PENDING) {
+      return this.buildManualRefundResult(payment, refund);
+    }
+    if (refund.executionMode !== RefundExecutionMode.STRIPE) {
+      throw new BadRequestException('Only pending STRIPE refunds can be retried');
+    }
+    const providerRefId = this.validateStripeRetryPayment(payment);
+
+    const inspection = await this.stripeService.findAdminRefund(providerRefId, refundId);
+    if (inspection.outcome === 'PENDING_UNKNOWN') {
+      return this.buildManualRefundResult(payment, refund);
+    }
+    if (inspection.outcome === 'FOUND') {
+      try {
+        return await this.finalizeStripeRefund(
+          paymentId,
+          refundId,
+          inspection.providerRefundId,
+          adminUserId
+        );
+      } catch (error: unknown) {
+        this.logger.error(
+          `Stripe refund ${refundId} requires local reconciliation`,
+          error instanceof Error ? error.stack : undefined
+        );
+        return this.buildManualRefundResult(payment, refund);
+      }
+    }
+    if (inspection.outcome === 'FAILED') {
+      try {
+        return await this.failStripeRefund(
+          paymentId,
+          refundId,
+          inspection.failureMessage,
+          adminUserId
+        );
+      } catch (error: unknown) {
+        this.logger.error(
+          `Stripe refund ${refundId} requires local reconciliation`,
+          error instanceof Error ? error.stack : undefined
+        );
+        return this.buildManualRefundResult(payment, refund);
+      }
+    }
+
+    return this.submitStripeRefund(
+      {
+        payment,
+        refund,
+        providerRefId,
+        shouldSubmit: true,
+      },
+      adminUserId
+    );
+  }
+
+  private validateStripeRetryPayment(payment: AdminPaymentRecord): string {
+    if (payment.provider !== PaymentProvider.STRIPE) {
+      throw new BadRequestException('Stripe retry requires an original STRIPE payment');
+    }
+    const providerRefId = payment.providerRefId?.trim();
+    if (!providerRefId) {
+      throw new BadRequestException('Stripe payment has no usable provider reference');
+    }
+    return providerRefId;
+  }
+
+  private toAdminRefund(refund: InternalRefundRecord): AdminRefund {
+    return {
+      id: refund.id,
+      amountCents: refund.amountCents,
+      currency: refund.currency,
+      executionMode: refund.executionMode,
+      status: refund.status,
+      reason: refund.reason,
+      externalReference: refund.externalReference,
+      resultingRegistrationStatus: refund.resultingRegistrationStatus,
+      createdAt: refund.createdAt,
+      updatedAt: refund.updatedAt,
+    };
   }
 
   private isSerializationConflict(error: unknown): boolean {

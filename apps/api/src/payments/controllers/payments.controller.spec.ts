@@ -15,7 +15,9 @@ const mockPaymentsService = {
   initiateStripePayment: jest.fn(),
   initiatePaypalPayment: jest.fn(),
   processRefund: jest.fn(),
+  createRefund: jest.fn(),
   createManualRefund: jest.fn(),
+  retryStripeRefund: jest.fn(),
   linkToRegistration: jest.fn(),
   handlePaypalWebhook: jest.fn(),
 };
@@ -296,11 +298,13 @@ describe('PaymentsController', () => {
   });
 
   describe('createRefund', () => {
-    it('should record a manual refund for the authenticated admin', async () => {
+    it.each(['MANUAL', 'STRIPE'] as const)(
+      'should submit a %s refund for the authenticated admin',
+      async executionMode => {
       const paymentId = '5f8d0d55-e0a3-4cf0-a620-2412acd4361c';
       const mockRefundDto = {
         amountCents: 5000,
-        executionMode: 'MANUAL' as const,
+        executionMode,
         reason: 'Partial refund completed externally',
         idempotencyKey: '43ea4b84-1f0d-413d-bc1c-9c91b435d66d',
       };
@@ -319,16 +323,43 @@ describe('PaymentsController', () => {
         availableRefundCents: 5000,
       };
 
-      mockPaymentsService.createManualRefund.mockResolvedValue(mockResponse);
+      mockPaymentsService.createRefund.mockResolvedValue(mockResponse);
 
       const result = await controller.createRefund(paymentId, mockRefundDto, mockRequest);
 
-      expect(mockPaymentsService.createManualRefund).toHaveBeenCalledWith(
+      expect(mockPaymentsService.createRefund).toHaveBeenCalledWith(
         paymentId,
         mockRefundDto,
         'admin-id'
       );
       expect(result).toEqual(mockResponse);
+      }
+    );
+
+    it('should retry a pending Stripe refund without mutable refund data', async () => {
+      const paymentId = '5f8d0d55-e0a3-4cf0-a620-2412acd4361c';
+      const refundId = '6a9e1e88-e8c0-43f1-9fe4-a2cad9703120';
+      const mockRequest = {
+        user: {
+          id: 'admin-id',
+          role: UserRole.ADMIN,
+        },
+      } as unknown as Parameters<typeof controller.retryRefund>[2];
+      const mockResponse = {
+        payment: { id: paymentId },
+        refund: { id: refundId, status: 'PENDING' },
+        outcome: 'PENDING_UNKNOWN',
+      };
+      mockPaymentsService.retryStripeRefund.mockResolvedValue(mockResponse);
+
+      const actualResult = await controller.retryRefund(paymentId, refundId, mockRequest);
+
+      expect(mockPaymentsService.retryStripeRefund).toHaveBeenCalledWith(
+        paymentId,
+        refundId,
+        'admin-id'
+      );
+      expect(actualResult).toEqual(mockResponse);
     });
   });
 

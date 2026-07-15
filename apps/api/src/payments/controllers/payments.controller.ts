@@ -196,9 +196,9 @@ export class PaymentsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Record an already-completed manual refund' })
+  @ApiOperation({ summary: 'Record a manual refund or initiate a Stripe refund' })
   @ApiParam({ name: 'paymentId', required: true, description: 'Payment ID' })
-  @ApiResponse({ status: 201, description: 'Manual refund recorded successfully' })
+  @ApiResponse({ status: 201, description: 'Refund command accepted' })
   @ApiResponse({ status: 400, description: 'Invalid input data or refundable balance' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden - Admin access required' })
@@ -209,7 +209,27 @@ export class PaymentsController {
     @Body() createRefundDto: CreateRefundDto,
     @Request() req: AuthenticatedRequest
   ) {
-    return this.paymentsService.createManualRefund(paymentId, createRefundDto, req.user.id);
+    return this.paymentsService.createRefund(paymentId, createRefundDto, req.user.id);
+  }
+
+  @Post(':paymentId/refunds/:refundId/retry')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Retry reconciliation for a pending Stripe refund' })
+  @ApiParam({ name: 'paymentId', required: true, description: 'Payment ID' })
+  @ApiParam({ name: 'refundId', required: true, description: 'Refund ID' })
+  @ApiResponse({ status: 201, description: 'Refund reconciliation attempted' })
+  @ApiResponse({ status: 400, description: 'Refund is not eligible for Stripe retry' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Admin access required' })
+  @ApiResponse({ status: 404, description: 'Payment or refund not found' })
+  async retryRefund(
+    @Param('paymentId', ParseUUIDPipe) paymentId: string,
+    @Param('refundId', ParseUUIDPipe) refundId: string,
+    @Request() req: AuthenticatedRequest
+  ) {
+    return this.paymentsService.retryStripeRefund(paymentId, refundId, req.user.id);
   }
 
   @Post('link/:paymentId/registration/:registrationId')

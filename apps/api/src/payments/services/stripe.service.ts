@@ -4,6 +4,35 @@ import Stripe from 'stripe';
 import { CreateStripePaymentDto } from '../dto';
 import { CoreConfigService } from '../../core-config/services/core-config.service';
 
+interface StripeAdminRefundRequest {
+  readonly providerRefId: string;
+  readonly amountCents: number;
+  readonly reason: string | null;
+  readonly idempotencyKey: string;
+  readonly localRefundId: string;
+}
+
+type StripeAdminRefundResult =
+  | { readonly outcome: 'SUCCEEDED'; readonly providerRefundId: string }
+  | { readonly outcome: 'FAILED'; readonly failureMessage: string }
+  | { readonly outcome: 'PENDING_UNKNOWN' };
+
+type StripeRefundInspectionResult =
+  | { readonly outcome: 'FOUND'; readonly providerRefundId: string }
+  | { readonly outcome: 'FAILED'; readonly failureMessage: string }
+  | { readonly outcome: 'NOT_FOUND' }
+  | { readonly outcome: 'PENDING_UNKNOWN' };
+
+const DEFINITE_STRIPE_ERROR_TYPES = new Set([
+  'StripeCardError',
+  'StripeInvalidRequestError',
+  'StripeAuthenticationError',
+  'StripePermissionError',
+  'StripeRateLimitError',
+]);
+const LOCAL_REFUND_METADATA_KEY = 'paymentRefundId';
+const MAX_FAILURE_MESSAGE_LENGTH = 500;
+
 /**
  * Service for handling Stripe payment processing
  */
@@ -60,6 +89,164 @@ export class StripeService {
       .replace(/pk_test_[a-zA-Z0-9]+/g, 'pk_test_***')
       .replace(/pk_live_[a-zA-Z0-9]+/g, 'pk_live_***')
       .replace(/whsec_[a-zA-Z0-9]+/g, 'whsec_***');
+  }
+
+  private sanitizeRefundFailure(error: unknown): string {
+    const sanitizedMessage = this.sanitizeErrorMessage(error)
+      .replace(/\b(?:pi|cs|re|ch|req)_[a-zA-Z0-9]+\b/g, '[redacted]')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    return `Stripe rejected the refund request: ${sanitizedMessage}`.slice(
+      0,
+      MAX_FAILURE_MESSAGE_LENGTH
+    );
+  }
+
+  private getStripeErrorType(error: unknown): string | null {
+    if (
+      typeof error !== 'object' ||
+      error === null ||
+      !('type' in error) ||
+      typeof error.type !== 'string'
+    ) {
+      return null;
+    }
+
+    return error.type;
+  }
+
+  private isDefiniteRefundRejection(error: unknown): boolean {
+    const errorType = this.getStripeErrorType(error);
+    if (errorType) {
+      return DEFINITE_STRIPE_ERROR_TYPES.has(errorType);
+    }
+
+    return (
+      error instanceof Error &&
+      (error.message === 'Stripe payments are not configured' ||
+        error.message.includes('has no associated payment intent'))
+    );
+  }
+
+  private getRefundReason(reason: string | null | undefined): Stripe.RefundCreateParams.Reason | undefined {
+    if (!reason) {
+      return undefined;
+    }
+
+    const lowerReason = reason.toLowerCase();
+    if (lowerReason.includes('duplicate')) {
+      return 'duplicate';
+    }
+    if (lowerReason.includes('fraud')) {
+      return 'fraudulent';
+    }
+    return 'requested_by_customer';
+  }
+
+  private async resolvePaymentIntentId(stripe: Stripe, providerRefId: string): Promise<string> {
+    if (!providerRefId.startsWith('cs_')) {
+      return providerRefId;
+    }
+
+    const session = await stripe.checkout.sessions.retrieve(providerRefId, {
+      expand: ['payment_intent'],
+    });
+    if (!session.payment_intent) {
+      throw new Error(`Checkout session ${providerRefId} has no associated payment intent`);
+    }
+
+    return typeof session.payment_intent === 'string'
+      ? session.payment_intent
+      : session.payment_intent.id;
+  }
+
+  private classifyRefund(refund: Stripe.Refund): StripeAdminRefundResult {
+    if (refund.status === 'succeeded') {
+      return {
+        outcome: 'SUCCEEDED',
+        providerRefundId: refund.id,
+      };
+    }
+    if (refund.status === 'failed' || refund.status === 'canceled') {
+      return {
+        outcome: 'FAILED',
+        failureMessage: `Stripe rejected the refund request with status ${refund.status}`,
+      };
+    }
+    return { outcome: 'PENDING_UNKNOWN' };
+  }
+
+  private classifyInspectedRefund(refund: Stripe.Refund): StripeRefundInspectionResult {
+    const classifiedRefund = this.classifyRefund(refund);
+    if (classifiedRefund.outcome === 'SUCCEEDED') {
+      return {
+        outcome: 'FOUND',
+        providerRefundId: classifiedRefund.providerRefundId,
+      };
+    }
+    return classifiedRefund;
+  }
+
+  /**
+   * Submit an admin refund with stable idempotency and local metadata.
+   */
+  async createAdminRefund(request: StripeAdminRefundRequest): Promise<StripeAdminRefundResult> {
+    try {
+      const stripe = await this.getStripe();
+      const paymentIntentId = await this.resolvePaymentIntentId(stripe, request.providerRefId);
+      const reason = this.getRefundReason(request.reason);
+      const refund = await stripe.refunds.create(
+        {
+          payment_intent: paymentIntentId,
+          amount: request.amountCents,
+          metadata: {
+            [LOCAL_REFUND_METADATA_KEY]: request.localRefundId,
+          },
+          ...(reason ? { reason } : {}),
+        },
+        { idempotencyKey: request.idempotencyKey }
+      );
+
+      return this.classifyRefund(refund);
+    } catch (error: unknown) {
+      if (this.isDefiniteRefundRejection(error)) {
+        const failureMessage = this.sanitizeRefundFailure(error);
+        this.logger.error(failureMessage);
+        return {
+          outcome: 'FAILED',
+          failureMessage,
+        };
+      }
+
+      this.logger.warn('Stripe refund outcome is pending or unknown after a transport failure');
+      return { outcome: 'PENDING_UNKNOWN' };
+    }
+  }
+
+  /**
+   * Find a Stripe refund previously submitted for a local refund row.
+   */
+  async findAdminRefund(
+    providerRefId: string,
+    localRefundId: string
+  ): Promise<StripeRefundInspectionResult> {
+    try {
+      const stripe = await this.getStripe();
+      const paymentIntentId = await this.resolvePaymentIntentId(stripe, providerRefId);
+      const refunds = await stripe.refunds.list({
+        payment_intent: paymentIntentId,
+        limit: 100,
+      });
+      const matchingRefund = refunds.data.find(
+        refund => refund.metadata?.[LOCAL_REFUND_METADATA_KEY] === localRefundId
+      );
+
+      return matchingRefund ? this.classifyInspectedRefund(matchingRefund) : { outcome: 'NOT_FOUND' };
+    } catch {
+      this.logger.warn('Unable to inspect Stripe refunds; refund remains pending');
+      return { outcome: 'PENDING_UNKNOWN' };
+    }
   }
 
   /**
@@ -189,17 +376,9 @@ export class StripeService {
         refundParams.amount = amount;
       }
       
-      // Map custom reasons to valid Stripe reasons or omit if not applicable
-      if (reason) {
-        const lowerReason = reason.toLowerCase();
-        if (lowerReason.includes('duplicate')) {
-          refundParams.reason = 'duplicate';
-        } else if (lowerReason.includes('fraud')) {
-          refundParams.reason = 'fraudulent';
-        } else {
-          // For registration cancellations and other customer requests, use requested_by_customer
-          refundParams.reason = 'requested_by_customer';
-        }
+      const stripeReason = this.getRefundReason(reason);
+      if (stripeReason) {
+        refundParams.reason = stripeReason;
       }
       
       const refund = await stripe.refunds.create(refundParams);
