@@ -2634,6 +2634,40 @@ describe('PaymentsService', () => {
       expect(mockPrismaService.adminAudit.create).not.toHaveBeenCalled();
     });
 
+    it('should return the original payment when an identical request loses the registration update race', async () => {
+      mockPrismaService.registration.updateMany.mockResolvedValue({ count: 0 });
+      mockPrismaService.payment.findUnique
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(mockCreatedPayment);
+
+      const actualPayment = await service.recordExternalPayment(
+        inputRequest,
+        'admin-id',
+      );
+
+      expect(actualPayment.id).toBe(mockCreatedPayment.id);
+      expect(actualPayment).not.toHaveProperty('idempotencyKey');
+      expect(mockPrismaService.payment.findUnique).toHaveBeenCalledTimes(2);
+      expect(mockPrismaService.payment.create).not.toHaveBeenCalled();
+      expect(mockPrismaService.adminAudit.create).not.toHaveBeenCalled();
+    });
+
+    it('should return conflict when a different request loses the registration update race', async () => {
+      mockPrismaService.registration.updateMany.mockResolvedValue({ count: 0 });
+      mockPrismaService.payment.findUnique
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(mockCreatedPayment);
+
+      await expect(
+        service.recordExternalPayment(
+          { ...inputRequest, amount: 126 },
+          'admin-id',
+        ),
+      ).rejects.toThrow(ConflictException);
+      expect(mockPrismaService.payment.create).not.toHaveBeenCalled();
+      expect(mockPrismaService.adminAudit.create).not.toHaveBeenCalled();
+    });
+
     it('should reject a missing registration', async () => {
       mockPrismaService.registration.findUnique.mockResolvedValue(null);
 

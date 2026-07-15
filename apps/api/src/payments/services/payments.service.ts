@@ -458,6 +458,18 @@ export class PaymentsService {
         });
 
         if (registrationUpdate.count !== 1) {
+          const concurrentPayment = await tx.payment.findUnique({
+            where: { idempotencyKey: data.idempotencyKey },
+            select: externalPaymentSelect,
+          });
+
+          if (concurrentPayment) {
+            return this.resolveExternalPaymentReplay(
+              concurrentPayment,
+              canonicalRequest,
+            );
+          }
+
           throw new ConflictException(
             'Registration changed while recording payment; refresh and retry',
           );
