@@ -39,19 +39,22 @@ const mockJobs = [
     active: false,
   },
 ];
+const mockActiveJobs = mockJobs.filter((job) => job.active);
 
 describe('AdminJobsPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    (useJobs as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
-      jobs: mockJobs,
-      loading: false,
-      error: null,
-      fetchJobs: vi.fn(),
-      createJob: vi.fn(),
-      updateJob: mockUpdateJob,
-      deleteJob: mockDeleteJob,
-    });
+    (useJobs as unknown as ReturnType<typeof vi.fn>).mockImplementation(
+      (includeInactive: boolean) => ({
+        jobs: includeInactive ? mockJobs : mockActiveJobs,
+        loading: false,
+        error: null,
+        fetchJobs: vi.fn(),
+        createJob: vi.fn(),
+        updateJob: mockUpdateJob,
+        deleteJob: mockDeleteJob,
+      }),
+    );
     (useJobCategories as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
       categories: [
         {
@@ -77,13 +80,15 @@ describe('AdminJobsPage', () => {
     });
   });
 
-  it('requests active jobs by default and renders job statuses', async () => {
+  it('requests and renders only active jobs by default', async () => {
     render(<AdminJobsPage />, { wrapper: MemoryRouter });
 
     await waitFor(() => expect(screen.getByText('Active Job')).toBeInTheDocument());
     expect(useJobs).toHaveBeenCalledWith(false);
-    expect(screen.getByText('Active')).toBeInTheDocument();
-    expect(screen.getByText('Inactive')).toBeInTheDocument();
+    const activeRow = screen.getByText('Active Job').closest('tr');
+    expect(activeRow).not.toBeNull();
+    expect(within(activeRow!).getByText('Active')).toBeInTheDocument();
+    expect(screen.queryByText('Inactive Job')).not.toBeInTheDocument();
   });
 
   it('requests inactive jobs when the visibility control is enabled', () => {
@@ -96,6 +101,7 @@ describe('AdminJobsPage', () => {
 
   it('allows an administrator to reactivate an inactive job', async () => {
     render(<AdminJobsPage />, { wrapper: MemoryRouter });
+    fireEvent.click(screen.getByLabelText('Show inactive jobs'));
     await waitFor(() => expect(screen.getByText('Inactive Job')).toBeInTheDocument());
     const inactiveRow = screen.getByText('Inactive Job').closest('tr');
     expect(inactiveRow).not.toBeNull();
