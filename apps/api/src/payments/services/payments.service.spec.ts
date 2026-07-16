@@ -526,6 +526,133 @@ describe('PaymentsService', () => {
         });
       });
 
+      it('should report durable refund totals for a refunded payment with ledger rows', async () => {
+        const mockPayment = {
+          id: 'ledger-backed-refunded-payment',
+          amount: 125,
+          currency: 'USD',
+          status: PaymentStatus.REFUNDED,
+          provider: PaymentProvider.STRIPE,
+          externalMethod: null,
+          externalReference: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          userId: 'user-id',
+          registrationId: null,
+          user: {
+            id: 'user-id',
+            firstName: 'Test',
+            lastName: 'User',
+            email: 'test@example.com',
+          },
+          registration: null,
+          refunds: [
+            {
+              id: 'succeeded-refund',
+              amountCents: 10000,
+              currency: 'USD',
+              executionMode: RefundExecutionMode.MANUAL,
+              status: PaymentRefundStatus.SUCCEEDED,
+              reason: null,
+              externalReference: null,
+              resultingRegistrationStatus: null,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            },
+            {
+              id: 'pending-refund',
+              amountCents: 2500,
+              currency: 'USD',
+              executionMode: RefundExecutionMode.STRIPE,
+              status: PaymentRefundStatus.PENDING,
+              reason: null,
+              externalReference: null,
+              resultingRegistrationStatus: null,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            },
+          ],
+        };
+        mockPrismaService.payment.findMany.mockResolvedValue([mockPayment]);
+        mockPrismaService.payment.count.mockResolvedValue(1);
+
+        const actualResult = await service.findAllForAdmin();
+
+        expect(actualResult.payments[0]).toEqual(
+          expect.objectContaining({
+            paymentAmountCents: 12500,
+            successfulRefundCents: 10000,
+            pendingRefundCents: 2500,
+            availableRefundCents: 0,
+            refundUnavailableReason: null,
+          })
+        );
+      });
+
+      it('should preserve durable refund totals for a refunded payment with invalid currency', async () => {
+        const mockPayment = {
+          id: 'invalid-currency-ledger-backed-refunded-payment',
+          amount: 125,
+          currency: 'usd',
+          status: PaymentStatus.REFUNDED,
+          provider: PaymentProvider.STRIPE,
+          externalMethod: null,
+          externalReference: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          userId: 'user-id',
+          registrationId: null,
+          user: {
+            id: 'user-id',
+            firstName: 'Test',
+            lastName: 'User',
+            email: 'test@example.com',
+          },
+          registration: null,
+          refunds: [
+            {
+              id: 'succeeded-refund',
+              amountCents: 10000,
+              currency: 'USD',
+              executionMode: RefundExecutionMode.MANUAL,
+              status: PaymentRefundStatus.SUCCEEDED,
+              reason: null,
+              externalReference: null,
+              resultingRegistrationStatus: null,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            },
+            {
+              id: 'pending-refund',
+              amountCents: 2500,
+              currency: 'USD',
+              executionMode: RefundExecutionMode.STRIPE,
+              status: PaymentRefundStatus.PENDING,
+              reason: null,
+              externalReference: null,
+              resultingRegistrationStatus: null,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            },
+          ],
+        };
+        mockPrismaService.payment.findMany.mockResolvedValue([mockPayment]);
+        mockPrismaService.payment.count.mockResolvedValue(1);
+
+        const actualResult = await service.findAllForAdmin();
+
+        expect(actualResult.payments[0]).toEqual(
+          expect.objectContaining({
+            paymentAmountCents: 12500,
+            successfulRefundCents: 10000,
+            pendingRefundCents: 2500,
+            availableRefundCents: 0,
+            refundUnavailableReason:
+              'Refund unavailable because the stored payment currency is invalid.',
+          })
+        );
+      });
+
       it('should report legacy ledgerless refunded payments as fully refunded', async () => {
         const mockPayment = {
           id: 'legacy-refunded-payment',
@@ -559,6 +686,7 @@ describe('PaymentsService', () => {
             successfulRefundCents: 12500,
             pendingRefundCents: 0,
             availableRefundCents: 0,
+            refundUnavailableReason: null,
             refunds: [],
           })
         );

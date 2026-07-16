@@ -724,6 +724,9 @@ export class PaymentsService {
       );
     }
 
+    const isLegacyLedgerlessRefund =
+      payment.status === PaymentStatus.REFUNDED && payment.refunds.length === 0;
+
     try {
       this.validateStoredPaymentCurrency(payment.currency);
     } catch (error: unknown) {
@@ -735,15 +738,11 @@ export class PaymentsService {
         paymentAmountCents,
         payment.refunds,
         UNSUPPORTED_PAYMENT_CURRENCY_REASON,
-        payment.status === PaymentStatus.REFUNDED
+        isLegacyLedgerlessRefund
       );
     }
 
-    return this.calculateRefundTotals(
-      paymentAmountCents,
-      payment.refunds,
-      payment.status === PaymentStatus.REFUNDED
-    );
+    return this.calculateRefundTotals(paymentAmountCents, payment.refunds, isLegacyLedgerlessRefund);
   }
 
   private buildUnavailableRefundTotals(
