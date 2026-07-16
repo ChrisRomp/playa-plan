@@ -17,6 +17,8 @@ import {
   UserRole,
 } from '@prisma/client';
 import { NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
+import { CreateRefundDto } from '../dto';
+import { GlobalValidationPipe } from '../../common/pipes/validation.pipe';
 
 // Mock implementations
 const mockPrismaService = {
@@ -3023,6 +3025,16 @@ describe('PaymentsService', () => {
       };
     }
 
+    async function sanitizeRefundRequest(
+      request: Record<string, unknown>
+    ): Promise<CreateRefundDto> {
+      const validationPipe = new GlobalValidationPipe();
+      return validationPipe.transform(request, {
+        type: 'body',
+        metatype: CreateRefundDto,
+      }) as Promise<CreateRefundDto>;
+    }
+
     beforeEach(() => {
       mockPrismaService.$transaction.mockImplementation(
         async (callback: (tx: typeof mockPrismaService) => Promise<unknown>) =>
@@ -3243,6 +3255,46 @@ describe('PaymentsService', () => {
       expect(mockPrismaService.adminAudit.create).not.toHaveBeenCalled();
     });
 
+    it('should reject explicit cents above the PostgreSQL INTEGER range before the transaction', async () => {
+      await expect(
+        service.createManualRefund(
+          paymentId,
+          { ...inputRequest, amountCents: 2_147_483_648 },
+          'admin-id'
+        )
+      ).rejects.toThrow('supported range');
+
+      expect(mockPrismaService.$transaction).not.toHaveBeenCalled();
+      expect(mockPrismaService.paymentRefund.create).not.toHaveBeenCalled();
+      expect(mockPrismaService.payment.update).not.toHaveBeenCalled();
+      expect(mockPrismaService.registration.update).not.toHaveBeenCalled();
+      expect(mockPrismaService.adminAudit.create).not.toHaveBeenCalled();
+    });
+
+    it('should reject a full refund for an oversized historical payment before writes', async () => {
+      mockPrismaService.payment.findUnique.mockReset().mockResolvedValue({
+        ...basePayment,
+        amount: 21_474_836.48,
+      });
+
+      await expect(
+        service.createManualRefund(
+          paymentId,
+          {
+            fullRefund: true,
+            executionMode: RefundExecutionMode.MANUAL,
+            idempotencyKey,
+          },
+          'admin-id'
+        )
+      ).rejects.toThrow(BadRequestException);
+
+      expect(mockPrismaService.paymentRefund.create).not.toHaveBeenCalled();
+      expect(mockPrismaService.payment.update).not.toHaveBeenCalled();
+      expect(mockPrismaService.registration.update).not.toHaveBeenCalled();
+      expect(mockPrismaService.adminAudit.create).not.toHaveBeenCalled();
+    });
+
     it('should reject manual refunds for a stored payment with sub-cent precision', async () => {
       mockPrismaService.payment.findUnique
         .mockReset()
@@ -3250,13 +3302,65 @@ describe('PaymentsService', () => {
 
       await expect(
         service.createManualRefund(paymentId, inputRequest, 'admin-id')
-      ).rejects.toThrow('Dollar amount must not have sub-cent precision');
+      ).rejects.toThrow(BadRequestException);
 
       expect(mockPrismaService.paymentRefund.create).not.toHaveBeenCalled();
       expect(mockPrismaService.payment.update).not.toHaveBeenCalled();
       expect(mockPrismaService.registration.update).not.toHaveBeenCalled();
       expect(mockPrismaService.adminAudit.create).not.toHaveBeenCalled();
     });
+
+    it('should persist canonical text at the exact post-sanitization limits', async () => {
+      const sanitizedRequest = await sanitizeRefundRequest({
+        ...inputRequest,
+        reason: '&'.repeat(100),
+        externalReference: '&'.repeat(51),
+      });
+
+      await service.createManualRefund(paymentId, sanitizedRequest, 'admin-id');
+
+      expect(sanitizedRequest.reason).toHaveLength(500);
+      expect(sanitizedRequest.externalReference).toHaveLength(255);
+      expect(mockPrismaService.paymentRefund.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            reason: sanitizedRequest.reason,
+            externalReference: sanitizedRequest.externalReference,
+          }),
+        })
+      );
+      expect(mockPrismaService.adminAudit.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          newValues: expect.objectContaining({
+            reason: sanitizedRequest.reason,
+            externalReference: sanitizedRequest.externalReference,
+          }),
+        }),
+      });
+    });
+
+    it.each([
+      ['reason', '&'.repeat(101), 500],
+      ['externalReference', '&'.repeat(52), 255],
+    ] as const)(
+      'should reject %s that exceeds its persistence limit after sanitization',
+      async (field, rawValue, expectedLimit) => {
+        const sanitizedRequest = await sanitizeRefundRequest({
+          ...inputRequest,
+          [field]: rawValue,
+        });
+
+        await expect(
+          service.createManualRefund(paymentId, sanitizedRequest, 'admin-id')
+        ).rejects.toThrow(`${field} must not exceed ${expectedLimit} characters`);
+
+        expect(mockPrismaService.$transaction).not.toHaveBeenCalled();
+        expect(mockPrismaService.paymentRefund.create).not.toHaveBeenCalled();
+        expect(mockPrismaService.payment.update).not.toHaveBeenCalled();
+        expect(mockPrismaService.registration.update).not.toHaveBeenCalled();
+        expect(mockPrismaService.adminAudit.create).not.toHaveBeenCalled();
+      }
+    );
 
     it('should reject manual refunds for an invalid stored currency before writes', async () => {
       mockPrismaService.payment.findUnique
@@ -3407,6 +3511,95 @@ describe('PaymentsService', () => {
       expect(mockPrismaService.payment.update).not.toHaveBeenCalled();
       expect(mockPrismaService.registration.update).not.toHaveBeenCalled();
       expect(mockPrismaService.adminAudit.create).not.toHaveBeenCalled();
+    });
+
+    it('should replay a full-refund request after another reservation fails', async () => {
+      const fullRefund = {
+        ...createdRefund,
+        amountCents: 8000,
+      };
+      const changedLedgerPayment = {
+        ...basePayment,
+        status: PaymentStatus.PARTIALLY_REFUNDED,
+        refunds: [
+          {
+            ...publicCreatedRefund,
+            amountCents: 8000,
+          },
+          {
+            ...publicCreatedRefund,
+            id: 'failed-reservation',
+            amountCents: 2000,
+            status: PaymentRefundStatus.FAILED,
+          },
+        ],
+      };
+      mockPrismaService.paymentRefund.findUnique.mockResolvedValue(fullRefund);
+      mockPrismaService.payment.findUnique.mockReset().mockResolvedValue(changedLedgerPayment);
+      mockPrismaService.adminAudit.findFirst.mockResolvedValue({
+        newValues: { requestedFullRefund: true },
+      });
+
+      const actualResult = await service.createManualRefund(
+        paymentId,
+        {
+          fullRefund: true,
+          executionMode: RefundExecutionMode.MANUAL,
+          reason: inputRequest.reason,
+          externalReference: inputRequest.externalReference,
+          idempotencyKey,
+        },
+        'admin-id'
+      );
+
+      expect(actualResult.refund.amountCents).toBe(8000);
+      expect(mockPrismaService.paymentRefund.create).not.toHaveBeenCalled();
+      expect(mockPrismaService.payment.update).not.toHaveBeenCalled();
+      expect(mockPrismaService.adminAudit.create).not.toHaveBeenCalled();
+    });
+
+    it('should resolve a full-refund P2002 winner after another reservation fails', async () => {
+      const fullRefund = {
+        ...createdRefund,
+        amountCents: 8000,
+      };
+      const changedLedgerPayment = {
+        ...basePayment,
+        status: PaymentStatus.PARTIALLY_REFUNDED,
+        refunds: [
+          {
+            ...publicCreatedRefund,
+            amountCents: 8000,
+          },
+          {
+            ...publicCreatedRefund,
+            id: 'failed-reservation',
+            amountCents: 2000,
+            status: PaymentRefundStatus.FAILED,
+          },
+        ],
+      };
+      mockPrismaService.$transaction.mockRejectedValue({ code: 'P2002' });
+      mockPrismaService.paymentRefund.findUnique.mockResolvedValue(fullRefund);
+      mockPrismaService.payment.findUnique.mockReset().mockResolvedValue(changedLedgerPayment);
+      mockPrismaService.adminAudit.findFirst.mockResolvedValue({
+        newValues: { requestedFullRefund: true },
+      });
+
+      const actualResult = await service.createManualRefund(
+        paymentId,
+        {
+          fullRefund: true,
+          executionMode: RefundExecutionMode.MANUAL,
+          reason: inputRequest.reason,
+          externalReference: inputRequest.externalReference,
+          idempotencyKey,
+        },
+        'admin-id'
+      );
+
+      expect(actualResult.refund.amountCents).toBe(8000);
+      expect(mockPrismaService.paymentRefund.create).not.toHaveBeenCalled();
     });
 
     it('should reject idempotency key reuse with different amount or full-refund semantics', async () => {

@@ -32,7 +32,7 @@ import {
 import { StripeService } from './stripe.service';
 import { PaypalService } from './paypal.service';
 import { isApplicationStatus } from '../../registrations/constants/registration-status.constants';
-import { dollarsToCents, normalizeCurrency } from '../utils/money.utils';
+import { centsToDollars, dollarsToCents, normalizeCurrency } from '../utils/money.utils';
 import { randomUUID } from 'crypto';
 
 // Create an extended Payment type that includes registration relationship
@@ -198,6 +198,8 @@ const UNSUPPORTED_PAYMENT_PRECISION_REASON =
   'Refund unavailable because the stored payment amount has unsupported precision.';
 const UNSUPPORTED_PAYMENT_CURRENCY_REASON =
   'Refund unavailable because the stored payment currency is invalid.';
+const REFUND_REASON_MAX_LENGTH = 500;
+const REFUND_EXTERNAL_REFERENCE_MAX_LENGTH = 255;
 
 // Interface for refund result
 export interface RefundResult {
@@ -1020,12 +1022,15 @@ export class PaymentsService {
     const hasFullRefund = data.fullRefund !== undefined;
     if (
       hasAmount === hasFullRefund ||
-      (hasAmount && (!Number.isSafeInteger(data.amountCents) || (data.amountCents ?? 0) <= 0)) ||
       (hasFullRefund && data.fullRefund !== true)
     ) {
       throw new BadRequestException(
         'Provide exactly one of a positive integer amountCents or fullRefund: true'
       );
+    }
+
+    if (hasAmount) {
+      this.validateRefundAmountCents(data.amountCents);
     }
 
     this.validateResultingRegistrationStatus(data.resultingRegistrationStatus);
@@ -1034,10 +1039,49 @@ export class PaymentsService {
       amountCents: data.amountCents,
       fullRefund: data.fullRefund === true,
       executionMode: RefundExecutionMode.MANUAL,
-      reason: data.reason?.trim() || null,
-      externalReference: data.externalReference?.trim() || null,
+      reason: this.canonicalizeRefundText(data.reason, REFUND_REASON_MAX_LENGTH, 'reason'),
+      externalReference: this.canonicalizeRefundText(
+        data.externalReference,
+        REFUND_EXTERNAL_REFERENCE_MAX_LENGTH,
+        'externalReference'
+      ),
       resultingRegistrationStatus: data.resultingRegistrationStatus ?? null,
     };
+  }
+
+  private validateRefundAmountCents(amountCents: number | undefined): void {
+    if (amountCents === undefined || amountCents <= 0) {
+      throw new BadRequestException(
+        'amountCents must be a positive integer within the supported range'
+      );
+    }
+
+    try {
+      centsToDollars(amountCents);
+    } catch (error: unknown) {
+      if (error instanceof RangeError) {
+        throw new BadRequestException(
+          'amountCents must be a positive integer within the supported range'
+        );
+      }
+
+      throw error;
+    }
+  }
+
+  private canonicalizeRefundText(
+    value: string | undefined,
+    maxLength: number,
+    fieldName: 'reason' | 'externalReference'
+  ): string | null {
+    const normalizedValue = value?.trim() || null;
+    if (normalizedValue && normalizedValue.length > maxLength) {
+      throw new BadRequestException(
+        `${fieldName} must not exceed ${maxLength} characters after sanitization`
+      );
+    }
+
+    return normalizedValue;
   }
 
   private validateManualRefundPayment(status: PaymentStatus): void {
@@ -1122,13 +1166,8 @@ export class PaymentsService {
     canonicalRequest: CanonicalManualRefund
   ): ManualRefundResult {
     const requestedFullRefund = this.getRequestedFullRefundFromAudit(auditValues);
-    const amountMatches = canonicalRequest.fullRefund
-      ? existingRefund.amountCents ===
-        this.calculateRefundTotals(
-          this.getPaymentAmountCents(payment.amount),
-          payment.refunds.filter(refund => refund.id !== existingRefund.id)
-        ).availableRefundCents
-      : existingRefund.amountCents === canonicalRequest.amountCents;
+    const amountMatches =
+      canonicalRequest.fullRefund || existingRefund.amountCents === canonicalRequest.amountCents;
 
     if (
       requestedFullRefund === null ||

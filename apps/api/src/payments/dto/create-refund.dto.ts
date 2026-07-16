@@ -14,6 +14,7 @@ import {
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { RefundExecutionMode, RegistrationStatus } from '@prisma/client';
+import { centsToDollars } from '../utils/money.utils';
 
 const ALLOWED_RESULTING_STATUSES = [
   RegistrationStatus.PENDING,
@@ -45,11 +46,24 @@ class RefundAmountSelectionConstraint implements ValidatorConstraintInterface {
       return request.fullRefund === true;
     }
 
-    return typeof amountCents === 'number' && Number.isSafeInteger(amountCents) && amountCents > 0;
+    if (typeof amountCents !== 'number' || amountCents <= 0) {
+      return false;
+    }
+
+    try {
+      centsToDollars(amountCents);
+      return true;
+    } catch (error: unknown) {
+      if (error instanceof RangeError) {
+        return false;
+      }
+
+      throw error;
+    }
   }
 
   defaultMessage(): string {
-    return 'Provide exactly one of a positive integer amountCents or fullRefund: true';
+    return 'Provide exactly one of a positive integer amountCents within the supported range or fullRefund: true';
   }
 }
 

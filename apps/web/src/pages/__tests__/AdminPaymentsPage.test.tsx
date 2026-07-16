@@ -443,6 +443,29 @@ describe('AdminPaymentsPage', () => {
     expect(screen.queryByText('Internal database connection details')).not.toBeInTheDocument();
   });
 
+  it('should show actionable refund validation arrays for a 400 response', async () => {
+    mockGetPayments.mockResolvedValue({ payments: [payment], total: 1 });
+    mockCreateManualRefund.mockRejectedValue(
+      createAxiosError(400, [
+        'amountCents must be within the supported range',
+        'reason must not exceed 500 characters',
+      ])
+    );
+    renderPage();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Refund' }));
+    fireEvent.change(screen.getByLabelText('Partial refund amount'), {
+      target: { value: '1.00' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Record manual refund' }));
+
+    expect(
+      await screen.findByText(
+        'amountCents must be within the supported range; reason must not exceed 500 characters'
+      )
+    ).toBeInTheDocument();
+  });
+
   it.each(['1.001', '125.51'])(
     'should reject invalid or excessive partial amount %s before submission',
     async inputAmount => {
