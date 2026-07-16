@@ -328,6 +328,9 @@ export class RegistrationAdminService {
             if (!job) {
               throw new BadRequestException(`Job ${jobId} not found`);
             }
+            if (job.active === false) {
+              throw new BadRequestException(`Inactive job cannot be assigned: ${job.name}`);
+            }
 
             // Add job to registration
             await prisma.registrationJob.create({

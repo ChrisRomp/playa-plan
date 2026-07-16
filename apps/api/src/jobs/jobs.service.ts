@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { CoreConfigService } from '../core-config/services/core-config.service';
 import { CreateJobDto } from './dto/create-job.dto';
@@ -55,6 +55,7 @@ export class JobsService {
         name: createJobDto.name,
         location: createJobDto.location,
         maxRegistrations: createJobDto.maxRegistrations || 10, // Default to 10 if not provided
+        active: createJobDto.active ?? true,
         category: {
           connect: { id: createJobDto.categoryId }
         },
@@ -82,10 +83,12 @@ export class JobsService {
    * Participants will not see staff-only jobs.
    * @param userRole - Optional role to filter results
    */
-  async findAll(userRole?: UserRole) {
+  async findAll(userRole?: UserRole, includeInactive = false) {
     const config = await this.coreConfigService.findCurrent();
+    const canIncludeInactive = userRole === UserRole.ADMIN && includeInactive;
     const jobs = await this.prisma.job.findMany({
       where: {
+        ...(!canIncludeInactive && { active: true }),
         ...(userRole === UserRole.PARTICIPANT && { category: { staffOnly: false } }),
       },
       include: {
@@ -134,6 +137,7 @@ export class JobsService {
       if (updateJobDto.name) updateData.name = updateJobDto.name;
       if (updateJobDto.location) updateData.location = updateJobDto.location;
       if (updateJobDto.maxRegistrations) updateData.maxRegistrations = updateJobDto.maxRegistrations;
+      if (updateJobDto.active !== undefined) updateData.active = updateJobDto.active;
       
       if (updateJobDto.categoryId) {
         updateData.category = { connect: { id: updateJobDto.categoryId } };
@@ -165,8 +169,15 @@ export class JobsService {
   }
 
   async remove(id: string) {
-    const config = await this.coreConfigService.findCurrent();
+    const historicalRegistrationCount = await this.prisma.registrationJob.count({
+      where: { jobId: id },
+    });
+    if (historicalRegistrationCount > 0) {
+      throw this.createHistoricalRegistrationError(id);
+    }
+
     try {
+      const config = await this.coreConfigService.findCurrent();
       const job = await this.prisma.job.delete({
         where: { id },
         include: {
@@ -182,9 +193,26 @@ export class JobsService {
 
       // Add derived properties from category and calculate current registrations
       return this.addDerivedPropertiesWithRegistrations(job, config.registrationYear);
-    } catch {
-      throw new NotFoundException(`Job with ID ${id} not found`);
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      if (error instanceof Prisma.PrismaClientKnownRequestError) {
+        if (error.code === 'P2003') {
+          throw this.createHistoricalRegistrationError(id);
+        }
+        if (error.code === 'P2025') {
+          throw new NotFoundException(`Job with ID ${id} not found`);
+        }
+      }
+      throw error;
     }
+  }
+
+  private createHistoricalRegistrationError(id: string): BadRequestException {
+    return new BadRequestException(
+      `Cannot delete job with ID ${id} because it has historical registrations. Deactivate it instead.`,
+    );
   }
 
   /**

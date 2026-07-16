@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Req, ForbiddenException } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Req, ForbiddenException, Query } from '@nestjs/common';
 import { JobsService } from './jobs.service';
 import { CreateJobDto } from './dto/create-job.dto';
 import { UpdateJobDto } from './dto/update-job.dto';
@@ -6,7 +6,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from '@prisma/client';
-import { ApiTags, ApiBearerAuth, ApiCreatedResponse, ApiOkResponse, ApiOperation } from '@nestjs/swagger';
+import { ApiTags, ApiBearerAuth, ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { RegistrationsService } from '../registrations/registrations.service';
 import { CoreConfigService } from '../core-config/services/core-config.service';
 import { Request } from 'express';
@@ -42,8 +42,15 @@ export class JobsController {
   @Get()
   @ApiOperation({ summary: 'Get all jobs' })
   @ApiOkResponse({ description: 'Returns all jobs. Staff-only jobs are excluded for participants.' })
-  findAll(@Req() req: RequestWithUser) {
-    return this.jobsService.findAll(req.user.role);
+  @ApiQuery({ name: 'includeInactive', required: false, type: Boolean })
+  findAll(
+    @Req() req: RequestWithUser,
+    @Query('includeInactive') includeInactive?: boolean | string,
+  ) {
+    return this.jobsService.findAll(
+      req.user.role,
+      includeInactive === true || includeInactive === 'true',
+    );
   }
 
   @Get(':id')

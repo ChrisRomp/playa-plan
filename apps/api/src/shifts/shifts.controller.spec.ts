@@ -198,6 +198,20 @@ describe('ShiftsController', () => {
         expect.objectContaining({
           include: expect.objectContaining({
             jobs: expect.objectContaining({
+              where: {
+                OR: [
+                  { active: true },
+                  {
+                    registrations: {
+                      some: {
+                        registration: {
+                          year: 2026,
+                        },
+                      },
+                    },
+                  },
+                ],
+              },
               include: expect.objectContaining({
                 registrations: expect.objectContaining({
                   where: {

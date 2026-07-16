@@ -14,10 +14,12 @@ interface JobFormState {
   categoryId: string;
   shiftId: string;
   maxRegistrations: number;
+  active: boolean;
 }
 
 export default function AdminJobsPage() {
   const navigate = useNavigate();
+  const [showInactive, setShowInactive] = useState(false);
   const {
     jobs,
     loading: jobsLoading,
@@ -25,7 +27,7 @@ export default function AdminJobsPage() {
     updateJob,
     deleteJob,
     error: jobsError,
-  } = useJobs();
+  } = useJobs(showInactive);
 
   const {
     categories,
@@ -45,6 +47,7 @@ export default function AdminJobsPage() {
     categoryId: '',
     shiftId: '',
     maxRegistrations: 5,
+    active: true,
   });
   const [formError, setFormError] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -193,6 +196,7 @@ export default function AdminJobsPage() {
       categoryId: categories.length > 0 ? categories[0].id : '',
       shiftId: shifts.length > 0 ? shifts[0].id : '',
       maxRegistrations: 5,
+      active: true,
     });
     setFormError(null);
     setDeleteError(null);
@@ -208,6 +212,7 @@ export default function AdminJobsPage() {
       categoryId: job.categoryId,
       shiftId: job.shiftId,
       maxRegistrations: job.maxRegistrations,
+      active: job.active,
     });
     setFormError(null);
     setDeleteError(null);
@@ -299,6 +304,15 @@ export default function AdminJobsPage() {
                 </svg>
               </span>
             </div>
+            <label className="mr-4 flex items-center text-sm text-gray-700">
+              <input
+                type="checkbox"
+                checked={showInactive}
+                onChange={(event) => setShowInactive(event.target.checked)}
+                className="mr-2 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              Show inactive jobs
+            </label>
             <button
               onClick={() => navigate(PATHS.ADMIN)}
               className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors"
@@ -316,7 +330,7 @@ export default function AdminJobsPage() {
         </div>
       </div>
       
-      {(jobsError) && (
+      {jobsError && !deleteError && (
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
           {jobsError}
         </div>
@@ -389,27 +403,41 @@ export default function AdminJobsPage() {
                     )}
                   </div>
                 </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Status
+                </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {loading ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-4 text-center">Loading...</td>
+                  <td colSpan={6} className="px-6 py-4 text-center">Loading...</td>
                 </tr>
               ) : filteredJobs.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-4 text-center">No jobs found.</td>
+                  <td colSpan={6} className="px-6 py-4 text-center">No jobs found.</td>
                 </tr>
               ) : (
                 filteredJobs.map((job) => (
-                  <tr key={job.id}>
+                  <tr key={job.id} className={job.active ? undefined : 'bg-gray-50'}>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{job.name}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{getCategoryNameById(job.categoryId)}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {getShiftDetails(job)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{job.maxRegistrations}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      <span
+                        className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${
+                          job.active
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-gray-200 text-gray-700'
+                        }`}
+                      >
+                        {job.active ? 'Active' : 'Inactive'}
+                      </span>
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <button
                         className="text-blue-600 hover:text-blue-900 mr-4"
@@ -515,6 +543,22 @@ export default function AdminJobsPage() {
                   onChange={handleFormChange}
                   required
                 />
+              </div>
+
+              <div className="mb-4">
+                <label className="flex items-center" htmlFor="active">
+                  <input
+                    id="active"
+                    name="active"
+                    type="checkbox"
+                    checked={form.active}
+                    onChange={handleFormChange}
+                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="ml-2 text-sm text-gray-700">
+                    Active and available for new registrations
+                  </span>
+                </label>
               </div>
               
               {/* Display derived properties from the selected category */}

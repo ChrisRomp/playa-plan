@@ -22,6 +22,7 @@ describe('useJobs', () => {
       description: 'Test Description 1', 
       location: 'Test Location 1',
       categoryId: 'category1',
+      active: true,
       staffOnly: false,
       alwaysRequired: false,
       category: {
@@ -38,6 +39,7 @@ describe('useJobs', () => {
       description: 'Test Description 2', 
       location: 'Test Location 2',
       categoryId: 'category2',
+      active: true,
       staffOnly: true,
       alwaysRequired: false,
       category: {
@@ -67,6 +69,24 @@ describe('useJobs', () => {
 
     expect(result.current.jobs).toEqual(mockJobs);
     expect(result.current.error).toBeNull();
+    expect(jobs.getAll).toHaveBeenCalledWith(false);
+  });
+
+  it('should request inactive jobs when enabled', async () => {
+    const { rerender } = renderHook(
+      ({ includeInactive }) => useJobs(includeInactive),
+      { initialProps: { includeInactive: false } },
+    );
+
+    await waitFor(() => {
+      expect(jobs.getAll).toHaveBeenCalledWith(false);
+    });
+
+    rerender({ includeInactive: true });
+
+    await waitFor(() => {
+      expect(jobs.getAll).toHaveBeenCalledWith(true);
+    });
   });
 
   it('should create a job', async () => {
@@ -80,6 +100,7 @@ describe('useJobs', () => {
     const createdJob = { 
       ...newJob, 
       id: '3',
+      active: true,
       staffOnly: false,
       alwaysRequired: false,
       category: {
@@ -138,6 +159,32 @@ describe('useJobs', () => {
     expect(result.current.jobs[0]).toEqual(updatedJob);
   });
 
+  it('should remove a deactivated job from the default list', async () => {
+    const updatedJob = { ...mockJobs[0], active: false };
+    (jobs.update as ReturnType<typeof vi.fn>).mockResolvedValue(updatedJob);
+    const { result } = renderHook(() => useJobs());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    await act(async () => {
+      await result.current.updateJob('1', { active: false });
+    });
+
+    expect(result.current.jobs).toEqual([mockJobs[1]]);
+  });
+
+  it('should retain a deactivated job when inactive jobs are included', async () => {
+    const updatedJob = { ...mockJobs[0], active: false };
+    (jobs.update as ReturnType<typeof vi.fn>).mockResolvedValue(updatedJob);
+    const { result } = renderHook(() => useJobs(true));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    await act(async () => {
+      await result.current.updateJob('1', { active: false });
+    });
+
+    expect(result.current.jobs[0]).toEqual(updatedJob);
+  });
+
   it('should delete a job', async () => {
     (jobs.delete as ReturnType<typeof vi.fn>).mockResolvedValue(mockJobs[0]);
 
@@ -154,6 +201,33 @@ describe('useJobs', () => {
 
     expect(jobs.delete).toHaveBeenCalledWith('1');
     expect(result.current.jobs).toEqual([mockJobs[1]]);
+  });
+
+  it('should propagate delete errors without retaining stale hook state', async () => {
+    const deleteError = Object.assign(new Error('Request failed'), {
+      isAxiosError: true,
+      response: {
+        data: {
+          message: 'Cannot delete this job because it has historical registrations. Deactivate it instead.',
+        },
+      },
+    });
+    (jobs.delete as ReturnType<typeof vi.fn>).mockRejectedValue(deleteError);
+    const { result } = renderHook(() => useJobs());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    let caughtError: unknown;
+    await act(async () => {
+      try {
+        await result.current.deleteJob('1');
+      } catch (error) {
+        caughtError = error;
+      }
+    });
+
+    expect(caughtError).toBe(deleteError);
+    expect(result.current.error).toBeNull();
+    expect(result.current.jobs).toEqual(mockJobs);
   });
 
   it('should handle errors when fetching jobs', async () => {

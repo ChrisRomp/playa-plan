@@ -2,8 +2,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { JobsService } from './jobs.service';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { CoreConfigService } from '../core-config/services/core-config.service';
-import { NotFoundException } from '@nestjs/common';
-import { UserRole } from '@prisma/client';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { Prisma, UserRole } from '@prisma/client';
 import { CreateJobDto } from './dto/create-job.dto';
 import { UpdateJobDto } from './dto/update-job.dto';
 
@@ -20,6 +20,9 @@ describe('JobsService', () => {
       update: jest.fn(),
       delete: jest.fn(),
     },
+    registrationJob: {
+      count: jest.fn(),
+    },
   };
 
   const mockCoreConfigService = {
@@ -27,6 +30,9 @@ describe('JobsService', () => {
   };
 
   beforeEach(async () => {
+    jest.clearAllMocks();
+    mockPrismaService.registrationJob.count.mockResolvedValue(0);
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         JobsService,
@@ -107,6 +113,7 @@ describe('JobsService', () => {
           name: createJobDto.name,
           location: createJobDto.location,
           maxRegistrations: 10,
+          active: true,
           category: {
             connect: { id: createJobDto.categoryId }
           },
@@ -209,7 +216,7 @@ describe('JobsService', () => {
 
       expect(result).toEqual(expectedJobs);
       expect(mockPrismaService.job.findMany).toHaveBeenCalledWith({
-        where: {},
+        where: { active: true },
         include: {
           category: true,
           shift: true,
@@ -246,7 +253,7 @@ describe('JobsService', () => {
       expect(result).toHaveLength(1);
       expect(result[0].staffOnly).toBe(false);
       expect(mockPrismaService.job.findMany).toHaveBeenCalledWith({
-        where: { category: { staffOnly: false } },
+        where: { active: true, category: { staffOnly: false } },
         include: {
           category: true,
           shift: true,
@@ -312,6 +319,31 @@ describe('JobsService', () => {
       const result = await service.findAll();
 
       expect(result).toHaveLength(1);
+    });
+
+    it('should include inactive jobs only when requested by an administrator', async () => {
+      mockPrismaService.job.findMany.mockResolvedValue([]);
+
+      await service.findAll(UserRole.ADMIN, true);
+
+      expect(mockPrismaService.job.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: {} }),
+      );
+    });
+
+    it('should ignore includeInactive for participants', async () => {
+      mockPrismaService.job.findMany.mockResolvedValue([]);
+
+      await service.findAll(UserRole.PARTICIPANT, true);
+
+      expect(mockPrismaService.job.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            active: true,
+            category: { staffOnly: false },
+          },
+        }),
+      );
     });
   });
 
@@ -470,6 +502,32 @@ describe('JobsService', () => {
 
       await expect(service.update(jobId, updateJobDto)).rejects.toThrow(NotFoundException);
     });
+
+    it('should persist active false', async () => {
+      const jobId = 'test-id';
+      mockPrismaService.job.update.mockResolvedValue({
+        id: jobId,
+        name: 'Test Job',
+        location: 'Test Location',
+        categoryId: 'category-id',
+        shiftId: 'shift-id',
+        maxRegistrations: 10,
+        active: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        category: { staffOnly: false, alwaysRequired: false },
+        shift: {},
+        registrations: [],
+      });
+
+      await service.update(jobId, { active: false });
+
+      expect(mockPrismaService.job.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: { active: false },
+        }),
+      );
+    });
   });
 
   describe('remove', () => {
@@ -538,9 +596,45 @@ describe('JobsService', () => {
 
     it('should throw NotFoundException if job to remove is not found', async () => {
       const jobId = 'non-existent-id';
-      mockPrismaService.job.delete.mockRejectedValue(new Error());
+      mockPrismaService.job.delete.mockRejectedValue(
+        new Prisma.PrismaClientKnownRequestError('Job not found', {
+          code: 'P2025',
+          clientVersion: '6.19.3',
+        }),
+      );
 
       await expect(service.remove(jobId)).rejects.toThrow(NotFoundException);
+    });
+
+    it('should reject deleting a job with historical registrations', async () => {
+      mockPrismaService.registrationJob.count.mockResolvedValue(1);
+
+      await expect(service.remove('referenced-job')).rejects.toThrow(
+        new BadRequestException(
+          'Cannot delete job with ID referenced-job because it has historical registrations. Deactivate it instead.',
+        ),
+      );
+      expect(mockPrismaService.job.delete).not.toHaveBeenCalled();
+    });
+
+    it('should translate a raced foreign key failure to the lifecycle error', async () => {
+      mockPrismaService.job.delete.mockRejectedValue(
+        new Prisma.PrismaClientKnownRequestError('Foreign key constraint failed', {
+          code: 'P2003',
+          clientVersion: '6.19.3',
+        }),
+      );
+
+      await expect(service.remove('raced-job')).rejects.toThrow(
+        'Deactivate it instead',
+      );
+    });
+
+    it('should propagate unrelated database errors', async () => {
+      const databaseError = new Error('Database unavailable');
+      mockPrismaService.job.delete.mockRejectedValue(databaseError);
+
+      await expect(service.remove('test-id')).rejects.toBe(databaseError);
     });
   });
 
