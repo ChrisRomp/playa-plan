@@ -23,11 +23,11 @@ export function useJobs(includeInactive = false): UseJobsResult {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const includeInactiveRef = useRef(includeInactive);
+  includeInactiveRef.current = includeInactive;
 
   const fetchJobs = useCallback(async (shouldIncludeInactive = false) => {
     setLoading(true);
     setError(null);
-    includeInactiveRef.current = shouldIncludeInactive;
     try {
       const data = await jobs.getAll(shouldIncludeInactive);
       setJobsList(data);

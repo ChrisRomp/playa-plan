@@ -185,6 +185,23 @@ describe('useJobs', () => {
     expect(result.current.jobs[0]).toEqual(updatedJob);
   });
 
+  it('should use the latest inactive visibility immediately after toggling', async () => {
+    const updatedJob = { ...mockJobs[0], active: false };
+    (jobs.update as ReturnType<typeof vi.fn>).mockResolvedValue(updatedJob);
+    const { result, rerender } = renderHook(
+      ({ includeInactive }) => useJobs(includeInactive),
+      { initialProps: { includeInactive: false } },
+    );
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    rerender({ includeInactive: true });
+    await act(async () => {
+      await result.current.updateJob('1', { active: false });
+    });
+
+    expect(result.current.jobs[0]).toEqual(updatedJob);
+  });
+
   it('should delete a job', async () => {
     (jobs.delete as ReturnType<typeof vi.fn>).mockResolvedValue(mockJobs[0]);
 
