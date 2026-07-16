@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID, Min } from 'class-validator';
+import { IsIn, IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID, Min } from 'class-validator';
 import { PaymentStatus } from '@prisma/client';
+import { LEGACY_WRITABLE_PAYMENT_STATUSES } from './legacy-writable-payment-statuses';
 
 /**
  * Data Transfer Object for recording a manual payment
@@ -27,12 +28,12 @@ export class RecordManualPaymentDto {
 
   @ApiProperty({
     description: 'The payment status',
-    enum: PaymentStatus,
+    enum: LEGACY_WRITABLE_PAYMENT_STATUSES,
     example: PaymentStatus.COMPLETED,
     default: PaymentStatus.COMPLETED,
   })
   @IsOptional()
-  @IsEnum(PaymentStatus)
+  @IsIn(LEGACY_WRITABLE_PAYMENT_STATUSES)
   status?: PaymentStatus = PaymentStatus.COMPLETED;
 
   @ApiProperty({
