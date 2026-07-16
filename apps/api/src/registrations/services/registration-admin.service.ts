@@ -17,6 +17,7 @@ import {
   AdminAuditTargetType, 
   PaymentStatus,
   PaymentProvider,
+  Job,
   Prisma 
 } from '@prisma/client';
 import { 
@@ -309,21 +310,10 @@ export class RegistrationAdminService {
           const currentJobIds = currentRegistration.jobs.map(rj => rj.jobId);
           const newJobIds = editData.jobIds;
 
-          // Find jobs to remove
           const jobsToRemove = currentJobIds.filter(jobId => !newJobIds.includes(jobId));
-          if (jobsToRemove.length > 0) {
-            await this.cleanupService.cleanupWorkShifts(
-              registrationId,
-              adminUserId,
-              `Work shifts modified: ${editData.notes || 'No notes provided'}`,
-              transactionId,
-            );
-          }
-
-          // Find jobs to add
-          const jobsToAdd = newJobIds.filter(jobId => !currentJobIds.includes(jobId));
-          for (const jobId of jobsToAdd) {
-            // Validate job exists
+          const jobIdsToAdd = newJobIds.filter(jobId => !currentJobIds.includes(jobId));
+          const jobsToAdd: Job[] = [];
+          for (const jobId of jobIdsToAdd) {
             const job = await prisma.job.findUnique({ where: { id: jobId } });
             if (!job) {
               throw new BadRequestException(`Job ${jobId} not found`);
@@ -331,12 +321,43 @@ export class RegistrationAdminService {
             if (job.active === false) {
               throw new BadRequestException(`Inactive job cannot be assigned: ${job.name}`);
             }
+            jobsToAdd.push(job);
+          }
 
-            // Add job to registration
+          if (jobsToRemove.length > 0) {
+            await prisma.registrationJob.deleteMany({
+              where: {
+                registrationId,
+                jobId: { in: jobsToRemove },
+              },
+            });
+
+            for (const jobId of jobsToRemove) {
+              const registrationJob = currentRegistration.jobs.find(
+                currentJob => currentJob.jobId === jobId,
+              )!;
+              auditRecords.push({
+                adminUserId,
+                actionType: AdminAuditActionType.WORK_SHIFT_REMOVE,
+                targetRecordType: AdminAuditTargetType.WORK_SHIFT,
+                targetRecordId: jobId,
+                oldValues: {
+                  registrationId,
+                  jobId,
+                  jobName: registrationJob.job.name,
+                },
+                newValues: undefined,
+                reason: `Work shifts modified: ${editData.notes || 'No notes provided'}`,
+                transactionId,
+              });
+            }
+          }
+
+          for (const job of jobsToAdd) {
             await prisma.registrationJob.create({
               data: {
                 registrationId,
-                jobId,
+                jobId: job.id,
               },
             });
 
@@ -344,15 +365,15 @@ export class RegistrationAdminService {
               adminUserId,
               actionType: AdminAuditActionType.WORK_SHIFT_ADD,
               targetRecordType: AdminAuditTargetType.WORK_SHIFT,
-              targetRecordId: jobId,
+              targetRecordId: job.id,
               oldValues: undefined,
-              newValues: { registrationId, jobId, jobName: job.name },
+              newValues: { registrationId, jobId: job.id, jobName: job.name },
               reason: `Work shift added: ${editData.notes || 'No notes provided'}`,
               transactionId,
             });
           }
 
-          if (jobsToRemove.length > 0 || jobsToAdd.length > 0) {
+          if (jobsToRemove.length > 0 || jobIdsToAdd.length > 0) {
             auditRecords.push({
               adminUserId,
               actionType: AdminAuditActionType.REGISTRATION_EDIT,
