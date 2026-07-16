@@ -24,17 +24,25 @@ export function useJobs(includeInactive = false): UseJobsResult {
   const [error, setError] = useState<string | null>(null);
   const includeInactiveRef = useRef(includeInactive);
   includeInactiveRef.current = includeInactive;
+  const generationRef = useRef(0);
 
   const fetchJobs = useCallback(async (shouldIncludeInactive = false) => {
+    const generation = ++generationRef.current;
     setLoading(true);
     setError(null);
     try {
       const data = await jobs.getAll(shouldIncludeInactive);
-      setJobsList(data);
+      if (generation === generationRef.current) {
+        setJobsList(data);
+      }
     } catch {
-      setError('Failed to fetch jobs');
+      if (generation === generationRef.current) {
+        setError('Failed to fetch jobs');
+      }
     } finally {
-      setLoading(false);
+      if (generation === generationRef.current) {
+        setLoading(false);
+      }
     }
   }, []);
 

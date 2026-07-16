@@ -257,6 +257,9 @@ describe('RegistrationEditForm', () => {
 
       fireEvent.click(existingInactiveJob);
       expect(existingInactiveJob).not.toBeChecked();
+      expect(existingInactiveJob).toBeEnabled();
+      fireEvent.click(existingInactiveJob);
+      expect(existingInactiveJob).toBeChecked();
     });
 
     it('should handle camping option changes', () => {

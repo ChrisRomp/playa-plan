@@ -120,6 +120,11 @@ export function RegistrationEditForm({
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  const originallyAssignedJobIds = useMemo(
+    () => new Set(registration.jobs.map((j) => j.job.id)),
+    [registration.jobs],
+  );
+
   // Check if form has changes
   const hasChanges = useMemo(() => {
     const originalJobIds = registration.jobs.map(j => j.job.id).sort();
@@ -301,7 +306,8 @@ export function RegistrationEditForm({
                   <div className="p-2">
                     {availableJobs.map((job) => {
                       const isSelected = formData.jobIds.includes(job.id);
-                      const cannotAddInactiveJob = !job.active && !isSelected;
+                      const cannotAddInactiveJob =
+                        !job.active && !originallyAssignedJobIds.has(job.id);
 
                       return (
                         <label
