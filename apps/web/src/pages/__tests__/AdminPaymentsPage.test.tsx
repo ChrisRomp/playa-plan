@@ -49,6 +49,19 @@ const registration = {
   payments: [],
 };
 
+const secondRegistration = {
+  ...registration,
+  id: '8c14b60a-8c68-4e09-8a7c-09c6964e420d',
+  status: 'WAITLISTED' as const,
+  user: {
+    ...registration.user,
+    id: 'second-server-derived-owner',
+    email: 'sam@example.com',
+    firstName: 'Sam',
+    lastName: 'Second',
+  },
+};
+
 const payment = {
   id: 'payment-id',
   amount: 125.5,
@@ -69,6 +82,25 @@ const payment = {
   },
 };
 
+function createAxiosError(
+  status: number,
+  message: string | string[],
+): Error & {
+  readonly isAxiosError: true;
+  readonly response: {
+    readonly status: number;
+    readonly data: { readonly message: string | string[] };
+  };
+} {
+  return Object.assign(new Error(`Request failed with status code ${status}`), {
+    isAxiosError: true as const,
+    response: {
+      status,
+      data: { message },
+    },
+  });
+}
+
 function renderPage(): void {
   render(
     <MemoryRouter>
@@ -86,6 +118,13 @@ async function searchAndSelectRegistration(): Promise<void> {
   );
   await screen.findByText('pat@example.com');
   fireEvent.click(screen.getByLabelText('Select Pat Participant'));
+}
+
+function completePaymentForm(): void {
+  fireEvent.change(screen.getByLabelText('External payment amount'), {
+    target: { value: '125.50' },
+  });
+  fireEvent.click(screen.getByLabelText('Confirm external payment'));
 }
 
 describe('AdminPaymentsPage', () => {
@@ -178,5 +217,122 @@ describe('AdminPaymentsPage', () => {
     expect(secondRequest).not.toHaveProperty('userId');
     expect(mockGetPayments).toHaveBeenLastCalledWith(0, 25);
     expect(screen.getByText(/payment-id: USD 125.50/)).toBeInTheDocument();
+  });
+
+  it('should require confirmation again after selecting another registration', async () => {
+    mockGetRegistrations.mockResolvedValue({
+      registrations: [registration, secondRegistration],
+      total: 2,
+      page: 1,
+      limit: 25,
+      totalPages: 1,
+    });
+    mockRecordExternalPayment.mockResolvedValue({
+      ...payment,
+      registrationId: secondRegistration.id,
+      userId: secondRegistration.user.id,
+      user: secondRegistration.user,
+      registration: {
+        id: secondRegistration.id,
+        year: secondRegistration.year,
+        status: secondRegistration.status,
+      },
+    });
+    renderPage();
+    await searchAndSelectRegistration();
+    completePaymentForm();
+
+    fireEvent.click(screen.getByLabelText('Select Sam Second'));
+
+    expect(screen.getByLabelText('Confirm external payment')).not.toBeChecked();
+    expect(
+      screen.getByRole('button', { name: 'Record external payment' }),
+    ).toBeDisabled();
+    expect(mockRecordExternalPayment).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByLabelText('Confirm external payment'));
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Record external payment' }),
+    );
+
+    await waitFor(() => {
+      expect(mockRecordExternalPayment).toHaveBeenCalledWith(
+        expect.objectContaining({
+          registrationId: secondRegistration.id,
+        }),
+      );
+    });
+  });
+
+  it.each([
+    {
+      status: 400,
+      serverMessage: ['Amount must be positive', 'Currency must be valid'],
+      expectedMessage: 'Amount must be positive; Currency must be valid',
+    },
+    {
+      status: 404,
+      serverMessage: 'Registration no longer exists',
+      expectedMessage: 'Registration no longer exists',
+    },
+    {
+      status: 409,
+      serverMessage: 'Idempotency key was reused with different input',
+      expectedMessage: 'Idempotency key was reused with different input',
+    },
+  ])(
+    'should show actionable $status server guidance',
+    async ({ status, serverMessage, expectedMessage }) => {
+      mockRecordExternalPayment.mockRejectedValue(
+        createAxiosError(status, serverMessage),
+      );
+      renderPage();
+      await searchAndSelectRegistration();
+      completePaymentForm();
+
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Record external payment' }),
+      );
+
+      expect(await screen.findByText(expectedMessage)).toBeInTheDocument();
+    },
+  );
+
+  it('should bound actionable server guidance to 500 characters', async () => {
+    const inputMessage = `Action required: ${'x'.repeat(600)}`;
+    mockRecordExternalPayment.mockRejectedValue(
+      createAxiosError(400, inputMessage),
+    );
+    renderPage();
+    await searchAndSelectRegistration();
+    completePaymentForm();
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Record external payment' }),
+    );
+
+    const actualAlert = await screen.findByRole('alert');
+    expect(actualAlert).toHaveTextContent(inputMessage.slice(0, 500));
+    expect(actualAlert.textContent).toHaveLength(500);
+  });
+
+  it('should hide internal server details for 5xx failures', async () => {
+    mockRecordExternalPayment.mockRejectedValue(
+      createAxiosError(500, 'Internal database connection details'),
+    );
+    renderPage();
+    await searchAndSelectRegistration();
+    completePaymentForm();
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Record external payment' }),
+    );
+
+    expect(
+      await screen.findByText('Unable to record the external payment.'),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText('Internal database connection details'),
+    ).not.toBeInTheDocument();
   });
 });

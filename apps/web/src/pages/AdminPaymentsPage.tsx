@@ -1,9 +1,8 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { isAxiosError } from 'axios';
 import { Link } from 'react-router-dom';
 import {
-  AdminRegistrationStatus,
   adminRegistrationsApi,
-  Registration,
   RegistrationFilters,
 } from '../lib/api/admin-registrations';
 import {
@@ -11,16 +10,20 @@ import {
   AdminPayment,
   adminPaymentsApi,
   ExternalPaymentMethod,
+  ExternalPaymentSearchRegistration,
+  ExternalPaymentSearchRegistrationStatus,
 } from '../lib/api/admin-payments';
 import { ROUTES } from '../routes';
 
-const ELIGIBLE_REGISTRATION_STATUSES: readonly AdminRegistrationStatus[] = [
+const ELIGIBLE_REGISTRATION_STATUSES:
+  readonly ExternalPaymentSearchRegistrationStatus[] = [
   'PENDING',
   'CONFIRMED',
   'WAITLISTED',
 ];
 
-const REGISTRATION_STATUS_OPTIONS: readonly AdminRegistrationStatus[] = [
+const REGISTRATION_STATUS_OPTIONS:
+  readonly ExternalPaymentSearchRegistrationStatus[] = [
   'PENDING',
   'CONFIRMED',
   'WAITLISTED',
@@ -39,15 +42,26 @@ const EXTERNAL_PAYMENT_METHODS: readonly ExternalPaymentMethod[] = [
   'OTHER',
 ];
 
+const ACTIONABLE_SERVER_ERROR_STATUSES = new Set([400, 404, 409]);
+const MAX_SERVER_ERROR_MESSAGE_LENGTH = 500;
+
+interface ApiErrorResponse {
+  readonly message?: unknown;
+}
+
 function createIdempotencyKey(): string {
   return crypto.randomUUID();
 }
 
-function isEligibleRegistration(registration: Registration): boolean {
+function isEligibleRegistration(
+  registration: ExternalPaymentSearchRegistration,
+): boolean {
   return ELIGIBLE_REGISTRATION_STATUSES.includes(registration.status);
 }
 
-function getRegistrationEffect(registration: Registration): string {
+function getRegistrationEffect(
+  registration: ExternalPaymentSearchRegistration,
+): string {
   if (registration.status === 'PENDING') {
     return 'The registration will become CONFIRMED and payment deferral will be cleared.';
   }
@@ -55,7 +69,34 @@ function getRegistrationEffect(registration: Registration): string {
   return `The registration will remain ${registration.status} and payment deferral will be cleared.`;
 }
 
+function normalizeServerErrorMessage(message: unknown): string | null {
+  const normalizedMessage = Array.isArray(message)
+    ? message
+        .filter((entry): entry is string => typeof entry === 'string')
+        .map((entry) => entry.trim())
+        .filter(Boolean)
+        .join('; ')
+    : typeof message === 'string'
+      ? message.trim()
+      : '';
+
+  return normalizedMessage
+    ? normalizedMessage.slice(0, MAX_SERVER_ERROR_MESSAGE_LENGTH)
+    : null;
+}
+
 function getErrorMessage(error: unknown, fallback: string): string {
+  if (isAxiosError<ApiErrorResponse>(error)) {
+    const status = error.response?.status;
+    if (!status || !ACTIONABLE_SERVER_ERROR_STATUSES.has(status)) {
+      return fallback;
+    }
+
+    return (
+      normalizeServerErrorMessage(error.response?.data?.message) ?? fallback
+    );
+  }
+
   return error instanceof Error ? error.message : fallback;
 }
 
@@ -66,10 +107,10 @@ export default function AdminPaymentsPage() {
   const [registrationFilters, setRegistrationFilters] =
     useState<RegistrationFilters>({});
   const [registrationResults, setRegistrationResults] = useState<
-    Registration[] | null
+    ExternalPaymentSearchRegistration[] | null
   >(null);
   const [selectedRegistration, setSelectedRegistration] =
-    useState<Registration | null>(null);
+    useState<ExternalPaymentSearchRegistration | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
 
@@ -150,12 +191,15 @@ export default function AdminPaymentsPage() {
     setSearchError(null);
     setSelectedRegistration(null);
     try {
-      const result = await adminRegistrationsApi.getRegistrations({
-        name: registrationFilters.name?.trim() || undefined,
-        email: registrationFilters.email?.trim() || undefined,
-        year: registrationFilters.year,
-        status: registrationFilters.status,
-      });
+      const result =
+        await adminRegistrationsApi.getRegistrations<ExternalPaymentSearchRegistration>(
+          {
+            name: registrationFilters.name?.trim() || undefined,
+            email: registrationFilters.email?.trim() || undefined,
+            year: registrationFilters.year,
+            status: registrationFilters.status,
+          },
+        );
       setRegistrationResults(result.registrations);
     } catch (error: unknown) {
       setSearchError(
@@ -165,6 +209,13 @@ export default function AdminPaymentsPage() {
     } finally {
       setIsSearching(false);
     }
+  };
+
+  const selectRegistration = (
+    registration: ExternalPaymentSearchRegistration,
+  ): void => {
+    setSelectedRegistration(registration);
+    setIsConfirmed(false);
   };
 
   const recordExternalPayment = async (event: FormEvent): Promise<void> => {
@@ -321,7 +372,7 @@ export default function AdminPaymentsPage() {
                           checked={selectedRegistration?.id === registration.id}
                           disabled={!eligible}
                           name="registration"
-                          onChange={() => setSelectedRegistration(registration)}
+                          onChange={() => selectRegistration(registration)}
                           type="radio"
                         />
                       </td>
