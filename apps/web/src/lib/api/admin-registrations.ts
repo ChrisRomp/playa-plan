@@ -19,6 +19,7 @@ interface Registration {
     job: {
       id: string;
       name: string;
+      active: boolean;
       category?: {
         name: string;
       };
@@ -34,6 +35,7 @@ interface Registration {
 interface Job {
   id: string;
   name: string;
+  active: boolean;
   description?: string;
   category?: {
     id: string;
@@ -160,7 +162,9 @@ export const adminRegistrationsApi = {
    * Get all available jobs for registration editing
    */
   getAvailableJobs: async (): Promise<Job[]> => {
-    const response = await api.get('/jobs');
+    const response = await api.get('/jobs', {
+      params: { includeInactive: true },
+    });
     return response.data;
   },
 

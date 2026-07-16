@@ -48,6 +48,20 @@ export class ShiftsController {
     const shifts = await this.prisma.shift.findMany({
       include: {
         jobs: {
+          where: {
+            OR: [
+              { active: true },
+              {
+                registrations: {
+                  some: {
+                    registration: {
+                      year: registrationYear,
+                    },
+                  },
+                },
+              },
+            ],
+          },
           include: {
             category: true,
             registrations: {

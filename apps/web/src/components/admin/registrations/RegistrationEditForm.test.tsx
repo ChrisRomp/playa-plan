@@ -27,6 +27,7 @@ describe('RegistrationEditForm', () => {
         job: {
           id: 'job-1',
           name: 'Kitchen Helper',
+          active: true,
           category: {
             name: 'Kitchen',
           },
@@ -56,6 +57,7 @@ describe('RegistrationEditForm', () => {
     {
       id: 'job-1',
       name: 'Kitchen Helper',
+      active: true,
       category: {
         name: 'Kitchen',
       },
@@ -70,6 +72,7 @@ describe('RegistrationEditForm', () => {
     {
       id: 'job-2',
       name: 'Cleanup Crew',
+      active: true,
       category: {
         name: 'Maintenance',
       },
@@ -217,6 +220,46 @@ describe('RegistrationEditForm', () => {
       fireEvent.click(kitchenJobCheckbox);
 
       expect(kitchenJobCheckbox).not.toBeChecked();
+    });
+
+    it('should allow removing an existing inactive job but prevent adding another', () => {
+      const registrationWithInactiveJob = {
+        ...mockRegistration,
+        jobs: [
+          {
+            ...mockRegistration.jobs[0],
+            job: {
+              ...mockRegistration.jobs[0].job,
+              active: false,
+            },
+          },
+        ],
+      };
+      const availableJobs = [
+        { ...mockAvailableJobs[0], active: false },
+        { ...mockAvailableJobs[1], active: false },
+      ];
+
+      render(
+        <RegistrationEditForm
+          {...defaultProps}
+          registration={registrationWithInactiveJob}
+          availableJobs={availableJobs}
+        />,
+      );
+
+      const existingInactiveJob = screen.getByLabelText(/Kitchen Helper/);
+      const unassignedInactiveJob = screen.getByLabelText(/Cleanup Crew/);
+      expect(existingInactiveJob).toBeChecked();
+      expect(existingInactiveJob).toBeEnabled();
+      expect(unassignedInactiveJob).toBeDisabled();
+      expect(screen.getAllByText('Inactive')).toHaveLength(2);
+
+      fireEvent.click(existingInactiveJob);
+      expect(existingInactiveJob).not.toBeChecked();
+      expect(existingInactiveJob).toBeEnabled();
+      fireEvent.click(existingInactiveJob);
+      expect(existingInactiveJob).toBeChecked();
     });
 
     it('should handle camping option changes', () => {
@@ -431,6 +474,7 @@ describe('RegistrationEditForm', () => {
         {
           id: 'job-3',
           name: 'Simple Job',
+          active: true,
           description: 'Job without category or shift',
         },
       ];

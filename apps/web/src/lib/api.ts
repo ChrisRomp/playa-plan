@@ -379,6 +379,7 @@ export interface IJob {
   id: string;
   name: string;
   location: string;
+  active: boolean;
   categoryId: string;
   category?: IJobCategory;
   shiftId: string;
@@ -422,6 +423,7 @@ export const JobSchema: z.ZodType<IJob> = z.lazy(() =>
     id: z.string(),
     name: z.string(),
     location: z.string(),
+    active: z.boolean().default(true),
     categoryId: z.string(),
     category: JobCategorySchema.optional(),
     shiftId: z.string(),
@@ -1032,8 +1034,10 @@ export const jobCategories = {
 };
 
 export const jobs = {
-  getAll: async (): Promise<Job[]> => {
-    const response = await api.get<Job[]>("/jobs");
+  getAll: async (includeInactive = false): Promise<Job[]> => {
+    const response = await api.get<Job[]>("/jobs", {
+      params: includeInactive ? { includeInactive: true } : undefined,
+    });
     return response.data.map(item => {
       // Derive staffOnly and alwaysRequired from the category
       const jobWithDerivedProps = {

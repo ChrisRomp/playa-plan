@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { jobs, Job } from '../lib/api';
 
 // Type for job inputs without derived/readonly fields
@@ -12,27 +12,37 @@ interface UseJobsResult {
   jobs: Job[];
   loading: boolean;
   error: string | null;
-  fetchJobs: () => Promise<void>;
+  fetchJobs: (includeInactive?: boolean) => Promise<void>;
   createJob: (data: JobInput) => Promise<Job | null>;
   updateJob: (id: string, data: Partial<JobInput>) => Promise<Job | null>;
   deleteJob: (id: string) => Promise<boolean>;
 }
 
-export function useJobs(): UseJobsResult {
+export function useJobs(includeInactive = false): UseJobsResult {
   const [jobsList, setJobsList] = useState<Job[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const includeInactiveRef = useRef(includeInactive);
+  includeInactiveRef.current = includeInactive;
+  const generationRef = useRef(0);
 
-  const fetchJobs = useCallback(async () => {
+  const fetchJobs = useCallback(async (shouldIncludeInactive = false) => {
+    const generation = ++generationRef.current;
     setLoading(true);
     setError(null);
     try {
-      const data = await jobs.getAll();
-      setJobsList(data);
+      const data = await jobs.getAll(shouldIncludeInactive);
+      if (generation === generationRef.current) {
+        setJobsList(data);
+      }
     } catch {
-      setError('Failed to fetch jobs');
+      if (generation === generationRef.current) {
+        setError('Failed to fetch jobs');
+      }
     } finally {
-      setLoading(false);
+      if (generation === generationRef.current) {
+        setLoading(false);
+      }
     }
   }, []);
 
@@ -41,7 +51,9 @@ export function useJobs(): UseJobsResult {
     setError(null);
     try {
       const created = await jobs.create(data);
-      setJobsList((prev) => [...prev, created]);
+      if (created.active || includeInactiveRef.current) {
+        setJobsList((prev) => [...prev, created]);
+      }
       return created;
     } catch {
       setError('Failed to create job');
@@ -56,7 +68,12 @@ export function useJobs(): UseJobsResult {
     setError(null);
     try {
       const updated = await jobs.update(id, data);
-      setJobsList((prev) => prev.map((job) => (job.id === id ? updated : job)));
+      setJobsList((prev) => {
+        if (!updated.active && !includeInactiveRef.current) {
+          return prev.filter((job) => job.id !== id);
+        }
+        return prev.map((job) => (job.id === id ? updated : job));
+      });
       return updated;
     } catch {
       setError('Failed to update job');
@@ -73,17 +90,16 @@ export function useJobs(): UseJobsResult {
       await jobs.delete(id);
       setJobsList((prev) => prev.filter((job) => job.id !== id));
       return true;
-    } catch {
-      setError('Failed to delete job');
-      return false;
+    } catch (caughtError) {
+      throw caughtError;
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    fetchJobs();
-  }, [fetchJobs]);
+    fetchJobs(includeInactive);
+  }, [fetchJobs, includeInactive]);
 
   return {
     jobs: jobsList,

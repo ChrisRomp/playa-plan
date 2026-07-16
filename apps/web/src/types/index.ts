@@ -143,6 +143,7 @@ export interface Job {
   id: string;
   name: string;
   location: string;
+  active: boolean;
   categoryId: string;
   shiftId: string;
   maxRegistrations: number;

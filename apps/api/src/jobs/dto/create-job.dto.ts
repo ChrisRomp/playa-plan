@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsUUID, IsInt, IsOptional } from 'class-validator';
+import { IsBoolean, IsString, IsNotEmpty, IsUUID, IsInt, IsOptional } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateJobDto {
@@ -42,4 +42,13 @@ export class CreateJobDto {
   @IsInt()
   @IsOptional()
   maxRegistrations?: number;
-} 
+
+  @ApiProperty({
+    description: 'Whether the job is available for new registrations',
+    default: true,
+    required: false,
+  })
+  @IsBoolean()
+  @IsOptional()
+  active?: boolean;
+}

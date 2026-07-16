@@ -119,6 +119,8 @@ describe('RegistrationAdminService', () => {
 
     const mockCleanupService = {
       cleanupRegistration: jest.fn(),
+      cleanupWorkShifts: jest.fn(),
+      cleanupCampingOptions: jest.fn(),
     };
 
     const mockPaymentsService = {
@@ -286,8 +288,8 @@ describe('RegistrationAdminService', () => {
       };
 
       const mockJobs = [
-        { id: 'job-1', title: 'Kitchen Duty', enabled: true },
-        { id: 'job-2', title: 'Gate Duty', enabled: true },
+        { id: 'job-1', name: 'Kitchen Duty', active: true },
+        { id: 'job-2', name: 'Gate Duty', active: true },
       ];
 
       prismaService.$transaction.mockImplementation(async (callback) => {
@@ -310,6 +312,78 @@ describe('RegistrationAdminService', () => {
       expect(adminAuditService.createMultipleAuditRecords).toHaveBeenCalled();
 
       expect(result.message).toBe('Registration successfully updated');
+    });
+
+    it('should reject adding an inactive job while preserving existing assignments', async () => {
+      const editData: AdminEditRegistrationDto = {
+        jobIds: ['retained-job', 'inactive-job'],
+        notes: 'Test inactive assignment',
+      };
+      const registrationWithInactiveJob = {
+        ...mockRegistration,
+        jobs: [
+          { jobId: 'retained-job', job: { id: 'retained-job', name: 'Retained Job' } },
+          { jobId: 'removed-job', job: { id: 'removed-job', name: 'Removed Job' } },
+        ],
+      };
+
+      prismaService.$transaction.mockImplementation(async (callback) => callback(prismaService));
+      (prismaService.registration.findUnique as jest.Mock).mockResolvedValue(
+        registrationWithInactiveJob,
+      );
+      (prismaService.job.findUnique as jest.Mock).mockResolvedValue({
+        id: 'inactive-job',
+        name: 'Retired Job',
+        active: false,
+      });
+
+      await expect(
+        service.editRegistration('reg-123', editData, 'admin-123'),
+      ).rejects.toThrow('Inactive job cannot be assigned: Retired Job');
+      expect(prismaService.registrationJob.create).not.toHaveBeenCalled();
+      expect(prismaService.registrationJob.deleteMany).not.toHaveBeenCalled();
+      expect(cleanupService.cleanupWorkShifts).not.toHaveBeenCalled();
+    });
+
+    it('should retain unaffected jobs when removing one assignment', async () => {
+      const editData: AdminEditRegistrationDto = {
+        jobIds: ['retained-job'],
+        notes: 'Remove one assignment',
+      };
+      const registrationWithJobs = {
+        ...mockRegistration,
+        jobs: [
+          { jobId: 'retained-job', job: { id: 'retained-job', name: 'Retained Job' } },
+          { jobId: 'removed-job', job: { id: 'removed-job', name: 'Removed Job' } },
+        ],
+      };
+
+      prismaService.$transaction.mockImplementation(async (callback) => callback(prismaService));
+      (prismaService.registration.findUnique as jest.Mock).mockResolvedValue(
+        registrationWithJobs,
+      );
+      (prismaService.registrationJob.deleteMany as jest.Mock).mockResolvedValue({ count: 1 });
+      adminAuditService.createMultipleAuditRecords.mockResolvedValue([mockAuditRecord]);
+
+      await service.editRegistration('reg-123', editData, 'admin-123');
+
+      expect(prismaService.registrationJob.deleteMany).toHaveBeenCalledWith({
+        where: {
+          registrationId: 'reg-123',
+          jobId: { in: ['removed-job'] },
+        },
+      });
+      expect(prismaService.registrationJob.create).not.toHaveBeenCalled();
+      expect(cleanupService.cleanupWorkShifts).not.toHaveBeenCalled();
+      expect(adminAuditService.createMultipleAuditRecords).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({
+            actionType: AdminAuditActionType.WORK_SHIFT_REMOVE,
+            targetRecordId: 'removed-job',
+          }),
+        ]),
+        expect.any(String),
+      );
     });
 
     // Task 5.2.5: Test editRegistration() uses Prisma transactions for atomicity

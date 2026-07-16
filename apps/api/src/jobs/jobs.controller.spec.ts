@@ -188,7 +188,18 @@ describe('JobsController', () => {
       const result = await controller.findAll(mockReq);
 
       expect(result).toEqual(expectedJobs);
-      expect(mockJobsService.findAll).toHaveBeenCalledWith(UserRole.ADMIN);
+      expect(mockJobsService.findAll).toHaveBeenCalledWith(UserRole.ADMIN, false);
+    });
+
+    it('should pass the inactive inclusion request to the service', async () => {
+      mockJobsService.findAll.mockResolvedValue([]);
+      const mockReq = {
+        user: { id: 'user-id', role: UserRole.ADMIN },
+      } as unknown as Parameters<typeof controller.findAll>[0];
+
+      await controller.findAll(mockReq, 'true');
+
+      expect(mockJobsService.findAll).toHaveBeenCalledWith(UserRole.ADMIN, true);
     });
   });
 

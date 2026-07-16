@@ -21,6 +21,7 @@ interface Registration {
     job: {
       id: string;
       name: string;
+      active: boolean;
       category?: {
         name: string;
       };
@@ -46,6 +47,7 @@ interface Registration {
 interface Job {
   id: string;
   name: string;
+  active: boolean;
   category?: {
     name: string;
   };
@@ -117,6 +119,11 @@ export function RegistrationEditForm({
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const originallyAssignedJobIds = useMemo(
+    () => new Set(registration.jobs.map((j) => j.job.id)),
+    [registration.jobs],
+  );
 
   // Check if form has changes
   const hasChanges = useMemo(() => {
@@ -297,27 +304,46 @@ export function RegistrationEditForm({
                   <p className="p-4 text-sm text-gray-500">No jobs available</p>
                 ) : (
                   <div className="p-2">
-                    {availableJobs.map((job) => (
-                      <label key={job.id} className="flex items-start p-2 hover:bg-gray-50 rounded">
-                        <input
-                          type="checkbox"
-                          checked={formData.jobIds.includes(job.id)}
-                          onChange={() => handleJobToggle(job.id)}
-                          className="h-4 w-4 text-amber-600 focus:ring-amber-500 border-gray-300 rounded mt-1"
-                        />
-                        <div className="ml-3 flex-1">
-                          <div className="text-sm font-medium text-gray-900">{job.name}</div>
-                          {job.category && (
-                            <div className="text-xs text-gray-500">{job.category.name}</div>
-                          )}
-                          {job.shift && (
-                            <div className="text-xs text-gray-500">
-                              {job.shift.dayOfWeek} {job.shift.startTime} - {job.shift.endTime}
+                    {availableJobs.map((job) => {
+                      const isSelected = formData.jobIds.includes(job.id);
+                      const cannotAddInactiveJob =
+                        !job.active && !originallyAssignedJobIds.has(job.id);
+
+                      return (
+                        <label
+                          key={job.id}
+                          className={`flex items-start rounded p-2 ${
+                            cannotAddInactiveJob ? 'cursor-not-allowed bg-gray-50 opacity-60' : 'hover:bg-gray-50'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            disabled={cannotAddInactiveJob}
+                            onChange={() => handleJobToggle(job.id)}
+                            className="mt-1 h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+                          />
+                          <div className="ml-3 flex-1">
+                            <div className="text-sm font-medium text-gray-900">
+                              {job.name}
+                              {!job.active && (
+                                <span className="ml-2 rounded bg-gray-200 px-2 py-0.5 text-xs text-gray-700">
+                                  Inactive
+                                </span>
+                              )}
                             </div>
-                          )}
-                        </div>
-                      </label>
-                    ))}
+                            {job.category && (
+                              <div className="text-xs text-gray-500">{job.category.name}</div>
+                            )}
+                            {job.shift && (
+                              <div className="text-xs text-gray-500">
+                                {job.shift.dayOfWeek} {job.shift.startTime} - {job.shift.endTime}
+                              </div>
+                            )}
+                          </div>
+                        </label>
+                      );
+                    })}
                   </div>
                 )}
               </div>

@@ -10,6 +10,7 @@ import {
   UpdateRegistrationDto,
 } from './dto';
 import {
+  Job,
   NotificationType,
   Prisma,
   Registration,
@@ -109,6 +110,7 @@ export class RegistrationsService {
         if (!job) {
           throw new NotFoundException(`Job with ID ${jobId} not found`);
         }
+        this.assertJobActive(job);
 
         const currentRegistrationCount = job.registrations.filter(
           r => isCapacityReservingStatus(r.registration.status)
@@ -204,6 +206,7 @@ export class RegistrationsService {
     if (!job) {
       throw new NotFoundException(`Job with ID ${addJobDto.jobId} not found`);
     }
+    this.assertJobActive(job);
 
     // Block participants from adding staff-only jobs
     if (!registration.user) {
@@ -887,6 +890,7 @@ export class RegistrationsService {
         if (!job) {
           throw new NotFoundException(`Job with ID ${jobId} not found`);
         }
+        this.assertJobActive(job);
 
         const currentRegistrationCount = job.registrations.filter(
           (currentJobRegistration) => isCapacityReservingStatus(currentJobRegistration.registration.status)
@@ -1114,6 +1118,7 @@ export class RegistrationsService {
         if (!job) {
           throw new NotFoundException(`Job with ID ${jobId} not found`);
         }
+        this.assertJobActive(job);
         const currentRegistrationCount = job.registrations.filter(
           (r) => isCapacityReservingStatus(r.registration.status)
             && r.registration.year === currentYear,
@@ -1707,6 +1712,12 @@ export class RegistrationsService {
     });
     if (staffOnlyJobs.length > 0) {
       throw new ForbiddenException('Participants cannot register for staff-only jobs');
+    }
+  }
+
+  private assertJobActive(job: Pick<Job, 'active' | 'name'>): void {
+    if (job.active === false) {
+      throw new BadRequestException(`Inactive job cannot be assigned: ${job.name}`);
     }
   }
 }

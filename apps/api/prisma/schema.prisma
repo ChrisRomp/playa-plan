@@ -173,6 +173,7 @@ model Job {
   categoryId       String
   shiftId          String
   maxRegistrations Int
+  active           Boolean           @default(true)
   alwaysRequired   Boolean           @default(false)
   staffOnly        Boolean           @default(false)
   category         JobCategory       @relation(fields: [categoryId], references: [id])

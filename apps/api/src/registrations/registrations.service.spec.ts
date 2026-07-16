@@ -144,11 +144,15 @@ describe('RegistrationsService', () => {
     const mockJobs = [
       {
         id: 'job-id-1',
+        name: 'Kitchen',
+        active: true,
         maxRegistrations: 10,
         registrations: [],
       },
       {
         id: 'job-id-2',
+        name: 'Gate',
+        active: true,
         maxRegistrations: 5,
         registrations: [],
       },
@@ -219,6 +223,23 @@ describe('RegistrationsService', () => {
       mockPrismaService.job.findUnique.mockResolvedValue(null);
 
       await expect(service.create(createDto)).rejects.toThrow(NotFoundException);
+    });
+
+    it('should reject an inactive job', async () => {
+      mockPrismaService.user.findUnique.mockResolvedValue({
+        ...mockUser,
+        role: UserRole.STAFF,
+      });
+      mockPrismaService.registration.findFirst.mockResolvedValue(null);
+      mockPrismaService.job.findUnique.mockResolvedValue({
+        ...mockJobs[0],
+        active: false,
+      });
+
+      await expect(
+        service.create({ ...createDto, jobIds: ['job-id-1'] }),
+      ).rejects.toThrow('Inactive job cannot be assigned: Kitchen');
+      expect(mockPrismaService.registration.create).not.toHaveBeenCalled();
     });
 
     it('should throw NotFoundException if user does not exist', async () => {
@@ -406,6 +427,8 @@ describe('RegistrationsService', () => {
 
     const mockJobWithRegistrations = {
       id: 'job-id-1',
+      name: 'Kitchen',
+      active: true,
       staffOnly: false,
       maxRegistrations: 10,
       registrations: [],
@@ -481,6 +504,19 @@ describe('RegistrationsService', () => {
 
       const result = await service.addJobToRegistration('registration-id', { jobId: 'job-id-1' });
       expect(result).toBeDefined();
+    });
+
+    it('should reject adding an inactive job', async () => {
+      mockPrismaService.registration.findUnique.mockResolvedValue(mockRegistrationWithJobs);
+      mockPrismaService.job.findUnique.mockResolvedValue({
+        ...mockJobWithRegistrations,
+        active: false,
+      });
+
+      await expect(
+        service.addJobToRegistration('registration-id', { jobId: 'job-id-1' }),
+      ).rejects.toThrow('Inactive job cannot be assigned: Kitchen');
+      expect(mockPrismaService.registrationJob.create).not.toHaveBeenCalled();
     });
   });
 
@@ -966,6 +1002,8 @@ describe('RegistrationsService', () => {
       mockPrismaService.job.findMany.mockResolvedValue([]);
       mockPrismaService.job.findUnique.mockImplementation(({ where }: { where: { id: string } }) => ({
         id: where.id,
+        name: 'Kitchen',
+        active: true,
         maxRegistrations: 10,
         registrations: [],
       }));
@@ -1079,6 +1117,21 @@ describe('RegistrationsService', () => {
       );
     });
 
+    it('should reject completion with an inactive job', async () => {
+      mockPrismaService.job.findUnique.mockResolvedValue({
+        id: 'job-1',
+        name: 'Kitchen',
+        active: false,
+        maxRegistrations: 10,
+        registrations: [],
+      });
+
+      await expect(service.completeRegistration(userId, completeDto)).rejects.toThrow(
+        'Inactive job cannot be assigned: Kitchen',
+      );
+      expect(mockPrismaService.registration.updateMany).not.toHaveBeenCalled();
+    });
+
     it('should reject completion with no jobs when the user is not allowNoJob', async () => {
       const noJobsDto: CompleteRegistrationDto = {
         jobs: [],
@@ -1160,6 +1213,8 @@ describe('RegistrationsService', () => {
       mockPrismaService.registration.findFirst.mockResolvedValue(null);
       mockPrismaService.job.findUnique.mockImplementation(({ where }: { where: { id: string } }) => ({
         id: where.id,
+        name: 'Kitchen',
+        active: true,
         maxRegistrations: 10,
         staffOnly: false,
         registrations: [],
@@ -1194,6 +1249,22 @@ describe('RegistrationsService', () => {
 
       expect(mockPrismaService.registration.create).toHaveBeenCalledTimes(1);
       expect(result.jobRegistration).toEqual(created);
+    });
+
+    it('rejects an inactive job before creating the registration', async () => {
+      mockPrismaService.job.findUnique.mockResolvedValue({
+        id: 'job-1',
+        name: 'Kitchen',
+        active: false,
+        maxRegistrations: 10,
+        staffOnly: false,
+        registrations: [],
+      });
+
+      await expect(service.createCampRegistration(userId, baseDto)).rejects.toThrow(
+        'Inactive job cannot be assigned: Kitchen',
+      );
+      expect(mockPrismaService.registration.create).not.toHaveBeenCalled();
     });
 
     it('creates deferred registration as CONFIRMED + paymentDeferred=true when no chosen job is over capacity', async () => {
