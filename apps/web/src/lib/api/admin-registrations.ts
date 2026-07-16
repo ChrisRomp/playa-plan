@@ -1,5 +1,24 @@
 import { api } from '../api';
 
+export interface AdminRegistrationResult {
+  id: string;
+  year: number;
+  status:
+    | 'PENDING'
+    | 'CONFIRMED'
+    | 'CANCELLED'
+    | 'WAITLISTED'
+    | 'APPLICATION_SUBMITTED'
+    | 'APPLICATION_APPROVED'
+    | 'APPLICATION_DECLINED';
+  user: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+  };
+}
+
 // TODO: Replace with actual API types when implemented
 export interface Registration {
   id: string;
@@ -88,7 +107,7 @@ export interface RegistrationFilters {
 }
 
 export interface PaginatedRegistrationsResponse<
-  TRegistration = Registration,
+  TRegistration extends AdminRegistrationResult = Registration,
 > {
   registrations: TRegistration[];
   total: number;
@@ -145,7 +164,9 @@ export const adminRegistrationsApi = {
   /**
    * Get paginated list of registrations with optional filters
    */
-  getRegistrations: async <TRegistration = Registration>(
+  getRegistrations: async <
+    TRegistration extends AdminRegistrationResult = Registration,
+  >(
     filters: RegistrationFilters = {},
   ): Promise<PaginatedRegistrationsResponse<TRegistration>> => {
     const params = new URLSearchParams();

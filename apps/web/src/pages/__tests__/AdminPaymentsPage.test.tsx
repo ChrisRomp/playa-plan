@@ -2,8 +2,19 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import AdminPaymentsPage from '../AdminPaymentsPage';
-import { adminRegistrationsApi } from '../../lib/api/admin-registrations';
-import { adminPaymentsApi } from '../../lib/api/admin-payments';
+import {
+  adminRegistrationsApi,
+  type Registration,
+} from '../../lib/api/admin-registrations';
+import {
+  adminPaymentsApi,
+  type ExternalPaymentSearchRegistration,
+} from '../../lib/api/admin-payments';
+
+void adminRegistrationsApi.getRegistrations<Registration>;
+void adminRegistrationsApi.getRegistrations<ExternalPaymentSearchRegistration>;
+// @ts-expect-error unrelated shapes must not be valid registration results
+void adminRegistrationsApi.getRegistrations<{ unrelated: string }>;
 
 vi.mock('../../lib/api/admin-registrations', () => ({
   adminRegistrationsApi: {
