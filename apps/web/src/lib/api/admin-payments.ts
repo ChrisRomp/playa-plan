@@ -27,6 +27,27 @@ export interface AdminPaymentRefund {
   updatedAt: string;
 }
 
+export type ExternalPaymentSearchRegistrationStatus =
+  | 'PENDING'
+  | 'CONFIRMED'
+  | 'CANCELLED'
+  | 'WAITLISTED'
+  | 'APPLICATION_SUBMITTED'
+  | 'APPLICATION_APPROVED'
+  | 'APPLICATION_DECLINED';
+
+export interface ExternalPaymentSearchRegistration {
+  id: string;
+  year: number;
+  status: ExternalPaymentSearchRegistrationStatus;
+  user: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+  };
+}
+
 export interface AdminPayment {
   id: string;
   amount: number;

@@ -1,19 +1,29 @@
 import { api } from '../api';
 
-export type AdminRegistrationStatus =
-  | 'PENDING'
-  | 'CONFIRMED'
-  | 'CANCELLED'
-  | 'WAITLISTED'
-  | 'APPLICATION_SUBMITTED'
-  | 'APPLICATION_APPROVED'
-  | 'APPLICATION_DECLINED';
+export interface AdminRegistrationResult {
+  id: string;
+  year: number;
+  status:
+    | 'PENDING'
+    | 'CONFIRMED'
+    | 'CANCELLED'
+    | 'WAITLISTED'
+    | 'APPLICATION_SUBMITTED'
+    | 'APPLICATION_APPROVED'
+    | 'APPLICATION_DECLINED';
+  user: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+  };
+}
 
 // TODO: Replace with actual API types when implemented
 export interface Registration {
   id: string;
   year: number;
-  status: AdminRegistrationStatus;
+  status: 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'WAITLISTED';
   paymentDeferred?: boolean;
   createdAt: string;
   user: {
@@ -96,8 +106,10 @@ export interface RegistrationFilters {
   limit?: number;
 }
 
-export interface PaginatedRegistrationsResponse {
-  registrations: Registration[];
+export interface PaginatedRegistrationsResponse<
+  TRegistration extends AdminRegistrationResult = Registration,
+> {
+  registrations: TRegistration[];
   total: number;
   page: number;
   limit: number;
@@ -152,7 +164,11 @@ export const adminRegistrationsApi = {
   /**
    * Get paginated list of registrations with optional filters
    */
-  getRegistrations: async (filters: RegistrationFilters = {}): Promise<PaginatedRegistrationsResponse> => {
+  getRegistrations: async <
+    TRegistration extends AdminRegistrationResult = Registration,
+  >(
+    filters: RegistrationFilters = {},
+  ): Promise<PaginatedRegistrationsResponse<TRegistration>> => {
     const params = new URLSearchParams();
     
     if (filters.year) params.append('year', filters.year.toString());

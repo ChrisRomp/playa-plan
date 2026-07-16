@@ -12,6 +12,7 @@ describe('money utilities', () => {
       [0.1, 10],
       [10.01, 1001],
       [1234.56, 123456],
+      [21_474_836.47, 2_147_483_647],
     ])('should convert %s dollars to %s cents', (inputDollars, expectedCents) => {
       const actualCents = dollarsToCents(inputDollars);
 
@@ -43,6 +44,12 @@ describe('money utilities', () => {
         'Dollar amount exceeds the supported range',
       );
     });
+
+    it('should reject cents above the PostgreSQL INTEGER range', () => {
+      expect(() => dollarsToCents(21_474_836.48)).toThrow(
+        'Dollar amount exceeds the supported range',
+      );
+    });
   });
 
   describe('centsToDollars', () => {
@@ -51,6 +58,7 @@ describe('money utilities', () => {
       [1, 0.01],
       [10, 0.1],
       [1001, 10.01],
+      [2_147_483_647, 21_474_836.47],
     ])('should convert %s cents to %s dollars', (inputCents, expectedDollars) => {
       const actualDollars = centsToDollars(inputCents);
 
@@ -69,6 +77,12 @@ describe('money utilities', () => {
     it('should reject unsafe integer cents', () => {
       expect(() => centsToDollars(Number.MAX_SAFE_INTEGER + 1)).toThrow(
         'Cent amount must be a non-negative safe integer',
+      );
+    });
+
+    it('should reject cents above the PostgreSQL INTEGER range', () => {
+      expect(() => centsToDollars(2_147_483_648)).toThrow(
+        'Cent amount exceeds the supported range',
       );
     });
   });
