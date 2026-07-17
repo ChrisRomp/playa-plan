@@ -69,6 +69,11 @@ export async function cleanupRunData(): Promise<void> {
       ['email_audit', () => prisma.emailAudit.deleteMany({ where: { userId: { in: allUserIds } } })],
       ['notifications', () => prisma.notification.deleteMany({ where: { recipient: { startsWith: prefix } } })],
       ['admin_audit', () => prisma.adminAudit.deleteMany({ where: { adminUserId: { in: allUserIds } } })],
+      ['payment_refunds', () =>
+        prisma.paymentRefund.deleteMany({
+          where: { payment: { userId: { in: allUserIds } } },
+        }),
+      ],
       ['payments', () => prisma.payment.deleteMany({ where: { userId: { in: allUserIds } } })],
       ['registration_jobs', () =>
         prisma.registrationJob.deleteMany({
