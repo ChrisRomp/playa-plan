@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { ArrowLeft, Download, Filter, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { DataTable, DataTableColumn } from '../components/common/DataTable/DataTable';
@@ -19,22 +19,31 @@ interface UserReportFilters {
  * Displays all users in a filterable, sortable table for staff/admin
  */
 export function UserReportsPage() {
+  const { config, isLoading: configLoading } = useConfig();
   const [users, setUsers] = useState<User[]>([]);
   const [registrationYearUsers, setRegistrationYearUsers] = useState<{ year: number; userId: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [filters, setFilters] = useState<UserReportFilters>({});
+  const [filters, setFilters] = useState<UserReportFilters>(() =>
+    config ? { year: config.currentYear } : {}
+  );
   const [showFilters, setShowFilters] = useState(false);
-  const { config } = useConfig();
-  const [defaultYearApplied, setDefaultYearApplied] = useState(false);
+  const [yearFilterReady, setYearFilterReady] = useState(
+    config !== null || !configLoading
+  );
+  const defaultYearApplied = useRef(config !== null || !configLoading);
 
-  // Set default year filter to registrationYear from config once config is loaded
   useEffect(() => {
-    if (config?.currentYear && !defaultYearApplied) {
-      setFilters(prev => ({ ...prev, year: config.currentYear }));
-      setDefaultYearApplied(true);
+    if (defaultYearApplied.current || configLoading) {
+      return;
     }
-  }, [config?.currentYear, defaultYearApplied]);
+
+    defaultYearApplied.current = true;
+    if (config) {
+      setFilters(previousFilters => ({ ...previousFilters, year: config.currentYear }));
+    }
+    setYearFilterReady(true);
+  }, [config, configLoading]);
 
   // Fetch users and registrations data
   const fetchData = useCallback(async () => {
@@ -97,9 +106,12 @@ export function UserReportsPage() {
 
   // Get unique years for filter dropdown from actual registration data
   const availableYears = useMemo(() => {
-    const years = [...new Set(registrationYearUsers.map(reg => reg.year))].sort((a, b) => b - a);
-    return years;
-  }, [registrationYearUsers]);
+    const years = new Set(registrationYearUsers.map(registration => registration.year));
+    if (config) {
+      years.add(config.currentYear);
+    }
+    return [...years].sort((a, b) => b - a);
+  }, [registrationYearUsers, config]);
 
   // Calculate summary statistics based on filtered data
   const summaryStats = useMemo(() => {
@@ -218,7 +230,7 @@ export function UserReportsPage() {
     downloadCsv(headers, csvData, { filename });
   };
 
-  if (loading) {
+  if (loading || !yearFilterReady) {
     return (
       <div className="container mx-auto px-4 py-8">
         <LoadingSpinner />

@@ -9,6 +9,7 @@ import RegistrationCancelForm from '../components/admin/registrations/Registrati
 import AuditTrailView from '../components/admin/registrations/AuditTrailView';
 import { useRegistrationManagement } from '../hooks/useRegistrationManagement';
 import { adminRegistrationsApi, PaginatedRegistrationsResponse, Job, CampingOption, UserCampingOptionRegistration } from '../lib/api/admin-registrations';
+import { useConfig } from '../hooks/useConfig';
 
 // TODO: Replace with actual API types when implemented
 interface Registration {
@@ -58,15 +59,24 @@ interface RegistrationFilters {
  * Allows admins to view, edit, and cancel user registrations
  */
 export function ManageRegistrationsPage() {
+  const { config, isLoading: configLoading } = useConfig();
+  const configuredYear = config?.currentYear;
+  const initialFilters = useRef<RegistrationFilters>(
+    configuredYear === undefined ? {} : { year: configuredYear }
+  );
   const [registrations, setRegistrations] = useState<Registration[]>([]);
   const [availableJobs, setAvailableJobs] = useState<Job[]>([]);
   const [availableCampingOptions, setAvailableCampingOptions] = useState<CampingOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [filters, setFilters] = useState<RegistrationFilters>({});
-  const [localFilters, setLocalFilters] = useState<RegistrationFilters>({});
+  const [filters, setFilters] = useState<RegistrationFilters>(initialFilters.current);
+  const [localFilters, setLocalFilters] = useState<RegistrationFilters>(initialFilters.current);
+  const [yearFilterReady, setYearFilterReady] = useState(
+    configuredYear !== undefined || !configLoading
+  );
   const [showFilters, setShowFilters] = useState(false);
   const debounceTimerRef = useRef<NodeJS.Timeout>();
+  const defaultYearApplied = useRef(configuredYear !== undefined || !configLoading);
 
   // Registration management state and actions
   const {
@@ -79,6 +89,20 @@ export function ManageRegistrationsPage() {
     cancelRegistration,
     clearMessages,
   } = useRegistrationManagement();
+
+  useEffect(() => {
+    if (defaultYearApplied.current || configLoading) {
+      return;
+    }
+
+    defaultYearApplied.current = true;
+    if (configuredYear !== undefined) {
+      const defaultFilters = { year: configuredYear };
+      setFilters(defaultFilters);
+      setLocalFilters(defaultFilters);
+    }
+    setYearFilterReady(true);
+  }, [configuredYear, configLoading]);
 
   // Fetch available options for edit form
   const fetchAvailableOptions = useCallback(async () => {
@@ -116,12 +140,24 @@ export function ManageRegistrationsPage() {
 
   // Debounced effect to update filters
   useEffect(() => {
+    if (!yearFilterReady) {
+      return;
+    }
+
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
     }
 
     debounceTimerRef.current = setTimeout(() => {
-      setFilters(localFilters);
+      setFilters(currentFilters => {
+        const filtersUnchanged =
+          currentFilters.year === localFilters.year &&
+          currentFilters.status === localFilters.status &&
+          currentFilters.email === localFilters.email &&
+          currentFilters.name === localFilters.name;
+
+        return filtersUnchanged ? currentFilters : localFilters;
+      });
     }, 500); // 500ms debounce
 
     return () => {
@@ -129,11 +165,13 @@ export function ManageRegistrationsPage() {
         clearTimeout(debounceTimerRef.current);
       }
     };
-  }, [localFilters]);
+  }, [localFilters, yearFilterReady]);
 
   useEffect(() => {
-    fetchRegistrations();
-  }, [fetchRegistrations]);
+    if (yearFilterReady) {
+      fetchRegistrations();
+    }
+  }, [fetchRegistrations, yearFilterReady]);
 
   // Fetch available options on component mount
   useEffect(() => {
@@ -155,9 +193,12 @@ export function ManageRegistrationsPage() {
   // Get unique years for filter dropdown
   const availableYears = useMemo(() => {
     const regArray = Array.isArray(registrations) ? registrations : [];
-    const years = [...new Set(regArray.map(reg => reg.year))].sort((a, b) => b - a);
-    return years;
-  }, [registrations]);
+    const years = new Set(regArray.map(registration => registration.year));
+    if (configuredYear !== undefined) {
+      years.add(configuredYear);
+    }
+    return [...years].sort((a, b) => b - a);
+  }, [registrations, configuredYear]);
 
   const handleFilterChange = (key: keyof RegistrationFilters, value: string) => {
     setLocalFilters(prev => ({
@@ -167,8 +208,9 @@ export function ManageRegistrationsPage() {
   };
 
   const clearFilters = () => {
-    setLocalFilters({});
-    setFilters({});
+    const clearedFilters = {};
+    setLocalFilters(clearedFilters);
+    setFilters(clearedFilters);
   };
 
   // Convert API registration format to component format with camping options
@@ -325,10 +367,11 @@ export function ManageRegistrationsPage() {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="registration-year-filter" className="block text-sm font-medium text-gray-700 mb-1">
                   Year
                 </label>
                 <select
+                  id="registration-year-filter"
                   value={localFilters.year || ''}
                   onChange={(e) => handleFilterChange('year', e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500"

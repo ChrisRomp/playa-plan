@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { ArrowLeft, Download, Filter, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { DataTable, DataTableColumn } from '../components/common/DataTable/DataTable';
@@ -7,6 +7,7 @@ import { PATHS } from '../routes';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import { downloadCsv } from '../utils/csv';
 import { formatRegistrationStatus } from '../utils/registrationUtils';
+import { useConfig } from '../hooks/useConfig';
 
 // Extended user type for registration reports that includes profile fields
 interface UserWithProfile {
@@ -39,11 +40,18 @@ const USER_PROFILE_FIELDS = [
  * Displays all registrations in a filterable, sortable table for staff/admin
  */
 export function RegistrationReportsPage() {
+  const { config, isLoading: configLoading } = useConfig();
   const [registrations, setRegistrations] = useState<Registration[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [filters, setFilters] = useState<RegistrationReportFilters>({});
+  const [filters, setFilters] = useState<RegistrationReportFilters>(() =>
+    config ? { year: config.currentYear } : {}
+  );
   const [showFilters, setShowFilters] = useState(false);
+  const [yearFilterReady, setYearFilterReady] = useState(
+    config !== null || !configLoading
+  );
+  const defaultYearApplied = useRef(config !== null || !configLoading);
   const [showCampingOptions, setShowCampingOptions] = useState(() => {
     // Restore from localStorage
     return localStorage.getItem('registrationReports_showCampingOptions') === 'true';
@@ -54,6 +62,18 @@ export function RegistrationReportsPage() {
   });
   const [campingOptionData, setCampingOptionData] = useState<CampingOptionRegistrationWithFields[]>([]);
   const [campingOptionsLoading, setCampingOptionsLoading] = useState(false);
+
+  useEffect(() => {
+    if (defaultYearApplied.current || configLoading) {
+      return;
+    }
+
+    defaultYearApplied.current = true;
+    if (config) {
+      setFilters(previousFilters => ({ ...previousFilters, year: config.currentYear }));
+    }
+    setYearFilterReady(true);
+  }, [config, configLoading]);
 
   // Fetch registrations data
   const fetchRegistrations = useCallback(async () => {
@@ -145,9 +165,12 @@ export function RegistrationReportsPage() {
 
   // Get unique years for filter dropdown
   const availableYears = useMemo(() => {
-    const years = [...new Set(registrations.map(reg => reg.year))].sort((a, b) => b - a);
-    return years;
-  }, [registrations]);
+    const years = new Set(registrations.map(registration => registration.year));
+    if (config) {
+      years.add(config.currentYear);
+    }
+    return [...years].sort((a, b) => b - a);
+  }, [registrations, config]);
 
   // Get unique field display names from camping option data
   const uniqueFields = useMemo(() => {
@@ -465,7 +488,7 @@ export function RegistrationReportsPage() {
     downloadCsv(headers, csvData, { filename });
   };
 
-  if (loading) {
+  if (loading || !yearFilterReady) {
     return (
       <div className="container mx-auto px-4 py-8">
         <LoadingSpinner />

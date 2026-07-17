@@ -4,6 +4,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { PaymentReportsPage } from '../PaymentReportsPage';
 import { reports } from '../../lib/api';
 import { Payment } from '../../types';
+import { ConfigContext, ConfigContextType } from '../../store/ConfigContextDefinition';
 
 // Mock the api module
 vi.mock('../../lib/api', () => ({
@@ -119,11 +120,32 @@ const mockPayments: Payment[] = [
   },
 ];
 
-const renderComponent = () => {
+const createConfigContextValue = (currentYear?: number, isLoading = false): ConfigContextType => ({
+  config: currentYear === undefined
+    ? null
+    : {
+        name: 'Test Camp',
+        description: 'Test camp',
+        homePageBlurb: '',
+        registrationOpen: true,
+        earlyRegistrationOpen: false,
+        currentYear,
+      },
+  isLoading,
+  error: null,
+  refreshConfig: vi.fn(),
+  isConnecting: false,
+  isConnected: true,
+  connectionError: null,
+});
+
+const renderComponent = (currentYear?: number, isLoading = false) => {
   return render(
-    <MemoryRouter>
-      <PaymentReportsPage />
-    </MemoryRouter>
+    <ConfigContext.Provider value={createConfigContextValue(currentYear, isLoading)}>
+      <MemoryRouter>
+        <PaymentReportsPage />
+      </MemoryRouter>
+    </ConfigContext.Provider>
   );
 };
 
@@ -353,6 +375,54 @@ describe('PaymentReportsPage', () => {
 
       // Verify the filter value is set
       expect(yearSelect).toHaveValue('2024');
+    });
+
+    it('should default to the configured year and preserve an explicit clear', async () => {
+      renderComponent(2025);
+
+      await waitFor(() => {
+        expect(screen.getByText('Filters')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Filters'));
+
+      const yearSelect = screen.getByLabelText('Year') as HTMLSelectElement;
+      expect(yearSelect).toHaveValue('2025');
+      expect(Array.from(yearSelect.options).map(option => option.value)).toContain('2025');
+      expect(screen.getByTestId('empty-message')).toHaveTextContent('No payments found');
+
+      fireEvent.click(screen.getByText('Clear All'));
+
+      expect(yearSelect).toHaveValue('');
+      expect(screen.getByTestId('payment-payment1')).toBeInTheDocument();
+      expect(screen.getByTestId('payment-payment4')).toBeInTheDocument();
+    });
+
+    it('should keep filters unavailable until configuration resolves', async () => {
+      const renderResult = renderComponent(undefined, true);
+
+      await waitFor(() => {
+        expect(reports.getPayments).toHaveBeenCalledTimes(1);
+      });
+      await new Promise(resolve => setTimeout(resolve, 0));
+
+      expect(screen.getByTestId('loading-spinner')).toBeInTheDocument();
+      expect(screen.queryByText('Filters')).not.toBeInTheDocument();
+
+      renderResult.rerender(
+        <ConfigContext.Provider value={createConfigContextValue(2025)}>
+          <MemoryRouter>
+            <PaymentReportsPage />
+          </MemoryRouter>
+        </ConfigContext.Provider>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('Filters')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Filters'));
+      expect(screen.getByLabelText('Year')).toHaveValue('2025');
     });
 
     it('should clear all filters', async () => {

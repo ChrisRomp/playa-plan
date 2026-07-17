@@ -3,6 +3,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { RegistrationReportsPage } from '../RegistrationReportsPage';
 import { reports, Registration } from '../../lib/api';
+import { ConfigContext, ConfigContextType } from '../../store/ConfigContextDefinition';
 
 // Mock the api module
 vi.mock('../../lib/api', () => ({
@@ -166,11 +167,32 @@ const mockRegistrations: Registration[] = [
   },
 ];
 
-const renderComponent = () => {
+const createConfigContextValue = (currentYear?: number, isLoading = false): ConfigContextType => ({
+  config: currentYear === undefined
+    ? null
+    : {
+        name: 'Test Camp',
+        description: 'Test camp',
+        homePageBlurb: '',
+        registrationOpen: true,
+        earlyRegistrationOpen: false,
+        currentYear,
+      },
+  isLoading,
+  error: null,
+  refreshConfig: vi.fn(),
+  isConnecting: false,
+  isConnected: true,
+  connectionError: null,
+});
+
+const renderComponent = (currentYear?: number, isLoading = false) => {
   return render(
-    <MemoryRouter>
-      <RegistrationReportsPage />
-    </MemoryRouter>
+    <ConfigContext.Provider value={createConfigContextValue(currentYear, isLoading)}>
+      <MemoryRouter>
+        <RegistrationReportsPage />
+      </MemoryRouter>
+    </ConfigContext.Provider>
   );
 };
 
@@ -391,6 +413,54 @@ describe('RegistrationReportsPage', () => {
       });
     });
 
+    it('should default to the configured year and preserve an explicit clear', async () => {
+      renderComponent(2025);
+
+      await waitFor(() => {
+        expect(screen.getByText('Filters')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Filters'));
+
+      const yearSelect = screen.getByLabelText('Year') as HTMLSelectElement;
+      expect(yearSelect).toHaveValue('2025');
+      expect(Array.from(yearSelect.options).map(option => option.value)).toContain('2025');
+      expect(screen.getByTestId('empty-message')).toHaveTextContent('No registrations found');
+
+      fireEvent.click(screen.getByText('Clear Filters'));
+
+      expect(yearSelect).toHaveValue('');
+      expect(screen.getByTestId('registration-1')).toBeInTheDocument();
+      expect(screen.getByTestId('registration-3')).toBeInTheDocument();
+    });
+
+    it('should keep filters unavailable until configuration resolves', async () => {
+      const renderResult = renderComponent(undefined, true);
+
+      await waitFor(() => {
+        expect(reports.getRegistrations).toHaveBeenCalledTimes(1);
+      });
+      await new Promise(resolve => setTimeout(resolve, 0));
+
+      expect(screen.getByTestId('loading-spinner')).toBeInTheDocument();
+      expect(screen.queryByText('Filters')).not.toBeInTheDocument();
+
+      renderResult.rerender(
+        <ConfigContext.Provider value={createConfigContextValue(2025)}>
+          <MemoryRouter>
+            <RegistrationReportsPage />
+          </MemoryRouter>
+        </ConfigContext.Provider>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('Filters')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Filters'));
+      expect(screen.getByLabelText('Year')).toHaveValue('2025');
+    });
+
     it('should filter by status when status filter is changed', async () => {
       const mockGetRegistrations = vi.mocked(reports.getRegistrations);
       // Mock multiple registrations with different statuses
@@ -443,57 +513,6 @@ describe('RegistrationReportsPage', () => {
         expect(screen.getByTestId('registration-1')).toBeInTheDocument();
         expect(screen.queryByTestId('registration-5')).not.toBeInTheDocument();
       });
-    });
-
-    // Note: This test has issues with React state updates in the test environment
-    // The clear filters functionality works in the actual component but has timing issues in tests
-    it.skip('should clear all filters when clear filters button is clicked', async () => {
-      const mockGetRegistrations = vi.mocked(reports.getRegistrations);
-      
-      renderComponent();
-
-      await waitFor(() => {
-        expect(screen.getByText('Filters')).toBeInTheDocument();
-      });
-
-      // Open filters panel
-      const filtersButton = screen.getByText('Filters');
-      fireEvent.click(filtersButton);
-
-      // Set some filters
-      const yearSelect = screen.getByLabelText('Year');
-      const statusSelect = screen.getByLabelText('Status');
-      
-      // Set year filter first
-      fireEvent.change(yearSelect, { target: { value: '2024' } });
-      
-      await waitFor(() => {
-        expect(mockGetRegistrations).toHaveBeenCalledWith({ year: 2024 });
-      });
-
-      // Set status filter
-      fireEvent.change(statusSelect, { target: { value: 'CONFIRMED' } });
-
-      // Verify that both filters are applied in the UI
-      expect((yearSelect as HTMLSelectElement).value).toBe('2024');
-      expect((statusSelect as HTMLSelectElement).value).toBe('CONFIRMED');
-
-      // Clear filters - verify button exists and is clickable
-      const clearButton = screen.getByText('Clear Filters');
-      expect(clearButton).toBeInTheDocument();
-      
-      fireEvent.click(clearButton);
-
-      // Wait for any potential API call or state updates
-      await new Promise(resolve => setTimeout(resolve, 200));
-
-      // Verify that clear button was clicked and could trigger an API call
-      // Note: Due to React batching, the UI might not immediately reflect the state change
-      // but the important thing is that the clear button is functional
-      expect(clearButton).toBeInTheDocument();
-      
-      // In a real application, this would clear the filters and trigger a new API call
-      // For now, we verify the button interaction works
     });
 
     it('should populate year dropdown with available years from data', async () => {
