@@ -30,6 +30,8 @@ const DEFINITE_STRIPE_ERROR_TYPES = new Set([
 ]);
 const LOCAL_REFUND_METADATA_KEY = 'paymentRefundId';
 const MAX_FAILURE_MESSAGE_LENGTH = 500;
+const STRIPE_REFUND_IDENTIFIER_PATTERN =
+  /\b(?:cs_(?:test|live)_[a-zA-Z0-9]+|(?:pi|re|ch|req)_[a-zA-Z0-9]{8,})\b/g;
 
 /**
  * Service for handling Stripe payment processing
@@ -91,7 +93,7 @@ export class StripeService {
 
   private sanitizeRefundFailure(error: unknown): string {
     const sanitizedMessage = this.sanitizeErrorMessage(error)
-      .replace(/\b(?:pi|cs|re|ch|req)_[a-zA-Z0-9]+\b/g, '[redacted]')
+      .replace(STRIPE_REFUND_IDENTIFIER_PATTERN, '[redacted]')
       .replace(/\s+/g, ' ')
       .trim();
 

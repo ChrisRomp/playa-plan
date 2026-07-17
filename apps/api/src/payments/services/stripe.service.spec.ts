@@ -421,10 +421,46 @@ describe('StripeService', () => {
       );
     });
 
+    it.each([
+      'cs_test_a1B2c3D4e5F6g7H8i9J0',
+      'cs_live_z9Y8x7W6v5U4t3S2r1Q0',
+    ])(
+      'should redact a Checkout Session ID when the session has no payment intent',
+      async sessionId => {
+        mockStripeInstance.checkout.sessions.retrieve.mockResolvedValue({
+          id: sessionId,
+          payment_intent: null,
+        });
+
+        const actualResult = await service.createAdminRefund({
+          ...inputRequest,
+          providerRefId: sessionId,
+        });
+
+        expect(actualResult).toEqual({
+          outcome: 'FAILED',
+          failureMessage:
+            'Stripe rejected the refund request: Checkout session [redacted] has no associated payment intent',
+        });
+        expect(JSON.stringify(actualResult)).not.toContain(sessionId);
+        expect(loggerSpy.error).toHaveBeenCalledWith(
+          'Stripe rejected the refund request: Checkout session [redacted] has no associated payment intent'
+        );
+        expect(loggerSpy.error.mock.calls.flat().join(' ')).not.toContain(sessionId);
+        expect(mockStripeInstance.refunds.create).not.toHaveBeenCalled();
+      }
+    );
+
     it('should classify and sanitize a definite rejection', async () => {
+      const sensitiveIdentifiers = [
+        'pi_3MwDX2CZ6qsJgOG31M02Umy2',
+        're_3MwDX2CZ6qsJgOG31M02Umy2',
+        'ch_3MwDX2CZ6qsJgOG31M02Umy2',
+        'req_3MwDX2CZ6qsJgOG31M02Umy2',
+      ];
       mockStripeInstance.refunds.create.mockRejectedValue({
         type: 'StripeInvalidRequestError',
-        message: `No such payment_intent: pi_secret ${'x'.repeat(600)}`,
+        message: `No such payment_intent: ${sensitiveIdentifiers.join(' ')}. Keep re_enter ch_name req_id and cs_test mode. ${'x'.repeat(600)}`,
       });
 
       const actualResult = await service.createAdminRefund(inputRequest);
@@ -433,7 +469,15 @@ describe('StripeService', () => {
       if (actualResult.outcome !== 'FAILED') {
         throw new Error('Expected a definite failure');
       }
-      expect(actualResult.failureMessage).not.toContain('pi_secret');
+      for (const sensitiveIdentifier of sensitiveIdentifiers) {
+        expect(actualResult.failureMessage).not.toContain(sensitiveIdentifier);
+        expect(loggerSpy.error.mock.calls.flat().join(' ')).not.toContain(sensitiveIdentifier);
+      }
+      expect(actualResult.failureMessage).toContain(
+        '[redacted] [redacted] [redacted] [redacted]'
+      );
+      expect(actualResult.failureMessage).toContain('Keep re_enter ch_name req_id and cs_test mode.');
+      expect(loggerSpy.error).toHaveBeenCalledWith(actualResult.failureMessage);
       expect(actualResult.failureMessage.length).toBeLessThanOrEqual(500);
     });
 
