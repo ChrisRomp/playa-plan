@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { ArrowLeft, Download, Filter, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { DataTable, DataTableColumn } from '../components/common/DataTable/DataTable';
@@ -7,6 +7,7 @@ import { Payment } from '../types';
 import { PATHS } from '../routes';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import { downloadCsv } from '../utils/csv';
+import { useConfig } from '../hooks/useConfig';
 
 interface PaymentReportFilters {
   year?: number;
@@ -19,11 +20,22 @@ interface PaymentReportFilters {
  * Displays all payments in a filterable, sortable table for admin users
  */
 export function PaymentReportsPage() {
+  const { config } = useConfig();
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [filters, setFilters] = useState<PaymentReportFilters>({});
+  const [filters, setFilters] = useState<PaymentReportFilters>(() =>
+    config ? { year: config.currentYear } : {}
+  );
   const [showFilters, setShowFilters] = useState(false);
+  const defaultYearApplied = useRef(config !== null);
+
+  useEffect(() => {
+    if (config && !defaultYearApplied.current) {
+      defaultYearApplied.current = true;
+      setFilters(previousFilters => ({ ...previousFilters, year: config.currentYear }));
+    }
+  }, [config]);
 
   // Fetch payments data
   const fetchPayments = useCallback(async () => {
@@ -54,18 +66,17 @@ export function PaymentReportsPage() {
 
   // Get unique years for filter dropdown
   const availableYears = useMemo(() => {
-    // Extract years from payment dates
-    if (!Array.isArray(payments) || payments.length === 0) {
-      return []; // Return empty array if no payments data
+    const years = new Set<number>();
+
+    if (Array.isArray(payments)) {
+      payments.forEach(payment => years.add(new Date(payment.createdAt).getFullYear()));
     }
-    
-    // Extract unique years from payment data
-    const years = [...new Set(
-      payments.map(payment => new Date(payment.createdAt).getFullYear())
-    )];
-    
-    return years.sort((a, b) => b - a); // Sort descending
-  }, [payments]);
+    if (config) {
+      years.add(config.currentYear);
+    }
+
+    return [...years].sort((a, b) => b - a);
+  }, [payments, config]);
 
   // Apply client-side filtering
   const filteredPayments = useMemo(() => {

@@ -3,6 +3,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { RegistrationReportsPage } from '../RegistrationReportsPage';
 import { reports, Registration } from '../../lib/api';
+import { ConfigContext, ConfigContextType } from '../../store/ConfigContextDefinition';
 
 // Mock the api module
 vi.mock('../../lib/api', () => ({
@@ -166,11 +167,32 @@ const mockRegistrations: Registration[] = [
   },
 ];
 
-const renderComponent = () => {
+const createConfigContextValue = (currentYear?: number): ConfigContextType => ({
+  config: currentYear === undefined
+    ? null
+    : {
+        name: 'Test Camp',
+        description: 'Test camp',
+        homePageBlurb: '',
+        registrationOpen: true,
+        earlyRegistrationOpen: false,
+        currentYear,
+      },
+  isLoading: false,
+  error: null,
+  refreshConfig: vi.fn(),
+  isConnecting: false,
+  isConnected: true,
+  connectionError: null,
+});
+
+const renderComponent = (currentYear?: number) => {
   return render(
-    <MemoryRouter>
-      <RegistrationReportsPage />
-    </MemoryRouter>
+    <ConfigContext.Provider value={createConfigContextValue(currentYear)}>
+      <MemoryRouter>
+        <RegistrationReportsPage />
+      </MemoryRouter>
+    </ConfigContext.Provider>
   );
 };
 
@@ -389,6 +411,27 @@ describe('RegistrationReportsPage', () => {
         expect(screen.getByTestId('registration-1')).toBeInTheDocument();
         expect(screen.queryByTestId('registration-4')).not.toBeInTheDocument();
       });
+    });
+
+    it('should default to the configured year and preserve an explicit clear', async () => {
+      renderComponent(2025);
+
+      await waitFor(() => {
+        expect(screen.getByText('Filters')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Filters'));
+
+      const yearSelect = screen.getByLabelText('Year') as HTMLSelectElement;
+      expect(yearSelect).toHaveValue('2025');
+      expect(Array.from(yearSelect.options).map(option => option.value)).toContain('2025');
+      expect(screen.getByTestId('empty-message')).toHaveTextContent('No registrations found');
+
+      fireEvent.click(screen.getByText('Clear Filters'));
+
+      expect(yearSelect).toHaveValue('');
+      expect(screen.getByTestId('registration-1')).toBeInTheDocument();
+      expect(screen.getByTestId('registration-3')).toBeInTheDocument();
     });
 
     it('should filter by status when status filter is changed', async () => {

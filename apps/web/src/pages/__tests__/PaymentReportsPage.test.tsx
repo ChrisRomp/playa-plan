@@ -4,6 +4,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { PaymentReportsPage } from '../PaymentReportsPage';
 import { reports } from '../../lib/api';
 import { Payment } from '../../types';
+import { ConfigContext, ConfigContextType } from '../../store/ConfigContextDefinition';
 
 // Mock the api module
 vi.mock('../../lib/api', () => ({
@@ -119,11 +120,32 @@ const mockPayments: Payment[] = [
   },
 ];
 
-const renderComponent = () => {
+const createConfigContextValue = (currentYear?: number): ConfigContextType => ({
+  config: currentYear === undefined
+    ? null
+    : {
+        name: 'Test Camp',
+        description: 'Test camp',
+        homePageBlurb: '',
+        registrationOpen: true,
+        earlyRegistrationOpen: false,
+        currentYear,
+      },
+  isLoading: false,
+  error: null,
+  refreshConfig: vi.fn(),
+  isConnecting: false,
+  isConnected: true,
+  connectionError: null,
+});
+
+const renderComponent = (currentYear?: number) => {
   return render(
-    <MemoryRouter>
-      <PaymentReportsPage />
-    </MemoryRouter>
+    <ConfigContext.Provider value={createConfigContextValue(currentYear)}>
+      <MemoryRouter>
+        <PaymentReportsPage />
+      </MemoryRouter>
+    </ConfigContext.Provider>
   );
 };
 
@@ -353,6 +375,27 @@ describe('PaymentReportsPage', () => {
 
       // Verify the filter value is set
       expect(yearSelect).toHaveValue('2024');
+    });
+
+    it('should default to the configured year and preserve an explicit clear', async () => {
+      renderComponent(2025);
+
+      await waitFor(() => {
+        expect(screen.getByText('Filters')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Filters'));
+
+      const yearSelect = screen.getByLabelText('Year') as HTMLSelectElement;
+      expect(yearSelect).toHaveValue('2025');
+      expect(Array.from(yearSelect.options).map(option => option.value)).toContain('2025');
+      expect(screen.getByTestId('empty-message')).toHaveTextContent('No payments found');
+
+      fireEvent.click(screen.getByText('Clear All'));
+
+      expect(yearSelect).toHaveValue('');
+      expect(screen.getByTestId('payment-payment1')).toBeInTheDocument();
+      expect(screen.getByTestId('payment-payment4')).toBeInTheDocument();
     });
 
     it('should clear all filters', async () => {

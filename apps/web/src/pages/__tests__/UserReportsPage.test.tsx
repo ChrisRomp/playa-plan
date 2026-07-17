@@ -151,6 +151,42 @@ describe('UserReportsPage', () => {
     expect(options).toEqual(['', '2024', '2023']);
   });
 
+  it('includes the configured year when registration data does not contain it', async () => {
+    mockUseConfig.mockReturnValue({
+      config: {
+        name: 'Test Camp',
+        description: 'Test',
+        homePageBlurb: '',
+        registrationOpen: true,
+        earlyRegistrationOpen: false,
+        currentYear: 2025,
+      },
+      isLoading: false,
+      error: null,
+      refreshConfig: vi.fn(),
+      isConnecting: false,
+      isConnected: true,
+      connectionError: null,
+    });
+
+    render(
+      <MemoryRouter>
+        <UserReportsPage />
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('loading-spinner')).not.toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByLabelText('Toggle filters'));
+
+    const yearSelect = screen.getByLabelText('Year') as HTMLSelectElement;
+    expect(yearSelect).toHaveValue('2025');
+    expect(Array.from(yearSelect.options).map(option => option.value)).toEqual(['', '2025', '2024', '2023']);
+    expect(screen.getByTestId('empty-message')).toHaveTextContent('No users found');
+  });
+
   it('filters users by registrations for the selected year', async () => {
     render(
       <MemoryRouter>
