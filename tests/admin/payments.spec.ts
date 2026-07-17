@@ -3,7 +3,7 @@
  *  - Payment Reports page loads with the expected heading, filter toggle, and
  *    export button.
  *  - An admin records an external payment against a deferred registration,
- *    durably linking the payment and confirming the registration.
+ *    durably linking the payment while clearing payment deferral.
  *  - An admin records a partial manual refund and then refunds the remaining
  *    balance, with the ledger and payment status updated after each command.
  */
@@ -55,7 +55,7 @@ test.describe(
   () => {
     test.use({ storageState: { cookies: [], origins: [] } });
 
-    test('records an external payment and confirms a deferred registration', async ({
+    test('records an external payment and clears a deferred registration', async ({
       page,
       freshDeferredParticipant,
     }) => {
@@ -64,7 +64,7 @@ test.describe(
         data: {
           userId: freshDeferredParticipant.id,
           year: new Date().getFullYear(),
-          status: 'PENDING',
+          status: 'CONFIRMED',
           paymentDeferred: true,
         },
       });
@@ -79,7 +79,7 @@ test.describe(
         .check();
       await expect(
         page.getByText(
-          'The registration will become CONFIRMED and payment deferral will be cleared.',
+          'The registration will remain CONFIRMED and payment deferral will be cleared.',
         ),
       ).toBeVisible();
 
