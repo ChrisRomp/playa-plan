@@ -226,6 +226,8 @@ interface StripeRefundReservation {
   shouldSubmit: boolean;
 }
 
+type StripeRefundRegistrationTargetOutcome = 'MATCHED' | 'RELINKED' | 'UNAVAILABLE';
+
 interface LegacyRefundRequest {
   paymentId: string;
   amount?: number;
@@ -1753,6 +1755,38 @@ export class PaymentsService {
           );
         }
 
+        const attemptAudit = await tx.adminAudit.findFirst({
+          where: {
+            transactionId: refund.idempotencyKey,
+            actionType: AdminAuditActionType.PAYMENT_REFUND,
+            targetRecordType: AdminAuditTargetType.PAYMENT,
+            targetRecordId: paymentId,
+            newValues: {
+              path: ['phase'],
+              equals: 'ATTEMPT',
+            },
+          },
+          select: { newValues: true },
+        });
+        const attemptRegistrationId = this.getStripeRefundAttemptRegistrationId(
+          attemptAudit?.newValues,
+          paymentId,
+          refundId
+        );
+        const currentRegistrationId = payment.registrationId;
+        const registrationTargetOutcome: StripeRefundRegistrationTargetOutcome =
+          attemptRegistrationId === undefined
+            ? 'UNAVAILABLE'
+            : attemptRegistrationId === currentRegistrationId
+              ? 'MATCHED'
+              : 'RELINKED';
+        const guardedRegistrationId =
+          refund.resultingRegistrationStatus &&
+          registrationTargetOutcome === 'MATCHED' &&
+          typeof attemptRegistrationId === 'string'
+            ? attemptRegistrationId
+            : null;
+
         const transition = await tx.paymentRefund.updateMany({
           where: {
             id: refundId,
@@ -1793,7 +1827,11 @@ export class PaymentsService {
             : PaymentStatus.PARTIALLY_REFUNDED;
 
         const paymentTransition = await tx.payment.updateMany({
-          where: { id: paymentId, status: payment.status },
+          where: {
+            id: paymentId,
+            status: payment.status,
+            ...(guardedRegistrationId ? { registrationId: guardedRegistrationId } : {}),
+          },
           data: { status: resultingPaymentStatus },
         });
         if (paymentTransition.count !== 1) {
@@ -1806,14 +1844,26 @@ export class PaymentsService {
         let registrationStatusAfter: RegistrationStatus | null = null;
         let registrationStatusApplied = false;
         let registrationStatusSkipReason: string | null = null;
-        if (payment.registrationId && refund.resultingRegistrationStatus) {
+        if (
+          refund.resultingRegistrationStatus &&
+          registrationTargetOutcome === 'UNAVAILABLE'
+        ) {
+          registrationStatusSkipReason = 'ATTEMPT_REGISTRATION_UNAVAILABLE';
+        } else if (
+          refund.resultingRegistrationStatus &&
+          registrationTargetOutcome === 'RELINKED'
+        ) {
+          registrationStatusSkipReason = 'PAYMENT_RELINKED';
+        } else if (refund.resultingRegistrationStatus && attemptRegistrationId === null) {
+          registrationStatusSkipReason = 'NO_REGISTRATION_TARGET';
+        } else if (refund.resultingRegistrationStatus && attemptRegistrationId) {
           const currentRegistration = await tx.registration.findUnique({
-            where: { id: payment.registrationId },
+            where: { id: attemptRegistrationId },
             select: { status: true },
           });
           if (!currentRegistration) {
             throw new NotFoundException(
-              `Registration with ID ${payment.registrationId} not found`
+              `Registration with ID ${attemptRegistrationId} not found`
             );
           }
 
@@ -1827,7 +1877,7 @@ export class PaymentsService {
           } else {
             const registrationTransition = await tx.registration.updateMany({
               where: {
-                id: payment.registrationId,
+                id: attemptRegistrationId,
                 status: currentRegistration.status,
               },
               data: { status: refund.resultingRegistrationStatus },
@@ -1855,6 +1905,9 @@ export class PaymentsService {
               paymentId,
               refundId,
               registrationId: payment.registrationId,
+              attemptRegistrationId: attemptRegistrationId ?? null,
+              currentRegistrationId,
+              registrationTargetOutcome,
               amountCents: refund.amountCents,
               currency: refund.currency,
               executionMode: RefundExecutionMode.STRIPE,
@@ -2001,35 +2054,33 @@ export class PaymentsService {
     if (!refund || refund.paymentId !== paymentId) {
       throw new NotFoundException(`Refund with ID ${refundId} not found for payment ${paymentId}`);
     }
+    if (refund.executionMode !== RefundExecutionMode.STRIPE) {
+      throw new BadRequestException('Only STRIPE refunds can be retried');
+    }
 
-    const [payment, attemptAudit] = await Promise.all([
-      this.prisma.payment.findUnique({
-        where: { id: paymentId },
-        select: adminPaymentSelect,
-      }),
-      this.prisma.adminAudit.findFirst({
-        where: {
-          transactionId: refund.idempotencyKey,
-          actionType: AdminAuditActionType.PAYMENT_REFUND,
-          targetRecordType: AdminAuditTargetType.PAYMENT,
-          targetRecordId: paymentId,
-          newValues: {
-            path: ['phase'],
-            equals: 'ATTEMPT',
-          },
-        },
-        select: { newValues: true },
-      }),
-    ]);
+    const payment = await this.prisma.payment.findUnique({
+      where: { id: paymentId },
+      select: adminPaymentSelect,
+    });
     if (!payment) {
       throw new NotFoundException(`Payment with ID ${paymentId} not found`);
     }
     if (refund.status !== PaymentRefundStatus.PENDING) {
       return this.buildManualRefundResult(payment, refund);
     }
-    if (refund.executionMode !== RefundExecutionMode.STRIPE) {
-      throw new BadRequestException('Only pending STRIPE refunds can be retried');
-    }
+    const attemptAudit = await this.prisma.adminAudit.findFirst({
+      where: {
+        transactionId: refund.idempotencyKey,
+        actionType: AdminAuditActionType.PAYMENT_REFUND,
+        targetRecordType: AdminAuditTargetType.PAYMENT,
+        targetRecordId: paymentId,
+        newValues: {
+          path: ['phase'],
+          equals: 'ATTEMPT',
+        },
+      },
+      select: { newValues: true },
+    });
     const providerRefId = this.getStripeRefundProviderTarget(
       attemptAudit?.newValues,
       paymentId,
@@ -2082,6 +2133,33 @@ export class PaymentsService {
       },
       adminUserId
     );
+  }
+
+  private getStripeRefundAttemptRegistrationId(
+    auditValues: Prisma.JsonValue | null | undefined,
+    paymentId: string,
+    refundId: string
+  ): string | null | undefined {
+    if (
+      typeof auditValues !== 'object' ||
+      auditValues === null ||
+      Array.isArray(auditValues) ||
+      auditValues.phase !== 'ATTEMPT' ||
+      auditValues.paymentId !== paymentId ||
+      auditValues.refundId !== refundId ||
+      auditValues.executionMode !== RefundExecutionMode.STRIPE ||
+      !('registrationId' in auditValues)
+    ) {
+      return undefined;
+    }
+    if (auditValues.registrationId === null) {
+      return null;
+    }
+    if (typeof auditValues.registrationId !== 'string') {
+      return undefined;
+    }
+
+    return auditValues.registrationId.trim() || undefined;
   }
 
   private getStripeRefundProviderTarget(

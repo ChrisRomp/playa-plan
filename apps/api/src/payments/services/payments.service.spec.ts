@@ -4237,6 +4237,7 @@ describe('PaymentsService', () => {
           executionMode: RefundExecutionMode.STRIPE,
           requestedFullRefund: false,
           providerRefId: 'pi_original',
+          registrationId: 'registration-id',
         },
       });
       mockStripeService.createAdminRefund.mockResolvedValue({
@@ -4415,7 +4416,11 @@ describe('PaymentsService', () => {
         },
       });
       expect(mockPrismaService.payment.updateMany).toHaveBeenCalledWith({
-        where: { id: paymentId, status: PaymentStatus.COMPLETED },
+        where: {
+          id: paymentId,
+          registrationId: 'registration-id',
+          status: PaymentStatus.COMPLETED,
+        },
         data: { status: PaymentStatus.PARTIALLY_REFUNDED },
       });
       expect(mockPrismaService.registration.findUnique).toHaveBeenCalledWith({
@@ -4435,11 +4440,251 @@ describe('PaymentsService', () => {
             phase: 'RESULT',
             outcome: PaymentRefundStatus.SUCCEEDED,
             providerRefundId: 're_provider',
+            attemptRegistrationId: 'registration-id',
+            currentRegistrationId: 'registration-id',
+            registrationTargetOutcome: 'MATCHED',
           }),
         }),
       });
       expect(actualResult.outcome).toBe('SUCCEEDED');
       expect(actualResult.refund).not.toHaveProperty('providerRefundId');
+    });
+
+    it('should finalize the refund without applying registration A status after relinking to B', async () => {
+      const requestedStatus = RegistrationStatus.WAITLISTED;
+      const pendingWithStatus = {
+        ...pendingRefund,
+        resultingRegistrationStatus: requestedStatus,
+      };
+      const succeededRefund = {
+        ...pendingWithStatus,
+        status: PaymentRefundStatus.SUCCEEDED,
+        providerRefundId: 're_provider',
+      };
+      const relinkedPayment = {
+        ...stripePayment,
+        registrationId: 'registration-b',
+        registration: {
+          ...stripePayment.registration,
+          id: 'registration-b',
+        },
+        refunds: [{ ...publicPendingRefund, resultingRegistrationStatus: requestedStatus }],
+      };
+      mockPrismaService.paymentRefund.create.mockResolvedValue(pendingWithStatus);
+      mockPrismaService.paymentRefund.findUnique
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(pendingWithStatus)
+        .mockResolvedValueOnce(succeededRefund);
+      mockPrismaService.payment.findUnique
+        .mockResolvedValueOnce(stripePayment)
+        .mockResolvedValueOnce(relinkedPayment)
+        .mockResolvedValueOnce({
+          ...relinkedPayment,
+          status: PaymentStatus.PARTIALLY_REFUNDED,
+          refunds: [
+            {
+              ...publicPendingRefund,
+              status: PaymentRefundStatus.SUCCEEDED,
+              resultingRegistrationStatus: requestedStatus,
+            },
+          ],
+        });
+      mockStripeService.createAdminRefund.mockResolvedValue({
+        outcome: 'SUCCEEDED',
+        providerRefundId: 're_provider',
+      });
+
+      const actualResult = await service.createRefund(
+        paymentId,
+        {
+          ...stripeRequest,
+          resultingRegistrationStatus: requestedStatus,
+        },
+        'admin-id'
+      );
+
+      expect(actualResult.outcome).toBe('SUCCEEDED');
+      expect(mockPrismaService.registration.findUnique).not.toHaveBeenCalled();
+      expect(mockPrismaService.registration.updateMany).not.toHaveBeenCalled();
+      expect(mockPrismaService.adminAudit.create).toHaveBeenLastCalledWith({
+        data: expect.objectContaining({
+          newValues: expect.objectContaining({
+            attemptRegistrationId: 'registration-id',
+            currentRegistrationId: 'registration-b',
+            registrationTargetOutcome: 'RELINKED',
+            registrationStatusApplied: false,
+            registrationStatusSkipReason: 'PAYMENT_RELINKED',
+          }),
+        }),
+      });
+    });
+
+    it.each([
+      ['missing audit', null],
+      [
+        'missing registration target',
+        {
+          newValues: {
+            phase: 'ATTEMPT',
+            paymentId,
+            refundId,
+            executionMode: RefundExecutionMode.STRIPE,
+          },
+        },
+      ],
+      [
+        'non-string registration target',
+        {
+          newValues: {
+            phase: 'ATTEMPT',
+            paymentId,
+            refundId,
+            executionMode: RefundExecutionMode.STRIPE,
+            registrationId: 42,
+          },
+        },
+      ],
+      [
+        'blank registration target',
+        {
+          newValues: {
+            phase: 'ATTEMPT',
+            paymentId,
+            refundId,
+            executionMode: RefundExecutionMode.STRIPE,
+            registrationId: ' ',
+          },
+        },
+      ],
+      [
+        'mismatched attempt identity',
+        {
+          newValues: {
+            phase: 'ATTEMPT',
+            paymentId: 'different-payment',
+            refundId,
+            executionMode: RefundExecutionMode.STRIPE,
+            registrationId: 'registration-id',
+          },
+        },
+      ],
+    ])(
+      'should finalize successfully and skip registration for an unavailable %s',
+      async (_caseName, inputAudit) => {
+        const requestedStatus = RegistrationStatus.WAITLISTED;
+        const pendingWithStatus = {
+          ...pendingRefund,
+          resultingRegistrationStatus: requestedStatus,
+        };
+        const succeededRefund = {
+          ...pendingWithStatus,
+          status: PaymentRefundStatus.SUCCEEDED,
+          providerRefundId: 're_provider',
+        };
+        mockPrismaService.paymentRefund.create.mockResolvedValue(pendingWithStatus);
+        mockPrismaService.paymentRefund.findUnique
+          .mockResolvedValueOnce(null)
+          .mockResolvedValueOnce(pendingWithStatus)
+          .mockResolvedValueOnce(succeededRefund);
+        mockPrismaService.payment.findUnique
+          .mockResolvedValueOnce(stripePayment)
+          .mockResolvedValueOnce({
+            ...stripePayment,
+            refunds: [{ ...publicPendingRefund, resultingRegistrationStatus: requestedStatus }],
+          })
+          .mockResolvedValueOnce({
+            ...buildStripePayment(
+              PaymentStatus.PARTIALLY_REFUNDED,
+              PaymentRefundStatus.SUCCEEDED
+            ),
+            registration: stripePayment.registration,
+          });
+        mockPrismaService.adminAudit.findFirst.mockResolvedValue(inputAudit);
+        mockStripeService.createAdminRefund.mockResolvedValue({
+          outcome: 'SUCCEEDED',
+          providerRefundId: 're_provider',
+        });
+
+        const actualResult = await service.createRefund(
+          paymentId,
+          {
+            ...stripeRequest,
+            resultingRegistrationStatus: requestedStatus,
+          },
+          'admin-id'
+        );
+
+        expect(actualResult.outcome).toBe('SUCCEEDED');
+        expect(mockPrismaService.registration.findUnique).not.toHaveBeenCalled();
+        expect(mockPrismaService.registration.updateMany).not.toHaveBeenCalled();
+        expect(mockPrismaService.adminAudit.create).toHaveBeenLastCalledWith({
+          data: expect.objectContaining({
+            newValues: expect.objectContaining({
+              attemptRegistrationId: null,
+              currentRegistrationId: 'registration-id',
+              registrationTargetOutcome: 'UNAVAILABLE',
+              registrationStatusApplied: false,
+              registrationStatusSkipReason: 'ATTEMPT_REGISTRATION_UNAVAILABLE',
+            }),
+          }),
+        });
+      }
+    );
+
+    it('should audit a valid null registration snapshot without mutating registration state', async () => {
+      const paymentWithoutRegistration = {
+        ...stripePayment,
+        registrationId: null,
+        registration: null,
+      };
+      const succeededRefund = {
+        ...pendingRefund,
+        status: PaymentRefundStatus.SUCCEEDED,
+        providerRefundId: 're_provider',
+      };
+      mockPrismaService.paymentRefund.findUnique
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(pendingRefund)
+        .mockResolvedValueOnce(succeededRefund);
+      mockPrismaService.payment.findUnique
+        .mockResolvedValueOnce(paymentWithoutRegistration)
+        .mockResolvedValueOnce({
+          ...paymentWithoutRegistration,
+          refunds: [publicPendingRefund],
+        })
+        .mockResolvedValueOnce({
+          ...paymentWithoutRegistration,
+          status: PaymentStatus.PARTIALLY_REFUNDED,
+          refunds: [{ ...publicPendingRefund, status: PaymentRefundStatus.SUCCEEDED }],
+        });
+      mockPrismaService.adminAudit.findFirst.mockResolvedValue({
+        newValues: {
+          phase: 'ATTEMPT',
+          paymentId,
+          refundId,
+          executionMode: RefundExecutionMode.STRIPE,
+          registrationId: null,
+        },
+      });
+      mockStripeService.createAdminRefund.mockResolvedValue({
+        outcome: 'SUCCEEDED',
+        providerRefundId: 're_provider',
+      });
+
+      const actualResult = await service.createRefund(paymentId, stripeRequest, 'admin-id');
+
+      expect(actualResult.outcome).toBe('SUCCEEDED');
+      expect(mockPrismaService.registration.findUnique).not.toHaveBeenCalled();
+      expect(mockPrismaService.registration.updateMany).not.toHaveBeenCalled();
+      expect(mockPrismaService.adminAudit.create).toHaveBeenLastCalledWith({
+        data: expect.objectContaining({
+          newValues: expect.objectContaining({
+            attemptRegistrationId: null,
+            currentRegistrationId: null,
+            registrationTargetOutcome: 'MATCHED',
+          }),
+        }),
+      });
     });
 
     it.each([PaymentStatus.FAILED, PaymentStatus.REFUNDED])(
@@ -4796,6 +5041,47 @@ describe('PaymentsService', () => {
       expect(mockStripeService.createAdminRefund).not.toHaveBeenCalled();
     });
 
+    it('should keep a found refund pending when the registration link guard loses a race', async () => {
+      const requestedStatus = RegistrationStatus.WAITLISTED;
+      const pendingWithStatus = {
+        ...pendingRefund,
+        resultingRegistrationStatus: requestedStatus,
+      };
+      const paymentWithPending = {
+        ...buildStripePayment(PaymentStatus.COMPLETED, PaymentRefundStatus.PENDING),
+        refunds: [{ ...publicPendingRefund, resultingRegistrationStatus: requestedStatus }],
+      };
+      mockPrismaService.paymentRefund.findUnique
+        .mockResolvedValueOnce(pendingWithStatus)
+        .mockResolvedValueOnce(pendingWithStatus);
+      mockPrismaService.payment.findUnique
+        .mockResolvedValueOnce(paymentWithPending)
+        .mockResolvedValueOnce(paymentWithPending);
+      mockPrismaService.payment.updateMany.mockResolvedValue({ count: 0 });
+      mockStripeService.findAdminRefund.mockResolvedValue({
+        outcome: 'FOUND',
+        providerRefundId: 're_found',
+      });
+
+      const actualResult = await service.retryStripeRefund(
+        paymentId,
+        refundId,
+        'retry-admin'
+      );
+
+      expect(actualResult.outcome).toBe('PENDING_UNKNOWN');
+      expect(mockPrismaService.payment.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: paymentId,
+          status: PaymentStatus.COMPLETED,
+          registrationId: 'registration-id',
+        },
+        data: { status: PaymentStatus.PARTIALLY_REFUNDED },
+      });
+      expect(mockStripeService.findAdminRefund).toHaveBeenCalledTimes(1);
+      expect(mockStripeService.createAdminRefund).not.toHaveBeenCalled();
+    });
+
     it('should resubmit the exact stored request with the same key only after inspection misses', async () => {
       const paymentWithPending = buildStripePayment(
         PaymentStatus.COMPLETED,
@@ -5003,5 +5289,26 @@ describe('PaymentsService', () => {
         expect(mockStripeService.createAdminRefund).not.toHaveBeenCalled();
       }
     );
+
+    it.each([
+      PaymentRefundStatus.PENDING,
+      PaymentRefundStatus.SUCCEEDED,
+      PaymentRefundStatus.FAILED,
+    ])('should reject MANUAL retry status %s before payment or network work', async inputStatus => {
+      mockPrismaService.paymentRefund.findUnique.mockResolvedValue({
+        ...pendingRefund,
+        status: inputStatus,
+        executionMode: RefundExecutionMode.MANUAL,
+      });
+
+      await expect(
+        service.retryStripeRefund(paymentId, refundId, 'retry-admin')
+      ).rejects.toThrow(BadRequestException);
+
+      expect(mockPrismaService.payment.findUnique).not.toHaveBeenCalled();
+      expect(mockPrismaService.adminAudit.findFirst).not.toHaveBeenCalled();
+      expect(mockStripeService.findAdminRefund).not.toHaveBeenCalled();
+      expect(mockStripeService.createAdminRefund).not.toHaveBeenCalled();
+    });
   });
 });
