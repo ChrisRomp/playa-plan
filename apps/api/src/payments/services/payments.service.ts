@@ -1744,6 +1744,14 @@ export class PaymentsService {
         if (refund.executionMode !== RefundExecutionMode.STRIPE) {
           throw new BadRequestException('Only pending STRIPE refunds can be finalized');
         }
+        if (
+          payment.status !== PaymentStatus.COMPLETED &&
+          payment.status !== PaymentStatus.PARTIALLY_REFUNDED
+        ) {
+          throw new ConflictException(
+            `Payment status ${payment.status} cannot be replaced by Stripe refund finalization`
+          );
+        }
 
         const transition = await tx.paymentRefund.updateMany({
           where: {
@@ -1784,10 +1792,15 @@ export class PaymentsService {
             ? PaymentStatus.REFUNDED
             : PaymentStatus.PARTIALLY_REFUNDED;
 
-        await tx.payment.update({
-          where: { id: paymentId },
+        const paymentTransition = await tx.payment.updateMany({
+          where: { id: paymentId, status: payment.status },
           data: { status: resultingPaymentStatus },
         });
+        if (paymentTransition.count !== 1) {
+          throw new ConflictException(
+            'Payment status changed concurrently; retry refund reconciliation'
+          );
+        }
 
         let registrationStatusBefore: RegistrationStatus | null = null;
         let registrationStatusAfter: RegistrationStatus | null = null;
@@ -2309,129 +2322,9 @@ export class PaymentsService {
       let updatedRegistrationStatus = payment.registration?.status;
 
       if (stripeSession.payment_status === 'paid') {
-        // Payment was successful - mark payment and registration as complete
-        updatedPaymentStatus = PaymentStatus.COMPLETED;
-
-        if (payment.registration) {
-          // Capacity beats payment: a WAITLISTED registration must NOT be
-          // promoted to CONFIRMED just because the user paid. The
-          // standard waitlist flow (admin or capacity-opens-up) is the
-          // only path that should transition WAITLISTED → CONFIRMED.
-          // We still record the payment as COMPLETED and clear
-          // `paymentDeferred` so the row reflects the paid state, but
-          // the status stays WAITLISTED.
-          //
-          // This is the only WAITLISTED-deferred interaction that is
-          // actually reachable via this PR's new UI: the dashboard's
-          // "Pay Now" CTA hides itself for WAITLISTED registrations
-          // (DashboardPage.tsx), but a direct API call or a TOCTOU race
-          // that produced a WAITLISTED + paymentDeferred=true row would
-          // expose the bug this guard prevents. Pre-#160, this method
-          // always set the registration to CONFIRMED on paid sessions
-          // — a latent issue that became reachable once dashboard
-          // "Pay Now" was added.
-          const isWaitlisted = payment.registration.status === 'WAITLISTED';
-          updatedRegistrationStatus = isWaitlisted ? 'WAITLISTED' : 'CONFIRMED';
-          const targetStatus = updatedRegistrationStatus;
-
-          // Update path fires when ANY of (a) payment not yet COMPLETED,
-          // (b) registration not at its target status (CONFIRMED unless
-          // WAITLISTED, in which case it stays WAITLISTED), (c) registration
-          // still flagged paymentDeferred=true. The third clause matters
-          // for deferred registrations: a deferred row starts as CONFIRMED
-          // + paymentDeferred=true, so without this clause a retry after
-          // payment would skip the update and leave paymentDeferred true.
-          if (
-            payment.status !== PaymentStatus.COMPLETED ||
-            payment.registration.status !== targetStatus ||
-            payment.registration.paymentDeferred
-          ) {
-            try {
-              this.logger.log(
-                `Updating payment ${payment.id} to COMPLETED and registration ${payment.registration.id} to ${targetStatus} (paymentDeferred cleared)`
-              );
-
-              try {
-                // Use transaction to ensure atomicity between payment and registration updates
-                const transactionResults = await this.prisma.$transaction([
-                  this.prisma.payment.update({
-                    where: { id: payment.id },
-                    data: { status: PaymentStatus.COMPLETED },
-                  }),
-                  this.prisma.registration.update({
-                    where: { id: payment.registration.id },
-                    data: { status: targetStatus, paymentDeferred: false },
-                  }),
-                ]);
-
-                this.logger.log(`Successfully updated payment and registration statuses`);
-                this.logger.debug(
-                  `Transaction results: ${JSON.stringify({
-                    payment: transactionResults[0].id,
-                    registration: transactionResults[1].id,
-                  })}`
-                );
-
-                // Send registration confirmation email with the updated
-                // status — but skip it for a deferred → paid transition,
-                // because the participant already received a confirmation
-                // email at registration creation time (with a "payment
-                // deferred" notice). Sending it again would duplicate.
-                const wasDeferred = payment.registration.paymentDeferred === true;
-                if (!wasDeferred) {
-                  this.sendRegistrationConfirmationEmailAfterPayment(payment.registration.id).catch(
-                    emailError => {
-                      this.logger.warn(
-                        `Failed to send registration confirmation email: ${emailError instanceof Error ? emailError.message : 'Unknown error'}`
-                      );
-                    }
-                  );
-                }
-              } catch (transactionError) {
-                // If the transaction fails, at least try to update the payment status
-                // This ensures we record the successful Stripe payment even if registration update fails
-                this.logger.warn(
-                  `Transaction failed, falling back to payment-only update: ${transactionError instanceof Error ? transactionError.message : 'Unknown error'}`
-                );
-
-                if (payment.status !== PaymentStatus.COMPLETED) {
-                  await this.prisma.payment.update({
-                    where: { id: payment.id },
-                    data: {
-                      status: PaymentStatus.COMPLETED,
-                    },
-                  });
-                  this.logger.log(
-                    `Updated payment ${payment.id} to COMPLETED (registration update failed: ${transactionError instanceof Error ? transactionError.message : 'Unknown error'})`
-                  );
-                }
-              }
-            } catch (error) {
-              const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-              this.logger.error(
-                `Failed to update statuses: ${errorMessage}`,
-                error instanceof Error ? error.stack : undefined
-              );
-              throw new BadRequestException(
-                `Failed to update payment or registration status: ${errorMessage}`
-              );
-            }
-          } else {
-            this.logger.log(
-              `Both payment and registration already have correct statuses, no update needed`
-            );
-          }
-        } else {
-          // No registration linked, just update the payment if needed
-          if (payment.status !== PaymentStatus.COMPLETED) {
-            await this.update(payment.id, {
-              status: PaymentStatus.COMPLETED,
-            });
-            this.logger.log(`Updated payment ${payment.id} to COMPLETED (no registration)`);
-          } else {
-            this.logger.log(`Payment ${payment.id} already marked as COMPLETED (no registration)`);
-          }
-        }
+        const paidState = await this.reconcilePaidStripeSession(payment);
+        updatedPaymentStatus = paidState.paymentStatus;
+        updatedRegistrationStatus = paidState.registrationStatus;
       } else if (
         stripeSession.payment_status === 'unpaid' &&
         payment.status === PaymentStatus.PENDING
@@ -2469,6 +2362,128 @@ export class PaymentsService {
       );
       throw new BadRequestException('Failed to verify Stripe session');
     }
+  }
+
+  private async reconcilePaidStripeSession(payment: PaymentWithRelations): Promise<{
+    paymentStatus: PaymentStatus;
+    registrationStatus?: RegistrationStatus;
+  }> {
+    const currentPayment = await this.loadStripeVerificationPayment(payment.id);
+    if (
+      currentPayment.status === PaymentStatus.FAILED ||
+      currentPayment.status === PaymentStatus.PARTIALLY_REFUNDED ||
+      currentPayment.status === PaymentStatus.REFUNDED
+    ) {
+      return {
+        paymentStatus: currentPayment.status,
+        registrationStatus: currentPayment.registration?.status,
+      };
+    }
+
+    const registration = currentPayment.registration;
+    const registrationIsProtected =
+      registration !== null &&
+      registration !== undefined &&
+      (registration.status === RegistrationStatus.CANCELLED ||
+        isApplicationStatus(registration.status));
+    const targetRegistrationStatus =
+      registration?.status === RegistrationStatus.WAITLISTED
+        ? RegistrationStatus.WAITLISTED
+        : RegistrationStatus.CONFIRMED;
+    const shouldCompletePayment = currentPayment.status === PaymentStatus.PENDING;
+    const shouldUpdateRegistration =
+      registration !== null &&
+      registration !== undefined &&
+      !registrationIsProtected &&
+      ((currentPayment.status === PaymentStatus.PENDING &&
+        (registration.status !== targetRegistrationStatus || registration.paymentDeferred)) ||
+        (currentPayment.status === PaymentStatus.COMPLETED && registration.paymentDeferred));
+
+    if (!shouldCompletePayment && !shouldUpdateRegistration) {
+      return {
+        paymentStatus: currentPayment.status,
+        registrationStatus: registration?.status,
+      };
+    }
+
+    try {
+      await this.prisma.$transaction(
+        async tx => {
+          if (shouldCompletePayment) {
+            const paymentTransition = await tx.payment.updateMany({
+              where: { id: currentPayment.id, status: PaymentStatus.PENDING },
+              data: { status: PaymentStatus.COMPLETED },
+            });
+            if (paymentTransition.count !== 1) {
+              throw new ConflictException('Payment status changed during Stripe verification');
+            }
+          }
+
+          if (shouldUpdateRegistration && registration) {
+            const registrationTransition = await tx.registration.updateMany({
+              where: {
+                id: registration.id,
+                status: registration.status,
+                paymentDeferred: registration.paymentDeferred,
+              },
+              data: {
+                status: targetRegistrationStatus,
+                paymentDeferred: false,
+              },
+            });
+            if (registrationTransition.count !== 1) {
+              throw new ConflictException('Registration status changed during Stripe verification');
+            }
+          }
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+      );
+    } catch (error: unknown) {
+      if (error instanceof ConflictException || this.isSerializationConflict(error)) {
+        return this.reloadStripeVerificationState(currentPayment.id);
+      }
+      throw error;
+    }
+
+    if (shouldUpdateRegistration && registration && !registration.paymentDeferred) {
+      this.sendRegistrationConfirmationEmailAfterPayment(registration.id).catch(emailError => {
+        this.logger.warn(
+          `Failed to send registration confirmation email: ${emailError instanceof Error ? emailError.message : 'Unknown error'}`
+        );
+      });
+    }
+
+    return {
+      paymentStatus: shouldCompletePayment ? PaymentStatus.COMPLETED : currentPayment.status,
+      registrationStatus:
+        shouldUpdateRegistration && registration
+          ? targetRegistrationStatus
+          : registration?.status,
+    };
+  }
+
+  private async reloadStripeVerificationState(paymentId: string): Promise<{
+    paymentStatus: PaymentStatus;
+    registrationStatus?: RegistrationStatus;
+  }> {
+    const currentPayment = await this.loadStripeVerificationPayment(paymentId);
+
+    return {
+      paymentStatus: currentPayment.status,
+      registrationStatus: currentPayment.registration?.status,
+    };
+  }
+
+  private async loadStripeVerificationPayment(paymentId: string): Promise<PaymentWithRelations> {
+    const currentPayment = (await this.prisma.payment.findUnique({
+      where: { id: paymentId },
+      include: { registration: true },
+    })) as PaymentWithRelations | null;
+    if (!currentPayment) {
+      throw new NotFoundException(`Payment with ID ${paymentId} not found`);
+    }
+
+    return currentPayment;
   }
 
   /**

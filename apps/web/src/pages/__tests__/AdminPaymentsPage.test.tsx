@@ -593,6 +593,117 @@ describe('AdminPaymentsPage', () => {
     expect(mockGetPayments).toHaveBeenLastCalledWith(0, 25);
   });
 
+  it.each([
+    ['SUCCEEDED', 'SUCCEEDED', 'Stripe refund reconciliation succeeded.'],
+    [
+      'PENDING_UNKNOWN',
+      'PENDING',
+      'Stripe outcome remains pending or unknown; the amount is still reserved.',
+    ],
+    ['FAILED', 'FAILED', 'Stripe rejected the refund. Its reserved balance has been released.'],
+  ] as const)(
+    'should render direct Stripe retry outcome %s without manual recording context',
+    async (outcome, refundStatus, expectedMessage) => {
+      const pendingRefund = {
+        id: 'pending-refund',
+        amountCents: 2500,
+        currency: 'USD',
+        executionMode: 'STRIPE' as const,
+        status: 'PENDING' as const,
+        reason: null,
+        externalReference: null,
+        resultingRegistrationStatus: null,
+        createdAt: '2026-07-14T01:00:00.000Z',
+        updatedAt: '2026-07-14T01:00:00.000Z',
+      };
+      const pendingPayment = {
+        ...payment,
+        provider: 'STRIPE',
+        stripeRefundEligible: true,
+        refunds: [pendingRefund],
+        pendingRefundCents: 2500,
+        availableRefundCents: 10050,
+      };
+      const resultRefund = { ...pendingRefund, status: refundStatus };
+      mockGetPayments.mockResolvedValue({ payments: [pendingPayment], total: 1 });
+      mockRetryStripeRefund.mockResolvedValue({
+        payment: {
+          ...pendingPayment,
+          status: outcome === 'SUCCEEDED' ? 'PARTIALLY_REFUNDED' : pendingPayment.status,
+          refunds: [resultRefund],
+          successfulRefundCents: outcome === 'SUCCEEDED' ? 2500 : 0,
+          pendingRefundCents: outcome === 'PENDING_UNKNOWN' ? 2500 : 0,
+          availableRefundCents: outcome === 'PENDING_UNKNOWN' ? 10050 : 12550,
+        },
+        refund: resultRefund,
+        paymentAmountCents: 12550,
+        successfulRefundCents: outcome === 'SUCCEEDED' ? 2500 : 0,
+        pendingRefundCents: outcome === 'PENDING_UNKNOWN' ? 2500 : 0,
+        availableRefundCents: outcome === 'PENDING_UNKNOWN' ? 10050 : 12550,
+        refundUnavailableReason: null,
+        outcome,
+      });
+      renderPage();
+
+      if (outcome === 'SUCCEEDED') {
+        fireEvent.click(await screen.findByRole('button', { name: 'Refund' }));
+        expect(
+          screen.getByRole('heading', { name: 'Record completed manual refund' })
+        ).toBeInTheDocument();
+      }
+      fireEvent.click(await screen.findByRole('button', { name: 'Retry' }));
+
+      expect(await screen.findByText(expectedMessage)).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Reconcile Stripe refund' })).toBeInTheDocument();
+      expect(
+        screen.getByText(/Retry inspects Stripe before deciding whether the stored request/)
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole('heading', { name: 'Record completed manual refund' })
+      ).not.toBeInTheDocument();
+      expect(screen.queryByText(/Manual mode records a refund/)).not.toBeInTheDocument();
+    }
+  );
+
+  it('should render a direct Stripe retry error without manual recording context', async () => {
+    const pendingRefund = {
+      id: 'pending-refund',
+      amountCents: 2500,
+      currency: 'USD',
+      executionMode: 'STRIPE' as const,
+      status: 'PENDING' as const,
+      reason: null,
+      externalReference: null,
+      resultingRegistrationStatus: null,
+      createdAt: '2026-07-14T01:00:00.000Z',
+      updatedAt: '2026-07-14T01:00:00.000Z',
+    };
+    mockGetPayments.mockResolvedValue({
+      payments: [
+        {
+          ...payment,
+          provider: 'STRIPE',
+          stripeRefundEligible: true,
+          refunds: [pendingRefund],
+          pendingRefundCents: 2500,
+          availableRefundCents: 10050,
+        },
+      ],
+      total: 1,
+    });
+    mockRetryStripeRefund.mockRejectedValue(new Error('Retry unavailable'));
+    renderPage();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Retry' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Retry unavailable');
+    expect(screen.getByRole('heading', { name: 'Reconcile Stripe refund' })).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Record completed manual refund' })
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/Manual mode records a refund/)).not.toBeInTheDocument();
+  });
+
   it('should show a definite Stripe failure and released reservation', async () => {
     const failedRefund = {
       id: 'failed-refund',

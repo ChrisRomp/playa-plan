@@ -53,6 +53,19 @@ interface ApiErrorResponse {
   readonly message?: unknown;
 }
 
+type RefundFeedbackSource = 'MANUAL_CREATE' | 'STRIPE_CREATE' | 'STRIPE_RETRY';
+
+interface RefundError {
+  readonly source: RefundFeedbackSource;
+  readonly message: string;
+}
+
+interface RefundNotice {
+  readonly source: RefundFeedbackSource;
+  readonly kind: 'success' | 'warning' | 'failure';
+  readonly message: string;
+}
+
 function createIdempotencyKey(): string {
   return crypto.randomUUID();
 }
@@ -167,11 +180,8 @@ export default function AdminPaymentsPage() {
   const [refundIdempotencyKey, setRefundIdempotencyKey] = useState(createIdempotencyKey);
   const [isSubmittingRefund, setIsSubmittingRefund] = useState(false);
   const [retryingRefundId, setRetryingRefundId] = useState<string | null>(null);
-  const [refundError, setRefundError] = useState<string | null>(null);
-  const [refundNotice, setRefundNotice] = useState<{
-    kind: 'success' | 'warning' | 'failure';
-    message: string;
-  } | null>(null);
+  const [refundError, setRefundError] = useState<RefundError | null>(null);
+  const [refundNotice, setRefundNotice] = useState<RefundNotice | null>(null);
 
   const hasMeaningfulSearch = useMemo(() => {
     const hasName = (registrationFilters.name?.trim().length ?? 0) >= 2;
@@ -287,17 +297,20 @@ export default function AdminPaymentsPage() {
     }
 
     let amountSelection: RefundAmountSelection;
+    const feedbackSource =
+      refundExecutionMode === 'MANUAL' ? 'MANUAL_CREATE' : 'STRIPE_CREATE';
     if (refundAmountMode === 'full') {
       amountSelection = { fullRefund: true };
     } else {
       const amountCents = parseDollarsToCents(refundAmount);
       if (amountCents === null || amountCents > selectedRefundPayment.availableRefundCents) {
-        setRefundError(
-          `Enter a positive amount with at most two decimals, no more than ${formatCents(
+        setRefundError({
+          source: feedbackSource,
+          message: `Enter a positive amount with at most two decimals, no more than ${formatCents(
             selectedRefundPayment.currency,
             selectedRefundPayment.availableRefundCents
-          )}.`
-        );
+          )}.`,
+        });
         return;
       }
       amountSelection = { amountCents };
@@ -328,6 +341,7 @@ export default function AdminPaymentsPage() {
       const formattedAmount = formatCents(result.refund.currency, result.refund.amountCents);
       if (result.outcome === 'SUCCEEDED') {
         setRefundNotice({
+          source: feedbackSource,
           kind: 'success',
           message:
             refundExecutionMode === 'MANUAL'
@@ -336,11 +350,13 @@ export default function AdminPaymentsPage() {
         });
       } else if (result.outcome === 'FAILED') {
         setRefundNotice({
+          source: feedbackSource,
           kind: 'failure',
           message: `Stripe rejected the refund. ${formattedAmount} is no longer reserved.`,
         });
       } else {
         setRefundNotice({
+          source: feedbackSource,
           kind: 'warning',
           message:
             `Stripe outcome is pending or unknown for ${formattedAmount}. ` +
@@ -355,14 +371,15 @@ export default function AdminPaymentsPage() {
       setRefundRegistrationStatus('');
       await loadPayments(paymentSkip);
     } catch (error: unknown) {
-      setRefundError(
-        getErrorMessage(
+      setRefundError({
+        source: feedbackSource,
+        message: getErrorMessage(
           error,
           refundExecutionMode === 'MANUAL'
             ? 'Unable to record the manual refund.'
             : 'Unable to initiate the Stripe refund.'
-        )
-      );
+        ),
+      });
     } finally {
       setIsSubmittingRefund(false);
     }
@@ -370,30 +387,49 @@ export default function AdminPaymentsPage() {
 
   const retryStripeRefund = async (paymentId: string, refundId: string): Promise<void> => {
     setRetryingRefundId(refundId);
+    setSelectedRefundPayment(null);
     setRefundError(null);
     setRefundNotice(null);
     try {
       const result = await adminPaymentsApi.retryStripeRefund(paymentId, refundId);
       if (result.outcome === 'SUCCEEDED') {
-        setRefundNotice({ kind: 'success', message: 'Stripe refund reconciliation succeeded.' });
+        setRefundNotice({
+          source: 'STRIPE_RETRY',
+          kind: 'success',
+          message: 'Stripe refund reconciliation succeeded.',
+        });
       } else if (result.outcome === 'FAILED') {
         setRefundNotice({
+          source: 'STRIPE_RETRY',
           kind: 'failure',
           message: 'Stripe rejected the refund. Its reserved balance has been released.',
         });
       } else {
         setRefundNotice({
+          source: 'STRIPE_RETRY',
           kind: 'warning',
           message: 'Stripe outcome remains pending or unknown; the amount is still reserved.',
         });
       }
       await loadPayments(paymentSkip);
     } catch (error: unknown) {
-      setRefundError(getErrorMessage(error, 'Unable to retry the Stripe refund.'));
+      setRefundError({
+        source: 'STRIPE_RETRY',
+        message: getErrorMessage(error, 'Unable to retry the Stripe refund.'),
+      });
     } finally {
       setRetryingRefundId(null);
     }
   };
+
+  const refundFeedbackSource: RefundFeedbackSource | null =
+    refundNotice?.source ??
+    refundError?.source ??
+    (selectedRefundPayment
+      ? refundExecutionMode === 'MANUAL'
+        ? 'MANUAL_CREATE'
+        : 'STRIPE_CREATE'
+      : null);
 
   return (
     <div className="mx-auto max-w-6xl space-y-8 px-4 py-8">
@@ -804,25 +840,34 @@ export default function AdminPaymentsPage() {
       {(selectedRefundPayment || refundNotice || refundError) && (
         <section className="rounded-lg bg-white p-6 shadow">
           <h2 className="text-xl font-semibold text-gray-900">
-            {refundExecutionMode === 'MANUAL'
+            {refundFeedbackSource === 'MANUAL_CREATE'
               ? 'Record completed manual refund'
-              : 'Initiate Stripe refund'}
+              : refundFeedbackSource === 'STRIPE_CREATE'
+                ? 'Initiate Stripe refund'
+                : 'Reconcile Stripe refund'}
           </h2>
-          {refundExecutionMode === 'MANUAL' ? (
+          {refundFeedbackSource === 'MANUAL_CREATE' ? (
             <p className="mt-2 text-sm text-gray-700">
               Manual mode records a refund that already completed outside PlayaPlan. It does not
               contact Stripe, PayPal, or another processor.
             </p>
-          ) : (
+          ) : refundFeedbackSource === 'STRIPE_CREATE' ? (
             <p className="mt-2 text-sm text-gray-700">
               Stripe mode initiates a processor refund. A pending or unknown outcome remains
               reserved until Retry reconciles it.
             </p>
+          ) : (
+            <p className="mt-2 text-sm text-gray-700">
+              Retry inspects Stripe before deciding whether the stored request needs to be
+              resubmitted.
+            </p>
           )}
-          <p className="mt-2 text-sm font-medium text-amber-800">
-            A full refund does not cancel the registration. Use the existing cancellation workflow
-            when cancellation is intended.
-          </p>
+          {refundFeedbackSource !== 'STRIPE_RETRY' && (
+            <p className="mt-2 text-sm font-medium text-amber-800">
+              A full refund does not cancel the registration. Use the existing cancellation
+              workflow when cancellation is intended.
+            </p>
+          )}
 
           {selectedRefundPayment && (
             <>
@@ -979,7 +1024,7 @@ export default function AdminPaymentsPage() {
 
                 {refundError && (
                   <p className="text-sm text-red-700" role="alert">
-                    {refundError}
+                    {refundError.message}
                   </p>
                 )}
                 <div className="flex gap-3">
@@ -1014,7 +1059,7 @@ export default function AdminPaymentsPage() {
 
           {!selectedRefundPayment && refundError && (
             <p className="mt-4 text-sm text-red-700" role="alert">
-              {refundError}
+              {refundError.message}
             </p>
           )}
 
