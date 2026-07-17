@@ -28,7 +28,6 @@ const DEFINITE_STRIPE_ERROR_TYPES = new Set([
   'StripeInvalidRequestError',
   'StripeAuthenticationError',
   'StripePermissionError',
-  'StripeRateLimitError',
 ]);
 const LOCAL_REFUND_METADATA_KEY = 'paymentRefundId';
 const MAX_FAILURE_MESSAGE_LENGTH = 500;

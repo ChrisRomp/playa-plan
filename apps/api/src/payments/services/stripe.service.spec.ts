@@ -453,6 +453,17 @@ describe('StripeService', () => {
       }
     );
 
+    it('should keep a rate-limited refund pending for retry', async () => {
+      mockStripeInstance.refunds.create.mockRejectedValue({
+        type: 'StripeRateLimitError',
+        message: 'Too many requests',
+      });
+
+      await expect(service.createAdminRefund(inputRequest)).resolves.toEqual({
+        outcome: 'PENDING_UNKNOWN',
+      });
+    });
+
     it('should keep a concurrent idempotency conflict pending', async () => {
       mockStripeInstance.refunds.create.mockRejectedValue({
         type: 'StripeIdempotencyError',
