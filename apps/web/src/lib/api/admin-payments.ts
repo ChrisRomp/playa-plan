@@ -28,6 +28,27 @@ export interface AdminPaymentRefund {
   updatedAt: string;
 }
 
+export type ExternalPaymentSearchRegistrationStatus =
+  | 'PENDING'
+  | 'CONFIRMED'
+  | 'CANCELLED'
+  | 'WAITLISTED'
+  | 'APPLICATION_SUBMITTED'
+  | 'APPLICATION_APPROVED'
+  | 'APPLICATION_DECLINED';
+
+export interface ExternalPaymentSearchRegistration {
+  id: string;
+  year: number;
+  status: ExternalPaymentSearchRegistrationStatus;
+  user: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+  };
+}
+
 export interface AdminPayment {
   id: string;
   amount: number;
@@ -74,24 +95,33 @@ export interface CreateExternalPaymentRequest {
   idempotencyKey: string;
 }
 
-export interface CreateManualRefundRequest {
-  amountCents?: number;
-  fullRefund?: true;
-  executionMode: 'MANUAL';
+export type RefundAmountSelection =
+  | {
+      amountCents: number;
+      fullRefund?: never;
+    }
+  | {
+      amountCents?: never;
+      fullRefund: true;
+    };
+
+interface CreateRefundRequestFields {
   reason?: string;
-  externalReference?: string;
   resultingRegistrationStatus?: RefundRegistrationStatus;
   idempotencyKey: string;
 }
 
-export interface CreateStripeRefundRequest {
-  amountCents?: number;
-  fullRefund?: true;
-  executionMode: 'STRIPE';
-  reason?: string;
-  resultingRegistrationStatus?: RefundRegistrationStatus;
-  idempotencyKey: string;
-}
+export type CreateManualRefundRequest = RefundAmountSelection &
+  CreateRefundRequestFields & {
+    executionMode: 'MANUAL';
+    externalReference?: string;
+  };
+
+export type CreateStripeRefundRequest = RefundAmountSelection &
+  CreateRefundRequestFields & {
+    executionMode: 'STRIPE';
+    externalReference?: never;
+  };
 
 export type CreateRefundRequest = CreateManualRefundRequest | CreateStripeRefundRequest;
 

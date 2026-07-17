@@ -32,7 +32,12 @@ import {
 import { StripeService } from './stripe.service';
 import { PaypalService } from './paypal.service';
 import { isApplicationStatus } from '../../registrations/constants/registration-status.constants';
-import { dollarsToCents, normalizeCurrency } from '../utils/money.utils';
+import {
+  centsToDollars,
+  dollarsToCents,
+  hasSubCentPrecision,
+  normalizeCurrency,
+} from '../utils/money.utils';
 import { randomUUID } from 'crypto';
 
 // Create an extended Payment type that includes registration relationship
@@ -165,6 +170,16 @@ interface RefundTotals {
   refundUnavailableReason: string | null;
 }
 
+type AdminPaymentAmountConversion =
+  | {
+      readonly paymentAmountCents: number;
+      readonly refundUnavailableReason: null;
+    }
+  | {
+      readonly paymentAmountCents: null;
+      readonly refundUnavailableReason: string;
+    };
+
 export type AdminPayment = Omit<AdminPaymentRecord, 'providerRefId'> &
   RefundTotals & {
     stripeRefundEligible: boolean;
@@ -222,8 +237,12 @@ const DEFAULT_ADMIN_PAYMENT_PAGE_SIZE = 25;
 const MAX_ADMIN_PAYMENT_PAGE_SIZE = 100;
 const UNSUPPORTED_PAYMENT_PRECISION_REASON =
   'Refund unavailable because the stored payment amount has unsupported precision.';
+const UNSUPPORTED_PAYMENT_AMOUNT_REASON =
+  'Refund unavailable because the stored payment amount is invalid or exceeds the supported refund range.';
 const UNSUPPORTED_PAYMENT_CURRENCY_REASON =
   'Refund unavailable because the stored payment currency is invalid.';
+const REFUND_REASON_MAX_LENGTH = 500;
+const REFUND_EXTERNAL_REFERENCE_MAX_LENGTH = 255;
 
 // Interface for refund result
 export interface RefundResult {
@@ -741,21 +760,19 @@ export class PaymentsService {
   private getAdminRefundTotals(
     payment: AdminPaymentRecord | ExternalPaymentRecord
   ): RefundTotals {
-    let paymentAmountCents: number;
-    try {
-      paymentAmountCents = dollarsToCents(payment.amount);
-    } catch (error: unknown) {
-      if (!(error instanceof RangeError)) {
-        throw error;
-      }
-
+    const amountConversion = this.convertAdminPaymentAmount(payment.amount);
+    if (amountConversion.refundUnavailableReason !== null) {
       return this.buildUnavailableRefundTotals(
         null,
         payment.refunds,
-        UNSUPPORTED_PAYMENT_PRECISION_REASON,
+        amountConversion.refundUnavailableReason,
         false
       );
     }
+    const paymentAmountCents = amountConversion.paymentAmountCents;
+
+    const isLegacyLedgerlessRefund =
+      payment.status === PaymentStatus.REFUNDED && payment.refunds.length === 0;
 
     try {
       this.validateStoredPaymentCurrency(payment.currency);
@@ -768,15 +785,40 @@ export class PaymentsService {
         paymentAmountCents,
         payment.refunds,
         UNSUPPORTED_PAYMENT_CURRENCY_REASON,
-        payment.status === PaymentStatus.REFUNDED
+        isLegacyLedgerlessRefund
       );
     }
 
-    return this.calculateRefundTotals(
-      paymentAmountCents,
-      payment.refunds,
-      payment.status === PaymentStatus.REFUNDED
-    );
+    return this.calculateRefundTotals(paymentAmountCents, payment.refunds, isLegacyLedgerlessRefund);
+  }
+
+  private convertAdminPaymentAmount(amount: number): AdminPaymentAmountConversion {
+    if (amount === 0) {
+      return {
+        paymentAmountCents: 0,
+        refundUnavailableReason: null,
+      };
+    }
+
+    try {
+      return {
+        paymentAmountCents: dollarsToCents(amount),
+        refundUnavailableReason: null,
+      };
+    } catch (error: unknown) {
+      if (!(error instanceof RangeError)) {
+        throw error;
+      }
+
+      const refundUnavailableReason =
+        Number.isFinite(amount) && amount > 0 && hasSubCentPrecision(amount)
+          ? UNSUPPORTED_PAYMENT_PRECISION_REASON
+          : UNSUPPORTED_PAYMENT_AMOUNT_REASON;
+      return {
+        paymentAmountCents: null,
+        refundUnavailableReason,
+      };
+    }
   }
 
   private buildUnavailableRefundTotals(
@@ -1073,12 +1115,15 @@ export class PaymentsService {
     const hasFullRefund = data.fullRefund !== undefined;
     if (
       hasAmount === hasFullRefund ||
-      (hasAmount && (!Number.isSafeInteger(data.amountCents) || (data.amountCents ?? 0) <= 0)) ||
       (hasFullRefund && data.fullRefund !== true)
     ) {
       throw new BadRequestException(
         'Provide exactly one of a positive integer amountCents or fullRefund: true'
       );
+    }
+
+    if (hasAmount) {
+      this.validateRefundAmountCents(data.amountCents);
     }
 
     this.validateResultingRegistrationStatus(data.resultingRegistrationStatus);
@@ -1087,10 +1132,49 @@ export class PaymentsService {
       amountCents: data.amountCents,
       fullRefund: data.fullRefund === true,
       executionMode: RefundExecutionMode.MANUAL,
-      reason: data.reason?.trim() || null,
-      externalReference: data.externalReference?.trim() || null,
+      reason: this.canonicalizeRefundText(data.reason, REFUND_REASON_MAX_LENGTH, 'reason'),
+      externalReference: this.canonicalizeRefundText(
+        data.externalReference,
+        REFUND_EXTERNAL_REFERENCE_MAX_LENGTH,
+        'externalReference'
+      ),
       resultingRegistrationStatus: data.resultingRegistrationStatus ?? null,
     };
+  }
+
+  private validateRefundAmountCents(amountCents: number | undefined): void {
+    if (amountCents === undefined || amountCents <= 0) {
+      throw new BadRequestException(
+        'amountCents must be a positive integer within the supported range'
+      );
+    }
+
+    try {
+      centsToDollars(amountCents);
+    } catch (error: unknown) {
+      if (error instanceof RangeError) {
+        throw new BadRequestException(
+          'amountCents must be a positive integer within the supported range'
+        );
+      }
+
+      throw error;
+    }
+  }
+
+  private canonicalizeRefundText(
+    value: string | undefined,
+    maxLength: number,
+    fieldName: 'reason' | 'externalReference'
+  ): string | null {
+    const normalizedValue = value?.trim() || null;
+    if (normalizedValue && normalizedValue.length > maxLength) {
+      throw new BadRequestException(
+        `${fieldName} must not exceed ${maxLength} characters after sanitization`
+      );
+    }
+
+    return normalizedValue;
   }
 
   private validateManualRefundPayment(status: PaymentStatus): void {

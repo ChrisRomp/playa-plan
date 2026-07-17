@@ -56,6 +56,26 @@ describe('CreateRefundDto', () => {
     expect(actualErrors.some(error => error.property === 'amountCents')).toBe(true);
   });
 
+  it('should accept the PostgreSQL INTEGER maximum amount in cents', async () => {
+    const actualErrors = await validateRequest({
+      ...validRequest,
+      amountCents: 2_147_483_647,
+    });
+
+    expect(actualErrors).toHaveLength(0);
+  });
+
+  it('should reject an amount above the PostgreSQL INTEGER maximum', async () => {
+    const actualErrors = await validateRequest({
+      ...validRequest,
+      amountCents: 2_147_483_648,
+    });
+
+    const amountError = actualErrors.find(error => error.property === 'amountCents');
+    expect(amountError).toBeDefined();
+    expect(Object.values(amountError?.constraints ?? {}).join(' ')).toContain('supported range');
+  });
+
   it('should normalize optional text and accept allowed registration status', async () => {
     const inputDto = plainToInstance(CreateRefundDto, {
       ...validRequest,

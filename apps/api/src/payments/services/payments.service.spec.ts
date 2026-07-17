@@ -17,6 +17,8 @@ import {
   UserRole,
 } from '@prisma/client';
 import { NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
+import { CreateRefundDto } from '../dto';
+import { GlobalValidationPipe } from '../../common/pipes/validation.pipe';
 
 // Mock implementations
 const mockPrismaService = {
@@ -463,7 +465,32 @@ describe('PaymentsService', () => {
             email: 'legacy@example.com',
           },
           registration: null,
-          refunds: [],
+          refunds: [
+            {
+              id: 'succeeded-refund',
+              amountCents: 600,
+              currency: 'USD',
+              executionMode: RefundExecutionMode.MANUAL,
+              status: PaymentRefundStatus.SUCCEEDED,
+              reason: null,
+              externalReference: null,
+              resultingRegistrationStatus: null,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            },
+            {
+              id: 'pending-refund',
+              amountCents: 100,
+              currency: 'USD',
+              executionMode: RefundExecutionMode.STRIPE,
+              status: PaymentRefundStatus.PENDING,
+              reason: null,
+              externalReference: null,
+              resultingRegistrationStatus: null,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            },
+          ],
         };
         mockPrismaService.payment.findMany.mockResolvedValue([mockPayment]);
         mockPrismaService.payment.count.mockResolvedValue(1);
@@ -475,8 +502,8 @@ describe('PaymentsService', () => {
             {
               ...mockPayment,
               paymentAmountCents: null,
-              successfulRefundCents: 0,
-              pendingRefundCents: 0,
+              successfulRefundCents: 600,
+              pendingRefundCents: 100,
               availableRefundCents: 0,
               refundUnavailableReason:
                 'Refund unavailable because the stored payment amount has unsupported precision.',
@@ -487,10 +514,192 @@ describe('PaymentsService', () => {
         });
       });
 
+      it('should report a zero-dollar comp payment as exactly zero cents', async () => {
+        const mockPayment = {
+          id: 'zero-dollar-payment',
+          amount: 0,
+          currency: 'USD',
+          status: PaymentStatus.COMPLETED,
+          provider: PaymentProvider.MANUAL,
+          externalMethod: null,
+          externalReference: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          userId: 'user-id',
+          registrationId: null,
+          user: {
+            id: 'user-id',
+            firstName: 'Comp',
+            lastName: 'Registration',
+            email: 'comp@example.com',
+          },
+          registration: null,
+          refunds: [],
+        };
+        mockPrismaService.payment.findMany.mockResolvedValue([mockPayment]);
+        mockPrismaService.payment.count.mockResolvedValue(1);
+
+        const actualResult = await service.findAllForAdmin();
+
+        expect(actualResult.payments[0]).toEqual(
+          expect.objectContaining({
+            paymentAmountCents: 0,
+            successfulRefundCents: 0,
+            pendingRefundCents: 0,
+            availableRefundCents: 0,
+            refundUnavailableReason: null,
+          })
+        );
+      });
+
+      it('should report the maximum supported historical payment amount in cents', async () => {
+        const mockPayment = {
+          id: 'maximum-payment',
+          amount: 21_474_836.47,
+          currency: 'USD',
+          status: PaymentStatus.COMPLETED,
+          provider: PaymentProvider.STRIPE,
+          externalMethod: null,
+          externalReference: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          userId: 'user-id',
+          registrationId: null,
+          user: {
+            id: 'user-id',
+            firstName: 'Maximum',
+            lastName: 'Payment',
+            email: 'maximum@example.com',
+          },
+          registration: null,
+          refunds: [],
+        };
+        mockPrismaService.payment.findMany.mockResolvedValue([mockPayment]);
+        mockPrismaService.payment.count.mockResolvedValue(1);
+
+        const actualResult = await service.findAllForAdmin();
+
+        expect(actualResult.payments[0]).toEqual(
+          expect.objectContaining({
+            paymentAmountCents: 2_147_483_647,
+            successfulRefundCents: 0,
+            pendingRefundCents: 0,
+            availableRefundCents: 2_147_483_647,
+            refundUnavailableReason: null,
+          })
+        );
+      });
+
+      it('should keep an out-of-range payment visible with durable refund totals', async () => {
+        const mockPayment = {
+          id: 'out-of-range-payment',
+          amount: 21_474_836.48,
+          currency: 'USD',
+          status: PaymentStatus.PARTIALLY_REFUNDED,
+          provider: PaymentProvider.STRIPE,
+          externalMethod: null,
+          externalReference: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          userId: 'user-id',
+          registrationId: null,
+          user: {
+            id: 'user-id',
+            firstName: 'Out Of Range',
+            lastName: 'Payment',
+            email: 'out-of-range@example.com',
+          },
+          registration: null,
+          refunds: [
+            {
+              id: 'succeeded-refund',
+              amountCents: 600,
+              currency: 'USD',
+              executionMode: RefundExecutionMode.MANUAL,
+              status: PaymentRefundStatus.SUCCEEDED,
+              reason: null,
+              externalReference: null,
+              resultingRegistrationStatus: null,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            },
+            {
+              id: 'pending-refund',
+              amountCents: 100,
+              currency: 'USD',
+              executionMode: RefundExecutionMode.STRIPE,
+              status: PaymentRefundStatus.PENDING,
+              reason: null,
+              externalReference: null,
+              resultingRegistrationStatus: null,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            },
+          ],
+        };
+        mockPrismaService.payment.findMany.mockResolvedValue([mockPayment]);
+        mockPrismaService.payment.count.mockResolvedValue(1);
+
+        const actualResult = await service.findAllForAdmin();
+
+        expect(actualResult.payments[0]).toEqual(
+          expect.objectContaining({
+            paymentAmountCents: null,
+            successfulRefundCents: 600,
+            pendingRefundCents: 100,
+            availableRefundCents: 0,
+            refundUnavailableReason:
+              'Refund unavailable because the stored payment amount is invalid or exceeds the supported refund range.',
+          })
+        );
+      });
+
+      it.each([-1, Number.NaN, Number.POSITIVE_INFINITY])(
+        'should keep invalid stored payment amount %s visible but unavailable',
+        async amount => {
+          const mockPayment = {
+            id: 'invalid-amount-payment',
+            amount,
+            currency: 'USD',
+            status: PaymentStatus.COMPLETED,
+            provider: PaymentProvider.PAYPAL,
+            externalMethod: null,
+            externalReference: null,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            userId: 'user-id',
+            registrationId: null,
+            user: {
+              id: 'user-id',
+              firstName: 'Invalid',
+              lastName: 'Payment',
+              email: 'invalid@example.com',
+            },
+            registration: null,
+            refunds: [],
+          };
+          mockPrismaService.payment.findMany.mockResolvedValue([mockPayment]);
+          mockPrismaService.payment.count.mockResolvedValue(1);
+
+          const actualResult = await service.findAllForAdmin();
+
+          expect(actualResult.payments[0]).toEqual(
+            expect.objectContaining({
+              paymentAmountCents: null,
+              successfulRefundCents: 0,
+              pendingRefundCents: 0,
+              availableRefundCents: 0,
+              refundUnavailableReason:
+                'Refund unavailable because the stored payment amount is invalid or exceeds the supported refund range.',
+            })
+          );
+        }
+      );
+
       it('should keep a malformed stored currency visible but unavailable for refunds', async () => {
         const mockPayment = {
           id: 'legacy-currency-payment',
-          amount: 10,
+          amount: 0,
           currency: 'usd',
           status: PaymentStatus.COMPLETED,
           provider: PaymentProvider.PAYPAL,
@@ -518,7 +727,7 @@ describe('PaymentsService', () => {
           payments: [
             {
               ...mockPayment,
-              paymentAmountCents: 1000,
+              paymentAmountCents: 0,
               successfulRefundCents: 0,
               pendingRefundCents: 0,
               availableRefundCents: 0,
@@ -529,6 +738,133 @@ describe('PaymentsService', () => {
           ],
           total: 1,
         });
+      });
+
+      it('should report durable refund totals for a refunded payment with ledger rows', async () => {
+        const mockPayment = {
+          id: 'ledger-backed-refunded-payment',
+          amount: 125,
+          currency: 'USD',
+          status: PaymentStatus.REFUNDED,
+          provider: PaymentProvider.STRIPE,
+          externalMethod: null,
+          externalReference: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          userId: 'user-id',
+          registrationId: null,
+          user: {
+            id: 'user-id',
+            firstName: 'Test',
+            lastName: 'User',
+            email: 'test@example.com',
+          },
+          registration: null,
+          refunds: [
+            {
+              id: 'succeeded-refund',
+              amountCents: 10000,
+              currency: 'USD',
+              executionMode: RefundExecutionMode.MANUAL,
+              status: PaymentRefundStatus.SUCCEEDED,
+              reason: null,
+              externalReference: null,
+              resultingRegistrationStatus: null,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            },
+            {
+              id: 'pending-refund',
+              amountCents: 2500,
+              currency: 'USD',
+              executionMode: RefundExecutionMode.STRIPE,
+              status: PaymentRefundStatus.PENDING,
+              reason: null,
+              externalReference: null,
+              resultingRegistrationStatus: null,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            },
+          ],
+        };
+        mockPrismaService.payment.findMany.mockResolvedValue([mockPayment]);
+        mockPrismaService.payment.count.mockResolvedValue(1);
+
+        const actualResult = await service.findAllForAdmin();
+
+        expect(actualResult.payments[0]).toEqual(
+          expect.objectContaining({
+            paymentAmountCents: 12500,
+            successfulRefundCents: 10000,
+            pendingRefundCents: 2500,
+            availableRefundCents: 0,
+            refundUnavailableReason: null,
+          })
+        );
+      });
+
+      it('should preserve durable refund totals for a refunded payment with invalid currency', async () => {
+        const mockPayment = {
+          id: 'invalid-currency-ledger-backed-refunded-payment',
+          amount: 125,
+          currency: 'usd',
+          status: PaymentStatus.REFUNDED,
+          provider: PaymentProvider.STRIPE,
+          externalMethod: null,
+          externalReference: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          userId: 'user-id',
+          registrationId: null,
+          user: {
+            id: 'user-id',
+            firstName: 'Test',
+            lastName: 'User',
+            email: 'test@example.com',
+          },
+          registration: null,
+          refunds: [
+            {
+              id: 'succeeded-refund',
+              amountCents: 10000,
+              currency: 'USD',
+              executionMode: RefundExecutionMode.MANUAL,
+              status: PaymentRefundStatus.SUCCEEDED,
+              reason: null,
+              externalReference: null,
+              resultingRegistrationStatus: null,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            },
+            {
+              id: 'pending-refund',
+              amountCents: 2500,
+              currency: 'USD',
+              executionMode: RefundExecutionMode.STRIPE,
+              status: PaymentRefundStatus.PENDING,
+              reason: null,
+              externalReference: null,
+              resultingRegistrationStatus: null,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            },
+          ],
+        };
+        mockPrismaService.payment.findMany.mockResolvedValue([mockPayment]);
+        mockPrismaService.payment.count.mockResolvedValue(1);
+
+        const actualResult = await service.findAllForAdmin();
+
+        expect(actualResult.payments[0]).toEqual(
+          expect.objectContaining({
+            paymentAmountCents: 12500,
+            successfulRefundCents: 10000,
+            pendingRefundCents: 2500,
+            availableRefundCents: 0,
+            refundUnavailableReason:
+              'Refund unavailable because the stored payment currency is invalid.',
+          })
+        );
       });
 
       it('should report legacy ledgerless refunded payments as fully refunded', async () => {
@@ -564,6 +900,7 @@ describe('PaymentsService', () => {
             successfulRefundCents: 12500,
             pendingRefundCents: 0,
             availableRefundCents: 0,
+            refundUnavailableReason: null,
             refunds: [],
           })
         );
@@ -3030,6 +3367,16 @@ describe('PaymentsService', () => {
       };
     }
 
+    async function sanitizeRefundRequest(
+      request: Record<string, unknown>
+    ): Promise<CreateRefundDto> {
+      const validationPipe = new GlobalValidationPipe();
+      return validationPipe.transform(request, {
+        type: 'body',
+        metatype: CreateRefundDto,
+      }) as Promise<CreateRefundDto>;
+    }
+
     beforeEach(() => {
       mockPrismaService.$transaction.mockImplementation(
         async (callback: (tx: typeof mockPrismaService) => Promise<unknown>) =>
@@ -3250,6 +3597,46 @@ describe('PaymentsService', () => {
       expect(mockPrismaService.adminAudit.create).not.toHaveBeenCalled();
     });
 
+    it('should reject explicit cents above the PostgreSQL INTEGER range before the transaction', async () => {
+      await expect(
+        service.createManualRefund(
+          paymentId,
+          { ...inputRequest, amountCents: 2_147_483_648 },
+          'admin-id'
+        )
+      ).rejects.toThrow('supported range');
+
+      expect(mockPrismaService.$transaction).not.toHaveBeenCalled();
+      expect(mockPrismaService.paymentRefund.create).not.toHaveBeenCalled();
+      expect(mockPrismaService.payment.update).not.toHaveBeenCalled();
+      expect(mockPrismaService.registration.update).not.toHaveBeenCalled();
+      expect(mockPrismaService.adminAudit.create).not.toHaveBeenCalled();
+    });
+
+    it('should reject a full refund for an oversized historical payment before writes', async () => {
+      mockPrismaService.payment.findUnique.mockReset().mockResolvedValue({
+        ...basePayment,
+        amount: 21_474_836.48,
+      });
+
+      await expect(
+        service.createManualRefund(
+          paymentId,
+          {
+            fullRefund: true,
+            executionMode: RefundExecutionMode.MANUAL,
+            idempotencyKey,
+          },
+          'admin-id'
+        )
+      ).rejects.toThrow(BadRequestException);
+
+      expect(mockPrismaService.paymentRefund.create).not.toHaveBeenCalled();
+      expect(mockPrismaService.payment.update).not.toHaveBeenCalled();
+      expect(mockPrismaService.registration.update).not.toHaveBeenCalled();
+      expect(mockPrismaService.adminAudit.create).not.toHaveBeenCalled();
+    });
+
     it('should reject manual refunds for a stored payment with sub-cent precision', async () => {
       mockPrismaService.payment.findUnique
         .mockReset()
@@ -3257,13 +3644,65 @@ describe('PaymentsService', () => {
 
       await expect(
         service.createManualRefund(paymentId, inputRequest, 'admin-id')
-      ).rejects.toThrow('Dollar amount must not have sub-cent precision');
+      ).rejects.toThrow(BadRequestException);
 
       expect(mockPrismaService.paymentRefund.create).not.toHaveBeenCalled();
       expect(mockPrismaService.payment.update).not.toHaveBeenCalled();
       expect(mockPrismaService.registration.update).not.toHaveBeenCalled();
       expect(mockPrismaService.adminAudit.create).not.toHaveBeenCalled();
     });
+
+    it('should persist canonical text at the exact post-sanitization limits', async () => {
+      const sanitizedRequest = await sanitizeRefundRequest({
+        ...inputRequest,
+        reason: '&'.repeat(100),
+        externalReference: '&'.repeat(51),
+      });
+
+      await service.createManualRefund(paymentId, sanitizedRequest, 'admin-id');
+
+      expect(sanitizedRequest.reason).toHaveLength(500);
+      expect(sanitizedRequest.externalReference).toHaveLength(255);
+      expect(mockPrismaService.paymentRefund.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            reason: sanitizedRequest.reason,
+            externalReference: sanitizedRequest.externalReference,
+          }),
+        })
+      );
+      expect(mockPrismaService.adminAudit.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          newValues: expect.objectContaining({
+            reason: sanitizedRequest.reason,
+            externalReference: sanitizedRequest.externalReference,
+          }),
+        }),
+      });
+    });
+
+    it.each([
+      ['reason', '&'.repeat(101), 500],
+      ['externalReference', '&'.repeat(52), 255],
+    ] as const)(
+      'should reject %s that exceeds its persistence limit after sanitization',
+      async (field, rawValue, expectedLimit) => {
+        const sanitizedRequest = await sanitizeRefundRequest({
+          ...inputRequest,
+          [field]: rawValue,
+        });
+
+        await expect(
+          service.createManualRefund(paymentId, sanitizedRequest, 'admin-id')
+        ).rejects.toThrow(`${field} must not exceed ${expectedLimit} characters`);
+
+        expect(mockPrismaService.$transaction).not.toHaveBeenCalled();
+        expect(mockPrismaService.paymentRefund.create).not.toHaveBeenCalled();
+        expect(mockPrismaService.payment.update).not.toHaveBeenCalled();
+        expect(mockPrismaService.registration.update).not.toHaveBeenCalled();
+        expect(mockPrismaService.adminAudit.create).not.toHaveBeenCalled();
+      }
+    );
 
     it('should reject manual refunds for an invalid stored currency before writes', async () => {
       mockPrismaService.payment.findUnique
@@ -3414,6 +3853,95 @@ describe('PaymentsService', () => {
       expect(mockPrismaService.payment.update).not.toHaveBeenCalled();
       expect(mockPrismaService.registration.update).not.toHaveBeenCalled();
       expect(mockPrismaService.adminAudit.create).not.toHaveBeenCalled();
+    });
+
+    it('should replay a full-refund request after another reservation fails', async () => {
+      const fullRefund = {
+        ...createdRefund,
+        amountCents: 8000,
+      };
+      const changedLedgerPayment = {
+        ...basePayment,
+        status: PaymentStatus.PARTIALLY_REFUNDED,
+        refunds: [
+          {
+            ...publicCreatedRefund,
+            amountCents: 8000,
+          },
+          {
+            ...publicCreatedRefund,
+            id: 'failed-reservation',
+            amountCents: 2000,
+            status: PaymentRefundStatus.FAILED,
+          },
+        ],
+      };
+      mockPrismaService.paymentRefund.findUnique.mockResolvedValue(fullRefund);
+      mockPrismaService.payment.findUnique.mockReset().mockResolvedValue(changedLedgerPayment);
+      mockPrismaService.adminAudit.findFirst.mockResolvedValue({
+        newValues: { requestedFullRefund: true },
+      });
+
+      const actualResult = await service.createManualRefund(
+        paymentId,
+        {
+          fullRefund: true,
+          executionMode: RefundExecutionMode.MANUAL,
+          reason: inputRequest.reason,
+          externalReference: inputRequest.externalReference,
+          idempotencyKey,
+        },
+        'admin-id'
+      );
+
+      expect(actualResult.refund.amountCents).toBe(8000);
+      expect(mockPrismaService.paymentRefund.create).not.toHaveBeenCalled();
+      expect(mockPrismaService.payment.update).not.toHaveBeenCalled();
+      expect(mockPrismaService.adminAudit.create).not.toHaveBeenCalled();
+    });
+
+    it('should resolve a full-refund P2002 winner after another reservation fails', async () => {
+      const fullRefund = {
+        ...createdRefund,
+        amountCents: 8000,
+      };
+      const changedLedgerPayment = {
+        ...basePayment,
+        status: PaymentStatus.PARTIALLY_REFUNDED,
+        refunds: [
+          {
+            ...publicCreatedRefund,
+            amountCents: 8000,
+          },
+          {
+            ...publicCreatedRefund,
+            id: 'failed-reservation',
+            amountCents: 2000,
+            status: PaymentRefundStatus.FAILED,
+          },
+        ],
+      };
+      mockPrismaService.$transaction.mockRejectedValue({ code: 'P2002' });
+      mockPrismaService.paymentRefund.findUnique.mockResolvedValue(fullRefund);
+      mockPrismaService.payment.findUnique.mockReset().mockResolvedValue(changedLedgerPayment);
+      mockPrismaService.adminAudit.findFirst.mockResolvedValue({
+        newValues: { requestedFullRefund: true },
+      });
+
+      const actualResult = await service.createManualRefund(
+        paymentId,
+        {
+          fullRefund: true,
+          executionMode: RefundExecutionMode.MANUAL,
+          reason: inputRequest.reason,
+          externalReference: inputRequest.externalReference,
+          idempotencyKey,
+        },
+        'admin-id'
+      );
+
+      expect(actualResult.refund.amountCents).toBe(8000);
+      expect(mockPrismaService.paymentRefund.create).not.toHaveBeenCalled();
     });
 
     it('should reject idempotency key reuse with different amount or full-refund semantics', async () => {

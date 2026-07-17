@@ -1,28 +1,27 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { isAxiosError } from 'axios';
 import { Link } from 'react-router-dom';
-import {
-  AdminRegistrationStatus,
-  adminRegistrationsApi,
-  Registration,
-  RegistrationFilters,
-} from '../lib/api/admin-registrations';
+import { adminRegistrationsApi, RegistrationFilters } from '../lib/api/admin-registrations';
 import {
   ADMIN_PAYMENT_PAGE_SIZE,
   AdminPayment,
   adminPaymentsApi,
   ExternalPaymentMethod,
   RefundExecutionMode,
+  RefundAmountSelection,
   RefundRegistrationStatus,
+  ExternalPaymentSearchRegistration,
+  ExternalPaymentSearchRegistrationStatus,
 } from '../lib/api/admin-payments';
 import { ROUTES } from '../routes';
 
-const ELIGIBLE_REGISTRATION_STATUSES: readonly AdminRegistrationStatus[] = [
+const ELIGIBLE_REGISTRATION_STATUSES: readonly ExternalPaymentSearchRegistrationStatus[] = [
   'PENDING',
   'CONFIRMED',
   'WAITLISTED',
 ];
 
-const REGISTRATION_STATUS_OPTIONS: readonly AdminRegistrationStatus[] = [
+const REGISTRATION_STATUS_OPTIONS: readonly ExternalPaymentSearchRegistrationStatus[] = [
   'PENDING',
   'CONFIRMED',
   'WAITLISTED',
@@ -46,6 +45,13 @@ const REFUND_REGISTRATION_STATUSES: readonly RefundRegistrationStatus[] = [
   'CONFIRMED',
   'WAITLISTED',
 ];
+
+const ACTIONABLE_SERVER_ERROR_STATUSES = new Set([400, 404, 409]);
+const MAX_SERVER_ERROR_MESSAGE_LENGTH = 500;
+
+interface ApiErrorResponse {
+  readonly message?: unknown;
+}
 
 function createIdempotencyKey(): string {
   return crypto.randomUUID();
@@ -81,11 +87,11 @@ function canRefundPayment(payment: AdminPayment): boolean {
   );
 }
 
-function isEligibleRegistration(registration: Registration): boolean {
+function isEligibleRegistration(registration: ExternalPaymentSearchRegistration): boolean {
   return ELIGIBLE_REGISTRATION_STATUSES.includes(registration.status);
 }
 
-function getRegistrationEffect(registration: Registration): string {
+function getRegistrationEffect(registration: ExternalPaymentSearchRegistration): string {
   if (registration.status === 'PENDING') {
     return 'The registration will become CONFIRMED and payment deferral will be cleared.';
   }
@@ -93,40 +99,31 @@ function getRegistrationEffect(registration: Registration): string {
   return `The registration will remain ${registration.status} and payment deferral will be cleared.`;
 }
 
-function getBoundedServerMessage(error: unknown): string | null {
-  if (typeof error !== 'object' || error === null || !('response' in error)) {
-    return null;
-  }
-
-  const response = error.response;
-  if (
-    typeof response !== 'object' ||
-    response === null ||
-    !('status' in response) ||
-    ![400, 404, 409].includes(typeof response.status === 'number' ? response.status : -1) ||
-    !('data' in response)
-  ) {
-    return null;
-  }
-
-  const data = response.data;
-  if (typeof data !== 'object' || data === null || Array.isArray(data) || !('message' in data)) {
-    return null;
-  }
-
-  const message = data.message;
-  const normalizedMessage =
-    typeof message === 'string'
+function normalizeServerErrorMessage(message: unknown): string | null {
+  const normalizedMessage = Array.isArray(message)
+    ? message
+        .filter((entry): entry is string => typeof entry === 'string')
+        .map(entry => entry.trim())
+        .filter(Boolean)
+        .join('; ')
+    : typeof message === 'string'
       ? message.trim()
-      : Array.isArray(message) && message.every(item => typeof item === 'string')
-        ? message.map(item => item.trim()).filter(Boolean).join('; ')
-        : '';
+      : '';
 
-  return normalizedMessage ? normalizedMessage.slice(0, 500) : null;
+  return normalizedMessage ? normalizedMessage.slice(0, MAX_SERVER_ERROR_MESSAGE_LENGTH) : null;
 }
 
 function getErrorMessage(error: unknown, fallback: string): string {
-  return getBoundedServerMessage(error) ?? fallback;
+  if (isAxiosError<ApiErrorResponse>(error)) {
+    const status = error.response?.status;
+    if (!status || !ACTIONABLE_SERVER_ERROR_STATUSES.has(status)) {
+      return fallback;
+    }
+
+    return normalizeServerErrorMessage(error.response?.data?.message) ?? fallback;
+  }
+  return error instanceof Error ? error.message : fallback;
+  return error instanceof Error ? error.message : fallback;
 }
 
 /**
@@ -134,8 +131,11 @@ function getErrorMessage(error: unknown, fallback: string): string {
  */
 export default function AdminPaymentsPage() {
   const [registrationFilters, setRegistrationFilters] = useState<RegistrationFilters>({});
-  const [registrationResults, setRegistrationResults] = useState<Registration[] | null>(null);
-  const [selectedRegistration, setSelectedRegistration] = useState<Registration | null>(null);
+  const [registrationResults, setRegistrationResults] = useState<
+    ExternalPaymentSearchRegistration[] | null
+  >(null);
+  const [selectedRegistration, setSelectedRegistration] =
+    useState<ExternalPaymentSearchRegistration | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
 
@@ -214,12 +214,13 @@ export default function AdminPaymentsPage() {
     setSearchError(null);
     setSelectedRegistration(null);
     try {
-      const result = await adminRegistrationsApi.getRegistrations({
-        name: registrationFilters.name?.trim() || undefined,
-        email: registrationFilters.email?.trim() || undefined,
-        year: registrationFilters.year,
-        status: registrationFilters.status,
-      });
+      const result =
+        await adminRegistrationsApi.getRegistrations<ExternalPaymentSearchRegistration>({
+          name: registrationFilters.name?.trim() || undefined,
+          email: registrationFilters.email?.trim() || undefined,
+          year: registrationFilters.year,
+          status: registrationFilters.status,
+        });
       setRegistrationResults(result.registrations);
     } catch (error: unknown) {
       setSearchError(getErrorMessage(error, 'Unable to search registrations.'));
@@ -227,6 +228,11 @@ export default function AdminPaymentsPage() {
     } finally {
       setIsSearching(false);
     }
+  };
+
+  const selectRegistration = (registration: ExternalPaymentSearchRegistration): void => {
+    setSelectedRegistration(registration);
+    setIsConfirmed(false);
   };
 
   const recordExternalPayment = async (event: FormEvent): Promise<void> => {
@@ -280,36 +286,45 @@ export default function AdminPaymentsPage() {
       return;
     }
 
-    const amountCents = refundAmountMode === 'partial' ? parseDollarsToCents(refundAmount) : null;
-    if (
-      refundAmountMode === 'partial' &&
-      (amountCents === null || amountCents > selectedRefundPayment.availableRefundCents)
-    ) {
-      setRefundError(
-        `Enter a positive amount with at most two decimals, no more than ${formatCents(
-          selectedRefundPayment.currency,
-          selectedRefundPayment.availableRefundCents
-        )}.`
-      );
-      return;
+    let amountSelection: RefundAmountSelection;
+    if (refundAmountMode === 'full') {
+      amountSelection = { fullRefund: true };
+    } else {
+      const amountCents = parseDollarsToCents(refundAmount);
+      if (amountCents === null || amountCents > selectedRefundPayment.availableRefundCents) {
+        setRefundError(
+          `Enter a positive amount with at most two decimals, no more than ${formatCents(
+            selectedRefundPayment.currency,
+            selectedRefundPayment.availableRefundCents
+          )}.`
+        );
+        return;
+      }
+      amountSelection = { amountCents };
     }
 
     setIsSubmittingRefund(true);
     setRefundError(null);
     setRefundNotice(null);
     try {
-      const result = await adminPaymentsApi.createRefund(selectedRefundPayment.id, {
-        ...(refundAmountMode === 'full'
-          ? { fullRefund: true as const }
-          : { amountCents: amountCents as number }),
-        executionMode: refundExecutionMode,
-        reason: refundReason.trim() || undefined,
-        ...(refundExecutionMode === 'MANUAL'
-          ? { externalReference: refundReference.trim() || undefined }
-          : {}),
-        resultingRegistrationStatus: refundRegistrationStatus || undefined,
-        idempotencyKey: refundIdempotencyKey,
-      });
+      const request =
+        refundExecutionMode === 'MANUAL'
+          ? {
+              ...amountSelection,
+              executionMode: 'MANUAL' as const,
+              reason: refundReason.trim() || undefined,
+              externalReference: refundReference.trim() || undefined,
+              resultingRegistrationStatus: refundRegistrationStatus || undefined,
+              idempotencyKey: refundIdempotencyKey,
+            }
+          : {
+              ...amountSelection,
+              executionMode: 'STRIPE' as const,
+              reason: refundReason.trim() || undefined,
+              resultingRegistrationStatus: refundRegistrationStatus || undefined,
+              idempotencyKey: refundIdempotencyKey,
+            };
+      const result = await adminPaymentsApi.createRefund(selectedRefundPayment.id, request);
       const formattedAmount = formatCents(result.refund.currency, result.refund.amountCents);
       if (result.outcome === 'SUCCEEDED') {
         setRefundNotice({
@@ -488,7 +503,7 @@ export default function AdminPaymentsPage() {
                           checked={selectedRegistration?.id === registration.id}
                           disabled={!eligible}
                           name="registration"
-                          onChange={() => setSelectedRegistration(registration)}
+                          onChange={() => selectRegistration(registration)}
                           type="radio"
                         />
                       </td>
@@ -678,9 +693,7 @@ export default function AdminPaymentsPage() {
                     <td className="px-3 py-3">
                       {new Date(payment.createdAt).toLocaleDateString()}
                     </td>
-                    <td className="px-3 py-3">
-                      {formatPaymentAmount(payment)}
-                    </td>
+                    <td className="px-3 py-3">{formatPaymentAmount(payment)}</td>
                     <td className="px-3 py-3">{payment.status}</td>
                     <td className="px-3 py-3">{payment.provider}</td>
                     <td className="px-3 py-3">
