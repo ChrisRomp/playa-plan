@@ -1561,6 +1561,7 @@ export class PaymentsService {
               amountCents: refundAmountCents,
               currency: paymentCurrency,
               executionMode: RefundExecutionMode.STRIPE,
+              providerRefId,
               reason: canonicalRequest.reason,
               resultingRegistrationStatus: canonicalRequest.resultingRegistrationStatus,
               requestedFullRefund: canonicalRequest.fullRefund,
@@ -1681,7 +1682,6 @@ export class PaymentsService {
     const stripeResult = await this.stripeService.createAdminRefund({
       providerRefId: reservation.providerRefId,
       amountCents: reservation.refund.amountCents,
-      reason: reservation.refund.reason,
       idempotencyKey: reservation.refund.idempotencyKey,
       localRefundId: reservation.refund.id,
     });
@@ -2002,10 +2002,25 @@ export class PaymentsService {
       throw new NotFoundException(`Refund with ID ${refundId} not found for payment ${paymentId}`);
     }
 
-    const payment = await this.prisma.payment.findUnique({
-      where: { id: paymentId },
-      select: adminPaymentSelect,
-    });
+    const [payment, attemptAudit] = await Promise.all([
+      this.prisma.payment.findUnique({
+        where: { id: paymentId },
+        select: adminPaymentSelect,
+      }),
+      this.prisma.adminAudit.findFirst({
+        where: {
+          transactionId: refund.idempotencyKey,
+          actionType: AdminAuditActionType.PAYMENT_REFUND,
+          targetRecordType: AdminAuditTargetType.PAYMENT,
+          targetRecordId: paymentId,
+          newValues: {
+            path: ['phase'],
+            equals: 'ATTEMPT',
+          },
+        },
+        select: { newValues: true },
+      }),
+    ]);
     if (!payment) {
       throw new NotFoundException(`Payment with ID ${paymentId} not found`);
     }
@@ -2015,7 +2030,11 @@ export class PaymentsService {
     if (refund.executionMode !== RefundExecutionMode.STRIPE) {
       throw new BadRequestException('Only pending STRIPE refunds can be retried');
     }
-    const providerRefId = this.validateStripeRetryPayment(payment);
+    const providerRefId = this.getStripeRefundProviderTarget(
+      attemptAudit?.newValues,
+      paymentId,
+      refundId
+    );
 
     const inspection = await this.stripeService.findAdminRefund(providerRefId, refundId);
     if (inspection.outcome === 'PENDING_UNKNOWN') {
@@ -2065,13 +2084,31 @@ export class PaymentsService {
     );
   }
 
-  private validateStripeRetryPayment(payment: AdminPaymentRecord): string {
-    if (payment.provider !== PaymentProvider.STRIPE) {
-      throw new BadRequestException('Stripe retry requires an original STRIPE payment');
+  private getStripeRefundProviderTarget(
+    auditValues: Prisma.JsonValue | null | undefined,
+    paymentId: string,
+    refundId: string
+  ): string {
+    if (
+      typeof auditValues !== 'object' ||
+      auditValues === null ||
+      Array.isArray(auditValues) ||
+      auditValues.phase !== 'ATTEMPT' ||
+      auditValues.paymentId !== paymentId ||
+      auditValues.refundId !== refundId ||
+      auditValues.executionMode !== RefundExecutionMode.STRIPE ||
+      typeof auditValues.providerRefId !== 'string'
+    ) {
+      throw new ConflictException(
+        'Stripe refund provider target is unavailable; refund remains pending'
+      );
     }
-    const providerRefId = payment.providerRefId?.trim();
+
+    const providerRefId = auditValues.providerRefId.trim();
     if (!providerRefId) {
-      throw new BadRequestException('Stripe payment has no usable provider reference');
+      throw new ConflictException(
+        'Stripe refund provider target is unavailable; refund remains pending'
+      );
     }
     return providerRefId;
   }

@@ -7,7 +7,6 @@ import { CoreConfigService } from '../../core-config/services/core-config.servic
 interface StripeAdminRefundRequest {
   readonly providerRefId: string;
   readonly amountCents: number;
-  readonly reason: string | null;
   readonly idempotencyKey: string;
   readonly localRefundId: string;
 }
@@ -194,7 +193,6 @@ export class StripeService {
     try {
       const stripe = await this.getStripe();
       const paymentIntentId = await this.resolvePaymentIntentId(stripe, request.providerRefId);
-      const reason = this.getRefundReason(request.reason);
       const refund = await stripe.refunds.create(
         {
           payment_intent: paymentIntentId,
@@ -202,7 +200,6 @@ export class StripeService {
           metadata: {
             [LOCAL_REFUND_METADATA_KEY]: request.localRefundId,
           },
-          ...(reason ? { reason } : {}),
         },
         { idempotencyKey: request.idempotencyKey }
       );

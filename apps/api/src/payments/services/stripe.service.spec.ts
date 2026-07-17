@@ -372,12 +372,11 @@ describe('StripeService', () => {
     const inputRequest = {
       providerRefId: 'pi_123',
       amountCents: 2500,
-      reason: 'duplicate charge',
       idempotencyKey: '43ea4b84-1f0d-413d-bc1c-9c91b435d66d',
       localRefundId: 'refund-local-id',
     };
 
-    it('should submit integer cents with stable idempotency and local metadata', async () => {
+    it('should submit integer cents with stable idempotency and local metadata without a reason', async () => {
       mockStripeInstance.refunds.create.mockResolvedValue({
         id: 're_provider_id',
         status: 'succeeded',
@@ -390,7 +389,6 @@ describe('StripeService', () => {
           payment_intent: 'pi_123',
           amount: 2500,
           metadata: { paymentRefundId: 'refund-local-id' },
-          reason: 'duplicate',
         },
         { idempotencyKey: inputRequest.idempotencyKey }
       );
