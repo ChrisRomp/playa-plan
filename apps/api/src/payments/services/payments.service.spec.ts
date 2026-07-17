@@ -1705,6 +1705,7 @@ describe('PaymentsService', () => {
         expect(mockPrismaService.registration.updateMany).not.toHaveBeenCalled();
         expect(actualResult.paymentStatus).toBe(PaymentStatus.COMPLETED);
         expect(actualResult.registrationStatus).toBe(protectedStatus);
+        expect(mockPrismaService.registration.findUnique).not.toHaveBeenCalled();
         expect(mockNotificationsService.sendRegistrationConfirmationEmail).not.toHaveBeenCalled();
       }
     );
@@ -3173,6 +3174,7 @@ describe('PaymentsService', () => {
           data: { status: 'CONFIRMED', paymentDeferred: false },
         })
       );
+      expect(mockPrismaService.registration.findUnique).not.toHaveBeenCalled();
       expect(mockNotificationsService.sendRegistrationConfirmationEmail).not.toHaveBeenCalled();
     });
 
