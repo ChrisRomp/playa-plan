@@ -40,10 +40,10 @@ jobs:
     environment: ${{ github.event.inputs.environment || 'test' }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: 'npm'
@@ -55,7 +55,7 @@ jobs:
           echo "GIT_COMMIT=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
         
       - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
@@ -63,7 +63,7 @@ jobs:
       
       - name: Extract Docker metadata for API
         id: meta-api
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ghcr.io/${{ github.repository_owner }}/playaplan-api
           tags: |
@@ -72,7 +72,7 @@ jobs:
             type=sha,format=short
       
       - name: Build and push API image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: ./apps/api/Dockerfile
@@ -86,7 +86,7 @@ jobs:
       
       - name: Extract Docker metadata for Web
         id: meta-web
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ghcr.io/${{ github.repository_owner }}/playaplan-web
           tags: |
@@ -95,7 +95,7 @@ jobs:
             type=sha,format=short
       
       - name: Build and push Web image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: ./apps/web/Dockerfile
@@ -115,10 +115,10 @@ jobs:
     environment: ${{ github.event.inputs.environment || 'test' }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Azure CLI
-        uses: azure/login@v2
+        uses: azure/login@v3
         with:
           client-id: ${{ env.AZURE_CLIENT_ID }}
           tenant-id: ${{ env.AZURE_TENANT_ID }}
