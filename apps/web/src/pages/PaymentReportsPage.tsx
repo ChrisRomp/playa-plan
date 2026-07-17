@@ -20,7 +20,7 @@ interface PaymentReportFilters {
  * Displays all payments in a filterable, sortable table for admin users
  */
 export function PaymentReportsPage() {
-  const { config } = useConfig();
+  const { config, isLoading: configLoading } = useConfig();
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -28,14 +28,22 @@ export function PaymentReportsPage() {
     config ? { year: config.currentYear } : {}
   );
   const [showFilters, setShowFilters] = useState(false);
-  const defaultYearApplied = useRef(config !== null);
+  const [yearFilterReady, setYearFilterReady] = useState(
+    config !== null || !configLoading
+  );
+  const defaultYearApplied = useRef(config !== null || !configLoading);
 
   useEffect(() => {
-    if (config && !defaultYearApplied.current) {
-      defaultYearApplied.current = true;
+    if (defaultYearApplied.current || configLoading) {
+      return;
+    }
+
+    defaultYearApplied.current = true;
+    if (config) {
       setFilters(previousFilters => ({ ...previousFilters, year: config.currentYear }));
     }
-  }, [config]);
+    setYearFilterReady(true);
+  }, [config, configLoading]);
 
   // Fetch payments data
   const fetchPayments = useCallback(async () => {
@@ -243,7 +251,7 @@ export function PaymentReportsPage() {
     downloadCsv(headers, csvData, { filename });
   };
 
-  if (loading) {
+  if (loading || !yearFilterReady) {
     return (
       <div className="container mx-auto px-4 py-8">
         <LoadingSpinner />

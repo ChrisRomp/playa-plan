@@ -40,7 +40,7 @@ const USER_PROFILE_FIELDS = [
  * Displays all registrations in a filterable, sortable table for staff/admin
  */
 export function RegistrationReportsPage() {
-  const { config } = useConfig();
+  const { config, isLoading: configLoading } = useConfig();
   const [registrations, setRegistrations] = useState<Registration[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -48,7 +48,10 @@ export function RegistrationReportsPage() {
     config ? { year: config.currentYear } : {}
   );
   const [showFilters, setShowFilters] = useState(false);
-  const defaultYearApplied = useRef(config !== null);
+  const [yearFilterReady, setYearFilterReady] = useState(
+    config !== null || !configLoading
+  );
+  const defaultYearApplied = useRef(config !== null || !configLoading);
   const [showCampingOptions, setShowCampingOptions] = useState(() => {
     // Restore from localStorage
     return localStorage.getItem('registrationReports_showCampingOptions') === 'true';
@@ -61,11 +64,16 @@ export function RegistrationReportsPage() {
   const [campingOptionsLoading, setCampingOptionsLoading] = useState(false);
 
   useEffect(() => {
-    if (config && !defaultYearApplied.current) {
-      defaultYearApplied.current = true;
+    if (defaultYearApplied.current || configLoading) {
+      return;
+    }
+
+    defaultYearApplied.current = true;
+    if (config) {
       setFilters(previousFilters => ({ ...previousFilters, year: config.currentYear }));
     }
-  }, [config]);
+    setYearFilterReady(true);
+  }, [config, configLoading]);
 
   // Fetch registrations data
   const fetchRegistrations = useCallback(async () => {
@@ -480,7 +488,7 @@ export function RegistrationReportsPage() {
     downloadCsv(headers, csvData, { filename });
   };
 
-  if (loading) {
+  if (loading || !yearFilterReady) {
     return (
       <div className="container mx-auto px-4 py-8">
         <LoadingSpinner />

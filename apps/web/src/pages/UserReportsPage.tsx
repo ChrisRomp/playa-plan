@@ -19,7 +19,7 @@ interface UserReportFilters {
  * Displays all users in a filterable, sortable table for staff/admin
  */
 export function UserReportsPage() {
-  const { config } = useConfig();
+  const { config, isLoading: configLoading } = useConfig();
   const [users, setUsers] = useState<User[]>([]);
   const [registrationYearUsers, setRegistrationYearUsers] = useState<{ year: number; userId: string }[]>([]);
   const [loading, setLoading] = useState(true);
@@ -28,14 +28,22 @@ export function UserReportsPage() {
     config ? { year: config.currentYear } : {}
   );
   const [showFilters, setShowFilters] = useState(false);
-  const defaultYearApplied = useRef(config !== null);
+  const [yearFilterReady, setYearFilterReady] = useState(
+    config !== null || !configLoading
+  );
+  const defaultYearApplied = useRef(config !== null || !configLoading);
 
   useEffect(() => {
-    if (config && !defaultYearApplied.current) {
-      defaultYearApplied.current = true;
+    if (defaultYearApplied.current || configLoading) {
+      return;
+    }
+
+    defaultYearApplied.current = true;
+    if (config) {
       setFilters(previousFilters => ({ ...previousFilters, year: config.currentYear }));
     }
-  }, [config]);
+    setYearFilterReady(true);
+  }, [config, configLoading]);
 
   // Fetch users and registrations data
   const fetchData = useCallback(async () => {
@@ -222,7 +230,7 @@ export function UserReportsPage() {
     downloadCsv(headers, csvData, { filename });
   };
 
-  if (loading) {
+  if (loading || !yearFilterReady) {
     return (
       <div className="container mx-auto px-4 py-8">
         <LoadingSpinner />

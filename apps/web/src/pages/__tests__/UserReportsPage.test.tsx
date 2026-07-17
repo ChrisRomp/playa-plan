@@ -131,6 +131,62 @@ describe('UserReportsPage', () => {
     expect(screen.queryByTestId('user-user3')).not.toBeInTheDocument();
   });
 
+  it('keeps filters unavailable until configuration resolves', async () => {
+    mockUseConfig.mockReturnValue({
+      config: null,
+      isLoading: true,
+      error: null,
+      refreshConfig: vi.fn(),
+      isConnecting: true,
+      isConnected: false,
+      connectionError: null,
+    });
+
+    const renderResult = render(
+      <MemoryRouter>
+        <UserReportsPage />
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(reports.getUsers).toHaveBeenCalledTimes(1);
+    });
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    expect(screen.getByTestId('loading-spinner')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Toggle filters')).not.toBeInTheDocument();
+
+    mockUseConfig.mockReturnValue({
+      config: {
+        name: 'Test Camp',
+        description: 'Test',
+        homePageBlurb: '',
+        registrationOpen: true,
+        earlyRegistrationOpen: false,
+        currentYear: 2025,
+      },
+      isLoading: false,
+      error: null,
+      refreshConfig: vi.fn(),
+      isConnecting: false,
+      isConnected: true,
+      connectionError: null,
+    });
+
+    renderResult.rerender(
+      <MemoryRouter>
+        <UserReportsPage />
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Toggle filters')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByLabelText('Toggle filters'));
+    expect(screen.getByLabelText('Year')).toHaveValue('2025');
+  });
+
   it('derives year options from registration data', async () => {
     render(
       <MemoryRouter>

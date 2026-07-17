@@ -120,7 +120,7 @@ const mockPayments: Payment[] = [
   },
 ];
 
-const createConfigContextValue = (currentYear?: number): ConfigContextType => ({
+const createConfigContextValue = (currentYear?: number, isLoading = false): ConfigContextType => ({
   config: currentYear === undefined
     ? null
     : {
@@ -131,7 +131,7 @@ const createConfigContextValue = (currentYear?: number): ConfigContextType => ({
         earlyRegistrationOpen: false,
         currentYear,
       },
-  isLoading: false,
+  isLoading,
   error: null,
   refreshConfig: vi.fn(),
   isConnecting: false,
@@ -139,9 +139,9 @@ const createConfigContextValue = (currentYear?: number): ConfigContextType => ({
   connectionError: null,
 });
 
-const renderComponent = (currentYear?: number) => {
+const renderComponent = (currentYear?: number, isLoading = false) => {
   return render(
-    <ConfigContext.Provider value={createConfigContextValue(currentYear)}>
+    <ConfigContext.Provider value={createConfigContextValue(currentYear, isLoading)}>
       <MemoryRouter>
         <PaymentReportsPage />
       </MemoryRouter>
@@ -396,6 +396,33 @@ describe('PaymentReportsPage', () => {
       expect(yearSelect).toHaveValue('');
       expect(screen.getByTestId('payment-payment1')).toBeInTheDocument();
       expect(screen.getByTestId('payment-payment4')).toBeInTheDocument();
+    });
+
+    it('should keep filters unavailable until configuration resolves', async () => {
+      const renderResult = renderComponent(undefined, true);
+
+      await waitFor(() => {
+        expect(reports.getPayments).toHaveBeenCalledTimes(1);
+      });
+      await new Promise(resolve => setTimeout(resolve, 0));
+
+      expect(screen.getByTestId('loading-spinner')).toBeInTheDocument();
+      expect(screen.queryByText('Filters')).not.toBeInTheDocument();
+
+      renderResult.rerender(
+        <ConfigContext.Provider value={createConfigContextValue(2025)}>
+          <MemoryRouter>
+            <PaymentReportsPage />
+          </MemoryRouter>
+        </ConfigContext.Provider>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('Filters')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Filters'));
+      expect(screen.getByLabelText('Year')).toHaveValue('2025');
     });
 
     it('should clear all filters', async () => {

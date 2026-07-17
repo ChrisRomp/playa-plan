@@ -149,7 +149,15 @@ export function ManageRegistrationsPage() {
     }
 
     debounceTimerRef.current = setTimeout(() => {
-      setFilters(localFilters);
+      setFilters(currentFilters => {
+        const filtersUnchanged =
+          currentFilters.year === localFilters.year &&
+          currentFilters.status === localFilters.status &&
+          currentFilters.email === localFilters.email &&
+          currentFilters.name === localFilters.name;
+
+        return filtersUnchanged ? currentFilters : localFilters;
+      });
     }, 500); // 500ms debounce
 
     return () => {

@@ -107,5 +107,8 @@ describe('ManageRegistrationsPage', () => {
       expect(adminRegistrationsApi.getRegistrations).toHaveBeenCalledWith({ year: 2026 });
     });
     expect(adminRegistrationsApi.getRegistrations).not.toHaveBeenCalledWith({});
+
+    await new Promise(resolve => setTimeout(resolve, 550));
+    expect(adminRegistrationsApi.getRegistrations).toHaveBeenCalledTimes(1);
   });
 });
