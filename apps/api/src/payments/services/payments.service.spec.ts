@@ -1146,7 +1146,11 @@ describe('PaymentsService', () => {
       });
       expect(mockStripeService.getCheckoutSession).toHaveBeenCalledWith(sessionId);
       expect(mockPrismaService.payment.updateMany).toHaveBeenCalledWith({
-        where: { id: mockPayment.id, status: PaymentStatus.PENDING },
+        where: {
+          id: mockPayment.id,
+          registrationId: null,
+          status: PaymentStatus.PENDING,
+        },
         data: { status: PaymentStatus.COMPLETED },
       });
 
@@ -1191,10 +1195,11 @@ describe('PaymentsService', () => {
       });
       expect(mockStripeService.getCheckoutSession).toHaveBeenCalledWith(sessionId);
 
-      // Should not update already completed payment
-      expect(mockPrismaService.$transaction).not.toHaveBeenCalled();
-      // Transaction already tested: expect(mockPrismaService.$transaction).toHaveBeenCalled();
-      // Transaction already tested
+      expect(mockPrismaService.$transaction).toHaveBeenCalledWith(expect.any(Function), {
+        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+      });
+      expect(mockPrismaService.payment.updateMany).not.toHaveBeenCalled();
+      expect(mockPrismaService.registration.updateMany).not.toHaveBeenCalled();
 
       expect(result).toEqual({
         sessionId,
@@ -1422,6 +1427,110 @@ describe('PaymentsService', () => {
       });
     });
 
+    it('should reconcile the registration linked when the serializable transaction begins', async () => {
+      const initiallyLinkedPayment = {
+        ...mockPayment,
+        registration: mockRegistration,
+      };
+      const transactionRegistration = {
+        ...mockRegistration,
+        id: 'registration-b',
+      };
+      const transactionPayment = {
+        ...mockPayment,
+        registrationId: transactionRegistration.id,
+        registration: transactionRegistration,
+      };
+      let transactionStarted = false;
+      mockPrismaService.payment.findFirst.mockResolvedValue(initiallyLinkedPayment);
+      mockPrismaService.payment.findUnique.mockImplementation(async () => {
+        expect(transactionStarted).toBe(true);
+        return transactionPayment;
+      });
+      mockPrismaService.$transaction.mockImplementation(
+        async (callback: (tx: typeof mockPrismaService) => Promise<unknown>) => {
+          transactionStarted = true;
+          return callback(mockPrismaService);
+        }
+      );
+      mockStripeService.getCheckoutSession.mockResolvedValue({
+        id: sessionId,
+        status: 'complete',
+        payment_status: 'paid',
+      });
+
+      const actualResult = await service.verifyStripeSession(sessionId);
+
+      expect(mockPrismaService.payment.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: mockPayment.id,
+          registrationId: transactionRegistration.id,
+          status: PaymentStatus.PENDING,
+        },
+        data: { status: PaymentStatus.COMPLETED },
+      });
+      expect(mockPrismaService.registration.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: transactionRegistration.id,
+          paymentDeferred: false,
+          status: RegistrationStatus.PENDING,
+        },
+        data: {
+          status: RegistrationStatus.CONFIRMED,
+          paymentDeferred: false,
+        },
+      });
+      expect(actualResult.registrationId).toBe(transactionRegistration.id);
+      expect(actualResult.registrationStatus).toBe(RegistrationStatus.CONFIRMED);
+    });
+
+    it('should reload the durable association when the registration identity guard loses a race', async () => {
+      const initiallyLinkedPayment = {
+        ...mockPayment,
+        registration: mockRegistration,
+      };
+      const relinkedRegistration = {
+        ...mockRegistration,
+        id: 'registration-b',
+        status: RegistrationStatus.WAITLISTED,
+      };
+      const relinkedPayment = {
+        ...mockPayment,
+        registrationId: relinkedRegistration.id,
+        registration: relinkedRegistration,
+      };
+      mockPrismaService.payment.findFirst.mockResolvedValue(initiallyLinkedPayment);
+      mockPrismaService.payment.findUnique
+        .mockResolvedValueOnce(initiallyLinkedPayment)
+        .mockResolvedValueOnce(relinkedPayment);
+      mockPrismaService.payment.updateMany.mockResolvedValue({ count: 0 });
+      mockStripeService.getCheckoutSession.mockResolvedValue({
+        id: sessionId,
+        status: 'complete',
+        payment_status: 'paid',
+      });
+
+      const actualResult = await service.verifyStripeSession(sessionId);
+
+      expect(mockPrismaService.payment.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: mockPayment.id,
+          registrationId: mockRegistration.id,
+          status: PaymentStatus.PENDING,
+        },
+        data: { status: PaymentStatus.COMPLETED },
+      });
+      expect(mockPrismaService.registration.updateMany).not.toHaveBeenCalled();
+      expect(actualResult).toEqual({
+        sessionId,
+        paymentStatus: PaymentStatus.PENDING,
+        registrationId: relinkedRegistration.id,
+        registrationStatus: RegistrationStatus.WAITLISTED,
+        paymentId: mockPayment.id,
+      });
+      expect(mockNotificationsService.sendRegistrationConfirmationEmail).not.toHaveBeenCalled();
+    });
+
     it.each([
       [PaymentStatus.FAILED, RegistrationStatus.CANCELLED],
       [PaymentStatus.PARTIALLY_REFUNDED, RegistrationStatus.PENDING],
@@ -1509,7 +1618,11 @@ describe('PaymentsService', () => {
         const actualResult = await service.verifyStripeSession(sessionId);
 
         expect(mockPrismaService.payment.updateMany).toHaveBeenCalledWith({
-          where: { id: mockPayment.id, status: PaymentStatus.PENDING },
+          where: {
+            id: mockPayment.id,
+            registrationId: mockRegistration.id,
+            status: PaymentStatus.PENDING,
+          },
           data: { status: PaymentStatus.COMPLETED },
         });
         expect(mockPrismaService.registration.updateMany).not.toHaveBeenCalled();
@@ -3044,6 +3157,14 @@ describe('PaymentsService', () => {
 
       await service.verifyStripeSession('cs_deferred_retry');
 
+      expect(mockPrismaService.payment.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: 'payment-id',
+          registrationId: 'registration-id',
+          status: PaymentStatus.COMPLETED,
+        },
+        data: { status: PaymentStatus.COMPLETED },
+      });
       expect(mockPrismaService.registration.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: {
@@ -3110,6 +3231,14 @@ describe('PaymentsService', () => {
 
       await service.verifyStripeSession('cs_waitlisted_pay');
 
+      expect(mockPrismaService.payment.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: 'payment-id',
+          registrationId: 'registration-id',
+          status: PaymentStatus.PENDING,
+        },
+        data: { status: PaymentStatus.COMPLETED },
+      });
       expect(mockPrismaService.registration.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: {
@@ -4213,6 +4342,16 @@ describe('PaymentsService', () => {
       };
     }
 
+    async function sanitizeStripeRefundRequest(
+      request: Record<string, unknown>
+    ): Promise<CreateRefundDto> {
+      const validationPipe = new GlobalValidationPipe();
+      return validationPipe.transform(request, {
+        type: 'body',
+        metatype: CreateRefundDto,
+      }) as Promise<CreateRefundDto>;
+    }
+
     beforeEach(() => {
       mockPrismaService.$transaction.mockImplementation(
         async (callback: (tx: typeof mockPrismaService) => Promise<unknown>) =>
@@ -4345,6 +4484,51 @@ describe('PaymentsService', () => {
         });
       }
     );
+
+    it('should persist a Stripe refund reason at the exact post-sanitization limit', async () => {
+      const sanitizedRequest = await sanitizeStripeRefundRequest({
+        ...stripeRequest,
+        reason: '&'.repeat(100),
+      });
+
+      await service.createRefund(paymentId, sanitizedRequest, 'admin-id');
+
+      expect(sanitizedRequest.reason).toHaveLength(500);
+      expect(mockPrismaService.paymentRefund.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ reason: sanitizedRequest.reason }),
+        select: expect.any(Object),
+      });
+      expect(mockPrismaService.adminAudit.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          reason: sanitizedRequest.reason,
+          newValues: expect.objectContaining({ reason: sanitizedRequest.reason }),
+        }),
+      });
+      expect(mockStripeService.createAdminRefund).toHaveBeenCalledWith({
+        providerRefId: 'pi_original',
+        amountCents: 2500,
+        idempotencyKey,
+        localRefundId: refundId,
+      });
+    });
+
+    it('should reject a 501-character sanitized Stripe reason before reservation', async () => {
+      const sanitizedRequest = await sanitizeStripeRefundRequest({
+        ...stripeRequest,
+        reason: `${'&'.repeat(100)}x`,
+      });
+
+      expect(sanitizedRequest.reason).toHaveLength(501);
+      await expect(
+        service.createRefund(paymentId, sanitizedRequest, 'admin-id')
+      ).rejects.toThrow('reason must not exceed 500 characters after sanitization');
+
+      expect(mockPrismaService.$transaction).not.toHaveBeenCalled();
+      expect(mockPrismaService.paymentRefund.create).not.toHaveBeenCalled();
+      expect(mockPrismaService.adminAudit.create).not.toHaveBeenCalled();
+      expect(mockStripeService.createAdminRefund).not.toHaveBeenCalled();
+      expect(mockStripeService.findAdminRefund).not.toHaveBeenCalled();
+    });
 
     it('should snapshot and submit the trimmed original Stripe target', async () => {
       mockPrismaService.payment.findUnique.mockResolvedValue({

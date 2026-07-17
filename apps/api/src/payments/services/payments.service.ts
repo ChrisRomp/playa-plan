@@ -1446,7 +1446,7 @@ export class PaymentsService {
       amountCents: data.amountCents,
       fullRefund: data.fullRefund === true,
       executionMode: RefundExecutionMode.STRIPE,
-      reason: data.reason?.trim() || null,
+      reason: this.canonicalizeRefundText(data.reason, REFUND_REASON_MAX_LENGTH, 'reason'),
       externalReference: null,
       resultingRegistrationStatus: data.resultingRegistrationStatus ?? null,
     };
@@ -2434,11 +2434,13 @@ export class PaymentsService {
 
       // Determine the payment status based on Stripe session
       let updatedPaymentStatus = payment.status;
+      let updatedRegistrationId = payment.registration?.id;
       let updatedRegistrationStatus = payment.registration?.status;
 
       if (stripeSession.payment_status === 'paid') {
-        const paidState = await this.reconcilePaidStripeSession(payment);
+        const paidState = await this.reconcilePaidStripeSession(payment.id);
         updatedPaymentStatus = paidState.paymentStatus;
+        updatedRegistrationId = paidState.registrationId;
         updatedRegistrationStatus = paidState.registrationStatus;
       } else if (
         stripeSession.payment_status === 'unpaid' &&
@@ -2462,7 +2464,7 @@ export class PaymentsService {
       return {
         sessionId,
         paymentStatus: updatedPaymentStatus,
-        registrationId: payment.registration?.id,
+        registrationId: updatedRegistrationId,
         registrationStatus: updatedRegistrationStatus,
         paymentId: payment.id,
       };
@@ -2479,58 +2481,80 @@ export class PaymentsService {
     }
   }
 
-  private async reconcilePaidStripeSession(payment: PaymentWithRelations): Promise<{
+  private async reconcilePaidStripeSession(paymentId: string): Promise<{
     paymentStatus: PaymentStatus;
+    registrationId?: string;
     registrationStatus?: RegistrationStatus;
   }> {
-    const currentPayment = await this.loadStripeVerificationPayment(payment.id);
-    if (
-      currentPayment.status === PaymentStatus.FAILED ||
-      currentPayment.status === PaymentStatus.PARTIALLY_REFUNDED ||
-      currentPayment.status === PaymentStatus.REFUNDED
-    ) {
-      return {
-        paymentStatus: currentPayment.status,
-        registrationStatus: currentPayment.registration?.status,
-      };
-    }
-
-    const registration = currentPayment.registration;
-    const registrationIsProtected =
-      registration !== null &&
-      registration !== undefined &&
-      (registration.status === RegistrationStatus.CANCELLED ||
-        isApplicationStatus(registration.status));
-    const targetRegistrationStatus =
-      registration?.status === RegistrationStatus.WAITLISTED
-        ? RegistrationStatus.WAITLISTED
-        : RegistrationStatus.CONFIRMED;
-    const shouldCompletePayment = currentPayment.status === PaymentStatus.PENDING;
-    const shouldUpdateRegistration =
-      registration !== null &&
-      registration !== undefined &&
-      !registrationIsProtected &&
-      ((currentPayment.status === PaymentStatus.PENDING &&
-        (registration.status !== targetRegistrationStatus || registration.paymentDeferred)) ||
-        (currentPayment.status === PaymentStatus.COMPLETED && registration.paymentDeferred));
-
-    if (!shouldCompletePayment && !shouldUpdateRegistration) {
-      return {
-        paymentStatus: currentPayment.status,
-        registrationStatus: registration?.status,
-      };
-    }
-
     try {
-      await this.prisma.$transaction(
+      const paidState = await this.prisma.$transaction(
         async tx => {
-          if (shouldCompletePayment) {
+          const currentPayment = (await tx.payment.findUnique({
+            where: { id: paymentId },
+            include: { registration: true },
+          })) as PaymentWithRelations | null;
+          if (!currentPayment) {
+            throw new NotFoundException(`Payment with ID ${paymentId} not found`);
+          }
+
+          const registration = currentPayment.registration;
+          if (
+            currentPayment.status === PaymentStatus.FAILED ||
+            currentPayment.status === PaymentStatus.PARTIALLY_REFUNDED ||
+            currentPayment.status === PaymentStatus.REFUNDED
+          ) {
+            return {
+              paymentStatus: currentPayment.status,
+              registrationId: registration?.id,
+              registrationStatus: registration?.status,
+              confirmationRegistrationId: undefined,
+            };
+          }
+
+          const registrationIsProtected =
+            registration !== null &&
+            registration !== undefined &&
+            (registration.status === RegistrationStatus.CANCELLED ||
+              isApplicationStatus(registration.status));
+          const targetRegistrationStatus =
+            registration?.status === RegistrationStatus.WAITLISTED
+              ? RegistrationStatus.WAITLISTED
+              : RegistrationStatus.CONFIRMED;
+          const shouldCompletePayment = currentPayment.status === PaymentStatus.PENDING;
+          const shouldUpdateRegistration =
+            registration !== null &&
+            registration !== undefined &&
+            !registrationIsProtected &&
+            ((currentPayment.status === PaymentStatus.PENDING &&
+              (registration.status !== targetRegistrationStatus ||
+                registration.paymentDeferred)) ||
+              (currentPayment.status === PaymentStatus.COMPLETED &&
+                registration.paymentDeferred));
+
+          if (!shouldCompletePayment && !shouldUpdateRegistration) {
+            return {
+              paymentStatus: currentPayment.status,
+              registrationId: registration?.id,
+              registrationStatus: registration?.status,
+              confirmationRegistrationId: undefined,
+            };
+          }
+
+          if (shouldCompletePayment || shouldUpdateRegistration) {
             const paymentTransition = await tx.payment.updateMany({
-              where: { id: currentPayment.id, status: PaymentStatus.PENDING },
-              data: { status: PaymentStatus.COMPLETED },
+              where: {
+                id: currentPayment.id,
+                registrationId: currentPayment.registrationId,
+                status: currentPayment.status,
+              },
+              data: {
+                status: shouldCompletePayment ? PaymentStatus.COMPLETED : currentPayment.status,
+              },
             });
             if (paymentTransition.count !== 1) {
-              throw new ConflictException('Payment status changed during Stripe verification');
+              throw new ConflictException(
+                'Payment status or registration changed during Stripe verification'
+              );
             }
           }
 
@@ -2550,41 +2574,58 @@ export class PaymentsService {
               throw new ConflictException('Registration status changed during Stripe verification');
             }
           }
+
+          return {
+            paymentStatus: shouldCompletePayment
+              ? PaymentStatus.COMPLETED
+              : currentPayment.status,
+            registrationId: registration?.id,
+            registrationStatus:
+              shouldUpdateRegistration && registration
+                ? targetRegistrationStatus
+                : registration?.status,
+            confirmationRegistrationId:
+              shouldUpdateRegistration && registration && !registration.paymentDeferred
+                ? registration.id
+                : undefined,
+          };
         },
         { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
       );
+
+      if (paidState.confirmationRegistrationId) {
+        this.sendRegistrationConfirmationEmailAfterPayment(
+          paidState.confirmationRegistrationId
+        ).catch(emailError => {
+          this.logger.warn(
+            `Failed to send registration confirmation email: ${emailError instanceof Error ? emailError.message : 'Unknown error'}`
+          );
+        });
+      }
+
+      return {
+        paymentStatus: paidState.paymentStatus,
+        registrationId: paidState.registrationId,
+        registrationStatus: paidState.registrationStatus,
+      };
     } catch (error: unknown) {
       if (error instanceof ConflictException || this.isSerializationConflict(error)) {
-        return this.reloadStripeVerificationState(currentPayment.id);
+        return this.reloadStripeVerificationState(paymentId);
       }
       throw error;
     }
-
-    if (shouldUpdateRegistration && registration && !registration.paymentDeferred) {
-      this.sendRegistrationConfirmationEmailAfterPayment(registration.id).catch(emailError => {
-        this.logger.warn(
-          `Failed to send registration confirmation email: ${emailError instanceof Error ? emailError.message : 'Unknown error'}`
-        );
-      });
-    }
-
-    return {
-      paymentStatus: shouldCompletePayment ? PaymentStatus.COMPLETED : currentPayment.status,
-      registrationStatus:
-        shouldUpdateRegistration && registration
-          ? targetRegistrationStatus
-          : registration?.status,
-    };
   }
 
   private async reloadStripeVerificationState(paymentId: string): Promise<{
     paymentStatus: PaymentStatus;
+    registrationId?: string;
     registrationStatus?: RegistrationStatus;
   }> {
     const currentPayment = await this.loadStripeVerificationPayment(paymentId);
 
     return {
       paymentStatus: currentPayment.status,
+      registrationId: currentPayment.registration?.id,
       registrationStatus: currentPayment.registration?.status,
     };
   }
