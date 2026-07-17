@@ -18,6 +18,7 @@ const mockStripeInstance = {
   },
   refunds: {
     create: jest.fn(),
+    list: jest.fn(),
   },
 };
 
@@ -226,7 +227,7 @@ describe('StripeService', () => {
         amount,
         reason: 'requested_by_customer',
       });
-      
+
       expect(loggerSpy.log).toHaveBeenCalledWith(
         expect.stringContaining('Creating refund'),
       );
@@ -366,7 +367,320 @@ describe('StripeService', () => {
       );
     });
   });
-  
+
+  describe('admin refunds', () => {
+    const inputRequest = {
+      providerRefId: 'pi_123',
+      amountCents: 2500,
+      idempotencyKey: '43ea4b84-1f0d-413d-bc1c-9c91b435d66d',
+      localRefundId: 'refund-local-id',
+    };
+
+    it('should submit integer cents with stable idempotency and local metadata without a reason', async () => {
+      mockStripeInstance.refunds.create.mockResolvedValue({
+        id: 're_provider_id',
+        status: 'succeeded',
+      });
+
+      const actualResult = await service.createAdminRefund(inputRequest);
+
+      expect(mockStripeInstance.refunds.create).toHaveBeenCalledWith(
+        {
+          payment_intent: 'pi_123',
+          amount: 2500,
+          metadata: { paymentRefundId: 'refund-local-id' },
+        },
+        { idempotencyKey: inputRequest.idempotencyKey }
+      );
+      expect(actualResult).toEqual({
+        outcome: 'SUCCEEDED',
+        providerRefundId: 're_provider_id',
+      });
+    });
+
+    it('should resolve a checkout session before submitting', async () => {
+      mockStripeInstance.checkout.sessions.retrieve.mockResolvedValue({
+        payment_intent: 'pi_resolved',
+      });
+      mockStripeInstance.refunds.create.mockResolvedValue({
+        id: 're_provider_id',
+        status: 'succeeded',
+      });
+
+      await service.createAdminRefund({
+        ...inputRequest,
+        providerRefId: 'cs_checkout',
+      });
+
+      expect(mockStripeInstance.checkout.sessions.retrieve).toHaveBeenCalledWith('cs_checkout', {
+        expand: ['payment_intent'],
+      });
+      expect(mockStripeInstance.refunds.create).toHaveBeenCalledWith(
+        expect.objectContaining({ payment_intent: 'pi_resolved' }),
+        { idempotencyKey: inputRequest.idempotencyKey }
+      );
+    });
+
+    it.each([
+      'cs_test_a1B2c3D4e5F6g7H8i9J0',
+      'cs_live_z9Y8x7W6v5U4t3S2r1Q0',
+    ])(
+      'should redact a Checkout Session ID when the session has no payment intent',
+      async sessionId => {
+        mockStripeInstance.checkout.sessions.retrieve.mockResolvedValue({
+          id: sessionId,
+          payment_intent: null,
+        });
+
+        const actualResult = await service.createAdminRefund({
+          ...inputRequest,
+          providerRefId: sessionId,
+        });
+
+        expect(actualResult).toEqual({
+          outcome: 'FAILED',
+          failureMessage:
+            'Stripe rejected the refund request: Checkout session [redacted] has no associated payment intent',
+        });
+        expect(JSON.stringify(actualResult)).not.toContain(sessionId);
+        expect(loggerSpy.error).toHaveBeenCalledWith(
+          'Stripe rejected the refund request: Checkout session [redacted] has no associated payment intent'
+        );
+        expect(loggerSpy.error.mock.calls.flat().join(' ')).not.toContain(sessionId);
+        expect(mockStripeInstance.refunds.create).not.toHaveBeenCalled();
+      }
+    );
+
+    it('should classify and sanitize a definite rejection', async () => {
+      const sensitiveIdentifiers = [
+        'pi_3MwDX2CZ6qsJgOG31M02Umy2',
+        're_3MwDX2CZ6qsJgOG31M02Umy2',
+        'ch_3MwDX2CZ6qsJgOG31M02Umy2',
+        'req_3MwDX2CZ6qsJgOG31M02Umy2',
+      ];
+      mockStripeInstance.refunds.create.mockRejectedValue({
+        type: 'StripeInvalidRequestError',
+        message: `No such payment_intent: ${sensitiveIdentifiers.join(' ')}. Keep re_enter ch_name req_id and cs_test mode. ${'x'.repeat(600)}`,
+      });
+
+      const actualResult = await service.createAdminRefund(inputRequest);
+
+      expect(actualResult.outcome).toBe('FAILED');
+      if (actualResult.outcome !== 'FAILED') {
+        throw new Error('Expected a definite failure');
+      }
+      for (const sensitiveIdentifier of sensitiveIdentifiers) {
+        expect(actualResult.failureMessage).not.toContain(sensitiveIdentifier);
+        expect(loggerSpy.error.mock.calls.flat().join(' ')).not.toContain(sensitiveIdentifier);
+      }
+      expect(actualResult.failureMessage).toContain(
+        '[redacted] [redacted] [redacted] [redacted]'
+      );
+      expect(actualResult.failureMessage).toContain('Keep re_enter ch_name req_id and cs_test mode.');
+      expect(loggerSpy.error).toHaveBeenCalledWith(actualResult.failureMessage);
+      expect(actualResult.failureMessage.length).toBeLessThanOrEqual(500);
+    });
+
+    it.each(['StripeConnectionError', 'StripeAPIError'])(
+      'should classify %s as pending unknown',
+      async errorType => {
+        mockStripeInstance.refunds.create.mockRejectedValue({
+          type: errorType,
+          message: 'Transport failed',
+        });
+
+        await expect(service.createAdminRefund(inputRequest)).resolves.toEqual({
+          outcome: 'PENDING_UNKNOWN',
+        });
+      }
+    );
+
+    it('should keep a rate-limited refund pending for retry', async () => {
+      mockStripeInstance.refunds.create.mockRejectedValue({
+        type: 'StripeRateLimitError',
+        message: 'Too many requests',
+      });
+
+      await expect(service.createAdminRefund(inputRequest)).resolves.toEqual({
+        outcome: 'PENDING_UNKNOWN',
+      });
+    });
+
+    it('should keep a concurrent idempotency conflict pending', async () => {
+      mockStripeInstance.refunds.create.mockRejectedValue({
+        type: 'StripeIdempotencyError',
+        message: 'Another request with this key is executing',
+      });
+
+      await expect(service.createAdminRefund(inputRequest)).resolves.toEqual({
+        outcome: 'PENDING_UNKNOWN',
+      });
+    });
+
+    it.each([
+      ['pending', 'PENDING_UNKNOWN'],
+      ['requires_action', 'PENDING_UNKNOWN'],
+      ['failed', 'FAILED'],
+      ['canceled', 'FAILED'],
+    ] as const)('should classify Stripe refund status %s as %s', async (status, outcome) => {
+      mockStripeInstance.refunds.create.mockResolvedValue({
+        id: 're_provider_id',
+        status,
+      });
+
+      const actualResult = await service.createAdminRefund(inputRequest);
+
+      expect(actualResult.outcome).toBe(outcome);
+    });
+
+    it('should find an existing refund by local metadata', async () => {
+      mockStripeInstance.refunds.list.mockResolvedValue({
+        has_more: false,
+        data: [
+          {
+            id: 're_other',
+            status: 'succeeded',
+            metadata: { paymentRefundId: 'other-refund' },
+          },
+          {
+            id: 're_match',
+            status: 'succeeded',
+            metadata: { paymentRefundId: inputRequest.localRefundId },
+          },
+        ],
+      });
+
+      const actualResult = await service.findAdminRefund(
+        inputRequest.providerRefId,
+        inputRequest.localRefundId
+      );
+
+      expect(mockStripeInstance.refunds.list).toHaveBeenCalledWith({
+        payment_intent: inputRequest.providerRefId,
+        limit: 100,
+      });
+      expect(actualResult).toEqual({
+        outcome: 'FOUND',
+        providerRefundId: 're_match',
+      });
+    });
+
+    it('should find a matching refund on a later page', async () => {
+      mockStripeInstance.refunds.list
+        .mockResolvedValueOnce({
+          has_more: true,
+          data: [
+            {
+              id: 're_first_page',
+              status: 'succeeded',
+              metadata: { paymentRefundId: 'other-refund' },
+            },
+          ],
+        })
+        .mockResolvedValueOnce({
+          has_more: false,
+          data: [
+            {
+              id: 're_later_match',
+              status: 'succeeded',
+              metadata: { paymentRefundId: inputRequest.localRefundId },
+            },
+          ],
+        });
+
+      await expect(
+        service.findAdminRefund(inputRequest.providerRefId, inputRequest.localRefundId)
+      ).resolves.toEqual({
+        outcome: 'FOUND',
+        providerRefundId: 're_later_match',
+      });
+      expect(mockStripeInstance.refunds.list).toHaveBeenNthCalledWith(2, {
+        payment_intent: inputRequest.providerRefId,
+        limit: 100,
+        starting_after: 're_first_page',
+      });
+    });
+
+    it('should report not found only after every page is inspected', async () => {
+      mockStripeInstance.refunds.list
+        .mockResolvedValueOnce({
+          has_more: true,
+          data: [
+            {
+              id: 're_first_page',
+              status: 'succeeded',
+              metadata: { paymentRefundId: 'other-refund' },
+            },
+          ],
+        })
+        .mockResolvedValueOnce({
+          has_more: false,
+          data: [
+            {
+              id: 're_last_page',
+              status: 'succeeded',
+              metadata: { paymentRefundId: 'another-refund' },
+            },
+          ],
+        });
+
+      await expect(
+        service.findAdminRefund(inputRequest.providerRefId, inputRequest.localRefundId)
+      ).resolves.toEqual({ outcome: 'NOT_FOUND' });
+      expect(mockStripeInstance.refunds.list).toHaveBeenCalledTimes(2);
+    });
+
+    it('should preserve pending state when a later page cannot be inspected', async () => {
+      mockStripeInstance.refunds.list
+        .mockResolvedValueOnce({
+          has_more: true,
+          data: [
+            {
+              id: 're_first_page',
+              status: 'succeeded',
+              metadata: { paymentRefundId: 'other-refund' },
+            },
+          ],
+        })
+        .mockRejectedValueOnce({
+          type: 'StripeConnectionError',
+          message: 'Connection reset',
+        });
+
+      await expect(
+        service.findAdminRefund(inputRequest.providerRefId, inputRequest.localRefundId)
+      ).resolves.toEqual({ outcome: 'PENDING_UNKNOWN' });
+    });
+
+    it('should not finalize a matching non-successful inspected refund', async () => {
+      mockStripeInstance.refunds.list.mockResolvedValue({
+        has_more: false,
+        data: [
+          {
+            id: 're_pending',
+            status: 'pending',
+            metadata: { paymentRefundId: inputRequest.localRefundId },
+          },
+        ],
+      });
+
+      await expect(
+        service.findAdminRefund(inputRequest.providerRefId, inputRequest.localRefundId)
+      ).resolves.toEqual({ outcome: 'PENDING_UNKNOWN' });
+    });
+
+    it('should preserve pending state when inspection is ambiguous', async () => {
+      mockStripeInstance.refunds.list.mockRejectedValue({
+        type: 'StripeConnectionError',
+        message: 'Connection reset',
+      });
+
+      await expect(
+        service.findAdminRefund(inputRequest.providerRefId, inputRequest.localRefundId)
+      ).resolves.toEqual({ outcome: 'PENDING_UNKNOWN' });
+    });
+  });
+
   describe('getPaymentIntent', () => {
     it('should retrieve a payment intent by ID', async () => {
       const paymentIntentId = 'pi_123';

@@ -23,6 +23,11 @@ describe('CreateRefundDto', () => {
   it.each([
     validRequest,
     {
+      amountCents: 5000,
+      executionMode: RefundExecutionMode.STRIPE,
+      idempotencyKey: validRequest.idempotencyKey,
+    },
+    {
       fullRefund: true,
       executionMode: RefundExecutionMode.MANUAL,
       idempotencyKey: validRequest.idempotencyKey,
@@ -109,10 +114,20 @@ describe('CreateRefundDto', () => {
     }
   );
 
-  it('should reject non-manual mode, invalid UUID, oversized text, and derived fields', async () => {
+  it('should reject a manual-only external reference for Stripe mode', async () => {
     const actualErrors = await validateRequest({
       ...validRequest,
       executionMode: RefundExecutionMode.STRIPE,
+      externalReference: 'external-refund-123',
+    });
+
+    expect(actualErrors.find(error => error.property === 'externalReference')).toBeDefined();
+  });
+
+  it('should reject invalid mode, invalid UUID, oversized text, and derived fields', async () => {
+    const actualErrors = await validateRequest({
+      ...validRequest,
+      executionMode: 'PAYPAL',
       idempotencyKey: 'not-a-uuid',
       reason: 'x'.repeat(501),
       externalReference: 'x'.repeat(256),

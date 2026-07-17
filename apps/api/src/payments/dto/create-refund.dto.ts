@@ -1,7 +1,7 @@
 import { Transform } from 'class-transformer';
 import {
   Allow,
-  Equals,
+  IsEnum,
   IsIn,
   IsOptional,
   IsString,
@@ -67,8 +67,20 @@ class RefundAmountSelectionConstraint implements ValidatorConstraintInterface {
   }
 }
 
+@ValidatorConstraint({ name: 'manualRefundExternalReference', async: false })
+class ManualRefundExternalReferenceConstraint implements ValidatorConstraintInterface {
+  validate(externalReference: unknown, validationArguments: ValidationArguments): boolean {
+    const request = validationArguments.object as CreateRefundDto;
+    return request.executionMode === RefundExecutionMode.MANUAL || externalReference === undefined;
+  }
+
+  defaultMessage(): string {
+    return 'externalReference is supported only for MANUAL refunds';
+  }
+}
+
 /**
- * Data required to record an already-completed manual refund.
+ * Data required to create a manual or Stripe refund.
  */
 export class CreateRefundDto {
   @ApiPropertyOptional({
@@ -87,10 +99,10 @@ export class CreateRefundDto {
   fullRefund?: boolean;
 
   @ApiProperty({
-    description: 'Manual refunds record an already-completed external refund',
-    enum: [RefundExecutionMode.MANUAL],
+    description: 'Manual records an external refund; Stripe initiates a processor refund',
+    enum: RefundExecutionMode,
   })
-  @Equals(RefundExecutionMode.MANUAL)
+  @IsEnum(RefundExecutionMode)
   executionMode!: RefundExecutionMode;
 
   @ApiPropertyOptional({
@@ -111,6 +123,7 @@ export class CreateRefundDto {
   @IsOptional()
   @IsString()
   @MaxLength(255)
+  @Validate(ManualRefundExternalReferenceConstraint)
   externalReference?: string;
 
   @ApiPropertyOptional({

@@ -13,6 +13,7 @@ export type ExternalPaymentMethod =
 export type RefundExecutionMode = 'MANUAL' | 'STRIPE';
 export type PaymentRefundStatus = 'PENDING' | 'SUCCEEDED' | 'FAILED';
 export type RefundRegistrationStatus = 'PENDING' | 'CONFIRMED' | 'WAITLISTED';
+export type RefundCommandOutcome = 'SUCCEEDED' | 'FAILED' | 'PENDING_UNKNOWN';
 
 export interface AdminPaymentRefund {
   id: string;
@@ -77,6 +78,7 @@ export interface AdminPayment {
   pendingRefundCents: number;
   availableRefundCents: number;
   refundUnavailableReason: string | null;
+  stripeRefundEligible: boolean;
 }
 
 export interface AdminPaymentPage {
@@ -105,7 +107,6 @@ export type RefundAmountSelection =
 
 interface CreateRefundRequestFields {
   reason?: string;
-  externalReference?: string;
   resultingRegistrationStatus?: RefundRegistrationStatus;
   idempotencyKey: string;
 }
@@ -113,9 +114,18 @@ interface CreateRefundRequestFields {
 export type CreateManualRefundRequest = RefundAmountSelection &
   CreateRefundRequestFields & {
     executionMode: 'MANUAL';
+    externalReference?: string;
   };
 
-export interface ManualRefundResult {
+export type CreateStripeRefundRequest = RefundAmountSelection &
+  CreateRefundRequestFields & {
+    executionMode: 'STRIPE';
+    externalReference?: never;
+  };
+
+export type CreateRefundRequest = CreateManualRefundRequest | CreateStripeRefundRequest;
+
+export interface RefundCommandResult {
   payment: AdminPayment;
   refund: AdminPaymentRefund;
   paymentAmountCents: number | null;
@@ -123,6 +133,7 @@ export interface ManualRefundResult {
   pendingRefundCents: number;
   availableRefundCents: number;
   refundUnavailableReason: string | null;
+  outcome: RefundCommandOutcome;
 }
 
 export const adminPaymentsApi = {
@@ -140,11 +151,19 @@ export const adminPaymentsApi = {
     return response.data;
   },
 
-  createManualRefund: async (
+  createRefund: async (
     paymentId: string,
-    request: CreateManualRefundRequest
-  ): Promise<ManualRefundResult> => {
+    request: CreateRefundRequest
+  ): Promise<RefundCommandResult> => {
     const response = await api.post(`/payments/${paymentId}/refunds`, request);
+    return response.data;
+  },
+
+  retryStripeRefund: async (
+    paymentId: string,
+    refundId: string
+  ): Promise<RefundCommandResult> => {
+    const response = await api.post(`/payments/${paymentId}/refunds/${refundId}/retry`);
     return response.data;
   },
 };
