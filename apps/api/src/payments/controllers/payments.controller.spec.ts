@@ -7,10 +7,11 @@ import { PaymentStatus, PaymentProvider, UserRole } from '@prisma/client';
 const mockPaymentsService = {
   create: jest.fn(),
   findAll: jest.fn(),
+  findAllForAdmin: jest.fn(),
   findOne: jest.fn(),
   findOneWithOwnershipCheck: jest.fn(),
   update: jest.fn(),
-  recordManualPayment: jest.fn(),
+  recordExternalPayment: jest.fn(),
   initiateStripePayment: jest.fn(),
   initiatePaypalPayment: jest.fn(),
   processRefund: jest.fn(),
@@ -102,6 +103,21 @@ describe('PaymentsController', () => {
       expect(result).toEqual(mockResponse);
     });
 
+    describe('findAllForAdmin', () => {
+      it('should return a bounded admin-safe payment list', async () => {
+        const mockResponse = {
+          payments: [{ id: 'payment-1', externalMethod: 'CHECK' }],
+          total: 1,
+        };
+        mockPaymentsService.findAllForAdmin.mockResolvedValue(mockResponse);
+
+        const actualResult = await controller.findAllForAdmin(0, 25);
+
+        expect(mockPaymentsService.findAllForAdmin).toHaveBeenCalledWith(0, 25);
+        expect(actualResult).toEqual(mockResponse);
+      });
+    });
+
     it('should apply filters when provided', async () => {
       // Mock data
       const mockPayments = [{ id: 'payment-1', amount: 100 }];
@@ -176,37 +192,44 @@ describe('PaymentsController', () => {
     });
   });
 
-  describe('recordManualPayment', () => {
-    it('should record a manual payment', async () => {
-      // Mock data
-      const mockManualPaymentDto = {
+  describe('recordExternalPayment', () => {
+    it('should record an external payment for the authenticated admin', async () => {
+      const mockExternalPaymentDto = {
+        registrationId: '7c8d0d55-e0a3-4cf0-a620-2412acd4361d',
         amount: 100,
         currency: 'USD',
-        userId: 'user-id',
-        reference: 'Cash payment',
-        status: PaymentStatus.COMPLETED,
+        externalMethod: 'CHECK' as const,
+        externalReference: 'check-123',
+        idempotencyKey: '43ea4b84-1f0d-413d-bc1c-9c91b435d66d',
       };
-      const mockPayment = { 
-        id: 'payment-id', 
+      const mockRequest = {
+        user: {
+          id: 'admin-id',
+          role: UserRole.ADMIN,
+        },
+      } as unknown as Parameters<typeof controller.recordExternalPayment>[1];
+      const mockPayment = {
+        id: 'payment-id',
         amount: 100,
         currency: 'USD',
         userId: 'user-id',
         status: PaymentStatus.COMPLETED,
-        provider: PaymentProvider.STRIPE,
-        providerRefId: 'manual:Cash payment',
+        provider: PaymentProvider.MANUAL,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
+      mockPaymentsService.recordExternalPayment.mockResolvedValue(mockPayment);
 
-      // Setup mocks
-      mockPaymentsService.recordManualPayment.mockResolvedValue(mockPayment);
+      const actualResult = await controller.recordExternalPayment(
+        mockExternalPaymentDto,
+        mockRequest,
+      );
 
-      // Execute
-      const result = await controller.recordManualPayment(mockManualPaymentDto);
-
-      // Assert
-      expect(mockPaymentsService.recordManualPayment).toHaveBeenCalledWith(mockManualPaymentDto);
-      expect(result).toEqual(mockPayment);
+      expect(mockPaymentsService.recordExternalPayment).toHaveBeenCalledWith(
+        mockExternalPaymentDto,
+        'admin-id',
+      );
+      expect(actualResult).toEqual(mockPayment);
     });
   });
 
