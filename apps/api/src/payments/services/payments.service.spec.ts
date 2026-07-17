@@ -44,6 +44,9 @@ const mockPrismaService = {
     update: jest.fn(),
     updateMany: jest.fn(),
   },
+  campingOptionRegistration: {
+    findMany: jest.fn(),
+  },
   adminAudit: {
     create: jest.fn(),
     findFirst: jest.fn(),
@@ -1056,6 +1059,28 @@ describe('PaymentsService', () => {
       updatedAt: new Date(),
     };
 
+    const mockPostPaymentConfirmationData = (
+      status: RegistrationStatus = RegistrationStatus.CONFIRMED
+    ): void => {
+      mockPrismaService.registration.findUnique.mockResolvedValueOnce({
+        ...mockRegistration,
+        status,
+        user: {
+          email: 'user@example.com',
+          firstName: 'Test',
+          lastName: 'User',
+          playaName: 'Tester',
+        },
+        jobs: [],
+        payments: [],
+      });
+      mockPrismaService.campingOptionRegistration.findMany.mockResolvedValueOnce([]);
+    };
+
+    const flushPostPaymentConfirmation = async (): Promise<void> => {
+      await new Promise<void>(resolve => setImmediate(resolve));
+    };
+
     beforeEach(() => {
       // Reset mocks before each test
       jest.clearAllMocks();
@@ -1085,9 +1110,20 @@ describe('PaymentsService', () => {
       mockPrismaService.payment.findFirst.mockResolvedValue(paymentWithRegistration);
       mockPrismaService.payment.findUnique.mockResolvedValue(paymentWithRegistration);
       mockStripeService.getCheckoutSession.mockResolvedValue(mockStripeSession);
+      mockPostPaymentConfirmationData();
+      mockPrismaService.$transaction.mockImplementation(
+        async (callback: (tx: typeof mockPrismaService) => Promise<unknown>) => {
+          const result = await callback(mockPrismaService);
+          expect(
+            mockNotificationsService.sendRegistrationConfirmationEmail
+          ).not.toHaveBeenCalled();
+          return result;
+        }
+      );
 
       // Execute
       const result = await service.verifyStripeSession(sessionId);
+      await flushPostPaymentConfirmation();
 
       // Assert
       expect(mockPrismaService.payment.findFirst).toHaveBeenCalledWith({
@@ -1106,6 +1142,7 @@ describe('PaymentsService', () => {
         registrationStatus: 'CONFIRMED',
         paymentId: mockPayment.id,
       });
+      expect(mockNotificationsService.sendRegistrationConfirmationEmail).toHaveBeenCalledTimes(1);
     });
 
     it('should verify successful payment without registration', async () => {
@@ -1163,6 +1200,7 @@ describe('PaymentsService', () => {
         registrationStatus: undefined,
         paymentId: mockPayment.id,
       });
+      expect(mockNotificationsService.sendRegistrationConfirmationEmail).not.toHaveBeenCalled();
     });
 
     it('should handle already completed payment', async () => {
@@ -1208,6 +1246,7 @@ describe('PaymentsService', () => {
         registrationStatus: 'CONFIRMED',
         paymentId: mockPayment.id,
       });
+      expect(mockNotificationsService.sendRegistrationConfirmationEmail).not.toHaveBeenCalled();
     });
 
     it('should handle expired session and update payment to failed', async () => {
@@ -1379,53 +1418,58 @@ describe('PaymentsService', () => {
       expect(mockPrismaService.payment.updateMany).not.toHaveBeenCalled();
     });
 
-    it('should update only payment status when registration is already confirmed', async () => {
-      // Mock payment with already confirmed registration
-      const partialCompletePayment = {
-        ...mockPayment,
-        status: PaymentStatus.PENDING, // Payment still pending
-        registration: {
-          ...mockRegistration,
-          status: 'CONFIRMED', // But registration already confirmed
-        },
-      };
+    it.each([RegistrationStatus.CONFIRMED, RegistrationStatus.WAITLISTED])(
+      'should complete payment and send confirmation when registration is already at target %s',
+      async registrationStatus => {
+        const partialCompletePayment = {
+          ...mockPayment,
+          status: PaymentStatus.PENDING,
+          registration: {
+            ...mockRegistration,
+            status: registrationStatus,
+          },
+        };
+        const mockStripeSession = {
+          id: sessionId,
+          status: 'complete',
+          payment_status: 'paid',
+        };
+        mockPrismaService.payment.findFirst.mockResolvedValue(partialCompletePayment);
+        mockPrismaService.payment.findUnique.mockResolvedValue(partialCompletePayment);
+        mockPostPaymentConfirmationData(registrationStatus);
+        mockStripeService.getCheckoutSession.mockResolvedValue(mockStripeSession);
 
-      // Mock successful Stripe session
-      const mockStripeSession = {
-        id: sessionId,
-        status: 'complete',
-        payment_status: 'paid',
-      };
+        const result = await service.verifyStripeSession(sessionId);
+        await flushPostPaymentConfirmation();
 
-      // Setup mocks
-      mockPrismaService.payment.findFirst.mockResolvedValue(partialCompletePayment);
-      mockPrismaService.payment.findUnique.mockResolvedValue(partialCompletePayment);
-      mockStripeService.getCheckoutSession.mockResolvedValue(mockStripeSession);
-      // Execute
-      const result = await service.verifyStripeSession(sessionId);
-
-      // Assert
-      expect(mockPrismaService.payment.findFirst).toHaveBeenCalledWith({
-        where: { providerRefId: sessionId },
-        include: { registration: true },
-      });
-      expect(mockStripeService.getCheckoutSession).toHaveBeenCalledWith(sessionId);
-
-      // Should still run transaction to update payment
-      expect(mockPrismaService.$transaction).toHaveBeenCalled();
-
-      // Individual update operations shouldn't be called
-      // Transaction already tested: expect(mockPrismaService.$transaction).toHaveBeenCalled();
-      // Transaction already tested
-
-      expect(result).toEqual({
-        sessionId,
-        paymentStatus: PaymentStatus.COMPLETED,
-        registrationId: mockRegistration.id,
-        registrationStatus: 'CONFIRMED',
-        paymentId: mockPayment.id,
-      });
-    });
+        expect(mockPrismaService.payment.findFirst).toHaveBeenCalledWith({
+          where: { providerRefId: sessionId },
+          include: { registration: true },
+        });
+        expect(mockStripeService.getCheckoutSession).toHaveBeenCalledWith(sessionId);
+        expect(mockPrismaService.$transaction).toHaveBeenCalled();
+        expect(result).toEqual({
+          sessionId,
+          paymentStatus: PaymentStatus.COMPLETED,
+          registrationId: mockRegistration.id,
+          registrationStatus,
+          paymentId: mockPayment.id,
+        });
+        expect(mockPrismaService.registration.updateMany).not.toHaveBeenCalled();
+        expect(mockNotificationsService.sendRegistrationConfirmationEmail).toHaveBeenCalledTimes(1);
+        expect(mockNotificationsService.sendRegistrationConfirmationEmail).toHaveBeenCalledWith(
+          'user@example.com',
+          expect.objectContaining({
+            id: mockRegistration.id,
+            year: 2024,
+            status: registrationStatus,
+          }),
+          'user-id',
+          'Test User',
+          'Tester'
+        );
+      }
+    );
 
     it('should reconcile the registration linked when the serializable transaction begins', async () => {
       const initiallyLinkedPayment = {
@@ -1531,6 +1575,38 @@ describe('PaymentsService', () => {
       expect(mockNotificationsService.sendRegistrationConfirmationEmail).not.toHaveBeenCalled();
     });
 
+    it('should not send confirmation when payment completion guard reloads a completed replay', async () => {
+      const pendingPayment = {
+        ...mockPayment,
+        registration: {
+          ...mockRegistration,
+          status: RegistrationStatus.CONFIRMED,
+          paymentDeferred: false,
+        },
+      };
+      const completedPayment = {
+        ...pendingPayment,
+        status: PaymentStatus.COMPLETED,
+      };
+      mockPrismaService.payment.findFirst.mockResolvedValue(pendingPayment);
+      mockPrismaService.payment.findUnique
+        .mockResolvedValueOnce(pendingPayment)
+        .mockResolvedValueOnce(completedPayment);
+      mockPrismaService.payment.updateMany.mockResolvedValue({ count: 0 });
+      mockStripeService.getCheckoutSession.mockResolvedValue({
+        id: sessionId,
+        status: 'complete',
+        payment_status: 'paid',
+      });
+
+      const actualResult = await service.verifyStripeSession(sessionId);
+
+      expect(actualResult.paymentStatus).toBe(PaymentStatus.COMPLETED);
+      expect(actualResult.registrationStatus).toBe(RegistrationStatus.CONFIRMED);
+      expect(mockPrismaService.registration.updateMany).not.toHaveBeenCalled();
+      expect(mockNotificationsService.sendRegistrationConfirmationEmail).not.toHaveBeenCalled();
+    });
+
     it.each([
       [PaymentStatus.FAILED, RegistrationStatus.CANCELLED],
       [PaymentStatus.PARTIALLY_REFUNDED, RegistrationStatus.PENDING],
@@ -1589,6 +1665,7 @@ describe('PaymentsService', () => {
       expect(actualResult.registrationStatus).toBe(RegistrationStatus.PENDING);
       expect(mockPrismaService.payment.updateMany).not.toHaveBeenCalled();
       expect(mockPrismaService.registration.updateMany).not.toHaveBeenCalled();
+      expect(mockNotificationsService.sendRegistrationConfirmationEmail).not.toHaveBeenCalled();
     });
 
     it.each([
@@ -1604,7 +1681,7 @@ describe('PaymentsService', () => {
           registration: {
             ...mockRegistration,
             status: protectedStatus,
-            paymentDeferred: true,
+            paymentDeferred: false,
           },
         };
         mockPrismaService.payment.findFirst.mockResolvedValue(paymentWithProtectedRegistration);
@@ -1628,6 +1705,7 @@ describe('PaymentsService', () => {
         expect(mockPrismaService.registration.updateMany).not.toHaveBeenCalled();
         expect(actualResult.paymentStatus).toBe(PaymentStatus.COMPLETED);
         expect(actualResult.registrationStatus).toBe(protectedStatus);
+        expect(mockNotificationsService.sendRegistrationConfirmationEmail).not.toHaveBeenCalled();
       }
     );
 
@@ -1662,6 +1740,7 @@ describe('PaymentsService', () => {
       expect(actualResult.paymentStatus).toBe(PaymentStatus.PARTIALLY_REFUNDED);
       expect(mockPrismaService.registration.updateMany).not.toHaveBeenCalled();
       expect(mockPrismaService.payment.update).not.toHaveBeenCalled();
+      expect(mockNotificationsService.sendRegistrationConfirmationEmail).not.toHaveBeenCalled();
     });
 
     it('should preserve a concurrent protected registration transition during paid verification', async () => {
@@ -1695,6 +1774,7 @@ describe('PaymentsService', () => {
       expect(actualResult.paymentStatus).toBe(PaymentStatus.PENDING);
       expect(actualResult.registrationStatus).toBe(RegistrationStatus.CANCELLED);
       expect(mockPrismaService.payment.update).not.toHaveBeenCalled();
+      expect(mockNotificationsService.sendRegistrationConfirmationEmail).not.toHaveBeenCalled();
     });
   });
 
@@ -3093,6 +3173,7 @@ describe('PaymentsService', () => {
           data: { status: 'CONFIRMED', paymentDeferred: false },
         })
       );
+      expect(mockNotificationsService.sendRegistrationConfirmationEmail).not.toHaveBeenCalled();
     });
 
     it('skips the post-payment confirmation email when paying off a deferred registration (already emailed at creation)', async () => {
@@ -3175,6 +3256,7 @@ describe('PaymentsService', () => {
           data: { status: 'CONFIRMED', paymentDeferred: false },
         })
       );
+      expect(mockNotificationsService.sendRegistrationConfirmationEmail).not.toHaveBeenCalled();
     });
 
     it('skips the update only when payment is COMPLETED AND registration is CONFIRMED AND paymentDeferred is false', async () => {
@@ -3202,6 +3284,7 @@ describe('PaymentsService', () => {
 
       expect(mockPrismaService.registration.updateMany).not.toHaveBeenCalled();
       expect(mockPrismaService.payment.updateMany).not.toHaveBeenCalled();
+      expect(mockNotificationsService.sendRegistrationConfirmationEmail).not.toHaveBeenCalled();
     });
 
     it('does NOT promote a WAITLISTED deferred registration to CONFIRMED on payment — capacity wins', async () => {
@@ -3249,6 +3332,7 @@ describe('PaymentsService', () => {
           data: { status: 'WAITLISTED', paymentDeferred: false },
         })
       );
+      expect(mockNotificationsService.sendRegistrationConfirmationEmail).not.toHaveBeenCalled();
     });
   });
 

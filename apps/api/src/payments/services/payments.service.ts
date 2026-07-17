@@ -2585,7 +2585,10 @@ export class PaymentsService {
                 ? targetRegistrationStatus
                 : registration?.status,
             confirmationRegistrationId:
-              shouldUpdateRegistration && registration && !registration.paymentDeferred
+              shouldCompletePayment &&
+              registration &&
+              !registrationIsProtected &&
+              !registration.paymentDeferred
                 ? registration.id
                 : undefined,
           };
