@@ -63,12 +63,36 @@ export async function cleanupRunData(): Promise<void> {
     const allUserIds = Array.from(new Set([...runUserIds, ...personaUserIds]));
     if (allUserIds.length === 0) return;
 
+    const [payments, registrations] = await Promise.all([
+      prisma.payment.findMany({
+        where: { userId: { in: allUserIds } },
+        select: { id: true },
+      }),
+      prisma.registration.findMany({
+        where: { userId: { in: allUserIds } },
+        select: { id: true },
+      }),
+    ]);
+    const ownedTargetRecordIds = [
+      ...payments.map((payment) => payment.id),
+      ...registrations.map((registration) => registration.id),
+    ];
+
     // Delete in FK-safe order. Each step is wrapped so a single failure doesn't
     // abort the rest of the cleanup.
     const steps: Array<[string, () => Promise<unknown>]> = [
       ['email_audit', () => prisma.emailAudit.deleteMany({ where: { userId: { in: allUserIds } } })],
       ['notifications', () => prisma.notification.deleteMany({ where: { recipient: { startsWith: prefix } } })],
-      ['admin_audit', () => prisma.adminAudit.deleteMany({ where: { adminUserId: { in: allUserIds } } })],
+      ['admin_audit', () =>
+        prisma.adminAudit.deleteMany({
+          where: {
+            OR: [
+              { targetRecordId: { in: ownedTargetRecordIds } },
+              { adminUserId: { in: runUserIds } },
+            ],
+          },
+        }),
+      ],
       ['payment_refunds', () =>
         prisma.paymentRefund.deleteMany({
           where: { payment: { userId: { in: allUserIds } } },
