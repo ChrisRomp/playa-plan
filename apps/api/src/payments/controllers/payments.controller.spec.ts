@@ -15,6 +15,7 @@ const mockPaymentsService = {
   initiateStripePayment: jest.fn(),
   initiatePaypalPayment: jest.fn(),
   processRefund: jest.fn(),
+  createManualRefund: jest.fn(),
   linkToRegistration: jest.fn(),
   handlePaypalWebhook: jest.fn(),
 };
@@ -62,8 +63,8 @@ describe('PaymentsController', () => {
         userId: 'user-id',
         providerRefId: 'provider-ref-id',
       };
-      const mockPayment = { 
-        id: 'payment-id', 
+      const mockPayment = {
+        id: 'payment-id',
         ...mockPaymentDto,
         status: PaymentStatus.PENDING,
         createdAt: new Date(),
@@ -144,17 +145,17 @@ describe('PaymentsController', () => {
     it('should return a payment by ID', async () => {
       // Mock data
       const paymentId = 'payment-id';
-      const mockPayment = { 
-        id: paymentId, 
+      const mockPayment = {
+        id: paymentId,
         amount: 100,
         status: PaymentStatus.COMPLETED,
       };
 
       const mockRequest = {
-        user: { 
-          id: 'user-id', 
-          role: UserRole.ADMIN 
-        }
+        user: {
+          id: 'user-id',
+          role: UserRole.ADMIN,
+        },
       } as unknown as Parameters<typeof controller.findOne>[1];
 
       // Setup mocks
@@ -164,7 +165,11 @@ describe('PaymentsController', () => {
       const result = await controller.findOne(paymentId, mockRequest);
 
       // Assert
-      expect(mockPaymentsService.findOneWithOwnershipCheck).toHaveBeenCalledWith(paymentId, 'user-id', UserRole.ADMIN);
+      expect(mockPaymentsService.findOneWithOwnershipCheck).toHaveBeenCalledWith(
+        paymentId,
+        'user-id',
+        UserRole.ADMIN
+      );
       expect(result).toEqual(mockPayment);
     });
   });
@@ -174,8 +179,8 @@ describe('PaymentsController', () => {
       // Mock data
       const paymentId = 'payment-id';
       const updateDto = { status: PaymentStatus.COMPLETED };
-      const mockPayment = { 
-        id: paymentId, 
+      const mockPayment = {
+        id: paymentId,
         amount: 100,
         status: PaymentStatus.COMPLETED,
       };
@@ -222,12 +227,12 @@ describe('PaymentsController', () => {
 
       const actualResult = await controller.recordExternalPayment(
         mockExternalPaymentDto,
-        mockRequest,
+        mockRequest
       );
 
       expect(mockPaymentsService.recordExternalPayment).toHaveBeenCalledWith(
         mockExternalPaymentDto,
-        'admin-id',
+        'admin-id'
       );
       expect(actualResult).toEqual(mockPayment);
     });
@@ -244,8 +249,8 @@ describe('PaymentsController', () => {
         successUrl: 'https://mycamp.playaplan.app/success',
         cancelUrl: 'https://mycamp.playaplan.app/cancel',
       };
-      const mockResponse = { 
-        paymentId: 'payment-id', 
+      const mockResponse = {
+        paymentId: 'payment-id',
         url: 'https://checkout.stripe.com/session-id',
       };
 
@@ -272,8 +277,8 @@ describe('PaymentsController', () => {
         successUrl: 'https://mycamp.playaplan.app/success',
         cancelUrl: 'https://mycamp.playaplan.app/cancel',
       };
-      const mockResponse = { 
-        paymentId: 'payment-id', 
+      const mockResponse = {
+        paymentId: 'payment-id',
         orderId: 'paypal-order-id',
         approvalUrl: 'https://www.paypal.com/checkoutnow/order-id',
       };
@@ -290,29 +295,39 @@ describe('PaymentsController', () => {
     });
   });
 
-  describe('processRefund', () => {
-    it('should process a refund', async () => {
-      // Mock data
+  describe('createRefund', () => {
+    it('should record a manual refund for the authenticated admin', async () => {
+      const paymentId = '5f8d0d55-e0a3-4cf0-a620-2412acd4361c';
       const mockRefundDto = {
-        paymentId: 'payment-id',
-        amount: 50,
-        reason: 'Partial refund requested by customer',
+        amountCents: 5000,
+        executionMode: 'MANUAL' as const,
+        reason: 'Partial refund completed externally',
+        idempotencyKey: '43ea4b84-1f0d-413d-bc1c-9c91b435d66d',
       };
-      const mockResponse = { 
-        paymentId: 'payment-id', 
-        refundAmount: 50,
-        providerRefundId: 'refund-id',
-        success: true,
+      const mockRequest = {
+        user: {
+          id: 'admin-id',
+          role: UserRole.ADMIN,
+        },
+      } as unknown as Parameters<typeof controller.createRefund>[2];
+      const mockResponse = {
+        payment: { id: paymentId },
+        refund: { id: 'refund-id', amountCents: 5000 },
+        paymentAmountCents: 10000,
+        successfulRefundCents: 5000,
+        pendingRefundCents: 0,
+        availableRefundCents: 5000,
       };
 
-      // Setup mocks
-      mockPaymentsService.processRefund.mockResolvedValue(mockResponse);
+      mockPaymentsService.createManualRefund.mockResolvedValue(mockResponse);
 
-      // Execute
-      const result = await controller.processRefund(mockRefundDto);
+      const result = await controller.createRefund(paymentId, mockRefundDto, mockRequest);
 
-      // Assert
-      expect(mockPaymentsService.processRefund).toHaveBeenCalledWith(mockRefundDto);
+      expect(mockPaymentsService.createManualRefund).toHaveBeenCalledWith(
+        paymentId,
+        mockRefundDto,
+        'admin-id'
+      );
       expect(result).toEqual(mockResponse);
     });
   });
@@ -322,8 +337,8 @@ describe('PaymentsController', () => {
       // Mock data
       const paymentId = 'payment-id';
       const registrationId = 'registration-id';
-      const mockPayment = { 
-        id: paymentId, 
+      const mockPayment = {
+        id: paymentId,
         amount: 100,
         status: PaymentStatus.COMPLETED,
         registrationId,
@@ -336,7 +351,10 @@ describe('PaymentsController', () => {
       const result = await controller.linkToRegistration(paymentId, registrationId);
 
       // Assert
-      expect(mockPaymentsService.linkToRegistration).toHaveBeenCalledWith(paymentId, registrationId);
+      expect(mockPaymentsService.linkToRegistration).toHaveBeenCalledWith(
+        paymentId,
+        registrationId
+      );
       expect(result).toEqual(mockPayment);
     });
   });
@@ -358,4 +376,4 @@ describe('PaymentsController', () => {
       expect(result).toEqual(mockResponse);
     });
   });
-}); 
+});

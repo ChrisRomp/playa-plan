@@ -10,6 +10,23 @@ export type ExternalPaymentMethod =
   | 'BANK_TRANSFER'
   | 'OTHER';
 
+export type RefundExecutionMode = 'MANUAL' | 'STRIPE';
+export type PaymentRefundStatus = 'PENDING' | 'SUCCEEDED' | 'FAILED';
+export type RefundRegistrationStatus = 'PENDING' | 'CONFIRMED' | 'WAITLISTED';
+
+export interface AdminPaymentRefund {
+  id: string;
+  amountCents: number;
+  currency: string;
+  executionMode: RefundExecutionMode;
+  status: PaymentRefundStatus;
+  reason: string | null;
+  externalReference: string | null;
+  resultingRegistrationStatus: RefundRegistrationStatus | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export type ExternalPaymentSearchRegistrationStatus =
   | 'PENDING'
   | 'CONFIRMED'
@@ -54,6 +71,12 @@ export interface AdminPayment {
     year: number;
     status: string;
   } | null;
+  refunds: AdminPaymentRefund[];
+  paymentAmountCents: number | null;
+  successfulRefundCents: number;
+  pendingRefundCents: number;
+  availableRefundCents: number;
+  refundUnavailableReason: string | null;
 }
 
 export interface AdminPaymentPage {
@@ -70,11 +93,40 @@ export interface CreateExternalPaymentRequest {
   idempotencyKey: string;
 }
 
+export type RefundAmountSelection =
+  | {
+      amountCents: number;
+      fullRefund?: never;
+    }
+  | {
+      amountCents?: never;
+      fullRefund: true;
+    };
+
+interface CreateRefundRequestFields {
+  reason?: string;
+  externalReference?: string;
+  resultingRegistrationStatus?: RefundRegistrationStatus;
+  idempotencyKey: string;
+}
+
+export type CreateManualRefundRequest = RefundAmountSelection &
+  CreateRefundRequestFields & {
+    executionMode: 'MANUAL';
+  };
+
+export interface ManualRefundResult {
+  payment: AdminPayment;
+  refund: AdminPaymentRefund;
+  paymentAmountCents: number | null;
+  successfulRefundCents: number;
+  pendingRefundCents: number;
+  availableRefundCents: number;
+  refundUnavailableReason: string | null;
+}
+
 export const adminPaymentsApi = {
-  getPayments: async (
-    skip = 0,
-    take = ADMIN_PAYMENT_PAGE_SIZE,
-  ): Promise<AdminPaymentPage> => {
+  getPayments: async (skip = 0, take = ADMIN_PAYMENT_PAGE_SIZE): Promise<AdminPaymentPage> => {
     const params = new URLSearchParams({
       skip: skip.toString(),
       take: take.toString(),
@@ -83,10 +135,16 @@ export const adminPaymentsApi = {
     return response.data;
   },
 
-  recordExternalPayment: async (
-    request: CreateExternalPaymentRequest,
-  ): Promise<AdminPayment> => {
+  recordExternalPayment: async (request: CreateExternalPaymentRequest): Promise<AdminPayment> => {
     const response = await api.post('/payments/external', request);
+    return response.data;
+  },
+
+  createManualRefund: async (
+    paymentId: string,
+    request: CreateManualRefundRequest
+  ): Promise<ManualRefundResult> => {
+    const response = await api.post(`/payments/${paymentId}/refunds`, request);
     return response.data;
   },
 };

@@ -1,49 +1,133 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator';
+import { Transform } from 'class-transformer';
+import {
+  Allow,
+  Equals,
+  IsIn,
+  IsOptional,
+  IsString,
+  IsUUID,
+  MaxLength,
+  Validate,
+  ValidatorConstraint,
+  ValidatorConstraintInterface,
+  ValidationArguments,
+} from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { RefundExecutionMode, RegistrationStatus } from '@prisma/client';
+import { centsToDollars } from '../utils/money.utils';
+
+const ALLOWED_RESULTING_STATUSES = [
+  RegistrationStatus.PENDING,
+  RegistrationStatus.CONFIRMED,
+  RegistrationStatus.WAITLISTED,
+] as const;
+
+function normalizeOptionalText(value: unknown): unknown {
+  if (typeof value !== 'string') {
+    return value;
+  }
+
+  const normalizedValue = value.trim();
+  return normalizedValue.length > 0 ? normalizedValue : undefined;
+}
+
+@ValidatorConstraint({ name: 'refundAmountSelection', async: false })
+class RefundAmountSelectionConstraint implements ValidatorConstraintInterface {
+  validate(amountCents: unknown, validationArguments: ValidationArguments): boolean {
+    const request = validationArguments.object as CreateRefundDto;
+    const hasAmount = amountCents !== undefined;
+    const hasFullRefund = request.fullRefund !== undefined;
+
+    if (hasAmount === hasFullRefund) {
+      return false;
+    }
+
+    if (hasFullRefund) {
+      return request.fullRefund === true;
+    }
+
+    if (typeof amountCents !== 'number' || amountCents <= 0) {
+      return false;
+    }
+
+    try {
+      centsToDollars(amountCents);
+      return true;
+    } catch (error: unknown) {
+      if (error instanceof RangeError) {
+        return false;
+      }
+
+      throw error;
+    }
+  }
+
+  defaultMessage(): string {
+    return 'Provide exactly one of a positive integer amountCents within the supported range or fullRefund: true';
+  }
+}
 
 /**
- * Data Transfer Object for creating a refund
+ * Data required to record an already-completed manual refund.
  */
 export class CreateRefundDto {
-  @ApiProperty({
-    description: 'ID of the payment to refund',
-    example: '5f8d0d55-e0a3-4cf0-a620-2412acd4361c',
-  })
-  @IsNotEmpty()
-  @IsString()
-  @IsUUID()
-  paymentId!: string;
-
-  @ApiProperty({
-    description: 'The refund amount (optional, defaults to full amount)',
-    example: 50.00,
-    minimum: 0.01,
-    required: false,
-  })
-  @IsOptional()
-  @IsNumber()
-  @Min(0.01)
-  amount?: number;
-
-  @ApiProperty({
-    description: 'Refund percentage of the original amount (alternative to specific amount)',
-    example: 50,
+  @ApiPropertyOptional({
+    description: 'Positive refund amount in integer cents',
+    example: 5000,
     minimum: 1,
-    maximum: 100,
-    required: false,
   })
-  @IsOptional()
-  @IsNumber()
-  @Min(1)
-  @Max(100)
-  percentageOfOriginal?: number;
+  @Validate(RefundAmountSelectionConstraint)
+  amountCents?: number;
+
+  @ApiPropertyOptional({
+    description: 'Refund the full currently available balance',
+    example: true,
+  })
+  @Allow()
+  fullRefund?: boolean;
 
   @ApiProperty({
-    description: 'Reason for the refund',
-    example: 'Customer requested refund',
-    required: false,
+    description: 'Manual refunds record an already-completed external refund',
+    enum: [RefundExecutionMode.MANUAL],
   })
+  @Equals(RefundExecutionMode.MANUAL)
+  executionMode!: RefundExecutionMode;
+
+  @ApiPropertyOptional({
+    description: 'Reason for the refund',
+    maxLength: 500,
+  })
+  @Transform(({ value }: { value: unknown }) => normalizeOptionalText(value))
   @IsOptional()
   @IsString()
+  @MaxLength(500)
   reason?: string;
-} 
+
+  @ApiPropertyOptional({
+    description: 'External refund transaction or receipt reference',
+    maxLength: 255,
+  })
+  @Transform(({ value }: { value: unknown }) => normalizeOptionalText(value))
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  externalReference?: string;
+
+  @ApiPropertyOptional({
+    description: 'Optional registration status to apply after success',
+    enum: ALLOWED_RESULTING_STATUSES,
+  })
+  @IsOptional()
+  @IsIn(ALLOWED_RESULTING_STATUSES, {
+    message:
+      'resultingRegistrationStatus must be PENDING, CONFIRMED, or WAITLISTED; use the cancellation workflow to cancel a registration',
+  })
+  resultingRegistrationStatus?: RegistrationStatus;
+
+  @ApiProperty({
+    description: 'Client-generated idempotency key retained for retries',
+    format: 'uuid',
+  })
+  @IsUUID()
+  idempotencyKey!: string;
+}

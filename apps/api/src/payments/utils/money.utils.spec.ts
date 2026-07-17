@@ -1,6 +1,7 @@
 import {
   centsToDollars,
   dollarsToCents,
+  hasSubCentPrecision,
   normalizeCurrency,
 } from './money.utils';
 
@@ -50,6 +51,22 @@ describe('money utilities', () => {
         'Dollar amount exceeds the supported range',
       );
     });
+  });
+
+  describe('hasSubCentPrecision', () => {
+    it.each([10.001, 1e-3, Number.MIN_VALUE])(
+      'should identify sub-cent precision for %s',
+      inputDollars => {
+        expect(hasSubCentPrecision(inputDollars)).toBe(true);
+      }
+    );
+
+    it.each([0, -0.01, 10.01, 21_474_836.48])(
+      'should not identify sub-cent precision for %s',
+      inputDollars => {
+        expect(hasSubCentPrecision(inputDollars)).toBe(false);
+      }
+    );
   });
 
   describe('centsToDollars', () => {

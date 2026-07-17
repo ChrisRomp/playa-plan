@@ -5,6 +5,7 @@ import { StripeService } from '../../services/stripe.service';
 import { PaypalService } from '../../services/paypal.service';
 import { UserRole, PaymentStatus, PaymentProvider } from '@prisma/client';
 import { NotFoundException } from '@nestjs/common';
+import { PATH_METADATA } from '@nestjs/common/constants';
 
 describe('PaymentsController Security', () => {
   let controller: PaymentsController;
@@ -37,6 +38,7 @@ describe('PaymentsController Security', () => {
             findAllForAdmin: jest.fn(),
             findOneWithOwnershipCheck: jest.fn(),
             recordExternalPayment: jest.fn(),
+            createManualRefund: jest.fn(),
           },
         },
         {
@@ -62,14 +64,19 @@ describe('PaymentsController Security', () => {
       const result = await controller.findAll();
 
       expect(result).toEqual(mockResult);
-      expect(paymentsService.findAll).toHaveBeenCalledWith(undefined, undefined, undefined, undefined);
+      expect(paymentsService.findAll).toHaveBeenCalledWith(
+        undefined,
+        undefined,
+        undefined,
+        undefined
+      );
     });
 
     describe('admin payment routes', () => {
       it('should restrict the dedicated payment list to admins', () => {
         const actualRoles = Reflect.getMetadata(
           'roles',
-          PaymentsController.prototype.findAllForAdmin,
+          PaymentsController.prototype.findAllForAdmin
         );
 
         expect(actualRoles).toEqual([UserRole.ADMIN]);
@@ -80,12 +87,30 @@ describe('PaymentsController Security', () => {
       it('should restrict external payment recording to admins', () => {
         const actualRoles = Reflect.getMetadata(
           'roles',
-          PaymentsController.prototype.recordExternalPayment,
+          PaymentsController.prototype.recordExternalPayment
         );
 
         expect(actualRoles).toEqual([UserRole.ADMIN]);
         expect(actualRoles).not.toContain(UserRole.STAFF);
         expect(actualRoles).not.toContain(UserRole.PARTICIPANT);
+      });
+
+      it('should expose only the nested admin manual refund route', () => {
+        const actualRoles = Reflect.getMetadata('roles', PaymentsController.prototype.createRefund);
+        const actualPath = Reflect.getMetadata(
+          PATH_METADATA,
+          PaymentsController.prototype.createRefund
+        );
+        const controllerPrototype = PaymentsController.prototype as unknown as Record<
+          string,
+          unknown
+        >;
+
+        expect(actualRoles).toEqual([UserRole.ADMIN]);
+        expect(actualRoles).not.toContain(UserRole.STAFF);
+        expect(actualRoles).not.toContain(UserRole.PARTICIPANT);
+        expect(actualPath).toBe(':paymentId/refunds');
+        expect(controllerPrototype.processRefund).toBeUndefined();
       });
     });
 
@@ -103,70 +128,93 @@ describe('PaymentsController Security', () => {
   describe('findMyPayments (user-specific)', () => {
     it('should only return payments for the authenticated user', async () => {
       const mockResult = { payments: [mockPayment], total: 1 };
-      const mockRequest = { 
-        user: { id: 'user-123', role: UserRole.PARTICIPANT } 
+      const mockRequest = {
+        user: { id: 'user-123', role: UserRole.PARTICIPANT },
       } as unknown as Parameters<typeof controller.findMyPayments>[0];
-      
+
       jest.spyOn(paymentsService, 'findAll').mockResolvedValue(mockResult);
 
       const result = await controller.findMyPayments(mockRequest);
 
       expect(result).toEqual(mockResult);
-      expect(paymentsService.findAll).toHaveBeenCalledWith(undefined, undefined, 'user-123', undefined);
+      expect(paymentsService.findAll).toHaveBeenCalledWith(
+        undefined,
+        undefined,
+        'user-123',
+        undefined
+      );
     });
   });
 
   describe('findOne (with ownership check)', () => {
     it('should allow admin to access any payment', async () => {
-      const mockRequest = { 
-        user: { id: 'admin-123', role: UserRole.ADMIN } 
+      const mockRequest = {
+        user: { id: 'admin-123', role: UserRole.ADMIN },
       } as unknown as Parameters<typeof controller.findOne>[1];
-      
+
       jest.spyOn(paymentsService, 'findOneWithOwnershipCheck').mockResolvedValue(mockPayment);
 
       const result = await controller.findOne('payment-123', mockRequest);
 
       expect(result).toEqual(mockPayment);
-      expect(paymentsService.findOneWithOwnershipCheck).toHaveBeenCalledWith('payment-123', 'admin-123', UserRole.ADMIN);
+      expect(paymentsService.findOneWithOwnershipCheck).toHaveBeenCalledWith(
+        'payment-123',
+        'admin-123',
+        UserRole.ADMIN
+      );
     });
 
     it('should allow staff to access any payment', async () => {
-      const mockRequest = { 
-        user: { id: 'staff-123', role: UserRole.STAFF } 
+      const mockRequest = {
+        user: { id: 'staff-123', role: UserRole.STAFF },
       } as unknown as Parameters<typeof controller.findOne>[1];
-      
+
       jest.spyOn(paymentsService, 'findOneWithOwnershipCheck').mockResolvedValue(mockPayment);
 
       const result = await controller.findOne('payment-123', mockRequest);
 
       expect(result).toEqual(mockPayment);
-      expect(paymentsService.findOneWithOwnershipCheck).toHaveBeenCalledWith('payment-123', 'staff-123', UserRole.STAFF);
+      expect(paymentsService.findOneWithOwnershipCheck).toHaveBeenCalledWith(
+        'payment-123',
+        'staff-123',
+        UserRole.STAFF
+      );
     });
 
     it('should only allow users to access their own payments', async () => {
-      const mockRequest = { 
-        user: { id: 'user-123', role: UserRole.PARTICIPANT } 
+      const mockRequest = {
+        user: { id: 'user-123', role: UserRole.PARTICIPANT },
       } as unknown as Parameters<typeof controller.findOne>[1];
-      
+
       jest.spyOn(paymentsService, 'findOneWithOwnershipCheck').mockResolvedValue(mockPayment);
 
       const result = await controller.findOne('payment-123', mockRequest);
 
       expect(result).toEqual(mockPayment);
-      expect(paymentsService.findOneWithOwnershipCheck).toHaveBeenCalledWith('payment-123', 'user-123', UserRole.PARTICIPANT);
+      expect(paymentsService.findOneWithOwnershipCheck).toHaveBeenCalledWith(
+        'payment-123',
+        'user-123',
+        UserRole.PARTICIPANT
+      );
     });
 
-    it('should throw NotFoundException when user tries to access another user\'s payment', async () => {
-      const mockRequest = { 
-        user: { id: 'user-456', role: UserRole.PARTICIPANT } 
+    it("should throw NotFoundException when user tries to access another user's payment", async () => {
+      const mockRequest = {
+        user: { id: 'user-456', role: UserRole.PARTICIPANT },
       } as unknown as Parameters<typeof controller.findOne>[1];
-      
-      jest.spyOn(paymentsService, 'findOneWithOwnershipCheck').mockRejectedValue(
-        new NotFoundException('Payment with ID payment-123 not found')
-      );
 
-      await expect(controller.findOne('payment-123', mockRequest)).rejects.toThrow(NotFoundException);
-      expect(paymentsService.findOneWithOwnershipCheck).toHaveBeenCalledWith('payment-123', 'user-456', UserRole.PARTICIPANT);
+      jest
+        .spyOn(paymentsService, 'findOneWithOwnershipCheck')
+        .mockRejectedValue(new NotFoundException('Payment with ID payment-123 not found'));
+
+      await expect(controller.findOne('payment-123', mockRequest)).rejects.toThrow(
+        NotFoundException
+      );
+      expect(paymentsService.findOneWithOwnershipCheck).toHaveBeenCalledWith(
+        'payment-123',
+        'user-456',
+        UserRole.PARTICIPANT
+      );
     });
   });
 });

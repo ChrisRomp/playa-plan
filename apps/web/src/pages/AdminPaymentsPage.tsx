@@ -1,29 +1,26 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { isAxiosError } from 'axios';
 import { Link } from 'react-router-dom';
-import {
-  adminRegistrationsApi,
-  RegistrationFilters,
-} from '../lib/api/admin-registrations';
+import { adminRegistrationsApi, RegistrationFilters } from '../lib/api/admin-registrations';
 import {
   ADMIN_PAYMENT_PAGE_SIZE,
   AdminPayment,
   adminPaymentsApi,
   ExternalPaymentMethod,
+  RefundAmountSelection,
+  RefundRegistrationStatus,
   ExternalPaymentSearchRegistration,
   ExternalPaymentSearchRegistrationStatus,
 } from '../lib/api/admin-payments';
 import { ROUTES } from '../routes';
 
-const ELIGIBLE_REGISTRATION_STATUSES:
-  readonly ExternalPaymentSearchRegistrationStatus[] = [
+const ELIGIBLE_REGISTRATION_STATUSES: readonly ExternalPaymentSearchRegistrationStatus[] = [
   'PENDING',
   'CONFIRMED',
   'WAITLISTED',
 ];
 
-const REGISTRATION_STATUS_OPTIONS:
-  readonly ExternalPaymentSearchRegistrationStatus[] = [
+const REGISTRATION_STATUS_OPTIONS: readonly ExternalPaymentSearchRegistrationStatus[] = [
   'PENDING',
   'CONFIRMED',
   'WAITLISTED',
@@ -42,6 +39,12 @@ const EXTERNAL_PAYMENT_METHODS: readonly ExternalPaymentMethod[] = [
   'OTHER',
 ];
 
+const REFUND_REGISTRATION_STATUSES: readonly RefundRegistrationStatus[] = [
+  'PENDING',
+  'CONFIRMED',
+  'WAITLISTED',
+];
+
 const ACTIONABLE_SERVER_ERROR_STATUSES = new Set([400, 404, 409]);
 const MAX_SERVER_ERROR_MESSAGE_LENGTH = 500;
 
@@ -53,15 +56,41 @@ function createIdempotencyKey(): string {
   return crypto.randomUUID();
 }
 
-function isEligibleRegistration(
-  registration: ExternalPaymentSearchRegistration,
-): boolean {
+function parseDollarsToCents(value: string): number | null {
+  const normalizedValue = value.trim();
+  if (!/^(?:0|[1-9]\d*)(?:\.\d{1,2})?$/.test(normalizedValue)) {
+    return null;
+  }
+
+  const [dollars, fraction = ''] = normalizedValue.split('.');
+  const amountCents = Number(dollars) * 100 + Number(fraction.padEnd(2, '0'));
+  return Number.isSafeInteger(amountCents) && amountCents > 0 ? amountCents : null;
+}
+
+function formatCents(currency: string, amountCents: number): string {
+  return `${currency} ${(amountCents / 100).toFixed(2)}`;
+}
+
+function formatPaymentAmount(payment: AdminPayment): string {
+  return payment.paymentAmountCents === null
+    ? `${payment.currency} ${String(payment.amount)}`
+    : formatCents(payment.currency, payment.paymentAmountCents);
+}
+
+function canRefundPayment(payment: AdminPayment): boolean {
+  return (
+    payment.paymentAmountCents !== null &&
+    payment.refundUnavailableReason === null &&
+    (payment.status === 'COMPLETED' || payment.status === 'PARTIALLY_REFUNDED') &&
+    payment.availableRefundCents > 0
+  );
+}
+
+function isEligibleRegistration(registration: ExternalPaymentSearchRegistration): boolean {
   return ELIGIBLE_REGISTRATION_STATUSES.includes(registration.status);
 }
 
-function getRegistrationEffect(
-  registration: ExternalPaymentSearchRegistration,
-): string {
+function getRegistrationEffect(registration: ExternalPaymentSearchRegistration): string {
   if (registration.status === 'PENDING') {
     return 'The registration will become CONFIRMED and payment deferral will be cleared.';
   }
@@ -73,16 +102,14 @@ function normalizeServerErrorMessage(message: unknown): string | null {
   const normalizedMessage = Array.isArray(message)
     ? message
         .filter((entry): entry is string => typeof entry === 'string')
-        .map((entry) => entry.trim())
+        .map(entry => entry.trim())
         .filter(Boolean)
         .join('; ')
     : typeof message === 'string'
       ? message.trim()
       : '';
 
-  return normalizedMessage
-    ? normalizedMessage.slice(0, MAX_SERVER_ERROR_MESSAGE_LENGTH)
-    : null;
+  return normalizedMessage ? normalizedMessage.slice(0, MAX_SERVER_ERROR_MESSAGE_LENGTH) : null;
 }
 
 function getErrorMessage(error: unknown, fallback: string): string {
@@ -92,11 +119,9 @@ function getErrorMessage(error: unknown, fallback: string): string {
       return fallback;
     }
 
-    return (
-      normalizeServerErrorMessage(error.response?.data?.message) ?? fallback
-    );
+    return normalizeServerErrorMessage(error.response?.data?.message) ?? fallback;
   }
-
+  return error instanceof Error ? error.message : fallback;
   return error instanceof Error ? error.message : fallback;
 }
 
@@ -104,8 +129,7 @@ function getErrorMessage(error: unknown, fallback: string): string {
  * Admin-only workflow for recording completed payments made outside PlayaPlan.
  */
 export default function AdminPaymentsPage() {
-  const [registrationFilters, setRegistrationFilters] =
-    useState<RegistrationFilters>({});
+  const [registrationFilters, setRegistrationFilters] = useState<RegistrationFilters>({});
   const [registrationResults, setRegistrationResults] = useState<
     ExternalPaymentSearchRegistration[] | null
   >(null);
@@ -122,41 +146,41 @@ export default function AdminPaymentsPage() {
 
   const [amount, setAmount] = useState('');
   const [currency, setCurrency] = useState('USD');
-  const [externalMethod, setExternalMethod] =
-    useState<ExternalPaymentMethod>('CASH');
+  const [externalMethod, setExternalMethod] = useState<ExternalPaymentMethod>('CASH');
   const [externalReference, setExternalReference] = useState('');
   const [isConfirmed, setIsConfirmed] = useState(false);
   const [idempotencyKey, setIdempotencyKey] = useState(createIdempotencyKey);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [successfulPayment, setSuccessfulPayment] =
-    useState<AdminPayment | null>(null);
+  const [successfulPayment, setSuccessfulPayment] = useState<AdminPayment | null>(null);
+  const [selectedRefundPayment, setSelectedRefundPayment] = useState<AdminPayment | null>(null);
+  const [refundAmountMode, setRefundAmountMode] = useState<'partial' | 'full'>('partial');
+  const [refundAmount, setRefundAmount] = useState('');
+  const [refundReason, setRefundReason] = useState('');
+  const [refundReference, setRefundReference] = useState('');
+  const [refundRegistrationStatus, setRefundRegistrationStatus] = useState<
+    RefundRegistrationStatus | ''
+  >('');
+  const [refundIdempotencyKey, setRefundIdempotencyKey] = useState(createIdempotencyKey);
+  const [isSubmittingRefund, setIsSubmittingRefund] = useState(false);
+  const [refundError, setRefundError] = useState<string | null>(null);
+  const [refundSuccess, setRefundSuccess] = useState<string | null>(null);
 
   const hasMeaningfulSearch = useMemo(() => {
     const hasName = (registrationFilters.name?.trim().length ?? 0) >= 2;
     const hasEmail = (registrationFilters.email?.trim().length ?? 0) >= 2;
-    return Boolean(
-      hasName ||
-        hasEmail ||
-        registrationFilters.year ||
-        registrationFilters.status,
-    );
+    return Boolean(hasName || hasEmail || registrationFilters.year || registrationFilters.status);
   }, [registrationFilters]);
 
   const loadPayments = useCallback(async (skip: number): Promise<void> => {
     setIsLoadingPayments(true);
     setPaymentListError(null);
     try {
-      const paymentPage = await adminPaymentsApi.getPayments(
-        skip,
-        ADMIN_PAYMENT_PAGE_SIZE,
-      );
+      const paymentPage = await adminPaymentsApi.getPayments(skip, ADMIN_PAYMENT_PAGE_SIZE);
       setPayments(paymentPage.payments);
       setPaymentTotal(paymentPage.total);
     } catch (error: unknown) {
-      setPaymentListError(
-        getErrorMessage(error, 'Unable to load admin payments.'),
-      );
+      setPaymentListError(getErrorMessage(error, 'Unable to load admin payments.'));
     } finally {
       setIsLoadingPayments(false);
     }
@@ -166,18 +190,10 @@ export default function AdminPaymentsPage() {
     void loadPayments(paymentSkip);
   }, [loadPayments, paymentSkip]);
 
-  const updateRegistrationFilter = (
-    key: keyof RegistrationFilters,
-    value: string,
-  ): void => {
-    setRegistrationFilters((currentFilters) => ({
+  const updateRegistrationFilter = (key: keyof RegistrationFilters, value: string): void => {
+    setRegistrationFilters(currentFilters => ({
       ...currentFilters,
-      [key]:
-        value === ''
-          ? undefined
-          : key === 'year'
-            ? Number.parseInt(value, 10)
-            : value,
+      [key]: value === '' ? undefined : key === 'year' ? Number.parseInt(value, 10) : value,
     }));
   };
 
@@ -192,28 +208,22 @@ export default function AdminPaymentsPage() {
     setSelectedRegistration(null);
     try {
       const result =
-        await adminRegistrationsApi.getRegistrations<ExternalPaymentSearchRegistration>(
-          {
-            name: registrationFilters.name?.trim() || undefined,
-            email: registrationFilters.email?.trim() || undefined,
-            year: registrationFilters.year,
-            status: registrationFilters.status,
-          },
-        );
+        await adminRegistrationsApi.getRegistrations<ExternalPaymentSearchRegistration>({
+          name: registrationFilters.name?.trim() || undefined,
+          email: registrationFilters.email?.trim() || undefined,
+          year: registrationFilters.year,
+          status: registrationFilters.status,
+        });
       setRegistrationResults(result.registrations);
     } catch (error: unknown) {
-      setSearchError(
-        getErrorMessage(error, 'Unable to search registrations.'),
-      );
+      setSearchError(getErrorMessage(error, 'Unable to search registrations.'));
       setRegistrationResults([]);
     } finally {
       setIsSearching(false);
     }
   };
 
-  const selectRegistration = (
-    registration: ExternalPaymentSearchRegistration,
-  ): void => {
+  const selectRegistration = (registration: ExternalPaymentSearchRegistration): void => {
     setSelectedRegistration(registration);
     setIsConfirmed(false);
   };
@@ -244,11 +254,73 @@ export default function AdminPaymentsPage() {
       setPaymentSkip(0);
       await loadPayments(0);
     } catch (error: unknown) {
-      setSubmitError(
-        getErrorMessage(error, 'Unable to record the external payment.'),
-      );
+      setSubmitError(getErrorMessage(error, 'Unable to record the external payment.'));
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const openRefundForm = (payment: AdminPayment): void => {
+    setSelectedRefundPayment(payment);
+    setRefundAmountMode('partial');
+    setRefundAmount('');
+    setRefundReason('');
+    setRefundReference('');
+    setRefundRegistrationStatus('');
+    setRefundIdempotencyKey(createIdempotencyKey());
+    setRefundError(null);
+    setRefundSuccess(null);
+  };
+
+  const recordManualRefund = async (event: FormEvent): Promise<void> => {
+    event.preventDefault();
+    if (!selectedRefundPayment) {
+      return;
+    }
+
+    let amountSelection: RefundAmountSelection;
+    if (refundAmountMode === 'full') {
+      amountSelection = { fullRefund: true };
+    } else {
+      const amountCents = parseDollarsToCents(refundAmount);
+      if (amountCents === null || amountCents > selectedRefundPayment.availableRefundCents) {
+        setRefundError(
+          `Enter a positive amount with at most two decimals, no more than ${formatCents(
+            selectedRefundPayment.currency,
+            selectedRefundPayment.availableRefundCents
+          )}.`
+        );
+        return;
+      }
+      amountSelection = { amountCents };
+    }
+
+    setIsSubmittingRefund(true);
+    setRefundError(null);
+    setRefundSuccess(null);
+    try {
+      const result = await adminPaymentsApi.createManualRefund(selectedRefundPayment.id, {
+        ...amountSelection,
+        executionMode: 'MANUAL',
+        reason: refundReason.trim() || undefined,
+        externalReference: refundReference.trim() || undefined,
+        resultingRegistrationStatus: refundRegistrationStatus || undefined,
+        idempotencyKey: refundIdempotencyKey,
+      });
+      setRefundSuccess(
+        `Manual refund recorded: ${formatCents(result.refund.currency, result.refund.amountCents)}.`
+      );
+      setRefundIdempotencyKey(createIdempotencyKey());
+      setSelectedRefundPayment(null);
+      setRefundAmount('');
+      setRefundReason('');
+      setRefundReference('');
+      setRefundRegistrationStatus('');
+      await loadPayments(paymentSkip);
+    } catch (error: unknown) {
+      setRefundError(getErrorMessage(error, 'Unable to record the manual refund.'));
+    } finally {
+      setIsSubmittingRefund(false);
     }
   };
 
@@ -261,19 +333,15 @@ export default function AdminPaymentsPage() {
         >
           &larr; Admin Panel
         </Link>
-        <h1 className="mt-3 text-3xl font-bold text-gray-900">
-          Admin Payments
-        </h1>
+        <h1 className="mt-3 text-3xl font-bold text-gray-900">Admin Payments</h1>
         <p className="mt-2 text-gray-600">
-          Record a payment that has already completed outside PlayaPlan. This
-          form does not charge Stripe, PayPal, or any other processor.
+          Record a payment that has already completed outside PlayaPlan. This form does not charge
+          Stripe, PayPal, or any other processor.
         </p>
       </div>
 
       <section className="rounded-lg bg-white p-6 shadow">
-        <h2 className="text-xl font-semibold text-gray-900">
-          1. Find a registration
-        </h2>
+        <h2 className="text-xl font-semibold text-gray-900">1. Find a registration</h2>
         <form
           className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-5"
           onSubmit={searchRegistrations}
@@ -284,9 +352,7 @@ export default function AdminPaymentsPage() {
               aria-label="Registration name"
               className="mt-1 w-full rounded border border-gray-300 px-3 py-2"
               value={registrationFilters.name ?? ''}
-              onChange={(event) =>
-                updateRegistrationFilter('name', event.target.value)
-              }
+              onChange={event => updateRegistrationFilter('name', event.target.value)}
             />
           </label>
           <label className="text-sm font-medium text-gray-700">
@@ -296,9 +362,7 @@ export default function AdminPaymentsPage() {
               className="mt-1 w-full rounded border border-gray-300 px-3 py-2"
               type="email"
               value={registrationFilters.email ?? ''}
-              onChange={(event) =>
-                updateRegistrationFilter('email', event.target.value)
-              }
+              onChange={event => updateRegistrationFilter('email', event.target.value)}
             />
           </label>
           <label className="text-sm font-medium text-gray-700">
@@ -309,9 +373,7 @@ export default function AdminPaymentsPage() {
               min="2020"
               type="number"
               value={registrationFilters.year ?? ''}
-              onChange={(event) =>
-                updateRegistrationFilter('year', event.target.value)
-              }
+              onChange={event => updateRegistrationFilter('year', event.target.value)}
             />
           </label>
           <label className="text-sm font-medium text-gray-700">
@@ -320,12 +382,10 @@ export default function AdminPaymentsPage() {
               aria-label="Registration status"
               className="mt-1 w-full rounded border border-gray-300 px-3 py-2"
               value={registrationFilters.status ?? ''}
-              onChange={(event) =>
-                updateRegistrationFilter('status', event.target.value)
-              }
+              onChange={event => updateRegistrationFilter('status', event.target.value)}
             >
               <option value="">Any status</option>
-              {REGISTRATION_STATUS_OPTIONS.map((status) => (
+              {REGISTRATION_STATUS_OPTIONS.map(status => (
                 <option key={status} value={status}>
                   {status}
                 </option>
@@ -362,7 +422,7 @@ export default function AdminPaymentsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {registrationResults.map((registration) => {
+                {registrationResults.map(registration => {
                   const eligible = isEligibleRegistration(registration);
                   return (
                     <tr key={registration.id}>
@@ -378,20 +438,15 @@ export default function AdminPaymentsPage() {
                       </td>
                       <td className="px-3 py-3">
                         <div className="font-medium text-gray-900">
-                          {registration.user.firstName}{' '}
-                          {registration.user.lastName}
+                          {registration.user.firstName} {registration.user.lastName}
                         </div>
-                        <div className="text-sm text-gray-500">
-                          {registration.user.email}
-                        </div>
+                        <div className="text-sm text-gray-500">{registration.user.email}</div>
                       </td>
                       <td className="px-3 py-3">{registration.year}</td>
                       <td className="px-3 py-3">
                         {registration.status}
                         {!eligible && (
-                          <span className="ml-2 text-sm text-red-700">
-                            Not eligible
-                          </span>
+                          <span className="ml-2 text-sm text-red-700">Not eligible</span>
                         )}
                       </td>
                     </tr>
@@ -400,9 +455,7 @@ export default function AdminPaymentsPage() {
               </tbody>
             </table>
             {registrationResults.length === 0 && (
-              <p className="py-4 text-sm text-gray-600">
-                No registrations matched.
-              </p>
+              <p className="py-4 text-sm text-gray-600">No registrations matched.</p>
             )}
           </div>
         )}
@@ -415,13 +468,11 @@ export default function AdminPaymentsPage() {
         {selectedRegistration ? (
           <div className="mt-3 rounded border border-blue-200 bg-blue-50 p-4">
             <p className="font-medium text-blue-950">
-              {selectedRegistration.user.firstName}{' '}
-              {selectedRegistration.user.lastName} (
+              {selectedRegistration.user.firstName} {selectedRegistration.user.lastName} (
               {selectedRegistration.user.email})
             </p>
             <p className="text-sm text-blue-900">
-              Registration {selectedRegistration.id} &middot;{' '}
-              {selectedRegistration.year} &middot;{' '}
+              Registration {selectedRegistration.id} &middot; {selectedRegistration.year} &middot;{' '}
               {selectedRegistration.status}
             </p>
             <p className="mt-2 text-sm text-blue-900">
@@ -446,7 +497,7 @@ export default function AdminPaymentsPage() {
                 step="0.01"
                 type="number"
                 value={amount}
-                onChange={(event) => setAmount(event.target.value)}
+                onChange={event => setAmount(event.target.value)}
               />
             </label>
             <label className="text-sm font-medium text-gray-700">
@@ -459,7 +510,7 @@ export default function AdminPaymentsPage() {
                 pattern="[A-Za-z]{3}"
                 required
                 value={currency}
-                onChange={(event) => setCurrency(event.target.value)}
+                onChange={event => setCurrency(event.target.value)}
               />
             </label>
             <label className="text-sm font-medium text-gray-700">
@@ -468,11 +519,9 @@ export default function AdminPaymentsPage() {
                 aria-label="External payment method"
                 className="mt-1 w-full rounded border border-gray-300 px-3 py-2"
                 value={externalMethod}
-                onChange={(event) =>
-                  setExternalMethod(event.target.value as ExternalPaymentMethod)
-                }
+                onChange={event => setExternalMethod(event.target.value as ExternalPaymentMethod)}
               >
-                {EXTERNAL_PAYMENT_METHODS.map((method) => (
+                {EXTERNAL_PAYMENT_METHODS.map(method => (
                   <option key={method} value={method}>
                     {method.replace('_', ' ')}
                   </option>
@@ -486,7 +535,7 @@ export default function AdminPaymentsPage() {
                 className="mt-1 w-full rounded border border-gray-300 px-3 py-2"
                 maxLength={255}
                 value={externalReference}
-                onChange={(event) => setExternalReference(event.target.value)}
+                onChange={event => setExternalReference(event.target.value)}
               />
             </label>
           </div>
@@ -495,12 +544,12 @@ export default function AdminPaymentsPage() {
               aria-label="Confirm external payment"
               checked={isConfirmed}
               className="mt-1"
-              onChange={(event) => setIsConfirmed(event.target.checked)}
+              onChange={event => setIsConfirmed(event.target.checked)}
               type="checkbox"
             />
             <span>
-              I confirm this payment already completed outside PlayaPlan and
-              that the selected registration behavior shown above is correct.
+              I confirm this payment already completed outside PlayaPlan and that the selected
+              registration behavior shown above is correct.
             </span>
           </label>
           {submitError && (
@@ -510,12 +559,7 @@ export default function AdminPaymentsPage() {
           )}
           <button
             className="rounded bg-green-700 px-4 py-2 font-medium text-white disabled:cursor-not-allowed disabled:bg-gray-400"
-            disabled={
-              !selectedRegistration ||
-              !isConfirmed ||
-              Number(amount) <= 0 ||
-              isSubmitting
-            }
+            disabled={!selectedRegistration || !isConfirmed || Number(amount) <= 0 || isSubmitting}
             type="submit"
           >
             {isSubmitting ? 'Recording...' : 'Record external payment'}
@@ -523,17 +567,11 @@ export default function AdminPaymentsPage() {
         </form>
 
         {successfulPayment && (
-          <div
-            className="mt-5 rounded border border-green-300 bg-green-50 p-4"
-            role="status"
-          >
-            <p className="font-semibold text-green-900">
-              External payment recorded
-            </p>
+          <div className="mt-5 rounded border border-green-300 bg-green-50 p-4" role="status">
+            <p className="font-semibold text-green-900">External payment recorded</p>
             <p className="text-sm text-green-800">
               {successfulPayment.id}: {successfulPayment.currency}{' '}
-              {successfulPayment.amount.toFixed(2)} for{' '}
-              {successfulPayment.user.firstName}{' '}
+              {successfulPayment.amount.toFixed(2)} for {successfulPayment.user.firstName}{' '}
               {successfulPayment.user.lastName}
             </p>
           </div>
@@ -561,21 +599,20 @@ export default function AdminPaymentsPage() {
                   <th className="px-3 py-2">Status</th>
                   <th className="px-3 py-2">Provider</th>
                   <th className="px-3 py-2">External details</th>
+                  <th className="px-3 py-2">Refund balance</th>
+                  <th className="px-3 py-2">Refund history</th>
+                  <th className="px-3 py-2">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {payments.map((payment) => (
+                {payments.map(payment => (
                   <tr
-                    className={
-                      payment.id === successfulPayment?.id ? 'bg-green-50' : ''
-                    }
+                    className={payment.id === successfulPayment?.id ? 'bg-green-50' : ''}
                     key={payment.id}
                   >
                     <td className="px-3 py-3">
                       {payment.user.firstName} {payment.user.lastName}
-                      <div className="text-sm text-gray-500">
-                        {payment.user.email}
-                      </div>
+                      <div className="text-sm text-gray-500">{payment.user.email}</div>
                     </td>
                     <td className="px-3 py-3">
                       {payment.registration
@@ -585,17 +622,59 @@ export default function AdminPaymentsPage() {
                     <td className="px-3 py-3">
                       {new Date(payment.createdAt).toLocaleDateString()}
                     </td>
-                    <td className="px-3 py-3">
-                      {payment.currency} {payment.amount.toFixed(2)}
-                    </td>
+                    <td className="px-3 py-3">{formatPaymentAmount(payment)}</td>
                     <td className="px-3 py-3">{payment.status}</td>
                     <td className="px-3 py-3">{payment.provider}</td>
                     <td className="px-3 py-3">
                       {payment.externalMethod ?? '—'}
                       {payment.externalReference && (
-                        <div className="text-sm text-gray-500">
-                          {payment.externalReference}
+                        <div className="text-sm text-gray-500">{payment.externalReference}</div>
+                      )}
+                    </td>
+                    <td className="px-3 py-3 text-sm">
+                      <div>
+                        Successful: {formatCents(payment.currency, payment.successfulRefundCents)}
+                      </div>
+                      <div>
+                        Pending: {formatCents(payment.currency, payment.pendingRefundCents)}
+                      </div>
+                      <div className="font-medium">
+                        Available: {formatCents(payment.currency, payment.availableRefundCents)}
+                      </div>
+                      {payment.refundUnavailableReason && (
+                        <div className="mt-1 max-w-xs text-red-700">
+                          {payment.refundUnavailableReason}
                         </div>
+                      )}
+                    </td>
+                    <td className="px-3 py-3 text-sm">
+                      {payment.refunds.length === 0 ? (
+                        <span className="text-gray-500">No ledger history</span>
+                      ) : (
+                        <ul className="space-y-1">
+                          {payment.refunds.map(refund => (
+                            <li key={refund.id}>
+                              {formatCents(refund.currency, refund.amountCents)} {refund.status} /{' '}
+                              {refund.executionMode}
+                              {refund.externalReference && (
+                                <div className="text-gray-500">{refund.externalReference}</div>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </td>
+                    <td className="px-3 py-3">
+                      {canRefundPayment(payment) ? (
+                        <button
+                          className="rounded bg-blue-700 px-3 py-2 text-sm font-medium text-white"
+                          onClick={() => openRefundForm(payment)}
+                          type="button"
+                        >
+                          Refund
+                        </button>
+                      ) : (
+                        <span className="text-sm text-gray-500">Unavailable</span>
                       )}
                     </td>
                   </tr>
@@ -612,9 +691,7 @@ export default function AdminPaymentsPage() {
             className="rounded border border-gray-300 px-3 py-2 text-sm disabled:text-gray-400"
             disabled={paymentSkip === 0 || isLoadingPayments}
             onClick={() =>
-              setPaymentSkip((currentSkip) =>
-                Math.max(0, currentSkip - ADMIN_PAYMENT_PAGE_SIZE),
-              )
+              setPaymentSkip(currentSkip => Math.max(0, currentSkip - ADMIN_PAYMENT_PAGE_SIZE))
             }
             type="button"
           >
@@ -625,26 +702,193 @@ export default function AdminPaymentsPage() {
               ? '0 payments'
               : `${paymentSkip + 1}-${Math.min(
                   paymentSkip + ADMIN_PAYMENT_PAGE_SIZE,
-                  paymentTotal,
+                  paymentTotal
                 )} of ${paymentTotal}`}
           </span>
           <button
             className="rounded border border-gray-300 px-3 py-2 text-sm disabled:text-gray-400"
-            disabled={
-              paymentSkip + ADMIN_PAYMENT_PAGE_SIZE >= paymentTotal ||
-              isLoadingPayments
-            }
-            onClick={() =>
-              setPaymentSkip(
-                (currentSkip) => currentSkip + ADMIN_PAYMENT_PAGE_SIZE,
-              )
-            }
+            disabled={paymentSkip + ADMIN_PAYMENT_PAGE_SIZE >= paymentTotal || isLoadingPayments}
+            onClick={() => setPaymentSkip(currentSkip => currentSkip + ADMIN_PAYMENT_PAGE_SIZE)}
             type="button"
           >
             Next
           </button>
         </div>
       </section>
+
+      {(selectedRefundPayment || refundSuccess) && (
+        <section className="rounded-lg bg-white p-6 shadow">
+          <h2 className="text-xl font-semibold text-gray-900">Record completed manual refund</h2>
+          <p className="mt-2 text-sm text-gray-700">
+            Manual mode records a refund that already completed outside PlayaPlan. It does not
+            contact Stripe, PayPal, or another processor.
+          </p>
+          <p className="mt-2 text-sm font-medium text-amber-800">
+            A full refund does not cancel the registration. Use the existing cancellation workflow
+            when cancellation is intended.
+          </p>
+
+          {selectedRefundPayment && (
+            <>
+              <div className="mt-4 grid gap-3 rounded border border-gray-200 p-4 text-sm md:grid-cols-4">
+                <div>
+                  <span className="block text-gray-500">Original amount</span>
+                  {formatPaymentAmount(selectedRefundPayment)}
+                </div>
+                <div>
+                  <span className="block text-gray-500">Successful refunds</span>
+                  {formatCents(
+                    selectedRefundPayment.currency,
+                    selectedRefundPayment.successfulRefundCents
+                  )}
+                </div>
+                <div>
+                  <span className="block text-gray-500">Pending reserved</span>
+                  {formatCents(
+                    selectedRefundPayment.currency,
+                    selectedRefundPayment.pendingRefundCents
+                  )}
+                </div>
+                <div>
+                  <span className="block text-gray-500">Available balance</span>
+                  {formatCents(
+                    selectedRefundPayment.currency,
+                    selectedRefundPayment.availableRefundCents
+                  )}
+                </div>
+              </div>
+
+              <form className="mt-5 space-y-4" onSubmit={recordManualRefund}>
+                <fieldset>
+                  <legend className="text-sm font-medium text-gray-700">Refund amount</legend>
+                  <div className="mt-2 flex flex-wrap gap-4">
+                    <label className="flex items-center gap-2 text-sm">
+                      <input
+                        checked={refundAmountMode === 'partial'}
+                        name="refundAmountMode"
+                        onChange={() => setRefundAmountMode('partial')}
+                        type="radio"
+                      />
+                      Partial
+                    </label>
+                    <label className="flex items-center gap-2 text-sm">
+                      <input
+                        aria-label="Full available refund"
+                        checked={refundAmountMode === 'full'}
+                        name="refundAmountMode"
+                        onChange={() => setRefundAmountMode('full')}
+                        type="radio"
+                      />
+                      Full available (
+                      {formatCents(
+                        selectedRefundPayment.currency,
+                        selectedRefundPayment.availableRefundCents
+                      )}
+                      )
+                    </label>
+                  </div>
+                </fieldset>
+
+                {refundAmountMode === 'partial' && (
+                  <label className="block text-sm font-medium text-gray-700">
+                    Partial refund amount
+                    <input
+                      aria-label="Partial refund amount"
+                      className="mt-1 block w-full max-w-xs rounded border border-gray-300 px-3 py-2"
+                      inputMode="decimal"
+                      placeholder="0.00"
+                      required
+                      value={refundAmount}
+                      onChange={event => setRefundAmount(event.target.value)}
+                    />
+                  </label>
+                )}
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <label className="text-sm font-medium text-gray-700">
+                    Reason (optional)
+                    <textarea
+                      aria-label="Manual refund reason"
+                      className="mt-1 w-full rounded border border-gray-300 px-3 py-2"
+                      maxLength={500}
+                      value={refundReason}
+                      onChange={event => setRefundReason(event.target.value)}
+                    />
+                  </label>
+                  <label className="text-sm font-medium text-gray-700">
+                    External reference (optional)
+                    <input
+                      aria-label="Manual refund reference"
+                      className="mt-1 w-full rounded border border-gray-300 px-3 py-2"
+                      maxLength={255}
+                      value={refundReference}
+                      onChange={event => setRefundReference(event.target.value)}
+                    />
+                  </label>
+                </div>
+
+                {selectedRefundPayment.registration && (
+                  <label className="block text-sm font-medium text-gray-700">
+                    Registration status after success (optional)
+                    <select
+                      aria-label="Refund registration status"
+                      className="mt-1 block w-full max-w-xs rounded border border-gray-300 px-3 py-2"
+                      value={refundRegistrationStatus}
+                      onChange={event =>
+                        setRefundRegistrationStatus(
+                          event.target.value as RefundRegistrationStatus | ''
+                        )
+                      }
+                    >
+                      <option value="">Leave unchanged</option>
+                      {REFUND_REGISTRATION_STATUSES.map(status => (
+                        <option key={status} value={status}>
+                          {status}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+
+                {refundError && (
+                  <p className="text-sm text-red-700" role="alert">
+                    {refundError}
+                  </p>
+                )}
+                <div className="flex gap-3">
+                  <button
+                    className="rounded bg-blue-700 px-4 py-2 font-medium text-white disabled:cursor-not-allowed disabled:bg-gray-400"
+                    disabled={isSubmittingRefund}
+                    type="submit"
+                  >
+                    {isSubmittingRefund ? 'Recording refund...' : 'Record manual refund'}
+                  </button>
+                  <button
+                    className="rounded border border-gray-300 px-4 py-2"
+                    disabled={isSubmittingRefund}
+                    onClick={() => {
+                      setSelectedRefundPayment(null);
+                      setRefundError(null);
+                    }}
+                    type="button"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </>
+          )}
+
+          {refundSuccess && (
+            <p
+              className="mt-4 rounded border border-green-300 bg-green-50 p-4 text-green-900"
+              role="status"
+            >
+              {refundSuccess}
+            </p>
+          )}
+        </section>
+      )}
     </div>
   );
 }

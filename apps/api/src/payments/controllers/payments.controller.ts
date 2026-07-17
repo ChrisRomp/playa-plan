@@ -1,7 +1,36 @@
-import { Controller, Post, Body, Get, Param, Query, UseGuards, ParseUUIDPipe, Put, HttpCode, HttpStatus, Request, DefaultValuePipe, ParseIntPipe } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiParam, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  Controller,
+  Post,
+  Body,
+  Get,
+  Param,
+  Query,
+  UseGuards,
+  ParseUUIDPipe,
+  Put,
+  HttpCode,
+  HttpStatus,
+  Request,
+  DefaultValuePipe,
+  ParseIntPipe,
+} from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiQuery,
+  ApiParam,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 import { PaymentsService, StripeService, PaypalService } from '../services';
-import { CreatePaymentDto, CreateStripePaymentDto, CreatePaypalPaymentDto, CreateRefundDto, CreateExternalPaymentDto, UpdatePaymentDto } from '../dto';
+import {
+  CreatePaymentDto,
+  CreateStripePaymentDto,
+  CreatePaypalPaymentDto,
+  CreateRefundDto,
+  CreateExternalPaymentDto,
+  UpdatePaymentDto,
+} from '../dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
@@ -14,7 +43,7 @@ export class PaymentsController {
   constructor(
     private readonly paymentsService: PaymentsService,
     private readonly stripeService: StripeService,
-    private readonly paypalService: PaypalService,
+    private readonly paypalService: PaypalService
   ) {}
 
   @Post()
@@ -45,13 +74,13 @@ export class PaymentsController {
     @Query('skip') skip?: string,
     @Query('take') take?: string,
     @Query('userId') userId?: string,
-    @Query('status') status?: PaymentStatus,
+    @Query('status') status?: PaymentStatus
   ) {
     return this.paymentsService.findAll(
       skip ? parseInt(skip, 10) : undefined,
       take ? parseInt(take, 10) : undefined,
       userId,
-      status,
+      status
     );
   }
 
@@ -68,7 +97,7 @@ export class PaymentsController {
   @ApiResponse({ status: 403, description: 'Forbidden - Admin access required' })
   async findAllForAdmin(
     @Query('skip', new DefaultValuePipe(0), ParseIntPipe) skip: number,
-    @Query('take', new DefaultValuePipe(25), ParseIntPipe) take: number,
+    @Query('take', new DefaultValuePipe(25), ParseIntPipe) take: number
   ) {
     return this.paymentsService.findAllForAdmin(skip, take);
   }
@@ -76,7 +105,7 @@ export class PaymentsController {
   @Get('my-payments')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get current user\'s payments only' })
+  @ApiOperation({ summary: "Get current user's payments only" })
   @ApiQuery({ name: 'skip', required: false, type: Number })
   @ApiQuery({ name: 'take', required: false, type: Number })
   @ApiQuery({ name: 'status', required: false, enum: PaymentStatus })
@@ -86,14 +115,14 @@ export class PaymentsController {
     @Request() req: AuthenticatedRequest,
     @Query('skip') skip?: string,
     @Query('take') take?: string,
-    @Query('status') status?: PaymentStatus,
+    @Query('status') status?: PaymentStatus
   ) {
     const userId = req.user.id;
     return this.paymentsService.findAll(
       skip ? parseInt(skip, 10) : undefined,
       take ? parseInt(take, 10) : undefined,
       userId, // Force filter to current user
-      status,
+      status
     );
   }
 
@@ -119,10 +148,7 @@ export class PaymentsController {
   @ApiResponse({ status: 200, description: 'Payment updated successfully' })
   @ApiResponse({ status: 404, description: 'Payment not found' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async update(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body() updatePaymentDto: UpdatePaymentDto,
-  ) {
+  async update(@Param('id', ParseUUIDPipe) id: string, @Body() updatePaymentDto: UpdatePaymentDto) {
     return this.paymentsService.update(id, updatePaymentDto);
   }
 
@@ -139,12 +165,9 @@ export class PaymentsController {
   @ApiResponse({ status: 409, description: 'Idempotency key reused with different input' })
   async recordExternalPayment(
     @Body() createExternalPaymentDto: CreateExternalPaymentDto,
-    @Request() req: AuthenticatedRequest,
+    @Request() req: AuthenticatedRequest
   ) {
-    return this.paymentsService.recordExternalPayment(
-      createExternalPaymentDto,
-      req.user.id,
-    );
+    return this.paymentsService.recordExternalPayment(createExternalPaymentDto, req.user.id);
   }
 
   @Post('stripe')
@@ -169,16 +192,24 @@ export class PaymentsController {
     return this.paymentsService.initiatePaypalPayment(createPaypalPaymentDto);
   }
 
-  @Post('refund')
+  @Post(':paymentId/refunds')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('ADMIN')
+  @Roles(UserRole.ADMIN)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Process a refund' })
-  @ApiResponse({ status: 201, description: 'Refund processed successfully' })
-  @ApiResponse({ status: 400, description: 'Invalid input data or cannot refund this payment' })
+  @ApiOperation({ summary: 'Record an already-completed manual refund' })
+  @ApiParam({ name: 'paymentId', required: true, description: 'Payment ID' })
+  @ApiResponse({ status: 201, description: 'Manual refund recorded successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid input data or refundable balance' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async processRefund(@Body() createRefundDto: CreateRefundDto) {
-    return this.paymentsService.processRefund(createRefundDto);
+  @ApiResponse({ status: 403, description: 'Forbidden - Admin access required' })
+  @ApiResponse({ status: 404, description: 'Payment not found' })
+  @ApiResponse({ status: 409, description: 'Idempotency or serialization conflict' })
+  async createRefund(
+    @Param('paymentId', ParseUUIDPipe) paymentId: string,
+    @Body() createRefundDto: CreateRefundDto,
+    @Request() req: AuthenticatedRequest
+  ) {
+    return this.paymentsService.createManualRefund(paymentId, createRefundDto, req.user.id);
   }
 
   @Post('link/:paymentId/registration/:registrationId')
@@ -194,7 +225,7 @@ export class PaymentsController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async linkToRegistration(
     @Param('paymentId', ParseUUIDPipe) paymentId: string,
-    @Param('registrationId', ParseUUIDPipe) registrationId: string,
+    @Param('registrationId', ParseUUIDPipe) registrationId: string
   ) {
     return this.paymentsService.linkToRegistration(paymentId, registrationId);
   }
