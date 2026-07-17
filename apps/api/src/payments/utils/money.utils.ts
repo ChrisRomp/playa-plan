@@ -13,6 +13,13 @@ function getDecimalPlaces(value: number): number {
 }
 
 /**
+ * Returns whether a dollar amount contains precision smaller than one cent.
+ */
+export function hasSubCentPrecision(amount: number): boolean {
+  return getDecimalPlaces(amount) > 2;
+}
+
+/**
  * Converts a positive dollar amount to PostgreSQL INTEGER cents.
  */
 export function dollarsToCents(amount: number): number {
@@ -20,7 +27,7 @@ export function dollarsToCents(amount: number): number {
     throw new RangeError('Dollar amount must be a positive finite number');
   }
 
-  if (getDecimalPlaces(amount) > 2) {
+  if (hasSubCentPrecision(amount)) {
     throw new RangeError('Dollar amount must not have sub-cent precision');
   }
 

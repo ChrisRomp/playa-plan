@@ -93,15 +93,27 @@ export interface CreateExternalPaymentRequest {
   idempotencyKey: string;
 }
 
-export interface CreateManualRefundRequest {
-  amountCents?: number;
-  fullRefund?: true;
-  executionMode: 'MANUAL';
+export type RefundAmountSelection =
+  | {
+      amountCents: number;
+      fullRefund?: never;
+    }
+  | {
+      amountCents?: never;
+      fullRefund: true;
+    };
+
+interface CreateRefundRequestFields {
   reason?: string;
   externalReference?: string;
   resultingRegistrationStatus?: RefundRegistrationStatus;
   idempotencyKey: string;
 }
+
+export type CreateManualRefundRequest = RefundAmountSelection &
+  CreateRefundRequestFields & {
+    executionMode: 'MANUAL';
+  };
 
 export interface ManualRefundResult {
   payment: AdminPayment;

@@ -7,6 +7,7 @@ import {
   AdminPayment,
   adminPaymentsApi,
   ExternalPaymentMethod,
+  RefundAmountSelection,
   RefundRegistrationStatus,
   ExternalPaymentSearchRegistration,
   ExternalPaymentSearchRegistrationStatus,
@@ -277,18 +278,21 @@ export default function AdminPaymentsPage() {
       return;
     }
 
-    const amountCents = refundAmountMode === 'partial' ? parseDollarsToCents(refundAmount) : null;
-    if (
-      refundAmountMode === 'partial' &&
-      (amountCents === null || amountCents > selectedRefundPayment.availableRefundCents)
-    ) {
-      setRefundError(
-        `Enter a positive amount with at most two decimals, no more than ${formatCents(
-          selectedRefundPayment.currency,
-          selectedRefundPayment.availableRefundCents
-        )}.`
-      );
-      return;
+    let amountSelection: RefundAmountSelection;
+    if (refundAmountMode === 'full') {
+      amountSelection = { fullRefund: true };
+    } else {
+      const amountCents = parseDollarsToCents(refundAmount);
+      if (amountCents === null || amountCents > selectedRefundPayment.availableRefundCents) {
+        setRefundError(
+          `Enter a positive amount with at most two decimals, no more than ${formatCents(
+            selectedRefundPayment.currency,
+            selectedRefundPayment.availableRefundCents
+          )}.`
+        );
+        return;
+      }
+      amountSelection = { amountCents };
     }
 
     setIsSubmittingRefund(true);
@@ -296,9 +300,7 @@ export default function AdminPaymentsPage() {
     setRefundSuccess(null);
     try {
       const result = await adminPaymentsApi.createManualRefund(selectedRefundPayment.id, {
-        ...(refundAmountMode === 'full'
-          ? { fullRefund: true as const }
-          : { amountCents: amountCents as number }),
+        ...amountSelection,
         executionMode: 'MANUAL',
         reason: refundReason.trim() || undefined,
         externalReference: refundReference.trim() || undefined,

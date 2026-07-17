@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, expectTypeOf, it, vi } from 'vitest';
 import { api } from '../../api';
 import {
   ADMIN_PAYMENT_PAGE_SIZE,
@@ -82,5 +82,51 @@ describe('adminPaymentsApi', () => {
     expect(mockApiPost.mock.calls[0]?.[1]).not.toHaveProperty('currency');
     expect(mockApiPost.mock.calls[0]?.[1]).not.toHaveProperty('availableRefundCents');
     expect(actualResult).toEqual(mockResult);
+  });
+
+  it('should require exactly one manual refund amount selection at compile time', () => {
+    const inputCommon = {
+      executionMode: 'MANUAL' as const,
+      idempotencyKey: '43ea4b84-1f0d-413d-bc1c-9c91b435d66d',
+    };
+    const inputPartialRequest = {
+      ...inputCommon,
+      amountCents: 5050,
+    };
+    const inputFullRequest = {
+      ...inputCommon,
+      fullRefund: true as const,
+    };
+    const inputMissingSelection = inputCommon;
+    const inputBothSelections = {
+      ...inputCommon,
+      amountCents: 5050,
+      fullRefund: true as const,
+    };
+    // @ts-expect-error -- A refund amount selection is required.
+    const invalidMissingSelection: CreateManualRefundRequest = inputMissingSelection;
+    // @ts-expect-error -- Partial and full refund selections are mutually exclusive.
+    const invalidBothSelections: CreateManualRefundRequest = inputBothSelections;
+
+    expectTypeOf(inputPartialRequest).toMatchTypeOf<CreateManualRefundRequest>();
+    expectTypeOf(inputFullRequest).toMatchTypeOf<CreateManualRefundRequest>();
+    expectTypeOf(inputMissingSelection).not.toMatchTypeOf<CreateManualRefundRequest>();
+    expectTypeOf(inputBothSelections).not.toMatchTypeOf<CreateManualRefundRequest>();
+    expect(invalidMissingSelection).toBe(inputMissingSelection);
+    expect(invalidBothSelections).toBe(inputBothSelections);
+  });
+
+  it('should send a full selection without amount cents to the manual refund route', async () => {
+    const inputRequest: CreateManualRefundRequest = {
+      fullRefund: true,
+      executionMode: 'MANUAL',
+      idempotencyKey: '43ea4b84-1f0d-413d-bc1c-9c91b435d66d',
+    };
+    mockApiPost.mockResolvedValue({ data: { refund: { id: 'refund-id' } } });
+
+    await adminPaymentsApi.createManualRefund('payment-id', inputRequest);
+
+    expect(mockApiPost).toHaveBeenCalledWith('/payments/payment-id/refunds', inputRequest);
+    expect(mockApiPost.mock.calls[0]?.[1]).not.toHaveProperty('amountCents');
   });
 });

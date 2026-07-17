@@ -460,7 +460,32 @@ describe('PaymentsService', () => {
             email: 'legacy@example.com',
           },
           registration: null,
-          refunds: [],
+          refunds: [
+            {
+              id: 'succeeded-refund',
+              amountCents: 600,
+              currency: 'USD',
+              executionMode: RefundExecutionMode.MANUAL,
+              status: PaymentRefundStatus.SUCCEEDED,
+              reason: null,
+              externalReference: null,
+              resultingRegistrationStatus: null,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            },
+            {
+              id: 'pending-refund',
+              amountCents: 100,
+              currency: 'USD',
+              executionMode: RefundExecutionMode.STRIPE,
+              status: PaymentRefundStatus.PENDING,
+              reason: null,
+              externalReference: null,
+              resultingRegistrationStatus: null,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            },
+          ],
         };
         mockPrismaService.payment.findMany.mockResolvedValue([mockPayment]);
         mockPrismaService.payment.count.mockResolvedValue(1);
@@ -472,8 +497,8 @@ describe('PaymentsService', () => {
             {
               ...mockPayment,
               paymentAmountCents: null,
-              successfulRefundCents: 0,
-              pendingRefundCents: 0,
+              successfulRefundCents: 600,
+              pendingRefundCents: 100,
               availableRefundCents: 0,
               refundUnavailableReason:
                 'Refund unavailable because the stored payment amount has unsupported precision.',
@@ -483,10 +508,192 @@ describe('PaymentsService', () => {
         });
       });
 
+      it('should report a zero-dollar comp payment as exactly zero cents', async () => {
+        const mockPayment = {
+          id: 'zero-dollar-payment',
+          amount: 0,
+          currency: 'USD',
+          status: PaymentStatus.COMPLETED,
+          provider: PaymentProvider.MANUAL,
+          externalMethod: null,
+          externalReference: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          userId: 'user-id',
+          registrationId: null,
+          user: {
+            id: 'user-id',
+            firstName: 'Comp',
+            lastName: 'Registration',
+            email: 'comp@example.com',
+          },
+          registration: null,
+          refunds: [],
+        };
+        mockPrismaService.payment.findMany.mockResolvedValue([mockPayment]);
+        mockPrismaService.payment.count.mockResolvedValue(1);
+
+        const actualResult = await service.findAllForAdmin();
+
+        expect(actualResult.payments[0]).toEqual(
+          expect.objectContaining({
+            paymentAmountCents: 0,
+            successfulRefundCents: 0,
+            pendingRefundCents: 0,
+            availableRefundCents: 0,
+            refundUnavailableReason: null,
+          })
+        );
+      });
+
+      it('should report the maximum supported historical payment amount in cents', async () => {
+        const mockPayment = {
+          id: 'maximum-payment',
+          amount: 21_474_836.47,
+          currency: 'USD',
+          status: PaymentStatus.COMPLETED,
+          provider: PaymentProvider.STRIPE,
+          externalMethod: null,
+          externalReference: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          userId: 'user-id',
+          registrationId: null,
+          user: {
+            id: 'user-id',
+            firstName: 'Maximum',
+            lastName: 'Payment',
+            email: 'maximum@example.com',
+          },
+          registration: null,
+          refunds: [],
+        };
+        mockPrismaService.payment.findMany.mockResolvedValue([mockPayment]);
+        mockPrismaService.payment.count.mockResolvedValue(1);
+
+        const actualResult = await service.findAllForAdmin();
+
+        expect(actualResult.payments[0]).toEqual(
+          expect.objectContaining({
+            paymentAmountCents: 2_147_483_647,
+            successfulRefundCents: 0,
+            pendingRefundCents: 0,
+            availableRefundCents: 2_147_483_647,
+            refundUnavailableReason: null,
+          })
+        );
+      });
+
+      it('should keep an out-of-range payment visible with durable refund totals', async () => {
+        const mockPayment = {
+          id: 'out-of-range-payment',
+          amount: 21_474_836.48,
+          currency: 'USD',
+          status: PaymentStatus.PARTIALLY_REFUNDED,
+          provider: PaymentProvider.STRIPE,
+          externalMethod: null,
+          externalReference: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          userId: 'user-id',
+          registrationId: null,
+          user: {
+            id: 'user-id',
+            firstName: 'Out Of Range',
+            lastName: 'Payment',
+            email: 'out-of-range@example.com',
+          },
+          registration: null,
+          refunds: [
+            {
+              id: 'succeeded-refund',
+              amountCents: 600,
+              currency: 'USD',
+              executionMode: RefundExecutionMode.MANUAL,
+              status: PaymentRefundStatus.SUCCEEDED,
+              reason: null,
+              externalReference: null,
+              resultingRegistrationStatus: null,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            },
+            {
+              id: 'pending-refund',
+              amountCents: 100,
+              currency: 'USD',
+              executionMode: RefundExecutionMode.STRIPE,
+              status: PaymentRefundStatus.PENDING,
+              reason: null,
+              externalReference: null,
+              resultingRegistrationStatus: null,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            },
+          ],
+        };
+        mockPrismaService.payment.findMany.mockResolvedValue([mockPayment]);
+        mockPrismaService.payment.count.mockResolvedValue(1);
+
+        const actualResult = await service.findAllForAdmin();
+
+        expect(actualResult.payments[0]).toEqual(
+          expect.objectContaining({
+            paymentAmountCents: null,
+            successfulRefundCents: 600,
+            pendingRefundCents: 100,
+            availableRefundCents: 0,
+            refundUnavailableReason:
+              'Refund unavailable because the stored payment amount is invalid or exceeds the supported refund range.',
+          })
+        );
+      });
+
+      it.each([-1, Number.NaN, Number.POSITIVE_INFINITY])(
+        'should keep invalid stored payment amount %s visible but unavailable',
+        async amount => {
+          const mockPayment = {
+            id: 'invalid-amount-payment',
+            amount,
+            currency: 'USD',
+            status: PaymentStatus.COMPLETED,
+            provider: PaymentProvider.PAYPAL,
+            externalMethod: null,
+            externalReference: null,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            userId: 'user-id',
+            registrationId: null,
+            user: {
+              id: 'user-id',
+              firstName: 'Invalid',
+              lastName: 'Payment',
+              email: 'invalid@example.com',
+            },
+            registration: null,
+            refunds: [],
+          };
+          mockPrismaService.payment.findMany.mockResolvedValue([mockPayment]);
+          mockPrismaService.payment.count.mockResolvedValue(1);
+
+          const actualResult = await service.findAllForAdmin();
+
+          expect(actualResult.payments[0]).toEqual(
+            expect.objectContaining({
+              paymentAmountCents: null,
+              successfulRefundCents: 0,
+              pendingRefundCents: 0,
+              availableRefundCents: 0,
+              refundUnavailableReason:
+                'Refund unavailable because the stored payment amount is invalid or exceeds the supported refund range.',
+            })
+          );
+        }
+      );
+
       it('should keep a malformed stored currency visible but unavailable for refunds', async () => {
         const mockPayment = {
           id: 'legacy-currency-payment',
-          amount: 10,
+          amount: 0,
           currency: 'usd',
           status: PaymentStatus.COMPLETED,
           provider: PaymentProvider.PAYPAL,
@@ -514,7 +721,7 @@ describe('PaymentsService', () => {
           payments: [
             {
               ...mockPayment,
-              paymentAmountCents: 1000,
+              paymentAmountCents: 0,
               successfulRefundCents: 0,
               pendingRefundCents: 0,
               availableRefundCents: 0,
