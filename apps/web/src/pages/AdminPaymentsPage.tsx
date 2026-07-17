@@ -423,13 +423,11 @@ export default function AdminPaymentsPage() {
   };
 
   const refundFeedbackSource: RefundFeedbackSource | null =
-    refundNotice?.source ??
-    refundError?.source ??
-    (selectedRefundPayment
+    selectedRefundPayment
       ? refundExecutionMode === 'MANUAL'
         ? 'MANUAL_CREATE'
         : 'STRIPE_CREATE'
-      : null);
+      : (refundNotice?.source ?? refundError?.source ?? null);
 
   return (
     <div className="mx-auto max-w-6xl space-y-8 px-4 py-8">

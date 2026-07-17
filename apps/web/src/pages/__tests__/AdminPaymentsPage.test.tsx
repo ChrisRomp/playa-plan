@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import AdminPaymentsPage from '../AdminPaymentsPage';
@@ -6,6 +6,7 @@ import { adminRegistrationsApi, type Registration } from '../../lib/api/admin-re
 import {
   adminPaymentsApi,
   type ExternalPaymentSearchRegistration,
+  type RefundCommandResult,
 } from '../../lib/api/admin-payments';
 
 void adminRegistrationsApi.getRegistrations<Registration>;
@@ -512,6 +513,65 @@ describe('AdminPaymentsPage', () => {
     expect(screen.getByText(/A full refund does not cancel the registration/)).toBeInTheDocument();
   });
 
+  it('should use Stripe form context after switching from manual feedback', async () => {
+    const stripePayment = {
+      ...payment,
+      provider: 'STRIPE',
+      externalMethod: null,
+      externalReference: null,
+      stripeRefundEligible: true,
+    };
+    mockGetPayments.mockResolvedValue({ payments: [stripePayment], total: 1 });
+    renderPage();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Refund' }));
+    fireEvent.change(screen.getByLabelText('Partial refund amount'), {
+      target: { value: '1.001' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Record manual refund' }));
+    await screen.findByText(/Enter a positive amount with at most two decimals/);
+    fireEvent.click(screen.getByLabelText('Initiate Stripe refund'));
+
+    expect(screen.getByRole('heading', { name: 'Initiate Stripe refund' })).toBeInTheDocument();
+    expect(screen.getByText(/Stripe mode initiates a processor refund/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Initiate Stripe refund' })).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Record completed manual refund' })
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/Manual mode records a refund/)).not.toBeInTheDocument();
+  });
+
+  it('should use manual form context after switching from Stripe feedback', async () => {
+    const stripePayment = {
+      ...payment,
+      provider: 'STRIPE',
+      externalMethod: null,
+      externalReference: null,
+      stripeRefundEligible: true,
+    };
+    mockGetPayments.mockResolvedValue({ payments: [stripePayment], total: 1 });
+    renderPage();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Refund' }));
+    fireEvent.click(screen.getByLabelText('Initiate Stripe refund'));
+    fireEvent.change(screen.getByLabelText('Partial refund amount'), {
+      target: { value: '1.001' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Initiate Stripe refund' }));
+    await screen.findByText(/Enter a positive amount with at most two decimals/);
+    fireEvent.click(screen.getByLabelText('Record completed external refund'));
+
+    expect(
+      screen.getByRole('heading', { name: 'Record completed manual refund' })
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Manual mode records a refund/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Record manual refund' })).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Initiate Stripe refund' })
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/Stripe mode initiates a processor refund/)).not.toBeInTheDocument();
+  });
+
   it('should keep an ambiguous Stripe refund reserved and retry it from history', async () => {
     const pendingRefund = {
       id: 'pending-refund',
@@ -664,6 +724,76 @@ describe('AdminPaymentsPage', () => {
       expect(screen.queryByText(/Manual mode records a refund/)).not.toBeInTheDocument();
     }
   );
+
+  it('should keep create form context when an in-flight Retry finishes', async () => {
+    const pendingRefund = {
+      id: 'pending-refund',
+      amountCents: 2500,
+      currency: 'USD',
+      executionMode: 'STRIPE' as const,
+      status: 'PENDING' as const,
+      reason: null,
+      externalReference: null,
+      resultingRegistrationStatus: null,
+      createdAt: '2026-07-14T01:00:00.000Z',
+      updatedAt: '2026-07-14T01:00:00.000Z',
+    };
+    const pendingPayment = {
+      ...payment,
+      provider: 'STRIPE',
+      stripeRefundEligible: true,
+      refunds: [pendingRefund],
+      pendingRefundCents: 2500,
+      availableRefundCents: 10050,
+    };
+    const succeededRefund = { ...pendingRefund, status: 'SUCCEEDED' as const };
+    const succeededPayment = {
+      ...pendingPayment,
+      status: 'PARTIALLY_REFUNDED',
+      refunds: [succeededRefund],
+      successfulRefundCents: 2500,
+      pendingRefundCents: 0,
+    };
+    const retryResult: RefundCommandResult = {
+      payment: succeededPayment,
+      refund: succeededRefund,
+      paymentAmountCents: 12550,
+      successfulRefundCents: 2500,
+      pendingRefundCents: 0,
+      availableRefundCents: 10050,
+      refundUnavailableReason: null,
+      outcome: 'SUCCEEDED',
+    };
+    let resolveRetry!: (result: RefundCommandResult) => void;
+    mockGetPayments.mockResolvedValue({ payments: [pendingPayment], total: 1 });
+    mockRetryStripeRefund.mockImplementation(
+      () =>
+        new Promise<RefundCommandResult>(resolve => {
+          resolveRetry = resolve;
+        })
+    );
+    renderPage();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Retry' }));
+    await waitFor(() => expect(mockRetryStripeRefund).toHaveBeenCalled());
+    fireEvent.click(screen.getByRole('button', { name: 'Refund' }));
+    expect(
+      screen.getByRole('heading', { name: 'Record completed manual refund' })
+    ).toBeInTheDocument();
+
+    await act(async () => {
+      resolveRetry(retryResult);
+    });
+
+    expect(await screen.findByText('Stripe refund reconciliation succeeded.')).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Record completed manual refund' })
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Manual mode records a refund/)).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Reconcile Stripe refund' })
+    ).not.toBeInTheDocument();
+  });
 
   it('should render a direct Stripe retry error without manual recording context', async () => {
     const pendingRefund = {
