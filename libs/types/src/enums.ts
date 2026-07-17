@@ -31,15 +31,7 @@ export enum RegistrationStatus {
   CANCELLED = 'CANCELLED'
 }
 
-/**
- * Represents the status of a payment
- */
-export enum PaymentStatus {
-  PENDING = 'PENDING',
-  COMPLETED = 'COMPLETED',
-  FAILED = 'FAILED',
-  REFUNDED = 'REFUNDED'
-}
+export { PaymentStatus } from './enums/payment-status.enum';
 
 /**
  * Represents the payment method used

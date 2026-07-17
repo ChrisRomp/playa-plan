@@ -4,7 +4,7 @@ import { StripeService } from './stripe.service';
 import { PaypalService } from './paypal.service';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { NotificationsService } from '../../notifications/services/notifications.service';
-import { PaymentProvider, PaymentStatus } from '@prisma/client';
+import { PaymentProvider, PaymentStatus, UserRole } from '@prisma/client';
 import { NotFoundException, BadRequestException } from '@nestjs/common';
 
 // Mock implementations
@@ -80,6 +80,28 @@ const mockPaypalService = {
 const mockNotificationsService = {
   sendNotification: jest.fn().mockResolvedValue(undefined),
   sendRegistrationConfirmationEmail: jest.fn().mockResolvedValue(true),
+};
+
+const expectedSharedPaymentSelect = {
+  id: true,
+  amount: true,
+  currency: true,
+  status: true,
+  provider: true,
+  providerRefId: true,
+  createdAt: true,
+  updatedAt: true,
+  userId: true,
+  registrationId: true,
+  user: {
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      email: true,
+    },
+  },
+  registration: true,
 };
 
 describe('PaymentsService', () => {
@@ -251,6 +273,44 @@ describe('PaymentsService', () => {
       expect(result).toEqual({ payments: mockPayments, total: mockTotal });
     });
 
+    it('should select only pre-foundation payment fields and relations', async () => {
+      const mockPayment = {
+        id: 'payment-1',
+        amount: 100,
+        currency: 'USD',
+        status: PaymentStatus.COMPLETED,
+        provider: PaymentProvider.STRIPE,
+        providerRefId: 'provider-reference',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        userId: 'user-id',
+        registrationId: null,
+        user: {
+          id: 'user-id',
+          firstName: 'Test',
+          lastName: 'User',
+          email: 'test@example.com',
+        },
+        registration: null,
+      };
+      mockPrismaService.payment.findMany.mockResolvedValue([mockPayment]);
+      mockPrismaService.payment.count.mockResolvedValue(1);
+
+      const actualResult = await service.findAll(0, 10, 'user-id');
+
+      expect(mockPrismaService.payment.findMany).toHaveBeenCalledWith({
+        where: { userId: 'user-id' },
+        skip: 0,
+        take: 10,
+        select: expectedSharedPaymentSelect,
+        orderBy: { createdAt: 'desc' },
+      });
+      expect(actualResult.payments[0]).not.toHaveProperty('externalMethod');
+      expect(actualResult.payments[0]).not.toHaveProperty('externalReference');
+      expect(actualResult.payments[0]).not.toHaveProperty('idempotencyKey');
+      expect(actualResult.payments[0]).not.toHaveProperty('refunds');
+    });
+
     it('should apply filters when provided', async () => {
       // Mock data
       const mockPayments = [{ id: 'payment-1', amount: 100 }];
@@ -311,6 +371,46 @@ describe('PaymentsService', () => {
 
       // Execute & Assert
       await expect(service.findOne(paymentId)).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('findOneWithOwnershipCheck', () => {
+    it('should select only pre-foundation payment fields and relations', async () => {
+      const mockPayment = {
+        id: 'payment-id',
+        amount: 100,
+        currency: 'USD',
+        status: PaymentStatus.COMPLETED,
+        provider: PaymentProvider.STRIPE,
+        providerRefId: 'provider-reference',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        userId: 'user-id',
+        registrationId: null,
+        user: {
+          id: 'user-id',
+          firstName: 'Test',
+          lastName: 'User',
+          email: 'test@example.com',
+        },
+        registration: null,
+      };
+      mockPrismaService.payment.findUnique.mockResolvedValue(mockPayment);
+
+      const actualPayment = await service.findOneWithOwnershipCheck(
+        'payment-id',
+        'user-id',
+        UserRole.PARTICIPANT,
+      );
+
+      expect(mockPrismaService.payment.findUnique).toHaveBeenCalledWith({
+        where: { id: 'payment-id' },
+        select: expectedSharedPaymentSelect,
+      });
+      expect(actualPayment).not.toHaveProperty('externalMethod');
+      expect(actualPayment).not.toHaveProperty('externalReference');
+      expect(actualPayment).not.toHaveProperty('idempotencyKey');
+      expect(actualPayment).not.toHaveProperty('refunds');
     });
   });
 

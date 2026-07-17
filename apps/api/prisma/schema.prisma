@@ -36,6 +36,7 @@ model User {
   loginCodeExpiry            DateTime?
   campingOptionRegistrations CampingOptionRegistration[]
   payments                   Payment[]
+  processedPaymentRefunds    PaymentRefund[]             @relation("PaymentRefundProcessedBy")
   registrations              Registration[]
   emailAudit                 EmailAudit[]
   adminAuditRecords          AdminAudit[]                @relation("AdminAuditRecords")
@@ -231,20 +232,47 @@ model RegistrationJob {
 }
 
 model Payment {
-  id             String          @id @default(uuid())
-  amount         Float
-  currency       String          @default("USD")
-  status         PaymentStatus   @default(PENDING)
-  provider       PaymentProvider
-  providerRefId  String?
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-  userId         String
-  registrationId String?
-  user           User            @relation(fields: [userId], references: [id])
-  registration   Registration?   @relation(fields: [registrationId], references: [id])
+  id                String                 @id @default(uuid())
+  amount            Float
+  currency          String                 @default("USD")
+  status            PaymentStatus          @default(PENDING)
+  provider          PaymentProvider
+  providerRefId     String?
+  externalMethod    ExternalPaymentMethod?
+  externalReference String?                @db.VarChar(255)
+  idempotencyKey    String?                @unique @db.Uuid
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+  userId            String
+  registrationId    String?
+  user              User                   @relation(fields: [userId], references: [id])
+  registration      Registration?          @relation(fields: [registrationId], references: [id])
+  refunds           PaymentRefund[]
 
   @@map("payments")
+}
+
+model PaymentRefund {
+  id                          String              @id @default(uuid())
+  paymentId                   String
+  amountCents                 Int
+  currency                    String              @db.VarChar(3)
+  executionMode               RefundExecutionMode
+  status                      PaymentRefundStatus @default(PENDING)
+  reason                      String?             @db.VarChar(500)
+  externalReference           String?             @db.VarChar(255)
+  providerRefundId            String?             @unique @db.VarChar(255)
+  idempotencyKey              String              @unique @db.Uuid
+  processedByUserId           String
+  resultingRegistrationStatus RegistrationStatus?
+  failureMessage              String?             @db.VarChar(500)
+  createdAt                   DateTime            @default(now())
+  updatedAt                   DateTime            @updatedAt
+  payment                     Payment             @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+  processedBy                 User                @relation("PaymentRefundProcessedBy", fields: [processedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([paymentId, status])
+  @@map("payment_refunds")
 }
 
 model Notification {
@@ -370,6 +398,7 @@ enum RegistrationStatus {
 enum PaymentStatus {
   PENDING
   COMPLETED
+  PARTIALLY_REFUNDED
   FAILED
   REFUNDED
 }
@@ -378,6 +407,26 @@ enum PaymentProvider {
   STRIPE
   PAYPAL
   MANUAL
+}
+
+enum ExternalPaymentMethod {
+  CASH
+  CHECK
+  PAYPAL
+  STRIPE
+  BANK_TRANSFER
+  OTHER
+}
+
+enum RefundExecutionMode {
+  MANUAL
+  STRIPE
+}
+
+enum PaymentRefundStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
 }
 
 enum NotificationType {
