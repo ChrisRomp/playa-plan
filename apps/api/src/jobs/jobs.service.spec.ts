@@ -3,7 +3,7 @@ import { JobsService } from './jobs.service';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { CoreConfigService } from '../core-config/services/core-config.service';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
-import { Prisma, UserRole } from '@prisma/client';
+import { DayOfWeek, Prisma, UserRole } from '@prisma/client';
 import { CreateJobDto } from './dto/create-job.dto';
 import { UpdateJobDto } from './dto/update-job.dto';
 
@@ -227,6 +227,101 @@ describe('JobsService', () => {
           },
         },
       });
+    });
+
+    it('should order out-of-order shifts chronologically regardless of availability', async () => {
+      const inputShifts: ReadonlyArray<{
+        readonly id: string;
+        readonly dayOfWeek: DayOfWeek;
+        readonly startTime: string;
+        readonly maxRegistrations: number;
+      }> = [
+        { id: 'wednesday-am', dayOfWeek: DayOfWeek.WEDNESDAY, startTime: '08:00', maxRegistrations: 10 },
+        { id: 'thursday-pm', dayOfWeek: DayOfWeek.THURSDAY, startTime: '13:00', maxRegistrations: 10 },
+        { id: 'friday-am', dayOfWeek: DayOfWeek.FRIDAY, startTime: '08:00', maxRegistrations: 10 },
+        { id: 'friday-pm', dayOfWeek: DayOfWeek.FRIDAY, startTime: '13:00', maxRegistrations: 10 },
+        { id: 'saturday-am', dayOfWeek: DayOfWeek.SATURDAY, startTime: '08:00', maxRegistrations: 0 },
+        { id: 'saturday-pm', dayOfWeek: DayOfWeek.SATURDAY, startTime: '13:00', maxRegistrations: 10 },
+        { id: 'thursday-am', dayOfWeek: DayOfWeek.THURSDAY, startTime: '08:00', maxRegistrations: 0 },
+        { id: 'wednesday-pm', dayOfWeek: DayOfWeek.WEDNESDAY, startTime: '13:00', maxRegistrations: 10 },
+      ];
+      const mockJobs = inputShifts.map(({ id, dayOfWeek, startTime, maxRegistrations }) => ({
+        id,
+        name: id,
+        location: 'Test Location',
+        maxRegistrations,
+        category: { id: 'category-id', name: 'Category', staffOnly: false, alwaysRequired: false },
+        shift: { id: `shift-${id}`, name: id, startTime, endTime: '17:00', dayOfWeek },
+        registrations: [],
+      }));
+      mockPrismaService.job.findMany.mockResolvedValue(mockJobs);
+
+      const actualJobs = await service.findAll(UserRole.PARTICIPANT);
+
+      expect(actualJobs.map(job => job.id)).toEqual([
+        'wednesday-am',
+        'wednesday-pm',
+        'thursday-am',
+        'thursday-pm',
+        'friday-am',
+        'friday-pm',
+        'saturday-am',
+        'saturday-pm',
+      ]);
+    });
+
+    it('should use the event-week sequence and job id as a deterministic tie-breaker', async () => {
+      const inputDays = [
+        DayOfWeek.POST_EVENT,
+        DayOfWeek.CLOSING_SUNDAY,
+        DayOfWeek.SATURDAY,
+        DayOfWeek.FRIDAY,
+        DayOfWeek.THURSDAY,
+        DayOfWeek.WEDNESDAY,
+        DayOfWeek.TUESDAY,
+        DayOfWeek.MONDAY,
+        DayOfWeek.OPENING_SUNDAY,
+        DayOfWeek.PRE_OPENING,
+      ];
+      const mockJobs = inputDays.map(dayOfWeek => ({
+        id: dayOfWeek,
+        name: dayOfWeek,
+        location: 'Test Location',
+        maxRegistrations: 10,
+        category: { id: 'category-id', name: 'Category', staffOnly: false, alwaysRequired: false },
+        shift: { id: `shift-${dayOfWeek}`, name: dayOfWeek, startTime: '08:00', endTime: '09:00', dayOfWeek },
+        registrations: [],
+      }));
+      mockJobs.push(
+        {
+          ...mockJobs[5],
+          id: 'same-time-b',
+          shift: { ...mockJobs[5].shift, id: 'same-shift' },
+        },
+        {
+          ...mockJobs[5],
+          id: 'same-time-a',
+          shift: { ...mockJobs[5].shift, id: 'same-shift' },
+        },
+      );
+      mockPrismaService.job.findMany.mockResolvedValue(mockJobs);
+
+      const actualJobs = await service.findAll();
+
+      expect(actualJobs.map(job => job.id)).toEqual([
+        DayOfWeek.PRE_OPENING,
+        DayOfWeek.OPENING_SUNDAY,
+        DayOfWeek.MONDAY,
+        DayOfWeek.TUESDAY,
+        'same-time-a',
+        'same-time-b',
+        DayOfWeek.WEDNESDAY,
+        DayOfWeek.THURSDAY,
+        DayOfWeek.FRIDAY,
+        DayOfWeek.SATURDAY,
+        DayOfWeek.CLOSING_SUNDAY,
+        DayOfWeek.POST_EVENT,
+      ]);
     });
 
     it('should filter out staffOnly jobs when userRole is PARTICIPANT', async () => {
