@@ -115,7 +115,7 @@ export class JobsService {
       },
     });
 
-    return jobs
+    return [...jobs]
       .sort((firstJob, secondJob) => this.compareJobsChronologically(firstJob, secondJob))
       .map(job => this.addDerivedPropertiesWithRegistrations(job, config.registrationYear));
   }
