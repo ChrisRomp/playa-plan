@@ -284,7 +284,7 @@ describe('JobsService', () => {
         DayOfWeek.PRE_OPENING,
       ];
       const mockJobs = inputDays.map(dayOfWeek => ({
-        id: dayOfWeek,
+        id: String(dayOfWeek),
         name: dayOfWeek,
         location: 'Test Location',
         maxRegistrations: 10,
