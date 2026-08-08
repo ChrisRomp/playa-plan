@@ -270,6 +270,46 @@ describe('JobsService', () => {
       ]);
     });
 
+    it('should order single-digit-hour shift start times chronologically', async () => {
+      const mockJobs = [
+        {
+          id: 'afternoon-job',
+          name: 'Afternoon Job',
+          location: 'Test Location',
+          maxRegistrations: 10,
+          category: { id: 'category-id', name: 'Category', staffOnly: false, alwaysRequired: false },
+          shift: {
+            id: 'shift-afternoon',
+            name: 'Afternoon',
+            startTime: '13:00',
+            endTime: '14:00',
+            dayOfWeek: DayOfWeek.MONDAY,
+          },
+          registrations: [],
+        },
+        {
+          id: 'morning-job',
+          name: 'Morning Job',
+          location: 'Test Location',
+          maxRegistrations: 10,
+          category: { id: 'category-id', name: 'Category', staffOnly: false, alwaysRequired: false },
+          shift: {
+            id: 'shift-morning',
+            name: 'Morning',
+            startTime: '8:00',
+            endTime: '09:00',
+            dayOfWeek: DayOfWeek.MONDAY,
+          },
+          registrations: [],
+        },
+      ];
+      mockPrismaService.job.findMany.mockResolvedValue(mockJobs);
+
+      const actualJobs = await service.findAll(UserRole.PARTICIPANT);
+
+      expect(actualJobs.map(job => job.id)).toEqual(['morning-job', 'afternoon-job']);
+    });
+
     it('should use the event-week sequence and job id as a deterministic tie-breaker', async () => {
       const inputDays = [
         DayOfWeek.POST_EVENT,

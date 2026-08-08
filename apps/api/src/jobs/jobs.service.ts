@@ -242,10 +242,19 @@ export class JobsService {
       return dayComparison;
     }
 
-    const startTimeComparison = (firstJob.shift?.startTime ?? '').localeCompare(
-      secondJob.shift?.startTime ?? '',
-    );
+    const startTimeComparison =
+      this.getStartTimeMinutes(firstJob.shift?.startTime) -
+      this.getStartTimeMinutes(secondJob.shift?.startTime);
     return startTimeComparison || firstJob.id.localeCompare(secondJob.id);
+  }
+
+  private getStartTimeMinutes(startTime?: string): number {
+    if (!startTime) {
+      return Number.MAX_SAFE_INTEGER;
+    }
+
+    const [hours, minutes] = startTime.split(':').map(Number);
+    return hours * 60 + minutes;
   }
 
   /**
