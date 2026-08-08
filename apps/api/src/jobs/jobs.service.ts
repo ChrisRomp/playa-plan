@@ -3,8 +3,21 @@ import { PrismaService } from '../common/prisma/prisma.service';
 import { CoreConfigService } from '../core-config/services/core-config.service';
 import { CreateJobDto } from './dto/create-job.dto';
 import { UpdateJobDto } from './dto/update-job.dto';
-import { Job, Prisma, UserRole } from '@prisma/client';
+import { DayOfWeek, Job, Prisma, UserRole } from '@prisma/client';
 import { isCapacityReservingStatus } from '../registrations/constants/registration-status.constants';
+
+const DAY_OF_WEEK_ORDER: Readonly<Record<DayOfWeek, number>> = {
+  [DayOfWeek.PRE_OPENING]: 0,
+  [DayOfWeek.OPENING_SUNDAY]: 1,
+  [DayOfWeek.MONDAY]: 2,
+  [DayOfWeek.TUESDAY]: 3,
+  [DayOfWeek.WEDNESDAY]: 4,
+  [DayOfWeek.THURSDAY]: 5,
+  [DayOfWeek.FRIDAY]: 6,
+  [DayOfWeek.SATURDAY]: 7,
+  [DayOfWeek.CLOSING_SUNDAY]: 8,
+  [DayOfWeek.POST_EVENT]: 9,
+};
 
 /**
  * Type definition for job with included relations
@@ -23,7 +36,7 @@ type JobWithRelations = Job & {
     description: string | null;
     startTime: string;
     endTime: string;
-    dayOfWeek: string;
+    dayOfWeek: DayOfWeek;
   } | null;
   registrations?: Array<{
     id: string;
@@ -102,7 +115,9 @@ export class JobsService {
       },
     });
 
-    return jobs.map(job => this.addDerivedPropertiesWithRegistrations(job, config.registrationYear));
+    return [...jobs]
+      .sort((firstJob, secondJob) => this.compareJobsChronologically(firstJob, secondJob))
+      .map(job => this.addDerivedPropertiesWithRegistrations(job, config.registrationYear));
   }
 
   async findOne(id: string) {
@@ -213,6 +228,33 @@ export class JobsService {
     return new BadRequestException(
       `Cannot delete job with ID ${id} because it has historical registrations. Deactivate it instead.`,
     );
+  }
+
+  private compareJobsChronologically(firstJob: JobWithRelations, secondJob: JobWithRelations): number {
+    const firstDayOrder = firstJob.shift
+      ? DAY_OF_WEEK_ORDER[firstJob.shift.dayOfWeek]
+      : Number.MAX_SAFE_INTEGER;
+    const secondDayOrder = secondJob.shift
+      ? DAY_OF_WEEK_ORDER[secondJob.shift.dayOfWeek]
+      : Number.MAX_SAFE_INTEGER;
+    const dayComparison = firstDayOrder - secondDayOrder;
+    if (dayComparison !== 0) {
+      return dayComparison;
+    }
+
+    const startTimeComparison =
+      this.getStartTimeMinutes(firstJob.shift?.startTime) -
+      this.getStartTimeMinutes(secondJob.shift?.startTime);
+    return startTimeComparison || firstJob.id.localeCompare(secondJob.id);
+  }
+
+  private getStartTimeMinutes(startTime?: string): number {
+    if (!startTime) {
+      return Number.MAX_SAFE_INTEGER;
+    }
+
+    const [hours, minutes] = startTime.split(':').map(Number);
+    return hours * 60 + minutes;
   }
 
   /**
