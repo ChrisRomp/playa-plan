@@ -2,8 +2,8 @@ import { useEffect, lazy, Suspense } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../store/authUtils';
 import { useConfig } from '../hooks/useConfig';
-import { PATHS } from '../routes';
 import { ConnectionStatus } from '../components/common/ConnectionStatus';
+import { getSafeReturnTo } from '../utils/returnToUtils';
 
 /**
  * Login page wrapper component
@@ -17,13 +17,12 @@ const LoginPage: React.FC = () => {
   
   // Extract the returnTo path from URL query params if present
   const searchParams = new URLSearchParams(location.search);
-  const returnTo = searchParams.get('returnTo');
+  const returnTo = getSafeReturnTo(searchParams.get('returnTo'));
   
   // Redirect to dashboard or requested page if already authenticated
   useEffect(() => {
     if (isAuthenticated) {
-      // Navigate to the returnTo path if available, or to dashboard
-      navigate(returnTo ? decodeURIComponent(returnTo) : PATHS.DASHBOARD, { replace: true });
+      navigate(returnTo, { replace: true });
     }
   }, [isAuthenticated, navigate, returnTo]);
 
