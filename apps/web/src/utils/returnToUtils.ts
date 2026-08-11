@@ -54,6 +54,7 @@ export const getSafeReturnTo = (value: string | null): string => {
     || targetUrl.username
     || targetUrl.password
     || targetUrl.hash
+    || targetUrl.pathname.startsWith('//')
     || !isAllowedRoute
   ) {
     return PATHS.DASHBOARD;

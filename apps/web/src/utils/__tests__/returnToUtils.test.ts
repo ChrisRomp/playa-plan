@@ -33,6 +33,8 @@ describe('getSafeReturnTo', () => {
     '/unknown',
     '/login',
     '/dashboard#unexpected',
+    '/.//dashboard',
+    '/%2e//dashboard',
     ' /dashboard',
     '/dashboard ',
     '/dashboard\u0000',
