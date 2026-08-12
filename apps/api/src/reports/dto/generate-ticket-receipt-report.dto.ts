@@ -1,6 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsInt, IsOptional, IsUUID, Max, Min } from 'class-validator';
+import { IsInt, IsUUID, Max, Min, ValidateIf } from 'class-validator';
 import { TicketReceiptSettingsDto } from './ticket-receipt-settings.dto';
 
 /** Validated options for generating a ticket-receipt signature form. */
@@ -9,7 +9,7 @@ export class GenerateTicketReceiptReportDto extends TicketReceiptSettingsDto {
     description: 'Registration year; defaults to the configured current year',
     example: 2026,
   })
-  @IsOptional()
+  @ValidateIf((_object, value) => value !== undefined)
   @Type(() => Number)
   @IsInt()
   @Min(2000)
@@ -20,7 +20,7 @@ export class GenerateTicketReceiptReportDto extends TicketReceiptSettingsDto {
     description: 'Camping option to include; omit to include all options',
     format: 'uuid',
   })
-  @IsOptional()
+  @ValidateIf((_object, value) => value !== undefined)
   @IsUUID()
   campingOptionId?: string;
 
@@ -30,7 +30,7 @@ export class GenerateTicketReceiptReportDto extends TicketReceiptSettingsDto {
     minimum: 0,
     maximum: 50,
   })
-  @IsOptional()
+  @ValidateIf((_object, value) => value !== undefined)
   @Type(() => Number)
   @IsInt()
   @Min(0)

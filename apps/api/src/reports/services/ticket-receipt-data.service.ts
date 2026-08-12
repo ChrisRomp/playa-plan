@@ -52,7 +52,7 @@ export class TicketReceiptDataService {
   }
 
   private async resolveYear(requestedYear?: number): Promise<number> {
-    if (requestedYear !== undefined) {
+    if (requestedYear != null) {
       return requestedYear;
     }
 

@@ -27,6 +27,21 @@ describe('GenerateTicketReceiptReportDto', () => {
     expect(actualErrors.some(error => error.property === 'additionalBlankRows')).toBe(true);
   });
 
+  it.each(['year', 'campingOptionId', 'additionalBlankRows'])(
+    'shouldRejectNullFor%s',
+    async property => {
+      const inputDto = plainToInstance(GenerateTicketReceiptReportDto, {
+        title: 'Ticket Receipt Report',
+        acknowledgementText: 'I received my ticket.',
+        [property]: null,
+      });
+
+      const actualErrors = await validate(inputDto);
+
+      expect(actualErrors.some(error => error.property === property)).toBe(true);
+    }
+  );
+
   it('shouldTrimTextBeforeRejectingWhitespaceOnlySettings', async () => {
     const inputDto = plainToInstance(GenerateTicketReceiptReportDto, {
       title: ' Ticket Receipt Report ',

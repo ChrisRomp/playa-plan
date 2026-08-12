@@ -105,6 +105,26 @@ describe('ReportsController (e2e)', () => {
       .expect(400);
   });
 
+  it('shouldRejectNullNumericOptions', async () => {
+    await request(app.getHttpServer())
+      .post('/reports/ticket-receipt')
+      .set('Authorization', `Bearer ${staffToken}`)
+      .send({
+        ...createReportRequest(1),
+        year: null,
+      })
+      .expect(400);
+
+    await request(app.getHttpServer())
+      .post('/reports/ticket-receipt')
+      .set('Authorization', `Bearer ${staffToken}`)
+      .send({
+        ...createReportRequest(1),
+        additionalBlankRows: null,
+      })
+      .expect(400);
+  });
+
   it('shouldReturnNotFoundWhenNoAttendeesOrBlankRowsExist', async () => {
     await request(app.getHttpServer())
       .post('/reports/ticket-receipt')

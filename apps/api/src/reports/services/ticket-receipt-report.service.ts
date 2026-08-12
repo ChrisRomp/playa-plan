@@ -20,7 +20,7 @@ export class TicketReceiptReportService {
 
   async generate(userId: string, options: GenerateTicketReceiptReportDto): Promise<PdfDownload> {
     const data = await this.dataService.getReportData(options);
-    if (data.attendees.length === 0 && options.additionalBlankRows === 0) {
+    if (data.attendees.length === 0 && (options.additionalBlankRows ?? 0) === 0) {
       throw new NotFoundException('No confirmed registrations match the selected report filters');
     }
 
