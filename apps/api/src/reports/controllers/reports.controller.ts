@@ -2,6 +2,8 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
+  HttpStatus,
   Post,
   Request,
   Res,
@@ -40,6 +42,7 @@ export class ReportsController {
   }
 
   @Post('ticket-receipt')
+  @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Generate a ticket-receipt signature form' })
   @ApiProduces('application/pdf')
   @ApiResponse({ status: 200, description: 'Generated PDF report' })

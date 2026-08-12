@@ -1,5 +1,4 @@
 import { Module } from '@nestjs/common';
-import { AdminAuditModule } from '../admin-audit/admin-audit.module';
 import { PrismaModule } from '../common/prisma/prisma.module';
 import { CoreConfigModule } from '../core-config/core-config.module';
 import { ReportsController } from './controllers/reports.controller';
@@ -13,7 +12,7 @@ import { TicketReceiptReportService } from './services/ticket-receipt-report.ser
 
 /** Reusable PDF infrastructure and concrete PlayaPlan reports. */
 @Module({
-  imports: [PrismaModule, CoreConfigModule, AdminAuditModule],
+  imports: [PrismaModule, CoreConfigModule],
   controllers: [ReportsController],
   providers: [
     PdfDownloadService,
