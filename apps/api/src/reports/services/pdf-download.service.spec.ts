@@ -31,4 +31,13 @@ describe('PdfDownloadService', () => {
     expect(actualDownload.filename).toBe(`${inputName}.pdf`);
     expect(actualDownload.contentDisposition).toContain('%F0%9F%98%80.pdf');
   });
+
+  it('shouldCollapseLongHyphenRunsWithoutBacktracking', () => {
+    const inputName = `Tickets${'-'.repeat(10_000)}2026`;
+
+    const actualDownload = service.create(Buffer.from('%PDF'), inputName);
+
+    expect(actualDownload.filename).toBe('Tickets-2026.pdf');
+    expect(actualDownload.contentDisposition).toContain('filename="Tickets-2026.pdf"');
+  });
 });

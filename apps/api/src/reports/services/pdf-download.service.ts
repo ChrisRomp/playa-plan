@@ -20,29 +20,49 @@ export class PdfDownloadService {
   }
 
   private sanitizeUnicodeName(value: string): string {
-    const sanitized = value
+    const replaced = value
       .replace(/[\u0000-\u001f\u007f/\\:*?"<>|]/g, '-')
       .replace(/\.{2,}/g, '-')
       .replace(/\s+/g, ' ')
-      .replace(/-+/g, '-')
-      .replace(/^-+|-+$/g, '')
       .trim();
+    const sanitized = this.collapseAndTrimHyphens(replaced);
 
     return Array.from(sanitized).slice(0, MAX_FILENAME_LENGTH).join('') || 'report';
   }
 
   private sanitizeAsciiName(value: string): string {
-    const sanitized = value
+    const replaced = value
       .normalize('NFKD')
       .replace(/[^\x20-\x7e]/g, '')
       .replace(/[\u0000-\u001f\u007f/\\:*?"<>|]/g, '-')
       .replace(/\.{2,}/g, '-')
-      .replace(/\s+/g, '-')
-      .replace(/-+/g, '-')
-      .replace(/^-|-$/g, '')
-      .slice(0, MAX_FILENAME_LENGTH);
+      .replace(/\s+/g, '-');
+    const sanitized = this.collapseAndTrimHyphens(replaced).slice(0, MAX_FILENAME_LENGTH);
 
     return sanitized || 'report';
+  }
+
+  private collapseAndTrimHyphens(value: string): string {
+    const characters: string[] = [];
+    let previousWasHyphen = false;
+
+    for (const character of value) {
+      if (character === '-') {
+        if (characters.length === 0 || previousWasHyphen) {
+          continue;
+        }
+        previousWasHyphen = true;
+      } else {
+        previousWasHyphen = false;
+      }
+      characters.push(character);
+    }
+
+    if (characters[characters.length - 1] === '-') {
+      characters.pop();
+    }
+
+    return characters.join('');
   }
 
   private encodeRfc5987(value: string): string {
