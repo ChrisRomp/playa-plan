@@ -20,7 +20,7 @@ describe('TicketReceiptDocumentService', () => {
 
     expect(actualDocument.pageOrientation).toBe('landscape');
     expect(table.table.headerRows).toBe(1);
-    expect(table.table.dontBreakRows).toBe(true);
+    expect(table.table.dontBreakRows).toBeUndefined();
     expect(table.table.widths).toEqual([110, 140, 225, 132, 63]);
     expect(table.table.body).toHaveLength(4);
     expect(table.table.body[1]).toEqual([
@@ -35,5 +35,26 @@ describe('TicketReceiptDocumentService', () => {
       expect.objectContaining({ text: 'I received one ticket.' })
     );
     expect(typeof actualDocument.footer).toBe('function');
+  });
+
+  it('shouldAllowOversizedAcknowledgementRowsToBreakAcrossPages', () => {
+    const service = new TicketReceiptDocumentService();
+    const inputOptions = Object.assign(new GenerateTicketReceiptReportDto(), {
+      title: 'Ticket Pickup',
+      acknowledgementText: Array.from({ length: 500 }, () => 'I').join('\n'),
+      additionalBlankRows: 0,
+    });
+
+    const actualDocument = service.build(inputOptions, {
+      year: 2026,
+      attendees: [{ name: 'Alex Burner', workShifts: 'Gate (Monday)' }],
+    });
+    const content = actualDocument.content as Content[];
+    const table = content[2] as ContentTable;
+
+    expect(table.table.dontBreakRows).toBeUndefined();
+    expect(table.table.body[1][2]).toEqual(
+      expect.objectContaining({ text: inputOptions.acknowledgementText })
+    );
   });
 });

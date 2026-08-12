@@ -56,7 +56,6 @@ export class TicketReceiptDocumentService {
           layout: TABLE_LAYOUT,
           table: {
             headerRows: 1,
-            dontBreakRows: true,
             heights: (rowIndex: number) => (rowIndex === 0 ? 24 : 55),
             widths: TABLE_COLUMN_WIDTHS,
             body: this.buildRows(options, data),
