@@ -35,7 +35,7 @@ export default () => ({
       : [process.env.FRONTEND_URL || 'http://localhost:5173'],
     methods: process.env.CORS_METHODS || 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     allowedHeaders: process.env.CORS_ALLOWED_HEADERS || 'Content-Type,Accept,Authorization',
-    exposedHeaders: process.env.CORS_EXPOSED_HEADERS || '',
+    exposedHeaders: process.env.CORS_EXPOSED_HEADERS || 'Content-Disposition',
     credentials: process.env.CORS_CREDENTIALS === undefined ? true : process.env.CORS_CREDENTIALS !== 'false',
     maxAge: parseInt(process.env.CORS_MAX_AGE || '3600', 10) || 3600,
   },
