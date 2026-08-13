@@ -99,22 +99,35 @@ export class WorkScheduleDocumentService {
   }
 
   private buildDayContent(shifts: ReadonlyArray<ScheduleShift>): Content[] {
-    const smallShifts = shifts.filter(shift => !this.isLargeShift(shift));
-    const largeShifts = shifts.filter(shift => this.isLargeShift(shift));
-    const content: Content[] = smallShifts.map(shift => this.buildSmallShift(shift));
+    const content: Content[] = [];
 
-    if (
-      largeShifts.length === 2 &&
-      largeShifts.every(
-        shift => this.getAssignedWorkers(shift).length <= MAX_ROSTER_ITEMS_PER_COLUMN
-      )
-    ) {
-      content.push(this.buildSideBySideLargeShifts(largeShifts[0], largeShifts[1]));
-      return content;
+    for (let index = 0; index < shifts.length; index += 1) {
+      const shift = shifts[index];
+      const nextShift = shifts[index + 1];
+      if (this.canRenderSideBySide(shift, nextShift)) {
+        content.push(this.buildSideBySideLargeShifts(shift, nextShift));
+        index += 1;
+      } else {
+        content.push(
+          this.isLargeShift(shift) ? this.buildLargeShift(shift) : this.buildSmallShift(shift)
+        );
+      }
     }
 
-    content.push(...largeShifts.map(shift => this.buildLargeShift(shift)));
     return content;
+  }
+
+  private canRenderSideBySide(
+    shift: ScheduleShift,
+    nextShift: ScheduleShift | undefined
+  ): nextShift is ScheduleShift {
+    return (
+      nextShift !== undefined &&
+      this.isLargeShift(shift) &&
+      this.isLargeShift(nextShift) &&
+      this.getAssignedWorkers(shift).length <= MAX_ROSTER_ITEMS_PER_COLUMN &&
+      this.getAssignedWorkers(nextShift).length <= MAX_ROSTER_ITEMS_PER_COLUMN
+    );
   }
 
   private buildSmallShift(shift: ScheduleShift): ContentStack {
@@ -172,78 +185,58 @@ export class WorkScheduleDocumentService {
   }
 
   private buildLargeShift(shift: ScheduleShift): ContentStack {
-    const workers = this.getAssignedWorkers(shift);
-    const roster =
-      workers.length <= MAX_ROSTER_ITEMS_PER_COLUMN
-        ? this.buildLargeJobSections(shift, 0, workers.length)
-        : [this.buildSplitRoster(shift, workers.length)];
-
     return {
-      stack: [this.buildShiftHeading(shift), ...roster],
+      stack: [this.buildShiftHeading(shift), ...this.buildShiftJobs(shift)],
       margin: [0, 0, 0, 10],
     };
   }
 
   private buildLargeShiftStack(shift: ScheduleShift): Content[] {
+    return [this.buildShiftHeading(shift), ...this.buildShiftJobs(shift)];
+  }
+
+  private buildShiftJobs(shift: ScheduleShift): Content[] {
+    return shift.jobs.flatMap(job =>
+      this.isLargeJob(job) ? this.buildLargeJob(job) : this.buildSmallJob(job)
+    );
+  }
+
+  private buildLargeJob(job: ScheduleJob): Content[] {
+    const workers = this.getAssignedWorkerNames(job);
+    if (workers.length > MAX_ROSTER_ITEMS_PER_COLUMN) {
+      return [this.buildSplitLargeJob(job, workers)];
+    }
+
     return [
-      this.buildShiftHeading(shift),
-      ...this.buildLargeJobSections(shift, 0, this.getAssignedWorkers(shift).length),
+      this.buildJobHeading(job),
+      ...(workers.length > 0 ? [this.buildNumberedRoster(workers, 1)] : []),
     ];
   }
 
-  private buildSplitRoster(shift: ScheduleShift, workerCount: number): ContentColumns {
-    const midpoint = Math.ceil(workerCount / 2);
+  private buildSplitLargeJob(
+    job: ScheduleJob,
+    workers: ReadonlyArray<string>
+  ): ContentColumns {
+    const midpoint = Math.ceil(workers.length / 2);
     return {
       columns: [
         {
           width: '*',
-          stack: this.buildLargeJobSections(shift, 0, midpoint),
+          stack: [
+            this.buildJobHeading(job),
+            this.buildNumberedRoster(workers.slice(0, midpoint), 1),
+          ],
         },
         {
           width: '*',
-          stack: this.buildLargeJobSections(shift, midpoint, workerCount),
+          stack: [
+            this.buildJobHeading(job, true),
+            this.buildNumberedRoster(workers.slice(midpoint), midpoint + 1),
+          ],
         },
       ],
       columnGap: 20,
     };
-  }
-
-  private buildLargeJobSections(
-    shift: ScheduleShift,
-    rangeStart: number,
-    rangeEnd: number
-  ): Content[] {
-    const content: Content[] = [];
-    const totalWorkers = this.getAssignedWorkers(shift).length;
-    let workerOffset = 0;
-
-    for (const job of shift.jobs) {
-      const workers = this.getAssignedWorkerNames(job);
-      const jobStart = workerOffset;
-      const jobEnd = jobStart + workers.length;
-      const sliceStart = Math.max(rangeStart, jobStart);
-      const sliceEnd = Math.min(rangeEnd, jobEnd);
-      const emptyJobIsInRange =
-        workers.length === 0 &&
-        jobStart >= rangeStart &&
-        (jobStart < rangeEnd || (jobStart === rangeEnd && rangeEnd === totalWorkers));
-
-      if (sliceStart < sliceEnd) {
-        content.push(
-          this.buildJobHeading(job, sliceStart > jobStart),
-          this.buildNumberedRoster(
-            workers.slice(sliceStart - jobStart, sliceEnd - jobStart),
-            sliceStart + 1
-          )
-        );
-      } else if (emptyJobIsInRange) {
-        content.push(this.buildJobHeading(job));
-      }
-
-      workerOffset = jobEnd;
-    }
-
-    return content;
   }
 
   private buildNumberedRoster(workers: ReadonlyArray<string>, start: number): Content {
@@ -269,8 +262,11 @@ export class WorkScheduleDocumentService {
   }
 
   private isLargeShift(shift: ScheduleShift): boolean {
-    const capacity = shift.jobs.reduce((total, job) => total + job.maxRegistrations, 0);
-    return capacity > MAX_BULLETED_SHIFT_CAPACITY;
+    return shift.jobs.some(job => this.isLargeJob(job));
+  }
+
+  private isLargeJob(job: ScheduleJob): boolean {
+    return job.maxRegistrations > MAX_BULLETED_SHIFT_CAPACITY;
   }
 
   private getAssignedWorkers(shift: ScheduleShift): string[] {

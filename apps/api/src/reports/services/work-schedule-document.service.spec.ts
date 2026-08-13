@@ -59,6 +59,66 @@ describe('WorkScheduleDocumentService', () => {
     expect(roster.start).toBe(1);
   });
 
+  it('shouldApplyTheThresholdToEachJobInsteadOfTotalShiftCapacity', () => {
+    const inputShift = createShift('wednesday-am', 0, 4);
+    const inputSecondJob = createShift('art-car', 2, 7).jobs[0];
+    const actualDocument = service.build(
+      createReportData([
+        {
+          ...inputShift,
+          jobs: [
+            inputShift.jobs[0],
+            {
+              ...inputSecondJob,
+              name: 'Art Car',
+            },
+          ],
+        },
+      ])
+    );
+    const day = (actualDocument.content as Content[])[0] as ContentStack;
+    const shift = day.stack[1] as ContentStack;
+    const firstRoster = shift.stack[2] as { ul: string[] };
+    const secondRoster = shift.stack[4] as { ul: string[] };
+
+    expect(firstRoster.ul).toEqual([' ', ' ', ' ', ' ']);
+    expect(secondRoster.ul).toHaveLength(7);
+    expect(secondRoster.ul.filter(worker => worker === ' ')).toHaveLength(5);
+  });
+
+  it('shouldPreserveTheSuppliedShiftOrderAcrossSmallAndLargeJobs', () => {
+    const actualDocument = service.build(
+      createReportData([
+        {
+          ...createShift('full', 0, 1),
+          name: 'Wednesday Full',
+          startTime: '09:00',
+        },
+        {
+          ...createShift('am', 7, 50),
+          name: 'Wednesday AM',
+          startTime: '09:30',
+        },
+        {
+          ...createShift('afternoon', 0, 1),
+          name: 'Wednesday PM',
+          startTime: '14:00',
+        },
+      ])
+    );
+    const day = (actualDocument.content as Content[])[0] as ContentStack;
+    const shiftHeadings = day.stack.slice(1).map(content => {
+      const shift = content as ContentStack;
+      return (shift.stack[0] as { text: string }).text;
+    });
+
+    expect(shiftHeadings).toEqual([
+      'Wednesday Full - 09:00 - 13:00',
+      'Wednesday AM - 09:30 - 13:00',
+      'Wednesday PM - 14:00 - 18:00',
+    ]);
+  });
+
   it('shouldPlaceTwoLargeShiftsSideBySideWhenEachFitsAColumn', () => {
     const actualDocument = service.build(
       createReportData([
@@ -78,9 +138,9 @@ describe('WorkScheduleDocumentService', () => {
     );
   });
 
-  it('shouldRetainJobHeadingsAndContinuousNumberingForLargeMultiJobShifts', () => {
-    const inputShift = createShift('teardown', 6, 10);
-    const inputSecondJob = createShift('cleanup', 6, 10).jobs[0];
+  it('shouldFormatLargeAndSmallJobsIndependentlyWithinOneShift', () => {
+    const inputShift = createShift('teardown', 6, 50);
+    const inputSecondJob = createShift('cleanup', 1, 3).jobs[0];
     const actualDocument = service.build(
       createReportData([
         {
@@ -104,8 +164,9 @@ describe('WorkScheduleDocumentService', () => {
     );
     expect(shift.stack[3]).toEqual(expect.objectContaining({ text: 'Cleanup' }));
     expect(shift.stack[4]).toEqual(
-      expect.objectContaining({ ol: expect.any(Array), start: 7 })
+      expect.objectContaining({ ul: expect.any(Array) })
     );
+    expect((shift.stack[4] as { ul: string[] }).ul).toHaveLength(3);
   });
 
   it('shouldSplitAnOversizedRosterIntoContinuouslyNumberedColumns', () => {
