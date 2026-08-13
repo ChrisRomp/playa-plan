@@ -3,8 +3,11 @@ import { DayOfWeek } from '@prisma/client';
 import { Content, ContentColumns, ContentStack, TDocumentDefinitions } from 'pdfmake/interfaces';
 import { WorkScheduleReportData } from '../models/work-schedule-report-data';
 
-const LARGE_SHIFT_ASSIGNMENT_THRESHOLD = 10;
+const MAX_BULLETED_SHIFT_ASSIGNMENTS = 10;
 const MAX_ROSTER_ITEMS_PER_COLUMN = 42;
+const SHIFT_INDENT = 18;
+const JOB_INDENT = 30;
+const ROSTER_INDENT = 44;
 const DAY_NAMES: Readonly<Record<DayOfWeek, string>> = {
   [DayOfWeek.PRE_OPENING]: 'Pre-Opening',
   [DayOfWeek.OPENING_SUNDAY]: 'Opening Sunday',
@@ -73,11 +76,11 @@ export class WorkScheduleDocumentService {
         shiftHeading: {
           bold: true,
           fontSize: 12,
-          margin: [0, 0, 0, 5],
+          margin: [SHIFT_INDENT, 0, 0, 5],
         },
         jobHeading: {
           bold: true,
-          margin: [0, 0, 0, 2],
+          margin: [JOB_INDENT, 0, 0, 2],
         },
       },
     };
@@ -136,15 +139,12 @@ export class WorkScheduleDocumentService {
     ];
 
     return [
-      {
-        text: job.name,
-        style: 'jobHeading',
-      },
+      this.buildJobHeading(job),
       ...(slots.length > 0
         ? [
             {
               ul: slots,
-              margin: [14, 0, 0, 7],
+              margin: [ROSTER_INDENT, 0, 0, 7],
             } as Content,
           ]
         : []),
@@ -175,8 +175,8 @@ export class WorkScheduleDocumentService {
     const workers = this.getAssignedWorkers(shift);
     const roster =
       workers.length <= MAX_ROSTER_ITEMS_PER_COLUMN
-        ? [this.buildNumberedRoster(workers, 1)]
-        : this.buildSplitRoster(workers);
+        ? this.buildLargeJobSections(shift, 0, workers.length)
+        : [this.buildSplitRoster(shift, workers.length)];
 
     return {
       stack: [this.buildShiftHeading(shift), ...roster],
@@ -187,36 +187,70 @@ export class WorkScheduleDocumentService {
   private buildLargeShiftStack(shift: ScheduleShift): Content[] {
     return [
       this.buildShiftHeading(shift),
-      this.buildNumberedRoster(this.getAssignedWorkers(shift), 1),
+      ...this.buildLargeJobSections(shift, 0, this.getAssignedWorkers(shift).length),
     ];
   }
 
-  private buildSplitRoster(workers: ReadonlyArray<string>): ContentColumns[] {
-    const midpoint = Math.ceil(workers.length / 2);
-    return [
-      {
-        columns: [
-          {
-            width: '*',
-            stack: [this.buildNumberedRoster(workers.slice(0, midpoint), 1)],
-          },
-          {
-            width: '*',
-            stack: [
-              this.buildNumberedRoster(workers.slice(midpoint), midpoint + 1),
-            ],
-          },
-        ],
-        columnGap: 20,
-      },
-    ];
+  private buildSplitRoster(shift: ScheduleShift, workerCount: number): ContentColumns {
+    const midpoint = Math.ceil(workerCount / 2);
+    return {
+      columns: [
+        {
+          width: '*',
+          stack: this.buildLargeJobSections(shift, 0, midpoint),
+        },
+        {
+          width: '*',
+          stack: this.buildLargeJobSections(shift, midpoint, workerCount),
+        },
+      ],
+      columnGap: 20,
+    };
+  }
+
+  private buildLargeJobSections(
+    shift: ScheduleShift,
+    rangeStart: number,
+    rangeEnd: number
+  ): Content[] {
+    const content: Content[] = [];
+    let workerOffset = 0;
+
+    for (const job of shift.jobs) {
+      const workers = this.getAssignedWorkerNames(job);
+      const jobStart = workerOffset;
+      const jobEnd = jobStart + workers.length;
+      const sliceStart = Math.max(rangeStart, jobStart);
+      const sliceEnd = Math.min(rangeEnd, jobEnd);
+
+      if (sliceStart < sliceEnd) {
+        content.push(
+          this.buildJobHeading(job, sliceStart > jobStart),
+          this.buildNumberedRoster(
+            workers.slice(sliceStart - jobStart, sliceEnd - jobStart),
+            sliceStart + 1
+          )
+        );
+      }
+
+      workerOffset = jobEnd;
+    }
+
+    return content;
   }
 
   private buildNumberedRoster(workers: ReadonlyArray<string>, start: number): Content {
     return {
       ol: [...workers],
       start,
-      margin: [14, 0, 0, 5],
+      margin: [ROSTER_INDENT, 0, 0, 5],
+    };
+  }
+
+  private buildJobHeading(job: ScheduleJob, continued = false): Content {
+    return {
+      text: continued ? `${job.name} (continued)` : job.name,
+      style: 'jobHeading',
     };
   }
 
@@ -228,17 +262,15 @@ export class WorkScheduleDocumentService {
   }
 
   private isLargeShift(shift: ScheduleShift): boolean {
-    return this.getAssignedWorkers(shift).length >= LARGE_SHIFT_ASSIGNMENT_THRESHOLD;
+    return this.getAssignedWorkers(shift).length > MAX_BULLETED_SHIFT_ASSIGNMENTS;
   }
 
   private getAssignedWorkers(shift: ScheduleShift): string[] {
-    const includeJobName = shift.jobs.length > 1;
-    return shift.jobs.flatMap(job =>
-      job.registrations.map(registration => {
-        const name = this.formatUserName(registration.user);
-        return includeJobName ? `${name} - ${job.name}` : name;
-      })
-    );
+    return shift.jobs.flatMap(job => this.getAssignedWorkerNames(job));
+  }
+
+  private getAssignedWorkerNames(job: ScheduleJob): string[] {
+    return job.registrations.map(registration => this.formatUserName(registration.user));
   }
 
   private formatUserName(user: {

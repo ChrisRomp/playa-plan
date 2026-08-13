@@ -18,10 +18,17 @@ describe('WorkScheduleDocumentService', () => {
 
     expect(actualDocument.pageOrientation).toBe('portrait');
     expect(actualDocument.info?.title).toBe('Burning Sky Work Schedule 2026');
+    expect(actualDocument.styles?.shiftHeading).toEqual(
+      expect.objectContaining({ margin: [18, 0, 0, 5] })
+    );
+    expect(actualDocument.styles?.jobHeading).toEqual(
+      expect.objectContaining({ margin: [30, 0, 0, 2] })
+    );
+    expect(roster).toEqual(expect.objectContaining({ margin: [44, 0, 0, 7] }));
     expect(roster.ul).toEqual(['Worker 1 Last 1 (Playa 1)', ' ', ' ']);
   });
 
-  it('shouldSwitchToAnAssignedOnlyNumberedRosterAtTenWorkers', () => {
+  it('shouldKeepTenWorkersInBulletedCapacityFormatting', () => {
     const actualDocument = service.build(
       createReportData([
         createShift('teardown', 10, 20),
@@ -29,9 +36,25 @@ describe('WorkScheduleDocumentService', () => {
     );
     const day = (actualDocument.content as Content[])[0] as ContentStack;
     const shift = day.stack[1] as ContentStack;
-    const roster = shift.stack[1] as { ol: string[]; start: number };
+    const roster = shift.stack[2] as { ul: string[] };
 
-    expect(roster.ol).toHaveLength(10);
+    expect(roster.ul).toHaveLength(20);
+    expect(roster.ul.filter(worker => worker === ' ')).toHaveLength(10);
+  });
+
+  it('shouldSwitchToAnAssignedOnlyNumberedRosterAboveTenWorkers', () => {
+    const actualDocument = service.build(
+      createReportData([
+        createShift('teardown', 11, 20),
+      ])
+    );
+    const day = (actualDocument.content as Content[])[0] as ContentStack;
+    const shift = day.stack[1] as ContentStack;
+    const jobHeading = shift.stack[1] as { text: string };
+    const roster = shift.stack[2] as { ol: string[]; start: number };
+
+    expect(jobHeading.text).toBe('Teardown');
+    expect(roster.ol).toHaveLength(11);
     expect(roster.ol).not.toContain(' ');
     expect(roster.start).toBe(1);
   });
@@ -47,11 +70,41 @@ describe('WorkScheduleDocumentService', () => {
     const columns = day.stack[1] as ContentColumns;
 
     expect(columns.columns).toHaveLength(2);
-    expect((columns.columns[0] as ContentStack).stack[1]).toEqual(
+    expect((columns.columns[0] as ContentStack).stack[2]).toEqual(
       expect.objectContaining({ ol: expect.any(Array), start: 1 })
     );
-    expect((columns.columns[1] as ContentStack).stack[1]).toEqual(
+    expect((columns.columns[1] as ContentStack).stack[2]).toEqual(
       expect.objectContaining({ ol: expect.any(Array), start: 1 })
+    );
+  });
+
+  it('shouldRetainJobHeadingsAndContinuousNumberingForLargeMultiJobShifts', () => {
+    const inputShift = createShift('teardown', 6, 10);
+    const inputSecondJob = createShift('cleanup', 6, 10).jobs[0];
+    const actualDocument = service.build(
+      createReportData([
+        {
+          ...inputShift,
+          jobs: [
+            inputShift.jobs[0],
+            {
+              ...inputSecondJob,
+              name: 'Cleanup',
+            },
+          ],
+        },
+      ])
+    );
+    const day = (actualDocument.content as Content[])[0] as ContentStack;
+    const shift = day.stack[1] as ContentStack;
+
+    expect(shift.stack[1]).toEqual(expect.objectContaining({ text: 'Teardown' }));
+    expect(shift.stack[2]).toEqual(
+      expect.objectContaining({ ol: expect.any(Array), start: 1 })
+    );
+    expect(shift.stack[3]).toEqual(expect.objectContaining({ text: 'Cleanup' }));
+    expect(shift.stack[4]).toEqual(
+      expect.objectContaining({ ol: expect.any(Array), start: 7 })
     );
   });
 
@@ -64,17 +117,21 @@ describe('WorkScheduleDocumentService', () => {
     const day = (actualDocument.content as Content[])[0] as ContentStack;
     const shift = day.stack[1] as ContentStack;
     const columns = shift.stack[1] as ContentColumns;
-    const left = (columns.columns[0] as ContentStack).stack[0] as {
+    const left = (columns.columns[0] as ContentStack).stack[1] as {
       ol: string[];
       start: number;
     };
-    const right = (columns.columns[1] as ContentStack).stack[0] as {
+    const rightHeading = (columns.columns[1] as ContentStack).stack[0] as {
+      text: string;
+    };
+    const right = (columns.columns[1] as ContentStack).stack[1] as {
       ol: string[];
       start: number;
     };
 
     expect(left.ol).toHaveLength(25);
     expect(left.start).toBe(1);
+    expect(rightHeading.text).toBe('Teardown (continued)');
     expect(right.ol).toHaveLength(25);
     expect(right.start).toBe(26);
   });
