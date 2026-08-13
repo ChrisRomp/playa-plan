@@ -3,7 +3,7 @@ import { DayOfWeek } from '@prisma/client';
 import { Content, ContentColumns, ContentStack, TDocumentDefinitions } from 'pdfmake/interfaces';
 import { WorkScheduleReportData } from '../models/work-schedule-report-data';
 
-const MAX_BULLETED_SHIFT_ASSIGNMENTS = 10;
+const MAX_BULLETED_SHIFT_CAPACITY = 10;
 const MAX_ROSTER_ITEMS_PER_COLUMN = 42;
 const SHIFT_INDENT = 18;
 const JOB_INDENT = 30;
@@ -214,6 +214,7 @@ export class WorkScheduleDocumentService {
     rangeEnd: number
   ): Content[] {
     const content: Content[] = [];
+    const totalWorkers = this.getAssignedWorkers(shift).length;
     let workerOffset = 0;
 
     for (const job of shift.jobs) {
@@ -222,6 +223,10 @@ export class WorkScheduleDocumentService {
       const jobEnd = jobStart + workers.length;
       const sliceStart = Math.max(rangeStart, jobStart);
       const sliceEnd = Math.min(rangeEnd, jobEnd);
+      const emptyJobIsInRange =
+        workers.length === 0 &&
+        jobStart >= rangeStart &&
+        (jobStart < rangeEnd || (jobStart === rangeEnd && rangeEnd === totalWorkers));
 
       if (sliceStart < sliceEnd) {
         content.push(
@@ -231,6 +236,8 @@ export class WorkScheduleDocumentService {
             sliceStart + 1
           )
         );
+      } else if (emptyJobIsInRange) {
+        content.push(this.buildJobHeading(job));
       }
 
       workerOffset = jobEnd;
@@ -262,7 +269,8 @@ export class WorkScheduleDocumentService {
   }
 
   private isLargeShift(shift: ScheduleShift): boolean {
-    return this.getAssignedWorkers(shift).length > MAX_BULLETED_SHIFT_ASSIGNMENTS;
+    const capacity = shift.jobs.reduce((total, job) => total + job.maxRegistrations, 0);
+    return capacity > MAX_BULLETED_SHIFT_CAPACITY;
   }
 
   private getAssignedWorkers(shift: ScheduleShift): string[] {

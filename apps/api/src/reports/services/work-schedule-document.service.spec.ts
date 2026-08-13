@@ -28,24 +28,24 @@ describe('WorkScheduleDocumentService', () => {
     expect(roster.ul).toEqual(['Worker 1 Last 1 (Playa 1)', ' ', ' ']);
   });
 
-  it('shouldKeepTenWorkersInBulletedCapacityFormatting', () => {
+  it('shouldKeepTenCapacitySlotsInBulletedCapacityFormatting', () => {
     const actualDocument = service.build(
       createReportData([
-        createShift('teardown', 10, 20),
+        createShift('teardown', 6, 10),
       ])
     );
     const day = (actualDocument.content as Content[])[0] as ContentStack;
     const shift = day.stack[1] as ContentStack;
     const roster = shift.stack[2] as { ul: string[] };
 
-    expect(roster.ul).toHaveLength(20);
-    expect(roster.ul.filter(worker => worker === ' ')).toHaveLength(10);
+    expect(roster.ul).toHaveLength(10);
+    expect(roster.ul.filter(worker => worker === ' ')).toHaveLength(4);
   });
 
-  it('shouldSwitchToAnAssignedOnlyNumberedRosterAboveTenWorkers', () => {
+  it('shouldSwitchToAnAssignedOnlyNumberedRosterAboveTenCapacitySlots', () => {
     const actualDocument = service.build(
       createReportData([
-        createShift('teardown', 11, 20),
+        createShift('teardown', 7, 50),
       ])
     );
     const day = (actualDocument.content as Content[])[0] as ContentStack;
@@ -54,7 +54,7 @@ describe('WorkScheduleDocumentService', () => {
     const roster = shift.stack[2] as { ol: string[]; start: number };
 
     expect(jobHeading.text).toBe('Teardown');
-    expect(roster.ol).toHaveLength(11);
+    expect(roster.ol).toHaveLength(7);
     expect(roster.ol).not.toContain(' ');
     expect(roster.start).toBe(1);
   });
