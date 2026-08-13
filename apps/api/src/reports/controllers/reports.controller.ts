@@ -18,9 +18,11 @@ import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { AuthenticatedRequest } from '../../auth/types/safe-user';
 import { GenerateTicketReceiptReportDto } from '../dto/generate-ticket-receipt-report.dto';
+import { GenerateWorkScheduleReportDto } from '../dto/generate-work-schedule-report.dto';
 import { TicketReceiptSettingsDto } from '../dto/ticket-receipt-settings.dto';
 import { ReportConfigurationService } from '../services/report-configuration.service';
 import { TicketReceiptReportService } from '../services/ticket-receipt-report.service';
+import { WorkScheduleReportService } from '../services/work-schedule-report.service';
 
 /** Staff/admin endpoints for report configuration and generation. */
 @ApiTags('Reports')
@@ -31,7 +33,8 @@ import { TicketReceiptReportService } from '../services/ticket-receipt-report.se
 export class ReportsController {
   constructor(
     private readonly configurationService: ReportConfigurationService,
-    private readonly ticketReceiptReportService: TicketReceiptReportService
+    private readonly ticketReceiptReportService: TicketReceiptReportService,
+    private readonly workScheduleReportService: WorkScheduleReportService
   ) {}
 
   @Get('ticket-receipt/configuration')
@@ -53,6 +56,23 @@ export class ReportsController {
     @Res({ passthrough: true }) response: Response
   ): Promise<StreamableFile> {
     const download = await this.ticketReceiptReportService.generate(request.user.id, options);
+    response.setHeader('Content-Type', download.contentType);
+    response.setHeader('Content-Disposition', download.contentDisposition);
+
+    return new StreamableFile(download.buffer);
+  }
+
+  @Post('work-schedule')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Generate a printable work schedule' })
+  @ApiProduces('application/pdf')
+  @ApiResponse({ status: 200, description: 'Generated PDF report' })
+  @ApiResponse({ status: 404, description: 'No schedule matches the selected day' })
+  async generateWorkScheduleReport(
+    @Body() options: GenerateWorkScheduleReportDto,
+    @Res({ passthrough: true }) response: Response
+  ): Promise<StreamableFile> {
+    const download = await this.workScheduleReportService.generate(options);
     response.setHeader('Content-Type', download.contentType);
     response.setHeader('Content-Disposition', download.contentDisposition);
 

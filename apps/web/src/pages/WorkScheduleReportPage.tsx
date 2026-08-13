@@ -5,6 +5,7 @@ import { reports } from '../lib/api';
 import { PATHS } from '../routes';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import { downloadCsv } from '../utils/csv';
+import { downloadFile } from '../utils/downloadFile';
 
 // Day of week values from backend for sorting
 // (removed enum definition to simplify type handling)
@@ -59,6 +60,7 @@ export function WorkScheduleReportPage() {
   const [error, setError] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [dayFilter, setDayFilter] = useState<string>('all');
+  const [generatingPdf, setGeneratingPdf] = useState(false);
 
   // Define the order for days of the week
   const dayOrder = useMemo(() => [
@@ -157,7 +159,7 @@ export function WorkScheduleReportPage() {
   };
 
   // Export data to CSV using shared utility function
-  const exportData = () => {
+  const exportCsv = (): void => {
     if (!workScheduleData) return;
     
     // CSV headers
@@ -215,6 +217,22 @@ export function WorkScheduleReportPage() {
     downloadCsv(headers, csvRows, { filename });
   };
 
+  const downloadPdf = async (): Promise<void> => {
+    setGeneratingPdf(true);
+    setError(null);
+    try {
+      const download = await reports.generateWorkSchedulePdf(
+        dayFilter === 'all' ? {} : { dayOfWeek: dayFilter }
+      );
+      downloadFile(download.blob, download.filename);
+    } catch (generationError) {
+      console.error('Failed to generate work schedule PDF:', generationError);
+      setError(reports.getWorkScheduleReportErrorMessage(generationError));
+    } finally {
+      setGeneratingPdf(false);
+    }
+  };
+
   // Count total shifts, jobs, and registrations
   const summaryStats = useMemo(() => {
     if (!workScheduleData) return { shifts: 0, jobs: 0, registrations: 0 };
@@ -266,11 +284,23 @@ export function WorkScheduleReportPage() {
               Filters
             </button>
             <button
-              onClick={exportData}
+              onClick={exportCsv}
               className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-amber-600 hover:bg-amber-700"
             >
               <Download size={16} className="mr-2" />
-              Export
+              Export CSV
+            </button>
+            <button
+              onClick={() => void downloadPdf()}
+              disabled={generatingPdf}
+              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-amber-600 hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {generatingPdf ? (
+                <LoadingSpinner size="sm" />
+              ) : (
+                <Download size={16} className="mr-2" />
+              )}
+              {generatingPdf ? 'Generating PDF…' : 'Download PDF'}
             </button>
           </div>
         </div>

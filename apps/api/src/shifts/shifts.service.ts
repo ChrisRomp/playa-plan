@@ -2,11 +2,29 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { CreateShiftDto } from './dto/create-shift.dto';
 import { UpdateShiftDto } from './dto/update-shift.dto';
-import { Prisma, Shift } from '@prisma/client';
+import { DayOfWeek, Prisma, Shift } from '@prisma/client';
+import { CoreConfigService } from '../core-config/services/core-config.service';
+import { WorkScheduleData } from './models/work-schedule-data';
+
+const DAY_OF_WEEK_ORDER: Readonly<Record<DayOfWeek, number>> = {
+  [DayOfWeek.PRE_OPENING]: 0,
+  [DayOfWeek.OPENING_SUNDAY]: 1,
+  [DayOfWeek.MONDAY]: 2,
+  [DayOfWeek.TUESDAY]: 3,
+  [DayOfWeek.WEDNESDAY]: 4,
+  [DayOfWeek.THURSDAY]: 5,
+  [DayOfWeek.FRIDAY]: 6,
+  [DayOfWeek.SATURDAY]: 7,
+  [DayOfWeek.CLOSING_SUNDAY]: 8,
+  [DayOfWeek.POST_EVENT]: 9,
+};
 
 @Injectable()
 export class ShiftsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly coreConfigService: CoreConfigService
+  ) {}
 
   /**
    * Create a new shift
@@ -36,6 +54,104 @@ export class ShiftsService {
         jobs: true,
       },
     });
+  }
+
+  /** Returns the printable work schedule for the configured registration year. */
+  async getWorkSchedule(
+    dayOfWeek?: DayOfWeek,
+    requestedYear?: number
+  ): Promise<WorkScheduleData> {
+    const registrationYear =
+      requestedYear ?? (await this.coreConfigService.findCurrent()).registrationYear;
+    const shifts = await this.prisma.shift.findMany({
+      ...(dayOfWeek ? { where: { dayOfWeek } } : {}),
+      include: {
+        jobs: {
+          where: {
+            OR: [
+              { active: true },
+              {
+                registrations: {
+                  some: {
+                    registration: {
+                      year: registrationYear,
+                    },
+                  },
+                },
+              },
+            ],
+          },
+          include: {
+            category: true,
+            registrations: {
+              where: {
+                registration: {
+                  year: registrationYear,
+                },
+              },
+              include: {
+                registration: {
+                  include: {
+                    user: {
+                      select: {
+                        id: true,
+                        firstName: true,
+                        lastName: true,
+                        playaName: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    return {
+      shifts: shifts
+        .map(shift => ({
+          id: shift.id,
+          name: shift.name,
+          dayOfWeek: shift.dayOfWeek,
+          startTime: shift.startTime,
+          endTime: shift.endTime,
+          jobs: shift.jobs
+            .map(job => ({
+              id: job.id,
+              name: job.name,
+              location: job.location,
+              maxRegistrations: job.maxRegistrations,
+              categoryId: job.categoryId,
+              category: {
+                id: job.category.id,
+                name: job.category.name,
+              },
+              registrations: job.registrations
+                .map(registration => ({
+                  id: registration.id,
+                  user: {
+                    id: registration.registration.user.id,
+                    firstName: registration.registration.user.firstName,
+                    lastName: registration.registration.user.lastName,
+                    playaName: registration.registration.user.playaName,
+                  },
+                }))
+                .sort((left, right) => this.compareUsers(left.user, right.user)),
+            }))
+            .sort((left, right) => left.name.localeCompare(right.name)),
+        }))
+        .sort((left, right) => {
+          const dayComparison =
+            DAY_OF_WEEK_ORDER[left.dayOfWeek] - DAY_OF_WEEK_ORDER[right.dayOfWeek];
+          if (dayComparison !== 0) {
+            return dayComparison;
+          }
+          const timeComparison = left.startTime.localeCompare(right.startTime);
+          return timeComparison !== 0 ? timeComparison : left.name.localeCompare(right.name);
+        }),
+    };
   }
 
   /**
@@ -110,4 +226,14 @@ export class ShiftsService {
       where: { id },
     });
   }
-} 
+
+  private compareUsers(
+    left: { readonly firstName: string; readonly lastName: string },
+    right: { readonly firstName: string; readonly lastName: string }
+  ): number {
+    const lastNameComparison = left.lastName.localeCompare(right.lastName);
+    return lastNameComparison !== 0
+      ? lastNameComparison
+      : left.firstName.localeCompare(right.firstName);
+  }
+}

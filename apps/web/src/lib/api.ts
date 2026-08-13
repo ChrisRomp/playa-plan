@@ -571,6 +571,10 @@ export interface TicketReceiptReportOptions extends TicketReceiptSettings {
   additionalBlankRows?: number;
 }
 
+export interface WorkScheduleReportOptions {
+  dayOfWeek?: string;
+}
+
 function getDownloadFilename(contentDisposition: string | undefined, fallback: string): string {
   const encodedMatch = contentDisposition?.match(/filename\*=UTF-8''([^;]+)/i);
   if (encodedMatch?.[1]) {
@@ -1239,6 +1243,35 @@ export const reports = {
         'ticket-receipt-report.pdf'
       ),
     };
+  },
+
+  generateWorkSchedulePdf: async (
+    options: WorkScheduleReportOptions = {}
+  ): Promise<{ blob: Blob; filename: string }> => {
+    const response = await api.post<Blob>('/reports/work-schedule', options, {
+      responseType: 'blob',
+      timeout: 30000,
+    });
+
+    return {
+      blob: response.data,
+      filename: getDownloadFilename(
+        response.headers['content-disposition'],
+        'work-schedule-report.pdf'
+      ),
+    };
+  },
+
+  getWorkScheduleReportErrorMessage: (error: unknown): string => {
+    if (axios.isAxiosError(error)) {
+      if (error.response?.status === 404) {
+        return 'No work schedule matches the selected day.';
+      }
+      if (error.response?.status === 403) {
+        return 'You do not have permission to generate this report.';
+      }
+    }
+    return 'Failed to generate the work schedule PDF. Please try again.';
   },
 
   getReportErrorMessage: (error: unknown): string => {
