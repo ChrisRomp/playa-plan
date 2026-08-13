@@ -22,7 +22,7 @@ export function TicketReceiptReportPage() {
   const [form, setForm] = useState<TicketReceiptFormState>({
     title: 'Ticket Receipt Report',
     acknowledgementText: '',
-    year: config?.registrationYear ?? new Date().getFullYear(),
+    year: config?.currentYear ?? new Date().getFullYear(),
     campingOptionId: '',
     additionalBlankRows: 0,
   });
@@ -59,13 +59,13 @@ export function TicketReceiptReportPage() {
   }, []);
 
   useEffect(() => {
-    if (config?.registrationYear) {
+    if (config?.currentYear) {
       setForm(current => ({
         ...current,
-        year: config.registrationYear,
+        year: config.currentYear,
       }));
     }
-  }, [config?.registrationYear]);
+  }, [config?.currentYear]);
 
   const updateForm = <Key extends keyof TicketReceiptFormState>(
     key: Key,

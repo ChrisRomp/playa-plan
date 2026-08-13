@@ -33,11 +33,21 @@ describe('TicketReceiptReportPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(useConfig).mockReturnValue({
-      config: { registrationYear: 2026 },
+      config: {
+        name: 'Burning Sky',
+        description: 'Test camp',
+        homePageBlurb: 'Welcome',
+        registrationOpen: true,
+        earlyRegistrationOpen: false,
+        currentYear: 2026,
+      },
       isLoading: false,
       error: null,
       refreshConfig: vi.fn(),
-    } as ReturnType<typeof useConfig>);
+      isConnecting: false,
+      isConnected: true,
+      connectionError: null,
+    });
     vi.mocked(reports.getTicketReceiptSettings).mockResolvedValue({
       title: 'Burning Sky Ticket Receipt',
       acknowledgementText: 'I received my ticket.',
