@@ -560,6 +560,27 @@ export interface CampingOptionReportFilters {
   includeInactive?: boolean;
 }
 
+export interface TicketReceiptSettings {
+  title: string;
+  acknowledgementText: string;
+}
+
+export interface TicketReceiptReportOptions extends TicketReceiptSettings {
+  year?: number;
+  campingOptionId?: string;
+  additionalBlankRows?: number;
+}
+
+function getDownloadFilename(contentDisposition: string | undefined, fallback: string): string {
+  const encodedMatch = contentDisposition?.match(/filename\*=UTF-8''([^;]+)/i);
+  if (encodedMatch?.[1]) {
+    return decodeURIComponent(encodedMatch[1]);
+  }
+
+  const plainMatch = contentDisposition?.match(/filename="?([^";]+)"?/i);
+  return plainMatch?.[1] || fallback;
+}
+
 // API Functions
 export const auth = {
   /**
@@ -1198,6 +1219,40 @@ export const registrations = {
 };
 
 export const reports = {
+  getTicketReceiptSettings: async (): Promise<TicketReceiptSettings> => {
+    const response = await api.get<TicketReceiptSettings>('/reports/ticket-receipt/configuration');
+    return response.data;
+  },
+
+  generateTicketReceipt: async (
+    options: TicketReceiptReportOptions
+  ): Promise<{ blob: Blob; filename: string }> => {
+    const response = await api.post<Blob>('/reports/ticket-receipt', options, {
+      responseType: 'blob',
+      timeout: 30000,
+    });
+
+    return {
+      blob: response.data,
+      filename: getDownloadFilename(
+        response.headers['content-disposition'],
+        'ticket-receipt-report.pdf'
+      ),
+    };
+  },
+
+  getReportErrorMessage: (error: unknown): string => {
+    if (axios.isAxiosError(error)) {
+      if (error.response?.status === 404) {
+        return 'No confirmed registrations match the selected filters.';
+      }
+      if (error.response?.status === 403) {
+        return 'You do not have permission to generate this report.';
+      }
+    }
+    return 'Failed to generate the report. Please try again.';
+  },
+
   /**
    * Get a lightweight summary of registration year/user pairs.
    * Used to populate year filter dropdowns and determine which users have

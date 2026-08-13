@@ -80,6 +80,7 @@ export class AdminAudit {
       [AdminAuditActionType.CAMPING_OPTION_MODIFY]: 'modified camping option',
       [AdminAuditActionType.APPLICATION_APPROVE]: 'approved application',
       [AdminAuditActionType.APPLICATION_DECLINE]: 'declined application',
+      [AdminAuditActionType.REPORT_CONFIGURATION_MODIFY]: 'modified report configuration',
     };
 
     return actionMap[this.actionType] || 'performed unknown action';
@@ -95,6 +96,7 @@ export class AdminAudit {
       [AdminAuditTargetType.PAYMENT]: 'payment',
       [AdminAuditTargetType.WORK_SHIFT]: 'work shift',
       [AdminAuditTargetType.CAMPING_OPTION]: 'camping option',
+      [AdminAuditTargetType.REPORT_CONFIGURATION]: 'report configuration',
     };
 
     return targetMap[this.targetRecordType] || 'unknown record';

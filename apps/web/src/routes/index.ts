@@ -148,6 +148,12 @@ export const ROUTES = {
     requiresAuth: true,
     allowedRoles: [ROLES.STAFF, ROLES.ADMIN],
   },
+  REPORTS_TICKET_RECEIPT: {
+    path: '/reports/ticket-receipt',
+    name: 'Ticket Receipt Signature Form',
+    requiresAuth: true,
+    allowedRoles: [ROLES.STAFF, ROLES.ADMIN],
+  },
   REPORTS_PAYMENTS: {
     path: '/reports/payments',
     name: 'Payment Reports',

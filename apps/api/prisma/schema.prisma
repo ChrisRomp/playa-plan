@@ -357,10 +357,25 @@ model CoreConfig {
   @@map("core_config")
 }
 
+model ReportConfiguration {
+  id            String     @id @default(uuid())
+  reportType    ReportType @unique
+  schemaVersion Int        @default(1)
+  settings      Json
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  @@map("report_configurations")
+}
+
 enum UserRole {
   ADMIN
   STAFF
   PARTICIPANT
+}
+
+enum ReportType {
+  TICKET_RECEIPT_SIGNATURE
 }
 
 enum FieldType {
@@ -476,6 +491,7 @@ enum AdminAuditActionType {
   CAMPING_OPTION_MODIFY
   APPLICATION_APPROVE
   APPLICATION_DECLINE
+  REPORT_CONFIGURATION_MODIFY
 }
 
 enum AdminAuditTargetType {
@@ -484,6 +500,7 @@ enum AdminAuditTargetType {
   PAYMENT
   WORK_SHIFT
   CAMPING_OPTION
+  REPORT_CONFIGURATION
 }
 
 model Passkey {

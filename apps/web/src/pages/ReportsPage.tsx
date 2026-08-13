@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { FileText, Users, CreditCard, Calendar } from 'lucide-react';
+import { FileText, Users, CreditCard, Calendar, FileSignature } from 'lucide-react';
 import { useAuth } from '../store/authUtils';
 import { PATHS } from '../routes';
 
@@ -23,6 +23,13 @@ export function ReportsPage() {
       icon: <Calendar size={24} />,
       title: 'Work Schedule Report',
       description: 'View all shifts with assigned workers',
+      allowedRoles: ['staff', 'admin'],
+    },
+    {
+      to: PATHS.REPORTS_TICKET_RECEIPT,
+      icon: <FileSignature size={24} />,
+      title: 'Ticket Receipt Signature Form',
+      description: 'Generate a printable ticket acknowledgement and signature form',
       allowedRoles: ['staff', 'admin'],
     },
     {
