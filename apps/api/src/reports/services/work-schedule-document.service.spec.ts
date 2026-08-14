@@ -52,9 +52,11 @@ describe('WorkScheduleDocumentService', () => {
     );
     const day = (actualDocument.content as Content[])[0] as ContentStack;
     const shift = day.stack[1] as ContentStack;
-    const jobHeading = shift.stack[1] as { text: string };
-    const roster = shift.stack[2] as { ol: string[]; start: number };
+    const job = shift.stack[1] as ContentStack;
+    const jobHeading = job.stack[0] as { text: string };
+    const roster = job.stack[1] as { ol: string[]; start: number };
 
+    expect(job.unbreakable).toBe(true);
     expect(jobHeading.text).toBe('Teardown');
     expect(roster.ol).toHaveLength(7);
     expect(roster.ol).not.toContain(' ');
@@ -155,12 +157,14 @@ describe('WorkScheduleDocumentService', () => {
     );
     const day = (actualDocument.content as Content[])[0] as ContentStack;
     const columns = day.stack[1] as ContentColumns;
+    const leftJob = (columns.columns[0] as ContentStack).stack[1] as ContentStack;
+    const rightJob = (columns.columns[1] as ContentStack).stack[1] as ContentStack;
 
     expect(columns.columns).toHaveLength(2);
-    expect((columns.columns[0] as ContentStack).stack[2]).toEqual(
+    expect(leftJob.stack[1]).toEqual(
       expect.objectContaining({ ol: expect.any(Array), start: 1 })
     );
-    expect((columns.columns[1] as ContentStack).stack[2]).toEqual(
+    expect(rightJob.stack[1]).toEqual(
       expect.objectContaining({ ol: expect.any(Array), start: 1 })
     );
   });
@@ -184,10 +188,11 @@ describe('WorkScheduleDocumentService', () => {
     );
     const day = (actualDocument.content as Content[])[0] as ContentStack;
     const shift = day.stack[1] as ContentStack;
-    const smallJob = shift.stack[3] as ContentStack;
+    const largeJob = shift.stack[1] as ContentStack;
+    const smallJob = shift.stack[2] as ContentStack;
 
-    expect(shift.stack[1]).toEqual(expect.objectContaining({ text: 'Teardown' }));
-    expect(shift.stack[2]).toEqual(
+    expect(largeJob.stack[0]).toEqual(expect.objectContaining({ text: 'Teardown' }));
+    expect(largeJob.stack[1]).toEqual(
       expect.objectContaining({ ol: expect.any(Array), start: 1 })
     );
     expect(smallJob.stack[0]).toEqual(expect.objectContaining({ text: 'Cleanup' }));
@@ -251,6 +256,38 @@ describe('WorkScheduleDocumentService', () => {
     expect(day.stack).toHaveLength(3);
   });
 
+  it('shouldLetWrappedPageSizedRostersFlowAcrossPages', () => {
+    const inputShift = createShift('teardown', 22, 50);
+    const inputJob = inputShift.jobs[0];
+    const actualDocument = service.build(
+      createReportData([
+        {
+          ...inputShift,
+          jobs: [
+            {
+              ...inputJob,
+              registrations: inputJob.registrations.map(registration => ({
+                ...registration,
+                user: {
+                  ...registration.user,
+                  firstName: 'Extraordinarily Long Worker First Name',
+                  lastName: 'Extraordinarily Long Worker Last Name',
+                },
+              })),
+            },
+          ],
+        },
+      ])
+    );
+    const day = (actualDocument.content as Content[])[0] as ContentStack;
+    const shift = day.stack[1] as ContentStack;
+
+    expect(shift.stack[1]).toEqual(expect.objectContaining({ text: 'Teardown' }));
+    expect(shift.stack[2]).toEqual(
+      expect.objectContaining({ ol: expect.any(Array), start: 1 })
+    );
+  });
+
   it('shouldNotPairShiftsWhenWorkerNamesWrapAcrossLines', () => {
     const inputShift = createShift('morning', 22, 50);
     const inputJob = inputShift.jobs[0];
@@ -306,6 +343,38 @@ describe('WorkScheduleDocumentService', () => {
     expect(rightHeading.text).toBe('Teardown (continued)');
     expect(right.ol).toHaveLength(25);
     expect(right.start).toBe(26);
+  });
+
+  it('shouldNotSplitWrappedRostersIntoFixedColumns', () => {
+    const inputShift = createShift('teardown', 50, 60);
+    const inputJob = inputShift.jobs[0];
+    const actualDocument = service.build(
+      createReportData([
+        {
+          ...inputShift,
+          jobs: [
+            {
+              ...inputJob,
+              registrations: inputJob.registrations.map(registration => ({
+                ...registration,
+                user: {
+                  ...registration.user,
+                  firstName: 'Extraordinarily Long Worker First Name',
+                  lastName: 'Extraordinarily Long Worker Last Name',
+                },
+              })),
+            },
+          ],
+        },
+      ])
+    );
+    const day = (actualDocument.content as Content[])[0] as ContentStack;
+    const shift = day.stack[1] as ContentStack;
+    const roster = shift.stack[2] as { ol: string[]; start: number };
+
+    expect(shift.stack[1]).toEqual(expect.objectContaining({ text: 'Teardown' }));
+    expect(roster.ol).toHaveLength(50);
+    expect(roster.start).toBe(1);
   });
 
   it('shouldLetRostersLargerThanTwoColumnsFlowAcrossPages', () => {

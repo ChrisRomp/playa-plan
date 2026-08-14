@@ -205,19 +205,56 @@ export class WorkScheduleDocumentService {
   private buildLargeJob(job: ScheduleJob): Content[] {
     const workers = this.getAssignedWorkerNames(job);
     if (workers.length > MAX_ROSTER_ITEMS_PER_COLUMN * 2) {
-      return [
-        this.buildJobHeading(job),
-        this.buildNumberedRoster(workers, 1),
-      ];
+      return this.buildFlowingLargeJob(job, workers);
     }
     if (workers.length > MAX_ROSTER_ITEMS_PER_COLUMN) {
-      return [this.buildSplitLargeJob(job, workers)];
+      return this.canSplitLargeJobIntoColumns(job, workers)
+        ? [this.buildSplitLargeJob(job, workers)]
+        : this.buildFlowingLargeJob(job, workers);
     }
 
+    return this.getEstimatedLargeJobLines(job.name, workers) <=
+      MAX_ESTIMATED_LINES_PER_SHIFT_COLUMN
+      ? [this.buildUnbreakableLargeJob(job, workers)]
+      : this.buildFlowingLargeJob(job, workers);
+  }
+
+  private buildUnbreakableLargeJob(
+    job: ScheduleJob,
+    workers: ReadonlyArray<string>
+  ): ContentStack {
+    return {
+      stack: [
+        this.buildJobHeading(job),
+        ...(workers.length > 0 ? [this.buildNumberedRoster(workers, 1)] : []),
+      ],
+      unbreakable: true,
+    };
+  }
+
+  private buildFlowingLargeJob(
+    job: ScheduleJob,
+    workers: ReadonlyArray<string>
+  ): Content[] {
     return [
       this.buildJobHeading(job),
       ...(workers.length > 0 ? [this.buildNumberedRoster(workers, 1)] : []),
     ];
+  }
+
+  private canSplitLargeJobIntoColumns(
+    job: ScheduleJob,
+    workers: ReadonlyArray<string>
+  ): boolean {
+    const midpoint = Math.ceil(workers.length / 2);
+    return (
+      this.getEstimatedLargeJobLines(job.name, workers.slice(0, midpoint)) <=
+        MAX_ESTIMATED_LINES_PER_SHIFT_COLUMN &&
+      this.getEstimatedLargeJobLines(
+        `${job.name} (continued)`,
+        workers.slice(midpoint)
+      ) <= MAX_ESTIMATED_LINES_PER_SHIFT_COLUMN
+    );
   }
 
   private buildSplitLargeJob(
@@ -300,6 +337,17 @@ export class WorkScheduleDocumentService {
 
     const vacancyCount = Math.max(job.maxRegistrations - assignedNames.length, 0);
     return assignedLines + vacancyCount;
+  }
+
+  private getEstimatedLargeJobLines(
+    heading: string,
+    workers: ReadonlyArray<string>
+  ): number {
+    const rosterLines = workers.reduce(
+      (lineCount, worker) => lineCount + this.getEstimatedTextLines(worker),
+      0
+    );
+    return this.getEstimatedTextLines(heading) + 1 + rosterLines;
   }
 
   private getEstimatedTextLines(text: string): number {
