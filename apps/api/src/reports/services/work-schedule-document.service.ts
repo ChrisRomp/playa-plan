@@ -127,6 +127,8 @@ export class WorkScheduleDocumentService {
       nextShift !== undefined &&
       this.isLargeShift(shift) &&
       this.isLargeShift(nextShift) &&
+      !this.hasRosterRequiringSplit(shift) &&
+      !this.hasRosterRequiringSplit(nextShift) &&
       this.getEstimatedShiftColumnLines(shift) <= MAX_ESTIMATED_LINES_PER_SHIFT_COLUMN &&
       this.getEstimatedShiftColumnLines(nextShift) <= MAX_ESTIMATED_LINES_PER_SHIFT_COLUMN
     );
@@ -311,6 +313,12 @@ export class WorkScheduleDocumentService {
 
   private isLargeJob(job: ScheduleJob): boolean {
     return job.maxRegistrations > MAX_BULLETED_SHIFT_CAPACITY;
+  }
+
+  private hasRosterRequiringSplit(shift: ScheduleShift): boolean {
+    return shift.jobs.some(
+      job => job.registrations.length > MAX_ROSTER_ITEMS_PER_COLUMN
+    );
   }
 
   private getEstimatedShiftColumnLines(shift: ScheduleShift): number {

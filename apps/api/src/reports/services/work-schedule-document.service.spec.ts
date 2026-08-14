@@ -1,10 +1,12 @@
 import { DayOfWeek } from '@prisma/client';
 import { Content, ContentColumns, ContentStack } from 'pdfmake/interfaces';
 import { WorkScheduleReportData } from '../models/work-schedule-report-data';
+import { PdfmakeRendererService } from './pdfmake-renderer.service';
 import { WorkScheduleDocumentService } from './work-schedule-document.service';
 
 describe('WorkScheduleDocumentService', () => {
   const service = new WorkScheduleDocumentService();
+  const renderer = new PdfmakeRendererService();
 
   it('shouldRenderSmallJobsWithAssignedAndVacantBulletSlots', () => {
     const actualDocument = service.build(
@@ -317,6 +319,18 @@ describe('WorkScheduleDocumentService', () => {
     expect(day.stack).toHaveLength(3);
   });
 
+  it('shouldNotNestSplitRostersInsideSideBySideShifts', () => {
+    const actualDocument = service.build(
+      createReportData([
+        createShift('morning', 43, 50),
+        createShift('afternoon', 43, 50),
+      ])
+    );
+    const day = (actualDocument.content as Content[])[0] as ContentStack;
+
+    expect(day.stack).toHaveLength(3);
+  });
+
   it('shouldSplitAnOversizedRosterIntoContinuouslyNumberedColumns', () => {
     const actualDocument = service.build(
       createReportData([
@@ -377,7 +391,7 @@ describe('WorkScheduleDocumentService', () => {
     expect(roster.start).toBe(1);
   });
 
-  it('shouldLetRostersLargerThanTwoColumnsFlowAcrossPages', () => {
+  it('shouldRenderRostersLargerThanTwoColumnsAcrossPages', async () => {
     const actualDocument = service.build(
       createReportData([
         createShift('teardown', 85, 100),
@@ -391,6 +405,12 @@ describe('WorkScheduleDocumentService', () => {
     expect(jobHeading.text).toBe('Teardown');
     expect(roster.ol).toHaveLength(85);
     expect(roster.start).toBe(1);
+    expect(roster.ol.at(-1)).toBe('Worker 85 Last 85 (Playa 85)');
+
+    const actualPdf = await renderer.render(actualDocument);
+    const actualPageCount =
+      actualPdf.toString('latin1').match(/\/Type\s*\/Page\b/g)?.length ?? 0;
+    expect(actualPageCount).toBeGreaterThan(1);
   });
 
   function createReportData(
