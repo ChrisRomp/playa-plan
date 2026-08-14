@@ -23,7 +23,9 @@ vi.mock('../../utils/downloadFile', () => ({
 }));
 
 vi.mock('../../components/common/LoadingSpinner', () => ({
-  LoadingSpinner: () => <span>Loading</span>,
+  LoadingSpinner: ({ className }: { className?: string }) => (
+    <span data-testid="loading-spinner" className={className}>Loading</span>
+  ),
 }));
 
 describe('WorkScheduleReportPage', () => {
@@ -139,6 +141,38 @@ describe('WorkScheduleReportPage', () => {
     await waitFor(() => expect(reports.generateWorkSchedulePdf).toHaveBeenCalledTimes(2));
     expect(reports.getWorkSchedule).toHaveBeenCalledTimes(1);
     expect(downloadFile).toHaveBeenCalledWith(inputBlob, 'work-schedule.pdf');
+  });
+
+  it('shouldPreserveScheduleErrorsAfterSuccessfulPdfGeneration', async () => {
+    vi.mocked(reports.getWorkSchedule).mockRejectedValue(new Error('failed'));
+    vi.mocked(reports.generateWorkSchedulePdf).mockResolvedValue({
+      blob: new Blob(['pdf'], { type: 'application/pdf' }),
+      filename: 'work-schedule.pdf',
+    });
+    renderPage();
+    await screen.findByText('Failed to fetch work schedule data');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Download PDF' }));
+
+    await waitFor(() => expect(downloadFile).toHaveBeenCalled());
+    expect(screen.getByText('Failed to fetch work schedule data')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
+  });
+
+  it('shouldShowAVisibleInlineSpinnerWhileGeneratingThePdf', async () => {
+    vi.mocked(reports.generateWorkSchedulePdf).mockReturnValue(
+      new Promise<never>(() => undefined)
+    );
+    renderPage();
+    await screen.findByText('Wednesday');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Download PDF' }));
+
+    expect(screen.getByTestId('loading-spinner')).toHaveClass(
+      '!p-0',
+      'mr-2',
+      '[&_svg]:!text-white'
+    );
   });
 
   it('shouldOrderUnpaddedShiftTimesChronologicallyForDisplayAndCsv', async () => {
