@@ -14,7 +14,8 @@ describe('WorkScheduleDocumentService', () => {
     );
     const day = (actualDocument.content as Content[])[0] as ContentStack;
     const shift = day.stack[1] as ContentStack;
-    const roster = shift.stack[2] as { ul: string[] };
+    const job = shift.stack[1] as ContentStack;
+    const roster = job.stack[1] as { ul: string[] };
 
     expect(actualDocument.pageOrientation).toBe('portrait');
     expect(actualDocument.info?.title).toBe('Burning Sky Work Schedule 2026');
@@ -36,7 +37,8 @@ describe('WorkScheduleDocumentService', () => {
     );
     const day = (actualDocument.content as Content[])[0] as ContentStack;
     const shift = day.stack[1] as ContentStack;
-    const roster = shift.stack[2] as { ul: string[] };
+    const job = shift.stack[1] as ContentStack;
+    const roster = job.stack[1] as { ul: string[] };
 
     expect(roster.ul).toHaveLength(10);
     expect(roster.ul.filter(worker => worker === ' ')).toHaveLength(4);
@@ -78,12 +80,37 @@ describe('WorkScheduleDocumentService', () => {
     );
     const day = (actualDocument.content as Content[])[0] as ContentStack;
     const shift = day.stack[1] as ContentStack;
-    const firstRoster = shift.stack[2] as { ul: string[] };
-    const secondRoster = shift.stack[4] as { ul: string[] };
+    const firstJob = shift.stack[1] as ContentStack;
+    const secondJob = shift.stack[2] as ContentStack;
+    const firstRoster = firstJob.stack[1] as { ul: string[] };
+    const secondRoster = secondJob.stack[1] as { ul: string[] };
 
     expect(firstRoster.ul).toEqual([' ', ' ', ' ', ' ']);
     expect(secondRoster.ul).toHaveLength(7);
     expect(secondRoster.ul.filter(worker => worker === ' ')).toHaveLength(5);
+  });
+
+  it('shouldAllowSmallShiftsToBreakBetweenJobs', () => {
+    const inputShift = createShift('wednesday-am', 0, 10);
+    const actualDocument = service.build(
+      createReportData([
+        {
+          ...inputShift,
+          jobs: Array.from({ length: 6 }, (_, index) => ({
+            ...inputShift.jobs[0],
+            id: `job-${index + 1}`,
+            name: `Job ${index + 1}`,
+          })),
+        },
+      ])
+    );
+    const day = (actualDocument.content as Content[])[0] as ContentStack;
+    const shift = day.stack[1] as ContentStack;
+    const jobs = shift.stack.slice(1) as ContentStack[];
+
+    expect(shift.unbreakable).toBeUndefined();
+    expect(jobs).toHaveLength(6);
+    expect(jobs.every(job => job.unbreakable === true)).toBe(true);
   });
 
   it('shouldPreserveTheSuppliedShiftOrderAcrossSmallAndLargeJobs', () => {
@@ -157,16 +184,47 @@ describe('WorkScheduleDocumentService', () => {
     );
     const day = (actualDocument.content as Content[])[0] as ContentStack;
     const shift = day.stack[1] as ContentStack;
+    const smallJob = shift.stack[3] as ContentStack;
 
     expect(shift.stack[1]).toEqual(expect.objectContaining({ text: 'Teardown' }));
     expect(shift.stack[2]).toEqual(
       expect.objectContaining({ ol: expect.any(Array), start: 1 })
     );
-    expect(shift.stack[3]).toEqual(expect.objectContaining({ text: 'Cleanup' }));
-    expect(shift.stack[4]).toEqual(
+    expect(smallJob.stack[0]).toEqual(expect.objectContaining({ text: 'Cleanup' }));
+    expect(smallJob.stack[1]).toEqual(
       expect.objectContaining({ ul: expect.any(Array) })
     );
-    expect((shift.stack[4] as { ul: string[] }).ul).toHaveLength(3);
+    expect((smallJob.stack[1] as { ul: string[] }).ul).toHaveLength(3);
+  });
+
+  it('shouldNotPairShiftsWhenVacantSlotsWouldOverflowAColumn', () => {
+    const inputShift = createShift('morning', 1, 50);
+    const inputSmallJob = createShift('small', 0, 10).jobs[0];
+    const actualDocument = service.build(
+      createReportData([
+        {
+          ...inputShift,
+          jobs: [
+            inputShift.jobs[0],
+            ...Array.from({ length: 5 }, (_, index) => ({
+              ...inputSmallJob,
+              id: `small-job-${index + 1}`,
+              name: `Small Job ${index + 1}`,
+            })),
+          ],
+        },
+        createShift('afternoon', 16, 20),
+      ])
+    );
+    const day = (actualDocument.content as Content[])[0] as ContentStack;
+
+    expect(day.stack).toHaveLength(3);
+    expect((day.stack[1] as ContentStack).stack[0]).toEqual(
+      expect.objectContaining({ text: 'Sunday AM - 10:00 - 13:00' })
+    );
+    expect((day.stack[2] as ContentStack).stack[0]).toEqual(
+      expect.objectContaining({ text: 'Sunday PM - 15:00 - 18:00' })
+    );
   });
 
   it('shouldSplitAnOversizedRosterIntoContinuouslyNumberedColumns', () => {
@@ -195,6 +253,22 @@ describe('WorkScheduleDocumentService', () => {
     expect(rightHeading.text).toBe('Teardown (continued)');
     expect(right.ol).toHaveLength(25);
     expect(right.start).toBe(26);
+  });
+
+  it('shouldLetRostersLargerThanTwoColumnsFlowAcrossPages', () => {
+    const actualDocument = service.build(
+      createReportData([
+        createShift('teardown', 85, 100),
+      ])
+    );
+    const day = (actualDocument.content as Content[])[0] as ContentStack;
+    const shift = day.stack[1] as ContentStack;
+    const jobHeading = shift.stack[1] as { text: string };
+    const roster = shift.stack[2] as { ol: string[]; start: number };
+
+    expect(jobHeading.text).toBe('Teardown');
+    expect(roster.ol).toHaveLength(85);
+    expect(roster.start).toBe(1);
   });
 
   function createReportData(

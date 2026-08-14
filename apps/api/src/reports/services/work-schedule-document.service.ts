@@ -125,23 +125,19 @@ export class WorkScheduleDocumentService {
       nextShift !== undefined &&
       this.isLargeShift(shift) &&
       this.isLargeShift(nextShift) &&
-      this.getAssignedWorkers(shift).length <= MAX_ROSTER_ITEMS_PER_COLUMN &&
-      this.getAssignedWorkers(nextShift).length <= MAX_ROSTER_ITEMS_PER_COLUMN
+      this.getRenderedRosterItemCount(shift) <= MAX_ROSTER_ITEMS_PER_COLUMN &&
+      this.getRenderedRosterItemCount(nextShift) <= MAX_ROSTER_ITEMS_PER_COLUMN
     );
   }
 
   private buildSmallShift(shift: ScheduleShift): ContentStack {
     return {
-      stack: [
-        this.buildShiftHeading(shift),
-        ...shift.jobs.flatMap(job => this.buildSmallJob(job)),
-      ],
+      stack: [this.buildShiftHeading(shift), ...shift.jobs.map(job => this.buildSmallJob(job))],
       margin: [0, 0, 0, 10],
-      unbreakable: true,
     };
   }
 
-  private buildSmallJob(job: ScheduleJob): Content[] {
+  private buildSmallJob(job: ScheduleJob): ContentStack {
     const assignedWorkers = job.registrations.map(registration =>
       this.formatUserName(registration.user)
     );
@@ -151,17 +147,20 @@ export class WorkScheduleDocumentService {
       ...Array.from({ length: vacancyCount }, () => ' '),
     ];
 
-    return [
-      this.buildJobHeading(job),
-      ...(slots.length > 0
-        ? [
-            {
-              ul: slots,
-              margin: [ROSTER_INDENT, 0, 0, 7],
-            } as Content,
-          ]
-        : []),
-    ];
+    return {
+      stack: [
+        this.buildJobHeading(job),
+        ...(slots.length > 0
+          ? [
+              {
+                ul: slots,
+                margin: [ROSTER_INDENT, 0, 0, 7],
+              } as Content,
+            ]
+          : []),
+      ],
+      unbreakable: true,
+    };
   }
 
   private buildSideBySideLargeShifts(
@@ -197,12 +196,18 @@ export class WorkScheduleDocumentService {
 
   private buildShiftJobs(shift: ScheduleShift): Content[] {
     return shift.jobs.flatMap(job =>
-      this.isLargeJob(job) ? this.buildLargeJob(job) : this.buildSmallJob(job)
+      this.isLargeJob(job) ? this.buildLargeJob(job) : [this.buildSmallJob(job)]
     );
   }
 
   private buildLargeJob(job: ScheduleJob): Content[] {
     const workers = this.getAssignedWorkerNames(job);
+    if (workers.length > MAX_ROSTER_ITEMS_PER_COLUMN * 2) {
+      return [
+        this.buildJobHeading(job),
+        this.buildNumberedRoster(workers, 1),
+      ];
+    }
     if (workers.length > MAX_ROSTER_ITEMS_PER_COLUMN) {
       return [this.buildSplitLargeJob(job, workers)];
     }
@@ -269,8 +274,14 @@ export class WorkScheduleDocumentService {
     return job.maxRegistrations > MAX_BULLETED_SHIFT_CAPACITY;
   }
 
-  private getAssignedWorkers(shift: ScheduleShift): string[] {
-    return shift.jobs.flatMap(job => this.getAssignedWorkerNames(job));
+  private getRenderedRosterItemCount(shift: ScheduleShift): number {
+    return shift.jobs.reduce((count, job) => {
+      const assignedCount = job.registrations.length;
+      const rosterItemCount = this.isLargeJob(job)
+        ? assignedCount
+        : Math.max(job.maxRegistrations, assignedCount);
+      return count + rosterItemCount;
+    }, 0);
   }
 
   private getAssignedWorkerNames(job: ScheduleJob): string[] {
