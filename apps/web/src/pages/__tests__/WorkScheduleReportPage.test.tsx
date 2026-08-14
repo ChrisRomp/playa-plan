@@ -119,6 +119,83 @@ describe('WorkScheduleReportPage', () => {
     ).toBeInTheDocument();
   });
 
+  it('shouldRetryPdfGenerationAfterADownloadError', async () => {
+    const inputBlob = new Blob(['pdf'], { type: 'application/pdf' });
+    vi.mocked(reports.generateWorkSchedulePdf)
+      .mockRejectedValueOnce(new Error('failed'))
+      .mockResolvedValueOnce({
+        blob: inputBlob,
+        filename: 'work-schedule.pdf',
+      });
+    vi.mocked(reports.getWorkScheduleReportErrorMessage).mockReturnValue(
+      'Failed to generate the work schedule PDF. Please try again.'
+    );
+    renderPage();
+    await screen.findByText('Wednesday');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Download PDF' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Try again' }));
+
+    await waitFor(() => expect(reports.generateWorkSchedulePdf).toHaveBeenCalledTimes(2));
+    expect(reports.getWorkSchedule).toHaveBeenCalledTimes(1);
+    expect(downloadFile).toHaveBeenCalledWith(inputBlob, 'work-schedule.pdf');
+  });
+
+  it('shouldOrderUnpaddedShiftTimesChronologicallyForDisplayAndCsv', async () => {
+    vi.mocked(reports.getWorkSchedule).mockResolvedValue({
+      shifts: [
+        {
+          id: 'afternoon',
+          name: 'Afternoon',
+          dayOfWeek: 'WEDNESDAY',
+          startTime: '13:00',
+          endTime: '14:00',
+          jobs: [
+            {
+              id: 'afternoon-job',
+              name: 'Afternoon Job',
+              location: 'Camp',
+              maxRegistrations: 1,
+              categoryId: 'operations',
+              category: { id: 'operations', name: 'Operations' },
+              registrations: [],
+            },
+          ],
+        },
+        {
+          id: 'morning',
+          name: 'Morning',
+          dayOfWeek: 'WEDNESDAY',
+          startTime: '8:00',
+          endTime: '09:00',
+          jobs: [
+            {
+              id: 'morning-job',
+              name: 'Morning Job',
+              location: 'Camp',
+              maxRegistrations: 1,
+              categoryId: 'operations',
+              category: { id: 'operations', name: 'Operations' },
+              registrations: [],
+            },
+          ],
+        },
+      ],
+    });
+    renderPage();
+
+    const morningHeading = await screen.findByText('Morning (8:00 - 09:00)');
+    const afternoonHeading = screen.getByText('Afternoon (13:00 - 14:00)');
+    expect(
+      morningHeading.compareDocumentPosition(afternoonHeading) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Export CSV' }));
+    const csvRows = vi.mocked(downloadCsv).mock.calls[0][1];
+    expect(csvRows.map(row => row[1])).toEqual(['Morning', 'Afternoon']);
+  });
+
   function renderPage(): void {
     render(
       <MemoryRouter>

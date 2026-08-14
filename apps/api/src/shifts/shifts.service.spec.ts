@@ -4,6 +4,7 @@ import { PrismaService } from '../common/prisma/prisma.service';
 import { NotFoundException } from '@nestjs/common';
 import { DayOfWeek } from '../common/enums/day-of-week.enum';
 import { CoreConfigService } from '../core-config/services/core-config.service';
+import { CAPACITY_RESERVING_STATUSES } from '../registrations/constants/registration-status.constants';
 
 describe('ShiftsService', () => {
   let service: ShiftsService;
@@ -104,6 +105,17 @@ describe('ShiftsService', () => {
     it('shouldFilterByConfiguredYearAndOrderScheduleData', async () => {
           jest.spyOn(prismaService.shift, 'findMany').mockResolvedValueOnce([
             {
+              id: 'thursday-early',
+              name: 'Thursday Early',
+              description: null,
+              startTime: '8:00',
+              endTime: '09:00',
+              dayOfWeek: DayOfWeek.THURSDAY,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+              jobs: [],
+            },
+            {
               id: 'thursday',
               name: 'Thursday AM',
               description: null,
@@ -168,6 +180,17 @@ describe('ShiftsService', () => {
                 },
               ],
             },
+            {
+              id: 'thursday-afternoon',
+              name: 'Thursday Afternoon',
+              description: null,
+              startTime: '13:00',
+              endTime: '14:00',
+              dayOfWeek: DayOfWeek.THURSDAY,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+              jobs: [],
+            },
           ] as never);
 
           const actualSchedule = await service.getWorkSchedule(DayOfWeek.THURSDAY);
@@ -178,21 +201,46 @@ describe('ShiftsService', () => {
               where: { dayOfWeek: DayOfWeek.THURSDAY },
               include: expect.objectContaining({
                 jobs: expect.objectContaining({
+                  where: {
+                    OR: [
+                      { active: true },
+                      {
+                        registrations: {
+                          some: {
+                            registration: {
+                              year: 2026,
+                              status: { in: [...CAPACITY_RESERVING_STATUSES] },
+                            },
+                          },
+                        },
+                      },
+                    ],
+                  },
                   include: expect.objectContaining({
                     registrations: expect.objectContaining({
-                      where: { registration: { year: 2026 } },
+                      where: {
+                        registration: {
+                          year: 2026,
+                          status: { in: [...CAPACITY_RESERVING_STATUSES] },
+                        },
+                      },
                     }),
                   }),
                 }),
               }),
             })
           );
-          expect(actualSchedule.shifts[0].jobs.map(job => job.name)).toEqual([
+          expect(actualSchedule.shifts.map(shift => shift.id)).toEqual([
+            'thursday-early',
+            'thursday',
+            'thursday-afternoon',
+          ]);
+          expect(actualSchedule.shifts[1].jobs.map(job => job.name)).toEqual([
             'Airport',
             'Manifest',
           ]);
           expect(
-            actualSchedule.shifts[0].jobs[1].registrations.map(
+            actualSchedule.shifts[1].jobs[1].registrations.map(
               registration => registration.user.firstName
             )
           ).toEqual(['Amy', 'Zoe']);

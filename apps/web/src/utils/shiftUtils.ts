@@ -58,4 +58,12 @@ export const formatTime = (timeString: string): string => {
     // Return the original string if parsing fails
     return timeString;
   }
-}; 
+};
+
+/**
+ * Convert a 24-hour time string to minutes after midnight for chronological sorting.
+ */
+export const getTimeInMinutes = (timeString: string): number => {
+  const [hours, minutes] = timeString.split(':').map(Number);
+  return hours * 60 + minutes;
+};

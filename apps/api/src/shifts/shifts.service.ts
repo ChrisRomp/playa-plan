@@ -4,6 +4,7 @@ import { CreateShiftDto } from './dto/create-shift.dto';
 import { UpdateShiftDto } from './dto/update-shift.dto';
 import { DayOfWeek, Prisma, Shift } from '@prisma/client';
 import { CoreConfigService } from '../core-config/services/core-config.service';
+import { CAPACITY_RESERVING_STATUSES } from '../registrations/constants/registration-status.constants';
 import { WorkScheduleData } from './models/work-schedule-data';
 
 const DAY_OF_WEEK_ORDER: Readonly<Record<DayOfWeek, number>> = {
@@ -75,6 +76,7 @@ export class ShiftsService {
                   some: {
                     registration: {
                       year: registrationYear,
+                      status: { in: [...CAPACITY_RESERVING_STATUSES] },
                     },
                   },
                 },
@@ -87,6 +89,7 @@ export class ShiftsService {
               where: {
                 registration: {
                   year: registrationYear,
+                  status: { in: [...CAPACITY_RESERVING_STATUSES] },
                 },
               },
               include: {
@@ -148,10 +151,17 @@ export class ShiftsService {
           if (dayComparison !== 0) {
             return dayComparison;
           }
-          const timeComparison = left.startTime.localeCompare(right.startTime);
+          const timeComparison =
+            this.getStartTimeMinutes(left.startTime) -
+            this.getStartTimeMinutes(right.startTime);
           return timeComparison !== 0 ? timeComparison : left.name.localeCompare(right.name);
         }),
     };
+  }
+
+  private getStartTimeMinutes(startTime: string): number {
+    const [hours, minutes] = startTime.split(':').map(Number);
+    return hours * 60 + minutes;
   }
 
   /**

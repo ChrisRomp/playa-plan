@@ -227,6 +227,59 @@ describe('WorkScheduleDocumentService', () => {
     );
   });
 
+  it('shouldNotPairShiftsWhenJobHeadingsWouldOverflowAColumn', () => {
+    const inputShift = createShift('morning', 0, 50);
+    const inputEmptyJob = createShift('empty', 0, 0).jobs[0];
+    const actualDocument = service.build(
+      createReportData([
+        {
+          ...inputShift,
+          jobs: [
+            inputShift.jobs[0],
+            ...Array.from({ length: 22 }, (_, index) => ({
+              ...inputEmptyJob,
+              id: `empty-job-${index + 1}`,
+              name: `Empty Job ${index + 1}`,
+            })),
+          ],
+        },
+        createShift('afternoon', 16, 20),
+      ])
+    );
+    const day = (actualDocument.content as Content[])[0] as ContentStack;
+
+    expect(day.stack).toHaveLength(3);
+  });
+
+  it('shouldNotPairShiftsWhenWorkerNamesWrapAcrossLines', () => {
+    const inputShift = createShift('morning', 22, 50);
+    const inputJob = inputShift.jobs[0];
+    const actualDocument = service.build(
+      createReportData([
+        {
+          ...inputShift,
+          jobs: [
+            {
+              ...inputJob,
+              registrations: inputJob.registrations.map(registration => ({
+                ...registration,
+                user: {
+                  ...registration.user,
+                  firstName: 'Extraordinarily Long Worker First Name',
+                  lastName: 'Extraordinarily Long Worker Last Name',
+                },
+              })),
+            },
+          ],
+        },
+        createShift('afternoon', 16, 20),
+      ])
+    );
+    const day = (actualDocument.content as Content[])[0] as ContentStack;
+
+    expect(day.stack).toHaveLength(3);
+  });
+
   it('shouldSplitAnOversizedRosterIntoContinuouslyNumberedColumns', () => {
     const actualDocument = service.build(
       createReportData([

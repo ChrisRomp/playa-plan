@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { ArrowLeft, Download, Filter, X, Calendar } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { reports } from '../lib/api';
@@ -6,6 +6,7 @@ import { PATHS } from '../routes';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import { downloadCsv } from '../utils/csv';
 import { downloadFile } from '../utils/downloadFile';
+import { getTimeInMinutes } from '../utils/shiftUtils';
 
 // Day of week values from backend for sorting
 // (removed enum definition to simplify type handling)
@@ -50,6 +51,8 @@ interface DayGroupedShifts {
   [key: string]: WorkScheduleShift[];
 }
 
+type ReportErrorSource = 'schedule' | 'pdf';
+
 /**
  * Work Schedule Report page
  * Displays all shifts with their jobs and user signups
@@ -58,6 +61,7 @@ export function WorkScheduleReportPage() {
   const [workScheduleData, setWorkScheduleData] = useState<WorkScheduleData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [errorSource, setErrorSource] = useState<ReportErrorSource | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [dayFilter, setDayFilter] = useState<string>('all');
   const [generatingPdf, setGeneratingPdf] = useState(false);
@@ -90,24 +94,26 @@ export function WorkScheduleReportPage() {
     POST_EVENT: 'Post-Event'
   }), []);
 
+  const fetchWorkSchedule = useCallback(async (): Promise<void> => {
+    setLoading(true);
+    setError(null);
+    setErrorSource(null);
+    try {
+      const data = await reports.getWorkSchedule();
+      setWorkScheduleData(data);
+    } catch (err) {
+      setError('Failed to fetch work schedule data');
+      setErrorSource('schedule');
+      console.error('Error fetching work schedule:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   // Fetch work schedule data
   useEffect(() => {
-    const fetchWorkSchedule = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const data = await reports.getWorkSchedule();
-        setWorkScheduleData(data);
-      } catch (err) {
-        setError('Failed to fetch work schedule data');
-        console.error('Error fetching work schedule:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchWorkSchedule();
-  }, []);
+    void fetchWorkSchedule();
+  }, [fetchWorkSchedule]);
 
   // Group shifts by day of week
   const shiftsByDay = useMemo(() => {
@@ -171,7 +177,9 @@ export function WorkScheduleReportPage() {
     Object.entries(filteredShiftsByDay).forEach(([day, shifts]) => {
       // Sort shifts by start time
       const sortedShifts = [...shifts].sort((a, b) => {
-        return a.startTime.localeCompare(b.startTime);
+        const timeComparison =
+          getTimeInMinutes(a.startTime) - getTimeInMinutes(b.startTime);
+        return timeComparison || a.name.localeCompare(b.name);
       });
       
       sortedShifts.forEach(shift => {
@@ -220,6 +228,7 @@ export function WorkScheduleReportPage() {
   const downloadPdf = async (): Promise<void> => {
     setGeneratingPdf(true);
     setError(null);
+    setErrorSource(null);
     try {
       const download = await reports.generateWorkSchedulePdf(
         dayFilter === 'all' ? {} : { dayOfWeek: dayFilter }
@@ -228,6 +237,7 @@ export function WorkScheduleReportPage() {
     } catch (generationError) {
       console.error('Failed to generate work schedule PDF:', generationError);
       setError(reports.getWorkScheduleReportErrorMessage(generationError));
+      setErrorSource('pdf');
     } finally {
       setGeneratingPdf(false);
     }
@@ -296,7 +306,7 @@ export function WorkScheduleReportPage() {
               className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-amber-600 hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {generatingPdf ? (
-                <LoadingSpinner size="sm" />
+                <LoadingSpinner size="sm" className="!p-0 mr-2" />
               ) : (
                 <Download size={16} className="mr-2" />
               )}
@@ -354,17 +364,7 @@ export function WorkScheduleReportPage() {
             <p className="text-red-800">{error}</p>
             <button
               onClick={() => {
-                setLoading(true);
-                reports.getWorkSchedule()
-                  .then(data => {
-                    setWorkScheduleData(data);
-                    setError(null);
-                  })
-                  .catch(err => {
-                    setError('Failed to fetch work schedule data');
-                    console.error('Error fetching work schedule:', err);
-                  })
-                  .finally(() => setLoading(false));
+                void (errorSource === 'pdf' ? downloadPdf() : fetchWorkSchedule());
               }}
               className="mt-2 text-red-600 hover:text-red-700 underline"
             >
@@ -399,7 +399,11 @@ export function WorkScheduleReportPage() {
                     
                     {/* Sort shifts by start time */}
                     {[...shifts]
-                      .sort((a, b) => a.startTime.localeCompare(b.startTime))
+                      .sort((a, b) => {
+                        const timeComparison =
+                          getTimeInMinutes(a.startTime) - getTimeInMinutes(b.startTime);
+                        return timeComparison || a.name.localeCompare(b.name);
+                      })
                       .map(shift => (
                         <div key={shift.id} className="mb-6">
                           <h3 className="text-lg font-semibold text-gray-800 mb-2">

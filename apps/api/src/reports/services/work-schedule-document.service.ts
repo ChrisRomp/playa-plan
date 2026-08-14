@@ -5,6 +5,8 @@ import { WorkScheduleReportData } from '../models/work-schedule-report-data';
 
 const MAX_BULLETED_SHIFT_CAPACITY = 10;
 const MAX_ROSTER_ITEMS_PER_COLUMN = 42;
+const MAX_ESTIMATED_LINES_PER_SHIFT_COLUMN = 46;
+const ESTIMATED_CHARACTERS_PER_COLUMN_LINE = 38;
 const SHIFT_INDENT = 18;
 const JOB_INDENT = 30;
 const ROSTER_INDENT = 44;
@@ -125,8 +127,8 @@ export class WorkScheduleDocumentService {
       nextShift !== undefined &&
       this.isLargeShift(shift) &&
       this.isLargeShift(nextShift) &&
-      this.getRenderedRosterItemCount(shift) <= MAX_ROSTER_ITEMS_PER_COLUMN &&
-      this.getRenderedRosterItemCount(nextShift) <= MAX_ROSTER_ITEMS_PER_COLUMN
+      this.getEstimatedShiftColumnLines(shift) <= MAX_ESTIMATED_LINES_PER_SHIFT_COLUMN &&
+      this.getEstimatedShiftColumnLines(nextShift) <= MAX_ESTIMATED_LINES_PER_SHIFT_COLUMN
     );
   }
 
@@ -274,14 +276,34 @@ export class WorkScheduleDocumentService {
     return job.maxRegistrations > MAX_BULLETED_SHIFT_CAPACITY;
   }
 
-  private getRenderedRosterItemCount(shift: ScheduleShift): number {
-    return shift.jobs.reduce((count, job) => {
-      const assignedCount = job.registrations.length;
-      const rosterItemCount = this.isLargeJob(job)
-        ? assignedCount
-        : Math.max(job.maxRegistrations, assignedCount);
-      return count + rosterItemCount;
-    }, 0);
+  private getEstimatedShiftColumnLines(shift: ScheduleShift): number {
+    const shiftHeading = `${shift.name} - ${shift.startTime} - ${shift.endTime}`;
+    return shift.jobs.reduce(
+      (lineCount, job) =>
+        lineCount +
+        this.getEstimatedTextLines(job.name) +
+        1 +
+        this.getEstimatedRosterLines(job),
+      this.getEstimatedTextLines(shiftHeading)
+    );
+  }
+
+  private getEstimatedRosterLines(job: ScheduleJob): number {
+    const assignedNames = this.getAssignedWorkerNames(job);
+    const assignedLines = assignedNames.reduce(
+      (lineCount, name) => lineCount + this.getEstimatedTextLines(name),
+      0
+    );
+    if (this.isLargeJob(job)) {
+      return assignedLines;
+    }
+
+    const vacancyCount = Math.max(job.maxRegistrations - assignedNames.length, 0);
+    return assignedLines + vacancyCount;
+  }
+
+  private getEstimatedTextLines(text: string): number {
+    return Math.max(Math.ceil(text.length / ESTIMATED_CHARACTERS_PER_COLUMN_LINE), 1);
   }
 
   private getAssignedWorkerNames(job: ScheduleJob): string[] {
