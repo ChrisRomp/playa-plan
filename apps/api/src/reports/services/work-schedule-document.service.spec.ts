@@ -117,6 +117,19 @@ describe('WorkScheduleDocumentService', () => {
     expect(jobs.every(job => job.unbreakable === true)).toBe(true);
   });
 
+  it('shouldAllowOverCapacitySmallJobsToFlowAcrossPages', () => {
+    const actualDocument = service.build(
+      createReportData([createShift('waitlisted', 50, 10)])
+    );
+    const day = (actualDocument.content as Content[])[0] as ContentStack;
+    const shift = day.stack[1] as ContentStack;
+    const job = shift.stack[1] as ContentStack;
+    const roster = job.stack[1] as { ul: string[] };
+
+    expect(job.unbreakable).toBeUndefined();
+    expect(roster.ul).toHaveLength(50);
+  });
+
   it('shouldPreserveTheSuppliedShiftOrderAcrossSmallAndLargeJobs', () => {
     const actualDocument = service.build(
       createReportData([

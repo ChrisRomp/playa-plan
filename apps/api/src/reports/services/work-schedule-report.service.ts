@@ -19,7 +19,11 @@ export class WorkScheduleReportService {
   async generate(options: GenerateWorkScheduleReportDto): Promise<PdfDownload> {
     const data = await this.dataService.getReportData(options);
     if (data.shifts.length === 0) {
-      throw new NotFoundException('No work schedule matches the selected day');
+      throw new NotFoundException(
+        options.dayOfWeek
+          ? 'No work schedule matches the selected day'
+          : 'No work schedule is available'
+      );
     }
 
     const document = this.documentService.build(data);

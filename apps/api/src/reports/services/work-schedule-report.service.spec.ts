@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { DayOfWeek } from '@prisma/client';
 import { GenerateWorkScheduleReportDto } from '../dto/generate-work-schedule-report.dto';
 import { PdfRenderer } from '../models/pdf-renderer';
 import { PdfDownloadService } from './pdf-download.service';
@@ -49,15 +49,30 @@ describe('WorkScheduleReportService', () => {
     );
   });
 
-  it('shouldRejectAnEmptyScheduleBeforeRendering', async () => {
+  it('shouldRejectAnEmptyFullScheduleBeforeRendering', async () => {
     mockGetReportData.mockResolvedValue({
       campName: 'Burning Sky',
       year: 2026,
       shifts: [],
     });
 
-    await expect(service.generate(new GenerateWorkScheduleReportDto())).rejects.toBeInstanceOf(
-      NotFoundException
+    await expect(service.generate(new GenerateWorkScheduleReportDto())).rejects.toThrow(
+      'No work schedule is available'
+    );
+    expect(mockRender).not.toHaveBeenCalled();
+  });
+
+  it('shouldRejectAnEmptySelectedDayBeforeRendering', async () => {
+    const inputOptions = new GenerateWorkScheduleReportDto();
+    inputOptions.dayOfWeek = DayOfWeek.MONDAY;
+    mockGetReportData.mockResolvedValue({
+      campName: 'Burning Sky',
+      year: 2026,
+      shifts: [],
+    });
+
+    await expect(service.generate(inputOptions)).rejects.toThrow(
+      'No work schedule matches the selected day'
     );
     expect(mockRender).not.toHaveBeenCalled();
   });

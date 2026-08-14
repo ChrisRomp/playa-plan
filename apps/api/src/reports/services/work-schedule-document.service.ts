@@ -150,6 +150,8 @@ export class WorkScheduleDocumentService {
       ...assignedWorkers,
       ...Array.from({ length: vacancyCount }, () => ' '),
     ];
+    const isPageSized =
+      this.getEstimatedJobLines(job.name, slots) <= MAX_ESTIMATED_LINES_PER_SHIFT_COLUMN;
 
     return {
       stack: [
@@ -163,7 +165,7 @@ export class WorkScheduleDocumentService {
             ]
           : []),
       ],
-      unbreakable: true,
+      ...(isPageSized ? { unbreakable: true } : {}),
     };
   }
 
@@ -215,7 +217,7 @@ export class WorkScheduleDocumentService {
         : this.buildFlowingLargeJob(job, workers);
     }
 
-    return this.getEstimatedLargeJobLines(job.name, workers) <=
+    return this.getEstimatedJobLines(job.name, workers) <=
       MAX_ESTIMATED_LINES_PER_SHIFT_COLUMN
       ? [this.buildUnbreakableLargeJob(job, workers)]
       : this.buildFlowingLargeJob(job, workers);
@@ -250,9 +252,9 @@ export class WorkScheduleDocumentService {
   ): boolean {
     const midpoint = Math.ceil(workers.length / 2);
     return (
-      this.getEstimatedLargeJobLines(job.name, workers.slice(0, midpoint)) <=
+      this.getEstimatedJobLines(job.name, workers.slice(0, midpoint)) <=
         MAX_ESTIMATED_LINES_PER_SHIFT_COLUMN &&
-      this.getEstimatedLargeJobLines(
+      this.getEstimatedJobLines(
         `${job.name} (continued)`,
         workers.slice(midpoint)
       ) <= MAX_ESTIMATED_LINES_PER_SHIFT_COLUMN
@@ -347,12 +349,12 @@ export class WorkScheduleDocumentService {
     return assignedLines + vacancyCount;
   }
 
-  private getEstimatedLargeJobLines(
+  private getEstimatedJobLines(
     heading: string,
-    workers: ReadonlyArray<string>
+    rosterItems: ReadonlyArray<string>
   ): number {
-    const rosterLines = workers.reduce(
-      (lineCount, worker) => lineCount + this.getEstimatedTextLines(worker),
+    const rosterLines = rosterItems.reduce(
+      (lineCount, item) => lineCount + this.getEstimatedTextLines(item),
       0
     );
     return this.getEstimatedTextLines(heading) + 1 + rosterLines;

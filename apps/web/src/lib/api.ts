@@ -1265,7 +1265,7 @@ export const reports = {
   getWorkScheduleReportErrorMessage: (error: unknown): string => {
     if (axios.isAxiosError(error)) {
       if (error.response?.status === 404) {
-        return 'No work schedule matches the selected day.';
+        return 'No work schedule is available.';
       }
       if (error.response?.status === 403) {
         return 'You do not have permission to generate this report.';

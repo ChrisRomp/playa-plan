@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 describe('work schedule report API', () => {
+  let mockIsAxiosError: ReturnType<typeof vi.fn>;
   let mockApi: {
     post: ReturnType<typeof vi.fn>;
     get: ReturnType<typeof vi.fn>;
@@ -14,6 +15,7 @@ describe('work schedule report API', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
+    mockIsAxiosError = vi.fn();
     mockApi = {
       post: vi.fn(),
       get: vi.fn(),
@@ -26,7 +28,7 @@ describe('work schedule report API', () => {
     vi.doMock('axios', () => ({
       default: {
         create: vi.fn(() => mockApi),
-        isAxiosError: vi.fn(),
+        isAxiosError: mockIsAxiosError,
       },
     }));
   });
@@ -59,5 +61,16 @@ describe('work schedule report API', () => {
       blob: inputBlob,
       filename: 'Burning Sky Work Schedule 2026.pdf',
     });
+  });
+
+  it('shouldDescribeAnEmptyFilteredOrFullSchedule', async () => {
+    mockIsAxiosError.mockReturnValue(true);
+    const { reports } = await import('../api');
+
+    const actualMessage = reports.getWorkScheduleReportErrorMessage({
+      response: { status: 404 },
+    });
+
+    expect(actualMessage).toBe('No work schedule is available.');
   });
 });
