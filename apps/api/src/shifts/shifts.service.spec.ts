@@ -137,7 +137,11 @@ describe('ShiftsService', () => {
                   createdAt: new Date(),
                   updatedAt: new Date(),
                   shiftId: 'thursday',
-                  category: { id: 'category', name: 'Operations' },
+                  category: {
+                    id: 'category',
+                    name: 'Operations',
+                    staffOnly: true,
+                  },
                   registrations: [
                     {
                       id: 'registration-b',
@@ -171,11 +175,15 @@ describe('ShiftsService', () => {
                   categoryId: 'category',
                   active: true,
                   alwaysRequired: false,
-                  staffOnly: false,
+                  staffOnly: true,
                   createdAt: new Date(),
                   updatedAt: new Date(),
                   shiftId: 'thursday',
-                  category: { id: 'category', name: 'Operations' },
+                  category: {
+                    id: 'category',
+                    name: 'Operations',
+                    staffOnly: false,
+                  },
                   registrations: [],
                 },
               ],
@@ -239,11 +247,48 @@ describe('ShiftsService', () => {
             'Airport',
             'Manifest',
           ]);
+          expect(actualSchedule.shifts[1].jobs.map(job => job.staffOnly)).toEqual([
+            false,
+            true,
+          ]);
           expect(
             actualSchedule.shifts[1].jobs[1].registrations.map(
               registration => registration.user.firstName
             )
           ).toEqual(['Amy', 'Zoe']);
+    });
+
+    it('shouldExcludeStaffOnlyJobsWhenRequested', async () => {
+      jest
+        .spyOn(prismaService.shift, 'findMany')
+        .mockResolvedValueOnce([
+          {
+            id: 'staff-only-shift',
+            name: 'Staff Only Shift',
+            description: null,
+            startTime: '09:00',
+            endTime: '10:00',
+            dayOfWeek: DayOfWeek.WEDNESDAY,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            jobs: [],
+          },
+        ] as never);
+
+      const actualSchedule = await service.getWorkSchedule(undefined, 2026, false);
+
+      expect(prismaService.shift.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          include: expect.objectContaining({
+            jobs: expect.objectContaining({
+              where: expect.objectContaining({
+                category: { staffOnly: false },
+              }),
+            }),
+          }),
+        })
+      );
+      expect(actualSchedule.shifts).toEqual([]);
     });
   });
 

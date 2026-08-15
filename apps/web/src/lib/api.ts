@@ -573,6 +573,7 @@ export interface TicketReceiptReportOptions extends TicketReceiptSettings {
 
 export interface WorkScheduleReportOptions {
   dayOfWeek?: string;
+  includeStaffOnly?: boolean;
 }
 
 function getDownloadFilename(contentDisposition: string | undefined, fallback: string): string {
@@ -1429,6 +1430,7 @@ export const reports = {
         name: string;
         location: string;
         maxRegistrations: number;
+        staffOnly: boolean;
         categoryId: string;
         category: { id: string; name: string };
         registrations: Array<{

@@ -1,6 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { DayOfWeek } from '@prisma/client';
-import { IsEnum, ValidateIf } from 'class-validator';
+import { IsBoolean, IsEnum, ValidateIf } from 'class-validator';
 
 /** Validated options for generating a printable work schedule. */
 export class GenerateWorkScheduleReportDto {
@@ -11,4 +11,12 @@ export class GenerateWorkScheduleReportDto {
   @ValidateIf((_object, value) => value !== undefined)
   @IsEnum(DayOfWeek)
   dayOfWeek?: DayOfWeek;
+
+  @ApiPropertyOptional({
+    description: 'Whether to include staff-only jobs',
+    default: true,
+  })
+  @ValidateIf((_object, value) => value !== undefined)
+  @IsBoolean()
+  includeStaffOnly?: boolean;
 }

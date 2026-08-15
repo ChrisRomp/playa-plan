@@ -60,7 +60,8 @@ export class ShiftsService {
   /** Returns the printable work schedule for the configured registration year. */
   async getWorkSchedule(
     dayOfWeek?: DayOfWeek,
-    requestedYear?: number
+    requestedYear?: number,
+    includeStaffOnly = true
   ): Promise<WorkScheduleData> {
     const registrationYear =
       requestedYear ?? (await this.coreConfigService.findCurrent()).registrationYear;
@@ -69,6 +70,7 @@ export class ShiftsService {
       include: {
         jobs: {
           where: {
+            ...(!includeStaffOnly ? { category: { staffOnly: false } } : {}),
             OR: [
               { active: true },
               {
@@ -126,6 +128,7 @@ export class ShiftsService {
               name: job.name,
               location: job.location,
               maxRegistrations: job.maxRegistrations,
+              staffOnly: job.category.staffOnly,
               categoryId: job.categoryId,
               category: {
                 id: job.category.id,
@@ -145,6 +148,7 @@ export class ShiftsService {
             }))
             .sort((left, right) => left.name.localeCompare(right.name)),
         }))
+        .filter(shift => includeStaffOnly || shift.jobs.length > 0)
         .sort((left, right) => {
           const dayComparison =
             DAY_OF_WEEK_ORDER[left.dayOfWeek] - DAY_OF_WEEK_ORDER[right.dayOfWeek];
