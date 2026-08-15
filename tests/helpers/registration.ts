@@ -115,7 +115,8 @@ async function selectFirstAvailableCampShift(page: Page): Promise<void> {
     // Expand and look for a non-tight shift.
     await category.click();
     // Spots: N of M available — match N >= 2 to leave room for parallel tests.
-    const roomy = page
+    const roomy = category
+      .locator('..')
       .getByRole('checkbox', { name: /Spots: ([2-9]|\d{2,}) of \d+ available/ })
       .first();
     if (await roomy.isVisible({ timeout: 1_000 }).catch(() => false)) {
