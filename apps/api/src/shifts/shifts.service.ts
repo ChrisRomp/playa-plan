@@ -148,6 +148,7 @@ export class ShiftsService {
             }))
             .sort((left, right) => left.name.localeCompare(right.name)),
         }))
+        .filter(shift => includeStaffOnly || shift.jobs.length > 0)
         .sort((left, right) => {
           const dayComparison =
             DAY_OF_WEEK_ORDER[left.dayOfWeek] - DAY_OF_WEEK_ORDER[right.dayOfWeek];

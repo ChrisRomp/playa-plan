@@ -157,13 +157,17 @@ export function WorkScheduleReportPage() {
     }
 
     return Object.fromEntries(
-      Object.entries(selectedDays).map(([day, shifts]) => [
-        day,
-        shifts.map(shift => ({
-          ...shift,
-          jobs: shift.jobs.filter(job => !job.staffOnly),
-        })),
-      ])
+      Object.entries(selectedDays)
+        .map(([day, shifts]) => [
+          day,
+          shifts
+            .map(shift => ({
+              ...shift,
+              jobs: shift.jobs.filter(job => !job.staffOnly),
+            }))
+            .filter(shift => shift.jobs.length > 0),
+        ] as const)
+        .filter(([, shifts]) => shifts.length > 0)
     );
   }, [shiftsByDay, dayFilter, includeStaffOnly]);
 

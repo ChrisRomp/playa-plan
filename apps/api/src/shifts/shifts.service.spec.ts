@@ -259,9 +259,23 @@ describe('ShiftsService', () => {
     });
 
     it('shouldExcludeStaffOnlyJobsWhenRequested', async () => {
-      jest.spyOn(prismaService.shift, 'findMany').mockResolvedValueOnce([]);
+      jest
+        .spyOn(prismaService.shift, 'findMany')
+        .mockResolvedValueOnce([
+          {
+            id: 'staff-only-shift',
+            name: 'Staff Only Shift',
+            description: null,
+            startTime: '09:00',
+            endTime: '10:00',
+            dayOfWeek: DayOfWeek.WEDNESDAY,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            jobs: [],
+          },
+        ] as never);
 
-      await service.getWorkSchedule(undefined, 2026, false);
+      const actualSchedule = await service.getWorkSchedule(undefined, 2026, false);
 
       expect(prismaService.shift.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -274,6 +288,7 @@ describe('ShiftsService', () => {
           }),
         })
       );
+      expect(actualSchedule.shifts).toEqual([]);
     });
   });
 

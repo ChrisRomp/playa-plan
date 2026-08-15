@@ -207,6 +207,80 @@ describe('WorkScheduleReportPage', () => {
     );
   });
 
+  it('shouldHideShiftsAndDaysWithNoJobsAfterFiltering', async () => {
+    vi.mocked(reports.getWorkSchedule).mockResolvedValue({
+      shifts: [
+        {
+          id: 'wednesday-public',
+          name: 'Wednesday AM',
+          dayOfWeek: 'WEDNESDAY',
+          startTime: '09:30',
+          endTime: '14:30',
+          jobs: [
+            {
+              id: 'public-wednesday',
+              name: 'Public Wednesday',
+              location: 'Camp',
+              maxRegistrations: 1,
+              staffOnly: false,
+              categoryId: 'operations',
+              category: { id: 'operations', name: 'Operations' },
+              registrations: [],
+            },
+          ],
+        },
+        {
+          id: 'wednesday-staff',
+          name: 'Wednesday Full',
+          dayOfWeek: 'WEDNESDAY',
+          startTime: '09:00',
+          endTime: '19:00',
+          jobs: [
+            {
+              id: 'staff-wednesday',
+              name: 'Staff Wednesday',
+              location: 'Camp',
+              maxRegistrations: 1,
+              staffOnly: true,
+              categoryId: 'staff',
+              category: { id: 'staff', name: 'Staff' },
+              registrations: [],
+            },
+          ],
+        },
+        {
+          id: 'thursday-staff',
+          name: 'Thursday Full',
+          dayOfWeek: 'THURSDAY',
+          startTime: '09:00',
+          endTime: '19:00',
+          jobs: [
+            {
+              id: 'staff-thursday',
+              name: 'Staff Thursday',
+              location: 'Camp',
+              maxRegistrations: 1,
+              staffOnly: true,
+              categoryId: 'staff',
+              category: { id: 'staff', name: 'Staff' },
+              registrations: [],
+            },
+          ],
+        },
+      ],
+    });
+    renderPage();
+    await screen.findByText('Wednesday Full (09:00 - 19:00)');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Filters' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Show staff-only jobs' }));
+
+    expect(screen.queryByText('Wednesday Full (09:00 - 19:00)')).not.toBeInTheDocument();
+    expect(screen.queryByText('Thursday Full (09:00 - 19:00)')).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Thursday' })).not.toBeInTheDocument();
+    expect(screen.getByText('Wednesday AM (09:30 - 14:30)')).toBeInTheDocument();
+  });
+
   it('shouldDisplayPdfGenerationErrors', async () => {
     vi.mocked(reports.generateWorkSchedulePdf).mockRejectedValue(new Error('failed'));
     vi.mocked(reports.getWorkScheduleReportErrorMessage).mockReturnValue(
