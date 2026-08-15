@@ -32,7 +32,7 @@ describe('GenerateWorkScheduleReportDto', () => {
   });
 
   it.each([null, 'false', 0])(
-    'shouldRejectInvalidStaffOnlyFilter%s',
+    'shouldRejectInvalidStaffOnlyFilter(%p)',
     async includeStaffOnly => {
       const inputDto = plainToInstance(GenerateWorkScheduleReportDto, { includeStaffOnly });
 

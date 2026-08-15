@@ -17,7 +17,7 @@ export class WorkScheduleDataService {
     const schedule = await this.shiftsService.getWorkSchedule(
       options.dayOfWeek,
       configuration.registrationYear,
-      options.includeStaffOnly !== false
+      options.includeStaffOnly ?? true
     );
 
     return {
