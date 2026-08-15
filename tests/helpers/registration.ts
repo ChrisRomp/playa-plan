@@ -106,7 +106,7 @@ export async function walkRegistrationToPayment(
  * Open each camp-shift category until we find a shift with at least 2 available
  * spots, then check it. Bails after trying every visible category.
  */
-async function selectFirstAvailableCampShift(page: Page): Promise<void> {
+export async function selectFirstAvailableCampShift(page: Page): Promise<void> {
   const categoryButtons = page.getByRole('button', { name: /\(\d+ shifts?\)/ });
   const count = await categoryButtons.count();
 
@@ -115,7 +115,8 @@ async function selectFirstAvailableCampShift(page: Page): Promise<void> {
     // Expand and look for a non-tight shift.
     await category.click();
     // Spots: N of M available — match N >= 2 to leave room for parallel tests.
-    const roomy = page
+    const roomy = category
+      .locator('..')
       .getByRole('checkbox', { name: /Spots: ([2-9]|\d{2,}) of \d+ available/ })
       .first();
     if (await roomy.isVisible({ timeout: 1_000 }).catch(() => false)) {
@@ -132,7 +133,7 @@ async function selectFirstAvailableCampShift(page: Page): Promise<void> {
 }
 
 /** Always-required Teardown — pick the 50-spot Morning shift. */
-async function selectTeardownShift(page: Page): Promise<void> {
+export async function selectTeardownShift(page: Page): Promise<void> {
   const teardownCategory = page.getByRole('button', { name: /Teardown\*/ });
   const teardownCheckboxes = page.getByRole('checkbox', { name: /Teardown/ });
   if ((await teardownCheckboxes.count()) === 0) {

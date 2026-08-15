@@ -6,6 +6,7 @@ import { getPrisma } from '../helpers/db';
 import { webUrl } from '../helpers/env';
 import { waitForRegistrationProfileHydrated } from '../helpers/hydration';
 import { PERSONAS } from '../helpers/personas';
+import { selectFirstAvailableCampShift, selectTeardownShift } from '../helpers/registration';
 import { payViaStripeCheckout } from '../helpers/stripe';
 
 interface CoreConfigSnapshot {
@@ -109,40 +110,6 @@ async function submitApplication(page: Page): Promise<void> {
   await spinbuttonByLabel(/how many skydives have you done in the last 6 months/i).fill('20');
   await spinbuttonByLabel(/total years jumping with burning sky/i).fill('3');
   await page.getByRole('button', { name: 'Submit Application' }).click();
-}
-
-async function selectFirstAvailableCampShift(page: Page): Promise<void> {
-  const categoryButtons = page.getByRole('button', { name: /\(\d+ shifts?\)/ });
-  const count = await categoryButtons.count();
-
-  for (let i = 0; i < count; i += 1) {
-    const category = categoryButtons.nth(i);
-    await category.click();
-
-    const roomyShift = page
-      .getByRole('checkbox', { name: /Spots: ([2-9]|\d{2,}) of \d+ available/ })
-      .first();
-
-    if (await roomyShift.isVisible({ timeout: 1_000 }).catch(() => false)) {
-      await roomyShift.check();
-      return;
-    }
-
-    await category.click();
-  }
-
-  throw new Error('No camp shift with at least two available spots was found.');
-}
-
-async function selectTeardownShift(page: Page): Promise<void> {
-  const teardownCategory = page.getByRole('button', { name: /Teardown\*/ });
-  const teardownCheckboxes = page.getByRole('checkbox', { name: /Teardown/ });
-
-  if ((await teardownCheckboxes.count()) === 0 && (await teardownCategory.isVisible().catch(() => false))) {
-    await teardownCategory.click();
-  }
-
-  await page.getByRole('checkbox', { name: /Teardown Morning/ }).check();
 }
 
 async function advanceApprovedRegistrationToPayment(page: Page): Promise<void> {
