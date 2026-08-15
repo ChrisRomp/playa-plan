@@ -453,6 +453,7 @@ describe('WorkScheduleDocumentService', () => {
           name: 'Teardown',
           location: 'Camp',
           maxRegistrations,
+          staffOnly: false,
           categoryId: 'category',
           category: { id: 'category', name: 'Operations' },
           registrations: Array.from({ length: workerCount }, (_, index) => ({

@@ -37,7 +37,7 @@ describe('work schedule report API', () => {
     vi.doUnmock('axios');
   });
 
-  it('shouldPostTheSelectedDayAndUseTheServerFilename', async () => {
+  it('shouldPostTheSelectedFiltersAndUseTheServerFilename', async () => {
     const inputBlob = new Blob(['pdf'], { type: 'application/pdf' });
     mockApi.post.mockResolvedValue({
       data: inputBlob,
@@ -50,11 +50,12 @@ describe('work schedule report API', () => {
 
     const actualDownload = await reports.generateWorkSchedulePdf({
       dayOfWeek: 'CLOSING_SUNDAY',
+      includeStaffOnly: false,
     });
 
     expect(mockApi.post).toHaveBeenCalledWith(
       '/reports/work-schedule',
-      { dayOfWeek: 'CLOSING_SUNDAY' },
+      { dayOfWeek: 'CLOSING_SUNDAY', includeStaffOnly: false },
       { responseType: 'blob', timeout: 30000 }
     );
     expect(actualDownload).toEqual({

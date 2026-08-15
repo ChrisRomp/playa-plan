@@ -5,7 +5,7 @@ import { GenerateWorkScheduleReportDto } from '../dto/generate-work-schedule-rep
 import { WorkScheduleDataService } from './work-schedule-data.service';
 
 describe('WorkScheduleDataService', () => {
-  it('shouldUseConfiguredCampYearAndSelectedDay', async () => {
+  it('shouldUseConfiguredCampYearAndSelectedFilters', async () => {
     const mockGetWorkSchedule = jest.fn().mockResolvedValue({ shifts: [] });
     const service = new WorkScheduleDataService(
       { getWorkSchedule: mockGetWorkSchedule } as unknown as ShiftsService,
@@ -18,11 +18,16 @@ describe('WorkScheduleDataService', () => {
     );
     const inputOptions = Object.assign(new GenerateWorkScheduleReportDto(), {
       dayOfWeek: DayOfWeek.CLOSING_SUNDAY,
+      includeStaffOnly: false,
     });
 
     const actualData = await service.getReportData(inputOptions);
 
-    expect(mockGetWorkSchedule).toHaveBeenCalledWith(DayOfWeek.CLOSING_SUNDAY, 2026);
+    expect(mockGetWorkSchedule).toHaveBeenCalledWith(
+      DayOfWeek.CLOSING_SUNDAY,
+      2026,
+      false
+    );
     expect(actualData).toEqual({
       campName: 'Burning Sky',
       year: 2026,

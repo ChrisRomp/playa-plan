@@ -29,6 +29,7 @@ interface WorkScheduleJob {
   name: string;
   location: string;
   maxRegistrations: number;
+  staffOnly: boolean;
   categoryId: string;
   category: { id: string; name: string };
   registrations: WorkScheduleRegistration[];
@@ -62,6 +63,7 @@ export function WorkScheduleReportPage() {
   const [pdfError, setPdfError] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [dayFilter, setDayFilter] = useState<string>('all');
+  const [includeStaffOnly, setIncludeStaffOnly] = useState(true);
   const [generatingPdf, setGeneratingPdf] = useState(false);
 
   // Define the order for days of the week
@@ -141,18 +143,29 @@ export function WorkScheduleReportPage() {
     );
   }, [workScheduleData, dayOrder]);
 
-  // Filter shifts by selected day
+  // Filter shifts by selected day and job visibility
   const filteredShiftsByDay = useMemo(() => {
-    if (dayFilter === 'all') {
-      return shiftsByDay;
+    const selectedDays =
+      dayFilter === 'all'
+        ? shiftsByDay
+        : shiftsByDay[dayFilter]
+          ? { [dayFilter]: shiftsByDay[dayFilter] }
+          : {};
+
+    if (includeStaffOnly) {
+      return selectedDays;
     }
-    
-    const filtered: DayGroupedShifts = {};
-    if (shiftsByDay[dayFilter]) {
-      filtered[dayFilter] = shiftsByDay[dayFilter];
-    }
-    return filtered;
-  }, [shiftsByDay, dayFilter]);
+
+    return Object.fromEntries(
+      Object.entries(selectedDays).map(([day, shifts]) => [
+        day,
+        shifts.map(shift => ({
+          ...shift,
+          jobs: shift.jobs.filter(job => !job.staffOnly),
+        })),
+      ])
+    );
+  }, [shiftsByDay, dayFilter, includeStaffOnly]);
 
   // Format name for display: "First Last (playaName)"
   const formatUserName = (user: WorkScheduleUser): string => {
@@ -226,7 +239,9 @@ export function WorkScheduleReportPage() {
     setPdfError(null);
     try {
       const download = await reports.generateWorkSchedulePdf(
-        dayFilter === 'all' ? {} : { dayOfWeek: dayFilter }
+        dayFilter === 'all'
+          ? { includeStaffOnly }
+          : { dayOfWeek: dayFilter, includeStaffOnly }
       );
       downloadFile(download.blob, download.filename);
     } catch (generationError) {
@@ -344,8 +359,26 @@ export function WorkScheduleReportPage() {
                 </select>
               </div>
               <div className="flex items-end">
+                <label
+                  htmlFor="staff-only-filter"
+                  className="inline-flex items-center gap-2 px-3 py-2 text-sm text-gray-700"
+                >
+                  <input
+                    id="staff-only-filter"
+                    type="checkbox"
+                    checked={includeStaffOnly}
+                    onChange={event => setIncludeStaffOnly(event.target.checked)}
+                    className="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+                  />
+                  Show staff-only jobs
+                </label>
+              </div>
+              <div className="flex items-end">
                 <button
-                  onClick={() => setDayFilter('all')}
+                  onClick={() => {
+                    setDayFilter('all');
+                    setIncludeStaffOnly(true);
+                  }}
                   className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800"
                 >
                   Clear Filters

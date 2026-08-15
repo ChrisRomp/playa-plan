@@ -15,6 +15,7 @@ describe('GenerateWorkScheduleReportDto', () => {
   it('shouldAllowAValidDayFilter', async () => {
     const inputDto = plainToInstance(GenerateWorkScheduleReportDto, {
       dayOfWeek: DayOfWeek.CLOSING_SUNDAY,
+      includeStaffOnly: false,
     });
 
     const actualErrors = await validate(inputDto);
@@ -29,4 +30,15 @@ describe('GenerateWorkScheduleReportDto', () => {
 
     expect(actualErrors.some(error => error.property === 'dayOfWeek')).toBe(true);
   });
+
+  it.each([null, 'false', 0])(
+    'shouldRejectInvalidStaffOnlyFilter%s',
+    async includeStaffOnly => {
+      const inputDto = plainToInstance(GenerateWorkScheduleReportDto, { includeStaffOnly });
+
+      const actualErrors = await validate(inputDto);
+
+      expect(actualErrors.some(error => error.property === 'includeStaffOnly')).toBe(true);
+    }
+  );
 });

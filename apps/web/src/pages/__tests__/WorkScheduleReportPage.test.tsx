@@ -45,6 +45,7 @@ describe('WorkScheduleReportPage', () => {
               name: 'Airport Manager',
               location: 'Airport',
               maxRegistrations: 2,
+              staffOnly: false,
               categoryId: 'operations',
               category: { id: 'operations', name: 'Operations' },
               registrations: [
@@ -78,7 +79,11 @@ describe('WorkScheduleReportPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Download PDF' }));
 
     expect(downloadCsv).toHaveBeenCalled();
-    await waitFor(() => expect(reports.generateWorkSchedulePdf).toHaveBeenCalledWith({}));
+    await waitFor(() =>
+      expect(reports.generateWorkSchedulePdf).toHaveBeenCalledWith({
+        includeStaffOnly: true,
+      })
+    );
     expect(downloadFile).toHaveBeenCalledWith(
       inputBlob,
       'Burning Sky Work Schedule 2026.pdf'
@@ -102,6 +107,102 @@ describe('WorkScheduleReportPage', () => {
     await waitFor(() =>
       expect(reports.generateWorkSchedulePdf).toHaveBeenCalledWith({
         dayOfWeek: 'WEDNESDAY',
+        includeStaffOnly: true,
+      })
+    );
+  });
+
+  it('shouldComposeTheDayAndStaffOnlyFiltersForDisplayCsvAndPdf', async () => {
+    vi.mocked(reports.getWorkSchedule).mockResolvedValue({
+      shifts: [
+        {
+          id: 'wednesday',
+          name: 'Wednesday',
+          dayOfWeek: 'WEDNESDAY',
+          startTime: '09:00',
+          endTime: '10:00',
+          jobs: [
+            {
+              id: 'public-wednesday',
+              name: 'Public Wednesday',
+              location: 'Camp',
+              maxRegistrations: 1,
+              staffOnly: false,
+              categoryId: 'operations',
+              category: { id: 'operations', name: 'Operations' },
+              registrations: [],
+            },
+            {
+              id: 'staff-wednesday',
+              name: 'Staff Wednesday',
+              location: 'Camp',
+              maxRegistrations: 1,
+              staffOnly: true,
+              categoryId: 'operations',
+              category: { id: 'operations', name: 'Operations' },
+              registrations: [
+                {
+                  id: 'staff-assignment',
+                  user: {
+                    id: 'staff-worker',
+                    firstName: 'Staff',
+                    lastName: 'Worker',
+                    playaName: null,
+                  },
+                },
+              ],
+            },
+          ],
+        },
+        {
+          id: 'thursday',
+          name: 'Thursday',
+          dayOfWeek: 'THURSDAY',
+          startTime: '09:00',
+          endTime: '10:00',
+          jobs: [
+            {
+              id: 'public-thursday',
+              name: 'Public Thursday',
+              location: 'Camp',
+              maxRegistrations: 1,
+              staffOnly: false,
+              categoryId: 'operations',
+              category: { id: 'operations', name: 'Operations' },
+              registrations: [],
+            },
+          ],
+        },
+      ],
+    });
+    vi.mocked(reports.generateWorkSchedulePdf).mockResolvedValue({
+      blob: new Blob(['pdf'], { type: 'application/pdf' }),
+      filename: 'work-schedule.pdf',
+    });
+    renderPage();
+    await screen.findByText('Staff Wednesday (1 of 1)');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Filters' }));
+    fireEvent.change(screen.getByLabelText('Day of Week'), {
+      target: { value: 'WEDNESDAY' },
+    });
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Show staff-only jobs' }));
+
+    expect(screen.queryByText('Staff Wednesday (1 of 1)')).not.toBeInTheDocument();
+    expect(screen.getByText('Public Wednesday (0 of 1)')).toBeInTheDocument();
+    expect(screen.queryByText('Public Thursday (0 of 1)')).not.toBeInTheDocument();
+    expect(screen.getByText('Total Jobs:').parentElement).toHaveTextContent('1');
+    expect(screen.getByText('Total Registrations:').parentElement).toHaveTextContent('0');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Export CSV' }));
+    const csvRows = vi.mocked(downloadCsv).mock.calls[0][1];
+    expect(csvRows.map(row => row[3])).toEqual(['Public Wednesday']);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Download PDF' }));
+    await waitFor(() =>
+      expect(reports.generateWorkSchedulePdf).toHaveBeenCalledWith({
+        dayOfWeek: 'WEDNESDAY',
+        includeStaffOnly: false,
       })
     );
   });
@@ -190,6 +291,7 @@ describe('WorkScheduleReportPage', () => {
               name: 'Afternoon Job',
               location: 'Camp',
               maxRegistrations: 1,
+              staffOnly: false,
               categoryId: 'operations',
               category: { id: 'operations', name: 'Operations' },
               registrations: [],
@@ -208,6 +310,7 @@ describe('WorkScheduleReportPage', () => {
               name: 'Morning Job',
               location: 'Camp',
               maxRegistrations: 1,
+              staffOnly: false,
               categoryId: 'operations',
               category: { id: 'operations', name: 'Operations' },
               registrations: [],

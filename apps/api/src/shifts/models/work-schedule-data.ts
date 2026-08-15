@@ -17,6 +17,7 @@ interface WorkScheduleJob {
   readonly name: string;
   readonly location: string;
   readonly maxRegistrations: number;
+  readonly staffOnly: boolean;
   readonly categoryId: string;
   readonly category: {
     readonly id: string;
