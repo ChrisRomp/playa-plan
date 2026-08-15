@@ -70,7 +70,7 @@ export class ShiftsService {
       include: {
         jobs: {
           where: {
-            ...(!includeStaffOnly ? { staffOnly: false } : {}),
+            ...(!includeStaffOnly ? { category: { staffOnly: false } } : {}),
             OR: [
               { active: true },
               {
@@ -128,7 +128,7 @@ export class ShiftsService {
               name: job.name,
               location: job.location,
               maxRegistrations: job.maxRegistrations,
-              staffOnly: job.staffOnly,
+              staffOnly: job.category.staffOnly,
               categoryId: job.categoryId,
               category: {
                 id: job.category.id,

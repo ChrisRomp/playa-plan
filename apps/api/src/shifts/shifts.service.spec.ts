@@ -133,11 +133,15 @@ describe('ShiftsService', () => {
                   categoryId: 'category',
                   active: true,
                   alwaysRequired: false,
-                  staffOnly: true,
+                  staffOnly: false,
                   createdAt: new Date(),
                   updatedAt: new Date(),
                   shiftId: 'thursday',
-                  category: { id: 'category', name: 'Operations' },
+                  category: {
+                    id: 'category',
+                    name: 'Operations',
+                    staffOnly: true,
+                  },
                   registrations: [
                     {
                       id: 'registration-b',
@@ -171,11 +175,15 @@ describe('ShiftsService', () => {
                   categoryId: 'category',
                   active: true,
                   alwaysRequired: false,
-                  staffOnly: false,
+                  staffOnly: true,
                   createdAt: new Date(),
                   updatedAt: new Date(),
                   shiftId: 'thursday',
-                  category: { id: 'category', name: 'Operations' },
+                  category: {
+                    id: 'category',
+                    name: 'Operations',
+                    staffOnly: false,
+                  },
                   registrations: [],
                 },
               ],
@@ -260,7 +268,7 @@ describe('ShiftsService', () => {
           include: expect.objectContaining({
             jobs: expect.objectContaining({
               where: expect.objectContaining({
-                staffOnly: false,
+                category: { staffOnly: false },
               }),
             }),
           }),
