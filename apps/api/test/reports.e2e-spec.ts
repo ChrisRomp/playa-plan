@@ -1,7 +1,7 @@
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Test, TestingModule } from '@nestjs/testing';
-import { ReportType, User, UserRole } from '@prisma/client';
+import { DayOfWeek, ReportType, User, UserRole } from '@prisma/client';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/common/prisma/prisma.service';
@@ -14,6 +14,9 @@ describe('ReportsController (e2e)', () => {
   let adminToken: string;
   let staffToken: string;
   let participantToken: string;
+  let workScheduleJobId: string;
+  let workScheduleShiftId: string;
+  let workScheduleCategoryId: string;
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -44,9 +47,41 @@ describe('ReportsController (e2e)', () => {
     adminToken = createToken(testUsers[0]);
     staffToken = createToken(testUsers[1]);
     participantToken = createToken(testUsers[2]);
+
+    const category = await prisma.jobCategory.create({
+      data: {
+        name: `Reports E2E ${Date.now()}`,
+        description: 'Work schedule PDF fixture',
+      },
+    });
+    workScheduleCategoryId = category.id;
+    const shift = await prisma.shift.create({
+      data: {
+        name: 'Wednesday AM',
+        description: 'Work schedule PDF fixture',
+        dayOfWeek: DayOfWeek.WEDNESDAY,
+        startTime: '09:30',
+        endTime: '14:30',
+      },
+    });
+    workScheduleShiftId = shift.id;
+    const job = await prisma.job.create({
+      data: {
+        name: 'Airport Manager',
+        location: 'Airport',
+        maxRegistrations: 1,
+        active: true,
+        categoryId: category.id,
+        shiftId: shift.id,
+      },
+    });
+    workScheduleJobId = job.id;
   });
 
   afterAll(async () => {
+    await prisma.job.delete({ where: { id: workScheduleJobId } });
+    await prisma.shift.delete({ where: { id: workScheduleShiftId } });
+    await prisma.jobCategory.delete({ where: { id: workScheduleCategoryId } });
     await prisma.adminAudit.deleteMany({
       where: { adminUserId: { in: testUsers.map(user => user.id) } },
     });
@@ -63,6 +98,8 @@ describe('ReportsController (e2e)', () => {
     await request(app.getHttpServer()).get('/reports/ticket-receipt/configuration').expect(401);
 
     await request(app.getHttpServer()).post('/reports/ticket-receipt').send({}).expect(401);
+
+    await request(app.getHttpServer()).post('/reports/work-schedule').send({}).expect(401);
   });
 
   it('shouldRejectParticipantRequests', async () => {
@@ -75,6 +112,12 @@ describe('ReportsController (e2e)', () => {
       .post('/reports/ticket-receipt')
       .set('Authorization', `Bearer ${participantToken}`)
       .send(createReportRequest(1))
+      .expect(403);
+
+    await request(app.getHttpServer())
+      .post('/reports/work-schedule')
+      .set('Authorization', `Bearer ${participantToken}`)
+      .send({})
       .expect(403);
   });
 
@@ -125,6 +168,14 @@ describe('ReportsController (e2e)', () => {
       .expect(400);
   });
 
+  it('shouldRejectInvalidWorkScheduleDay', async () => {
+    await request(app.getHttpServer())
+      .post('/reports/work-schedule')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ dayOfWeek: 'SUNDAY' })
+      .expect(400);
+  });
+
   it('shouldReturnNotFoundWhenNoAttendeesOrBlankRowsExist', async () => {
     await request(app.getHttpServer())
       .post('/reports/ticket-receipt')
@@ -138,6 +189,19 @@ describe('ReportsController (e2e)', () => {
       .post('/reports/ticket-receipt')
       .set('Authorization', `Bearer ${staffToken}`)
       .send(createReportRequest(1))
+      .expect(200)
+      .expect('Content-Type', /application\/pdf/)
+      .expect('Content-Disposition', /attachment;/);
+
+    expect(Buffer.isBuffer(response.body)).toBe(true);
+    expect(response.body.subarray(0, 5).toString('ascii')).toBe('%PDF-');
+  });
+
+  it('shouldGenerateFilteredWorkSchedulePdfForStaff', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/reports/work-schedule')
+      .set('Authorization', `Bearer ${staffToken}`)
+      .send({ dayOfWeek: DayOfWeek.WEDNESDAY })
       .expect(200)
       .expect('Content-Type', /application\/pdf/)
       .expect('Content-Disposition', /attachment;/);

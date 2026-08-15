@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getFriendlyDayName, formatTime } from '../shiftUtils';
+import { getFriendlyDayName, formatTime, getTimeInMinutes } from '../shiftUtils';
 
 describe('shiftUtils', () => {
   describe('getFriendlyDayName', () => {
@@ -59,4 +59,12 @@ describe('shiftUtils', () => {
       expect(() => formatTime('some random text')).not.toThrow();
     });
   });
-}); 
+
+  describe('getTimeInMinutes', () => {
+    it('shouldNormalizeZeroPaddedAndUnpaddedTimes', () => {
+      expect(getTimeInMinutes('8:00')).toBe(480);
+      expect(getTimeInMinutes('08:00')).toBe(480);
+      expect(getTimeInMinutes('13:30')).toBe(810);
+    });
+  });
+});

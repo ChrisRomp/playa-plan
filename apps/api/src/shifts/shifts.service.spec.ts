@@ -3,10 +3,13 @@ import { ShiftsService } from './shifts.service';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { NotFoundException } from '@nestjs/common';
 import { DayOfWeek } from '../common/enums/day-of-week.enum';
+import { CoreConfigService } from '../core-config/services/core-config.service';
+import { CAPACITY_RESERVING_STATUSES } from '../registrations/constants/registration-status.constants';
 
 describe('ShiftsService', () => {
   let service: ShiftsService;
   let prismaService: PrismaService;
+  let coreConfigService: CoreConfigService;
 
   const mockShift = {
     id: 'test-id',
@@ -51,11 +54,18 @@ describe('ShiftsService', () => {
             },
           },
         },
+        {
+          provide: CoreConfigService,
+          useValue: {
+            findCurrent: jest.fn().mockResolvedValue({ registrationYear: 2026 }),
+          },
+        },
       ],
     }).compile();
 
     service = module.get<ShiftsService>(ShiftsService);
     prismaService = module.get<PrismaService>(PrismaService);
+    coreConfigService = module.get<CoreConfigService>(CoreConfigService);
   });
 
   it('should be defined', () => {
@@ -88,6 +98,152 @@ describe('ShiftsService', () => {
           jobs: true
         }
       });
+    });
+  });
+
+  describe('getWorkSchedule', () => {
+    it('shouldFilterByConfiguredYearAndOrderScheduleData', async () => {
+          jest.spyOn(prismaService.shift, 'findMany').mockResolvedValueOnce([
+            {
+              id: 'thursday-early',
+              name: 'Thursday Early',
+              description: null,
+              startTime: '8:00',
+              endTime: '09:00',
+              dayOfWeek: DayOfWeek.THURSDAY,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+              jobs: [],
+            },
+            {
+              id: 'thursday',
+              name: 'Thursday AM',
+              description: null,
+              startTime: '09:30',
+              endTime: '14:30',
+              dayOfWeek: DayOfWeek.THURSDAY,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+              jobs: [
+                {
+                  id: 'job-b',
+                  name: 'Manifest',
+                  location: 'Airport',
+                  maxRegistrations: 2,
+                  categoryId: 'category',
+                  active: true,
+                  alwaysRequired: false,
+                  staffOnly: false,
+                  createdAt: new Date(),
+                  updatedAt: new Date(),
+                  shiftId: 'thursday',
+                  category: { id: 'category', name: 'Operations' },
+                  registrations: [
+                    {
+                      id: 'registration-b',
+                      registration: {
+                        user: {
+                          id: 'user-b',
+                          firstName: 'Zoe',
+                          lastName: 'Alpha',
+                          playaName: null,
+                        },
+                      },
+                    },
+                    {
+                      id: 'registration-a',
+                      registration: {
+                        user: {
+                          id: 'user-a',
+                          firstName: 'Amy',
+                          lastName: 'Alpha',
+                          playaName: 'Spark',
+                        },
+                      },
+                    },
+                  ],
+                },
+                {
+                  id: 'job-a',
+                  name: 'Airport',
+                  location: 'Runway',
+                  maxRegistrations: 1,
+                  categoryId: 'category',
+                  active: true,
+                  alwaysRequired: false,
+                  staffOnly: false,
+                  createdAt: new Date(),
+                  updatedAt: new Date(),
+                  shiftId: 'thursday',
+                  category: { id: 'category', name: 'Operations' },
+                  registrations: [],
+                },
+              ],
+            },
+            {
+              id: 'thursday-afternoon',
+              name: 'Thursday Afternoon',
+              description: null,
+              startTime: '13:00',
+              endTime: '14:00',
+              dayOfWeek: DayOfWeek.THURSDAY,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+              jobs: [],
+            },
+          ] as never);
+
+          const actualSchedule = await service.getWorkSchedule(DayOfWeek.THURSDAY);
+
+          expect(coreConfigService.findCurrent).toHaveBeenCalled();
+          expect(prismaService.shift.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+              where: { dayOfWeek: DayOfWeek.THURSDAY },
+              include: expect.objectContaining({
+                jobs: expect.objectContaining({
+                  where: {
+                    OR: [
+                      { active: true },
+                      {
+                        registrations: {
+                          some: {
+                            registration: {
+                              year: 2026,
+                              status: { in: [...CAPACITY_RESERVING_STATUSES] },
+                            },
+                          },
+                        },
+                      },
+                    ],
+                  },
+                  include: expect.objectContaining({
+                    registrations: expect.objectContaining({
+                      where: {
+                        registration: {
+                          year: 2026,
+                          status: { in: [...CAPACITY_RESERVING_STATUSES] },
+                        },
+                      },
+                    }),
+                  }),
+                }),
+              }),
+            })
+          );
+          expect(actualSchedule.shifts.map(shift => shift.id)).toEqual([
+            'thursday-early',
+            'thursday',
+            'thursday-afternoon',
+          ]);
+          expect(actualSchedule.shifts[1].jobs.map(job => job.name)).toEqual([
+            'Airport',
+            'Manifest',
+          ]);
+          expect(
+            actualSchedule.shifts[1].jobs[1].registrations.map(
+              registration => registration.user.firstName
+            )
+          ).toEqual(['Amy', 'Zoe']);
     });
   });
 

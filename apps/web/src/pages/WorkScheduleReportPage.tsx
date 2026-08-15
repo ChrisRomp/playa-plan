@@ -1,10 +1,12 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { ArrowLeft, Download, Filter, X, Calendar } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { reports } from '../lib/api';
 import { PATHS } from '../routes';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import { downloadCsv } from '../utils/csv';
+import { downloadFile } from '../utils/downloadFile';
+import { getTimeInMinutes } from '../utils/shiftUtils';
 
 // Day of week values from backend for sorting
 // (removed enum definition to simplify type handling)
@@ -56,9 +58,11 @@ interface DayGroupedShifts {
 export function WorkScheduleReportPage() {
   const [workScheduleData, setWorkScheduleData] = useState<WorkScheduleData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [scheduleError, setScheduleError] = useState<string | null>(null);
+  const [pdfError, setPdfError] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [dayFilter, setDayFilter] = useState<string>('all');
+  const [generatingPdf, setGeneratingPdf] = useState(false);
 
   // Define the order for days of the week
   const dayOrder = useMemo(() => [
@@ -88,24 +92,24 @@ export function WorkScheduleReportPage() {
     POST_EVENT: 'Post-Event'
   }), []);
 
+  const fetchWorkSchedule = useCallback(async (): Promise<void> => {
+    setLoading(true);
+    setScheduleError(null);
+    try {
+      const data = await reports.getWorkSchedule();
+      setWorkScheduleData(data);
+    } catch (err) {
+      setScheduleError('Failed to fetch work schedule data');
+      console.error('Error fetching work schedule:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   // Fetch work schedule data
   useEffect(() => {
-    const fetchWorkSchedule = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const data = await reports.getWorkSchedule();
-        setWorkScheduleData(data);
-      } catch (err) {
-        setError('Failed to fetch work schedule data');
-        console.error('Error fetching work schedule:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchWorkSchedule();
-  }, []);
+    void fetchWorkSchedule();
+  }, [fetchWorkSchedule]);
 
   // Group shifts by day of week
   const shiftsByDay = useMemo(() => {
@@ -157,7 +161,7 @@ export function WorkScheduleReportPage() {
   };
 
   // Export data to CSV using shared utility function
-  const exportData = () => {
+  const exportCsv = (): void => {
     if (!workScheduleData) return;
     
     // CSV headers
@@ -169,7 +173,9 @@ export function WorkScheduleReportPage() {
     Object.entries(filteredShiftsByDay).forEach(([day, shifts]) => {
       // Sort shifts by start time
       const sortedShifts = [...shifts].sort((a, b) => {
-        return a.startTime.localeCompare(b.startTime);
+        const timeComparison =
+          getTimeInMinutes(a.startTime) - getTimeInMinutes(b.startTime);
+        return timeComparison || a.name.localeCompare(b.name);
       });
       
       sortedShifts.forEach(shift => {
@@ -213,6 +219,22 @@ export function WorkScheduleReportPage() {
     
     // Use shared CSV download function with BOM for Unicode support
     downloadCsv(headers, csvRows, { filename });
+  };
+
+  const downloadPdf = async (): Promise<void> => {
+    setGeneratingPdf(true);
+    setPdfError(null);
+    try {
+      const download = await reports.generateWorkSchedulePdf(
+        dayFilter === 'all' ? {} : { dayOfWeek: dayFilter }
+      );
+      downloadFile(download.blob, download.filename);
+    } catch (generationError) {
+      console.error('Failed to generate work schedule PDF:', generationError);
+      setPdfError(reports.getWorkScheduleReportErrorMessage(generationError));
+    } finally {
+      setGeneratingPdf(false);
+    }
   };
 
   // Count total shifts, jobs, and registrations
@@ -266,11 +288,26 @@ export function WorkScheduleReportPage() {
               Filters
             </button>
             <button
-              onClick={exportData}
+              onClick={exportCsv}
               className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-amber-600 hover:bg-amber-700"
             >
               <Download size={16} className="mr-2" />
-              Export
+              Export CSV
+            </button>
+            <button
+              onClick={() => void downloadPdf()}
+              disabled={generatingPdf}
+              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-amber-600 hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {generatingPdf ? (
+                <LoadingSpinner
+                  size="sm"
+                  className="!p-0 mr-2 [&_svg]:!text-white"
+                />
+              ) : (
+                <Download size={16} className="mr-2" />
+              )}
+              {generatingPdf ? 'Generating PDF…' : 'Download PDF'}
             </button>
           </div>
         </div>
@@ -318,24 +355,25 @@ export function WorkScheduleReportPage() {
           </div>
         )}
 
-        {/* Error Message */}
-        {error && (
+        {/* Schedule Error Message */}
+        {scheduleError && (
           <div className="bg-red-50 border border-red-200 rounded-md p-4 mb-6">
-            <p className="text-red-800">{error}</p>
+            <p className="text-red-800">{scheduleError}</p>
             <button
-              onClick={() => {
-                setLoading(true);
-                reports.getWorkSchedule()
-                  .then(data => {
-                    setWorkScheduleData(data);
-                    setError(null);
-                  })
-                  .catch(err => {
-                    setError('Failed to fetch work schedule data');
-                    console.error('Error fetching work schedule:', err);
-                  })
-                  .finally(() => setLoading(false));
-              }}
+              onClick={() => void fetchWorkSchedule()}
+              className="mt-2 text-red-600 hover:text-red-700 underline"
+            >
+              Try again
+            </button>
+          </div>
+        )}
+
+        {/* PDF Error Message */}
+        {pdfError && (
+          <div className="bg-red-50 border border-red-200 rounded-md p-4 mb-6">
+            <p className="text-red-800">{pdfError}</p>
+            <button
+              onClick={() => void downloadPdf()}
               className="mt-2 text-red-600 hover:text-red-700 underline"
             >
               Try again
@@ -369,7 +407,11 @@ export function WorkScheduleReportPage() {
                     
                     {/* Sort shifts by start time */}
                     {[...shifts]
-                      .sort((a, b) => a.startTime.localeCompare(b.startTime))
+                      .sort((a, b) => {
+                        const timeComparison =
+                          getTimeInMinutes(a.startTime) - getTimeInMinutes(b.startTime);
+                        return timeComparison || a.name.localeCompare(b.name);
+                      })
                       .map(shift => (
                         <div key={shift.id} className="mb-6">
                           <h3 className="text-lg font-semibold text-gray-800 mb-2">

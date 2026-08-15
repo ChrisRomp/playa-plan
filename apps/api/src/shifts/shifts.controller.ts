@@ -6,19 +6,13 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from '@prisma/client';
-import { PrismaService } from '../common/prisma/prisma.service';
-import { CoreConfigService } from '../core-config/services/core-config.service';
 
 @ApiTags('shifts')
 @Controller('shifts')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @ApiBearerAuth()
 export class ShiftsController {
-  constructor(
-    private readonly shiftsService: ShiftsService,
-    private readonly prisma: PrismaService,
-    private readonly coreConfigService: CoreConfigService,
-  ) {}
+  constructor(private readonly shiftsService: ShiftsService) {}
 
   @Post()
   @Roles(UserRole.ADMIN, UserRole.STAFF)
@@ -40,90 +34,7 @@ export class ShiftsController {
   @ApiOperation({ summary: 'Get all shifts with jobs and registrations' })
   @ApiOkResponse({ description: 'Returns all shifts with jobs and user registrations.' })
   async findAllWithJobsAndRegistrations() {
-    // Get the configured registration year
-    const config = await this.coreConfigService.findCurrent();
-    const registrationYear = config.registrationYear;
-
-    // Get all shifts with their associated jobs and job registrations for the current year
-    const shifts = await this.prisma.shift.findMany({
-      include: {
-        jobs: {
-          where: {
-            OR: [
-              { active: true },
-              {
-                registrations: {
-                  some: {
-                    registration: {
-                      year: registrationYear,
-                    },
-                  },
-                },
-              },
-            ],
-          },
-          include: {
-            category: true,
-            registrations: {
-              where: {
-                registration: {
-                  year: registrationYear,
-                },
-              },
-              include: {
-                registration: {
-                  include: {
-                    user: {
-                      select: {
-                        id: true,
-                        firstName: true,
-                        lastName: true,
-                        playaName: true,
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      },
-      orderBy: [
-        { dayOfWeek: 'asc' },
-        { startTime: 'asc' }
-      ]
-    });
-
-    // Transform the data to match the expected format in the frontend
-    return {
-      shifts: shifts.map(shift => ({
-        id: shift.id,
-        name: shift.name,
-        dayOfWeek: shift.dayOfWeek,
-        startTime: shift.startTime,
-        endTime: shift.endTime,
-        jobs: shift.jobs.map(job => ({
-          id: job.id,
-          name: job.name,
-          location: job.location,
-          maxRegistrations: job.maxRegistrations,
-          categoryId: job.categoryId,
-          category: {
-            id: job.category.id,
-            name: job.category.name
-          },
-          registrations: job.registrations.map(regJob => ({
-            id: regJob.id,
-            user: {
-              id: regJob.registration.user.id,
-              firstName: regJob.registration.user.firstName,
-              lastName: regJob.registration.user.lastName,
-              playaName: regJob.registration.user.playaName
-            }
-          }))
-        }))
-      }))
-    };
+    return this.shiftsService.getWorkSchedule();
   }
 
   @Get(':id')
