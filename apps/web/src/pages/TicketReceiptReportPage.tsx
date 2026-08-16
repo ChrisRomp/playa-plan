@@ -8,6 +8,8 @@ import { PATHS } from '../routes';
 import { CampingOption } from '../types';
 import { downloadFile } from '../utils/downloadFile';
 
+const ACKNOWLEDGEMENT_MAXIMUM_LINES = 10;
+
 interface TicketReceiptFormState {
   readonly title: string;
   readonly acknowledgementText: string;
@@ -80,6 +82,11 @@ export function TicketReceiptReportPage() {
     }
     if (!form.acknowledgementText.trim()) {
       return 'Acknowledgement text is required.';
+    }
+    if (
+      form.acknowledgementText.trim().split(/\r\n|\r|\n/).length > ACKNOWLEDGEMENT_MAXIMUM_LINES
+    ) {
+      return `Acknowledgement must be ${ACKNOWLEDGEMENT_MAXIMUM_LINES} lines or fewer.`;
     }
     if (
       !Number.isInteger(form.additionalBlankRows) ||
@@ -205,7 +212,8 @@ export function TicketReceiptReportPage() {
                 className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-200"
               />
               <p className="mt-1 text-xs text-gray-500">
-                The title and acknowledgement become shared defaults after a successful download.
+                Up to {ACKNOWLEDGEMENT_MAXIMUM_LINES} lines. The title and acknowledgement become
+                shared defaults after a successful download.
               </p>
             </div>
 
