@@ -130,6 +130,23 @@ describe('TicketReceiptReportPage', () => {
     expect(reports.generateTicketReceipt).not.toHaveBeenCalled();
   });
 
+  it('shouldRejectAcknowledgementWithMoreThanTenLines', async () => {
+    render(
+      <MemoryRouter>
+        <TicketReceiptReportPage />
+      </MemoryRouter>
+    );
+    await screen.findByDisplayValue('I received my ticket.');
+
+    fireEvent.change(screen.getByLabelText('Acknowledgement'), {
+      target: { value: Array.from({ length: 11 }, () => 'Acknowledgement').join('\n') },
+    });
+    fireEvent.submit(screen.getByRole('button', { name: 'Generate PDF' }).closest('form')!);
+
+    expect(screen.getByText('Acknowledgement must be 10 lines or fewer.')).toBeInTheDocument();
+    expect(reports.generateTicketReceipt).not.toHaveBeenCalled();
+  });
+
   it('shouldSurfaceGenerationErrors', async () => {
     vi.mocked(reports.generateTicketReceipt).mockRejectedValue(new Error('no rows'));
     vi.mocked(reports.getReportErrorMessage).mockReturnValue(

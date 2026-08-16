@@ -53,4 +53,26 @@ describe('GenerateTicketReceiptReportDto', () => {
     expect(inputDto.title).toBe('Ticket Receipt Report');
     expect(actualErrors.some(error => error.property === 'acknowledgementText')).toBe(true);
   });
+
+  it('shouldRejectAcknowledgementWithMoreThanTenLines', async () => {
+    const inputDto = plainToInstance(GenerateTicketReceiptReportDto, {
+      title: 'Ticket Receipt Report',
+      acknowledgementText: Array.from({ length: 11 }, () => 'Acknowledgement').join('\n'),
+    });
+
+    const actualErrors = await validate(inputDto);
+
+    expect(actualErrors.some(error => error.property === 'acknowledgementText')).toBe(true);
+  });
+
+  it('shouldAllowAcknowledgementWithTenLines', async () => {
+    const inputDto = plainToInstance(GenerateTicketReceiptReportDto, {
+      title: 'Ticket Receipt Report',
+      acknowledgementText: Array.from({ length: 10 }, () => 'Acknowledgement').join('\r\n'),
+    });
+
+    const actualErrors = await validate(inputDto);
+
+    expect(actualErrors).toHaveLength(0);
+  });
 });
