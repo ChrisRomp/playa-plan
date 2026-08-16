@@ -83,7 +83,9 @@ export function TicketReceiptReportPage() {
     if (!form.acknowledgementText.trim()) {
       return 'Acknowledgement text is required.';
     }
-    if (form.acknowledgementText.split(/\r\n|\r|\n/).length > ACKNOWLEDGEMENT_MAXIMUM_LINES) {
+    if (
+      form.acknowledgementText.trim().split(/\r\n|\r|\n/).length > ACKNOWLEDGEMENT_MAXIMUM_LINES
+    ) {
       return `Acknowledgement must be ${ACKNOWLEDGEMENT_MAXIMUM_LINES} lines or fewer.`;
     }
     if (

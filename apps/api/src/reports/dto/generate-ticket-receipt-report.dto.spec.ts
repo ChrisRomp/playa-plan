@@ -68,11 +68,14 @@ describe('GenerateTicketReceiptReportDto', () => {
   it('shouldAllowAcknowledgementWithTenLines', async () => {
     const inputDto = plainToInstance(GenerateTicketReceiptReportDto, {
       title: 'Ticket Receipt Report',
-      acknowledgementText: Array.from({ length: 10 }, () => 'Acknowledgement').join('\r\n'),
+      acknowledgementText: `${Array.from({ length: 10 }, () => 'Acknowledgement').join(
+        '\r\n'
+      )}\r\n`,
     });
 
     const actualErrors = await validate(inputDto);
 
     expect(actualErrors).toHaveLength(0);
+    expect(inputDto.acknowledgementText.endsWith('\r\n')).toBe(false);
   });
 });

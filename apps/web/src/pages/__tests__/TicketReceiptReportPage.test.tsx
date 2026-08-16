@@ -147,6 +147,32 @@ describe('TicketReceiptReportPage', () => {
     expect(reports.generateTicketReceipt).not.toHaveBeenCalled();
   });
 
+  it('shouldValidateTheTrimmedAcknowledgementLineCount', async () => {
+    const inputBlob = new Blob(['pdf'], { type: 'application/pdf' });
+    vi.mocked(reports.generateTicketReceipt).mockResolvedValue({
+      blob: inputBlob,
+      filename: 'tickets.pdf',
+    });
+    render(
+      <MemoryRouter>
+        <TicketReceiptReportPage />
+      </MemoryRouter>
+    );
+    await screen.findByDisplayValue('I received my ticket.');
+    const inputAcknowledgement = Array.from({ length: 10 }, () => 'Acknowledgement').join('\n');
+
+    fireEvent.change(screen.getByLabelText('Acknowledgement'), {
+      target: { value: `${inputAcknowledgement}\n` },
+    });
+    fireEvent.submit(screen.getByRole('button', { name: 'Generate PDF' }).closest('form')!);
+
+    await waitFor(() => {
+      expect(reports.generateTicketReceipt).toHaveBeenCalledWith(
+        expect.objectContaining({ acknowledgementText: inputAcknowledgement })
+      );
+    });
+  });
+
   it('shouldSurfaceGenerationErrors', async () => {
     vi.mocked(reports.generateTicketReceipt).mockRejectedValue(new Error('no rows'));
     vi.mocked(reports.getReportErrorMessage).mockReturnValue(

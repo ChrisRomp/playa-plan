@@ -62,6 +62,25 @@ describe('ReportConfigurationService', () => {
     );
   });
 
+  it('shouldReturnLegacySettingsThatExceedTheGenerationLineLimit', async () => {
+    const expectedAcknowledgement = Array.from({ length: 11 }, () => 'Acknowledgement').join('\n');
+    mockFindUnique.mockResolvedValue({
+      id: 'configuration-id',
+      reportType: ReportType.TICKET_RECEIPT_SIGNATURE,
+      schemaVersion: 1,
+      settings: {
+        title: 'Ticket Receipt Report',
+        acknowledgementText: expectedAcknowledgement,
+      },
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const actualSettings = await service.getTicketReceiptSettings();
+
+    expect(actualSettings.acknowledgementText).toBe(expectedAcknowledgement);
+  });
+
   it('shouldCreateAndAuditChangedSettings', async () => {
     mockTransactionFindUnique.mockResolvedValue(null);
     mockUpsert.mockResolvedValue({
@@ -164,6 +183,51 @@ describe('ReportConfigurationService', () => {
         oldValues: {
           title: 'Previous title',
           acknowledgementText: 'Previous acknowledgement',
+        },
+        newValues: {
+          title: 'Next title',
+          acknowledgementText: 'Next acknowledgement',
+        },
+      }),
+    });
+  });
+
+  it('shouldReplaceLegacySettingsThatExceedTheGenerationLineLimit', async () => {
+    const inputLegacyAcknowledgement = Array.from({ length: 11 }, () => 'Acknowledgement').join(
+      '\n'
+    );
+    mockTransactionFindUnique.mockResolvedValue({
+      id: 'configuration-id',
+      reportType: ReportType.TICKET_RECEIPT_SIGNATURE,
+      schemaVersion: 1,
+      settings: {
+        title: 'Previous title',
+        acknowledgementText: inputLegacyAcknowledgement,
+      },
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    mockUpsert.mockResolvedValue({
+      id: 'configuration-id',
+      reportType: ReportType.TICKET_RECEIPT_SIGNATURE,
+      schemaVersion: 1,
+      settings: {},
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    const inputSettings = Object.assign(new TicketReceiptSettingsDto(), {
+      title: 'Next title',
+      acknowledgementText: 'Next acknowledgement',
+    });
+
+    await service.saveTicketReceiptSettings('user-id', inputSettings);
+
+    expect(mockUpsert).toHaveBeenCalled();
+    expect(mockCreateAudit).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        oldValues: {
+          title: 'Previous title',
+          acknowledgementText: inputLegacyAcknowledgement,
         },
         newValues: {
           title: 'Next title',
