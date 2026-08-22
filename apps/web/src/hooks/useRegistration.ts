@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { JobCategory, Job, api, jobCategories, jobs, shifts, Shift, CampingOption } from '../lib/api';
 
 // Define types for registration data
@@ -23,105 +23,117 @@ export function useRegistration() {
   const [categories, setCategories] = useState<JobCategory[]>([]);
   const [jobsList, setJobsList] = useState<Job[]>([]);
   const [shiftsList, setShiftsList] = useState<Shift[]>([]);
+  const [loadedResources, setLoadedResources] = useState({
+    campingOptions: false,
+    jobCategories: false,
+    jobs: false,
+    shifts: false,
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const requestIds = useRef({
+    campingOptions: 0,
+    jobCategories: 0,
+    jobs: 0,
+    shifts: 0,
+  });
 
   // Fetch camping options
   const fetchCampingOptions = useCallback(async () => {
+    const requestId = ++requestIds.current.campingOptions;
+    setLoadedResources(current => ({ ...current, campingOptions: false }));
     setLoading(true);
     setError(null);
     try {
       const response = await api.get('/camping-options');
-      setCampingOptions(response.data);
+      if (requestId === requestIds.current.campingOptions) {
+        setCampingOptions(response.data);
+      }
     } catch (err) {
-      setError('Failed to fetch camping options');
-      console.error(err);
+      if (requestId === requestIds.current.campingOptions) {
+        setError('Failed to fetch camping options');
+        console.error(err);
+      }
     } finally {
-      setLoading(false);
+      if (requestId === requestIds.current.campingOptions) {
+        setLoadedResources(current => ({ ...current, campingOptions: true }));
+        setLoading(false);
+      }
     }
   }, []);
 
   // Fetch job categories
   const fetchJobCategories = useCallback(async () => {
+    const requestId = ++requestIds.current.jobCategories;
+    setLoadedResources(current => ({ ...current, jobCategories: false }));
     setLoading(true);
     setError(null);
     try {
       const result = await jobCategories.getAll();
-      setCategories(result);
+      if (requestId === requestIds.current.jobCategories) {
+        setCategories(result);
+      }
     } catch (err) {
-      setError('Failed to fetch job categories');
-      console.error(err);
+      if (requestId === requestIds.current.jobCategories) {
+        setError('Failed to fetch job categories');
+        console.error(err);
+      }
     } finally {
-      setLoading(false);
+      if (requestId === requestIds.current.jobCategories) {
+        setLoadedResources(current => ({ ...current, jobCategories: true }));
+        setLoading(false);
+      }
     }
   }, []);
 
   // Fetch shifts
   const fetchShifts = useCallback(async () => {
+    const requestId = ++requestIds.current.shifts;
+    setLoadedResources(current => ({ ...current, shifts: false }));
     setLoading(true);
     setError(null);
     try {
       const result = await shifts.getAll();
-      setShiftsList(result);
+      if (requestId === requestIds.current.shifts) {
+        setShiftsList(result);
+      }
     } catch (err) {
-      setError('Failed to fetch shifts');
-      console.error(err);
+      if (requestId === requestIds.current.shifts) {
+        setError('Failed to fetch shifts');
+        console.error(err);
+      }
     } finally {
-      setLoading(false);
+      if (requestId === requestIds.current.shifts) {
+        setLoadedResources(current => ({ ...current, shifts: true }));
+        setLoading(false);
+      }
     }
   }, []);
 
-  // Fetch jobs 
-  const fetchJobs = useCallback(async (campingOptionIds: string[] = []) => {
+  // Fetch the complete role-filtered collection. Eligibility is derived by the page.
+  const fetchJobs = useCallback(async () => {
+    const requestId = ++requestIds.current.jobs;
+    setLoadedResources(current => ({ ...current, jobs: false }));
     setLoading(true);
     setError(null);
     try {
-      // Get always required categories
-      const alwaysRequiredCategories = categories
-        .filter(cat => cat.alwaysRequired)
-        .map(cat => cat.id);
-      
-      // Build query to fetch jobs for selected camping options
-      // and always required categories
-      const params = new URLSearchParams();
-      
-      // Add always required categories
-      alwaysRequiredCategories.forEach(id => {
-        params.append('categoryIds', id);
-      });
-      
-      // Find categories associated with the selected camping options
-      const selectedCampingOptions = campingOptions.filter(
-        option => campingOptionIds.includes(option.id)
-      );
-      
-      // Add job categories from selected camping options
-      selectedCampingOptions.forEach(option => {
-        if (option.jobCategoryIds) {
-          option.jobCategoryIds.forEach((catId: string) => {
-            params.append('categoryIds', catId);
-          });
-        }
-      });
-      
-      // Fetch all jobs and filter client-side based on required parameters
-      // This is a temporary solution until we implement proper filtering on the API
       const allJobs = await jobs.getAll();
-      
-      // Filter jobs based on the categories we're interested in
-      const categoryIds = Array.from(params.getAll('categoryIds'));
-      const filteredJobs = categoryIds.length > 0 
-        ? allJobs.filter(job => categoryIds.includes(job.categoryId))
-        : allJobs;
-        
-      setJobsList(filteredJobs);
+
+      if (requestId === requestIds.current.jobs) {
+        setJobsList(allJobs);
+      }
     } catch (err) {
-      setError('Failed to fetch jobs');
-      console.error(err);
+      if (requestId === requestIds.current.jobs) {
+        setError('Failed to fetch jobs');
+        console.error(err);
+      }
     } finally {
-      setLoading(false);
+      if (requestId === requestIds.current.jobs) {
+        setLoadedResources(current => ({ ...current, jobs: true }));
+        setLoading(false);
+      }
     }
-  }, [categories, campingOptions]);
+  }, []);
 
   // Submit registration
   const submitRegistration = async (formData: RegistrationFormData) => {
@@ -144,6 +156,7 @@ export function useRegistration() {
     jobCategories: categories,
     jobs: jobsList,
     shifts: shiftsList,
+    initialDataLoaded: Object.values(loadedResources).every(Boolean),
     loading,
     error,
     fetchCampingOptions,
