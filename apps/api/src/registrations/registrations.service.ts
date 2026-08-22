@@ -3,7 +3,6 @@ import { PrismaService } from '../common/prisma/prisma.service';
 import { NotificationsService } from '../notifications/services/notifications.service';
 import {
   CreateRegistrationDto,
-  AddJobToRegistrationDto,
   CreateCampRegistrationDto,
   CompleteRegistrationDto,
   SubmitApplicationDto,
@@ -113,7 +112,8 @@ export class RegistrationsService {
       createRegistrationDto.jobIds.map(async (jobId) => {
         const job = await this.prisma.job.findUnique({
           where: { id: jobId },
-          include: { 
+          include: {
+            shift: true,
             registrations: {
               include: {
                 registration: true,
@@ -135,6 +135,25 @@ export class RegistrationsService {
         return { job, currentRegistrationCount };
       })
     );
+
+    const selectionAnalysis = this.jobSelectionService.analyze({
+      jobs: jobs.map(({ job }) => ({
+        id: job.id,
+        name: job.name,
+        shift: job.shift ?? undefined,
+      })),
+      allowNoJob: true,
+      campingOptions: [],
+      alwaysRequiredCategories: [],
+    });
+    if (
+      selectionAnalysis.conflicts.length > 0 &&
+      !createRegistrationDto.conflictOverrideConfirmed
+    ) {
+      throw new BadRequestException(
+        'Schedule conflicts require explicit administrator override confirmation',
+      );
+    }
 
     // Determine overall registration status. WAITLISTED wins when any
     // chosen job is over capacity; otherwise PENDING (awaiting payment).
@@ -176,133 +195,6 @@ export class RegistrationsService {
         },
       },
     });
-  }
-
-  /**
-   * Add a job to an existing registration
-   * @param registrationId - The ID of the registration
-   * @param addJobDto - The job to add
-   * @returns The updated registration
-   */
-  async addJobToRegistration(registrationId: string, addJobDto: AddJobToRegistrationDto): Promise<Registration> {
-    // Check if registration exists
-    const registration = await this.prisma.registration.findUnique({
-      where: { id: registrationId },
-      include: {
-        jobs: {
-          include: {
-            job: true,
-          },
-        },
-        user: {
-          select: { id: true, role: true },
-        },
-      },
-    });
-
-    if (!registration) {
-      throw new NotFoundException(`Registration with ID ${registrationId} not found`);
-    }
-
-    if (registration.status === RegistrationStatus.CANCELLED) {
-      throw new BadRequestException('Cannot modify a cancelled registration');
-    }
-
-    // Check if job exists
-    const job = await this.prisma.job.findUnique({
-      where: { id: addJobDto.jobId },
-      include: { 
-        registrations: {
-          include: {
-            registration: true,
-          },
-        },
-      },
-    });
-
-    if (!job) {
-      throw new NotFoundException(`Job with ID ${addJobDto.jobId} not found`);
-    }
-    this.assertJobActive(job);
-
-    // Block participants from adding staff-only jobs
-    if (!registration.user) {
-      throw new NotFoundException(`User for registration ${registration.id} not found`);
-    }
-    await this.validateNoStaffOnlyJobsForParticipant(registration.user.role, [addJobDto.jobId]);
-
-    // Check if job is already in this registration
-    const existingJobRegistration = registration.jobs.find(
-      rj => rj.job.id === addJobDto.jobId
-    );
-
-    if (existingJobRegistration) {
-      throw new ConflictException('Job is already part of this registration');
-    }
-
-    // Add the job to the registration
-    await this.prisma.registrationJob.create({
-      data: {
-        registration: { connect: { id: registrationId } },
-        job: { connect: { id: addJobDto.jobId } },
-      },
-    });
-
-    // Check if this affects the registration status
-    const currentRegistrationCount = job.registrations.filter(
-      r => isCapacityReservingStatus(r.registration.status)
-        && r.registration.year === registration.year
-    ).length;
-
-    const shouldBeWaitlisted = currentRegistrationCount >= job.maxRegistrations;
-
-    if (shouldBeWaitlisted && registration.status !== RegistrationStatus.WAITLISTED) {
-      await this.prisma.registration.update({
-        where: { id: registrationId },
-        data: { status: RegistrationStatus.WAITLISTED },
-      });
-    }
-
-    return this.findOne(registrationId);
-  }
-
-  /**
-   * Remove a job from a registration
-   * @param registrationId - The ID of the registration
-   * @param jobId - The ID of the job to remove
-   * @returns The updated registration
-   */
-  async removeJobFromRegistration(registrationId: string, jobId: string): Promise<Registration> {
-    // Check if registration exists
-    const registration = await this.prisma.registration.findUnique({
-      where: { id: registrationId },
-    });
-
-    if (!registration) {
-      throw new NotFoundException(`Registration with ID ${registrationId} not found`);
-    }
-
-    if (registration.status === RegistrationStatus.CANCELLED) {
-      throw new BadRequestException('Cannot modify a cancelled registration');
-    }
-
-    // Find and remove the job registration
-    const registrationJob = await this.prisma.registrationJob.findFirst({
-      where: {
-        registrationId,
-        jobId,
-      },
-    });
-
-    if (!registrationJob) {
-      throw new NotFoundException('Job not found in this registration');
-    }
-
-    await this.prisma.registrationJob.delete({
-      where: { id: registrationJob.id },
-    });
-
-    return this.findOne(registrationId);
   }
 
   /**

@@ -2,13 +2,12 @@ import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Query, Re
 import { RegistrationsService } from './registrations.service';
 import {
   CreateRegistrationDto,
-  AddJobToRegistrationDto,
   CreateCampRegistrationDto,
   CompleteRegistrationDto,
   SubmitApplicationDto,
   UpdateRegistrationDto,
 } from './dto';
-import { ApiBearerAuth, ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiQuery, ApiTags, ApiParam } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -38,31 +37,6 @@ export class RegistrationsController {
   @ApiCreatedResponse({ description: 'The registration has been successfully created.' })
   async create(@Body() createRegistrationDto: CreateRegistrationDto) {
     return this.registrationsService.create(createRegistrationDto);
-  }
-
-  @Post(':id/jobs')
-  @Roles(UserRole.ADMIN, UserRole.STAFF)
-  @ApiOperation({ summary: 'Add a job to an existing registration' })
-  @ApiCreatedResponse({ description: 'The job has been successfully added to the registration.' })
-  @ApiParam({ name: 'id', description: 'Registration ID' })
-  async addJobToRegistration(
-    @Param('id') id: string,
-    @Body() addJobDto: AddJobToRegistrationDto
-  ) {
-    return this.registrationsService.addJobToRegistration(id, addJobDto);
-  }
-
-  @Delete(':id/jobs/:jobId')
-  @Roles(UserRole.ADMIN, UserRole.STAFF)
-  @ApiOperation({ summary: 'Remove a job from a registration' })
-  @ApiOkResponse({ description: 'The job has been successfully removed from the registration.' })
-  @ApiParam({ name: 'id', description: 'Registration ID' })
-  @ApiParam({ name: 'jobId', description: 'Job ID to remove' })
-  async removeJobFromRegistration(
-    @Param('id') id: string,
-    @Param('jobId') jobId: string
-  ) {
-    return this.registrationsService.removeJobFromRegistration(id, jobId);
   }
 
   @Get()

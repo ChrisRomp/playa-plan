@@ -167,6 +167,13 @@ describe('RegistrationsService', () => {
         active: true,
         maxRegistrations: 10,
         registrations: [],
+        shift: {
+          id: 'shift-id-1',
+          name: 'Monday AM',
+          dayOfWeek: 'MONDAY',
+          startTime: '08:00',
+          endTime: '12:00',
+        },
       },
       {
         id: 'job-id-2',
@@ -174,6 +181,13 @@ describe('RegistrationsService', () => {
         active: true,
         maxRegistrations: 5,
         registrations: [],
+        shift: {
+          id: 'shift-id-2',
+          name: 'Monday PM',
+          dayOfWeek: 'MONDAY',
+          startTime: '12:00',
+          endTime: '16:00',
+        },
       },
     ];
 
@@ -273,6 +287,55 @@ describe('RegistrationsService', () => {
       mockPrismaService.job.findUnique.mockResolvedValue(null);
 
       await expect(service.create(createDto)).rejects.toThrow(NotFoundException);
+    });
+
+    it('should reject conflicting jobs without administrator confirmation', async () => {
+      const conflictingJob = {
+        ...mockJobs[1],
+        shift: {
+          id: 'shift-id-3',
+          name: 'Monday Midday',
+          dayOfWeek: 'MONDAY',
+          startTime: '10:00',
+          endTime: '14:00',
+        },
+      };
+      mockPrismaService.user.findUnique.mockResolvedValue(mockUser);
+      mockPrismaService.registration.findFirst.mockResolvedValue(null);
+      mockPrismaService.job.findUnique
+        .mockResolvedValueOnce(mockJobs[0])
+        .mockResolvedValueOnce(conflictingJob);
+
+      await expect(service.create(createDto)).rejects.toThrow(
+        'Schedule conflicts require explicit administrator override confirmation',
+      );
+      expect(mockPrismaService.registration.create).not.toHaveBeenCalled();
+    });
+
+    it('should create conflicting jobs with administrator confirmation', async () => {
+      const conflictingJob = {
+        ...mockJobs[1],
+        shift: {
+          id: 'shift-id-3',
+          name: 'Monday Midday',
+          dayOfWeek: 'MONDAY',
+          startTime: '10:00',
+          endTime: '14:00',
+        },
+      };
+      mockPrismaService.user.findUnique.mockResolvedValue(mockUser);
+      mockPrismaService.registration.findFirst.mockResolvedValue(null);
+      mockPrismaService.job.findUnique
+        .mockResolvedValueOnce(mockJobs[0])
+        .mockResolvedValueOnce(conflictingJob);
+      mockPrismaService.registration.create.mockResolvedValue(mockRegistration);
+
+      await expect(
+        service.create({
+          ...createDto,
+          conflictOverrideConfirmed: true,
+        }),
+      ).resolves.toEqual(mockRegistration);
     });
 
     it('should reject an inactive job', async () => {
@@ -401,7 +464,10 @@ describe('RegistrationsService', () => {
       mockPrismaService.job.findMany.mockResolvedValue([]);
       mockPrismaService.registration.create.mockResolvedValue(mockRegistration);
 
-      const result = await service.create(createDto);
+      const result = await service.create({
+        ...createDto,
+        jobIds: ['job-id-1'],
+      });
       expect(result).toEqual(mockRegistration);
     });
 
@@ -417,7 +483,10 @@ describe('RegistrationsService', () => {
       mockPrismaService.job.findMany.mockResolvedValue([]);
       mockPrismaService.registration.create.mockResolvedValue(mockRegistration);
 
-      const result = await service.create(createDto);
+      const result = await service.create({
+        ...createDto,
+        jobIds: ['job-id-1'],
+      });
       expect(result).toEqual(mockRegistration);
     });
 
@@ -462,126 +531,6 @@ describe('RegistrationsService', () => {
         jobIds: ['job-id-1'],
       };
       await expect(service.create(inputDto)).rejects.toThrow(ForbiddenException);
-    });
-  });
-
-  describe('addJobToRegistration', () => {
-    const mockRegistrationWithJobs = {
-      id: 'registration-id',
-      userId: 'user-id',
-      year: 2024,
-      status: RegistrationStatus.PENDING,
-      jobs: [],
-      user: { id: 'user-id', role: UserRole.PARTICIPANT },
-    };
-
-    const mockJobWithRegistrations = {
-      id: 'job-id-1',
-      name: 'Kitchen',
-      active: true,
-      staffOnly: false,
-      maxRegistrations: 10,
-      registrations: [],
-    };
-
-    it('should throw BadRequestException when adding job to cancelled registration', async () => {
-      mockPrismaService.registration.findUnique.mockResolvedValue({
-        ...mockRegistrationWithJobs,
-        status: RegistrationStatus.CANCELLED,
-      });
-
-      await expect(
-        service.addJobToRegistration('registration-id', { jobId: 'job-id-1' })
-      ).rejects.toThrow(BadRequestException);
-      expect(mockPrismaService.job.findUnique).not.toHaveBeenCalled();
-      expect(mockPrismaService.registrationJob.create).not.toHaveBeenCalled();
-    });
-
-    it('should throw ForbiddenException when adding staffOnly job for participant', async () => {
-      const staffOnlyJob = {
-        id: 'staff-job-id',
-        staffOnly: true,
-        maxRegistrations: 10,
-        registrations: [],
-      };
-      mockPrismaService.registration.findUnique.mockResolvedValue(mockRegistrationWithJobs);
-      mockPrismaService.job.findUnique.mockResolvedValue(staffOnlyJob);
-      mockPrismaService.job.findMany.mockResolvedValue([staffOnlyJob]);
-
-      await expect(
-        service.addJobToRegistration('registration-id', { jobId: 'staff-job-id' })
-      ).rejects.toThrow(ForbiddenException);
-    });
-
-    it('should throw NotFoundException when registration owner is not found', async () => {
-      const registrationWithNoUser = {
-        ...mockRegistrationWithJobs,
-        user: null,
-      };
-      const staffOnlyJob = {
-        id: 'staff-job-id',
-        staffOnly: true,
-        maxRegistrations: 10,
-        registrations: [],
-      };
-      mockPrismaService.registration.findUnique.mockResolvedValue(registrationWithNoUser);
-      mockPrismaService.job.findUnique.mockResolvedValue(staffOnlyJob);
-
-      await expect(
-        service.addJobToRegistration('registration-id', { jobId: 'staff-job-id' })
-      ).rejects.toThrow(NotFoundException);
-    });
-
-    it('should allow adding staffOnly job for staff user', async () => {
-      const mockStaff = {
-        id: 'user-id',
-        role: UserRole.STAFF,
-      };
-      const staffRegistration = {
-        ...mockRegistrationWithJobs,
-        user: mockStaff,
-      };
-      mockPrismaService.registration.findUnique
-        .mockResolvedValueOnce(staffRegistration)
-        .mockResolvedValueOnce({
-          ...staffRegistration,
-          jobs: [{ job: mockJobWithRegistrations }],
-          payments: [],
-        });
-      mockPrismaService.job.findUnique.mockResolvedValue(mockJobWithRegistrations);
-      mockPrismaService.job.findMany.mockResolvedValue([]);
-      mockPrismaService.registrationJob.create.mockResolvedValue({});
-
-      const result = await service.addJobToRegistration('registration-id', { jobId: 'job-id-1' });
-      expect(result).toBeDefined();
-    });
-
-    it('should reject adding an inactive job', async () => {
-      mockPrismaService.registration.findUnique.mockResolvedValue(mockRegistrationWithJobs);
-      mockPrismaService.job.findUnique.mockResolvedValue({
-        ...mockJobWithRegistrations,
-        active: false,
-      });
-
-      await expect(
-        service.addJobToRegistration('registration-id', { jobId: 'job-id-1' }),
-      ).rejects.toThrow('Inactive job cannot be assigned: Kitchen');
-      expect(mockPrismaService.registrationJob.create).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('removeJobFromRegistration', () => {
-    it('should throw BadRequestException when removing job from cancelled registration', async () => {
-      mockPrismaService.registration.findUnique.mockResolvedValue({
-        id: 'registration-id',
-        status: RegistrationStatus.CANCELLED,
-      });
-
-      await expect(
-        service.removeJobFromRegistration('registration-id', 'job-id-1')
-      ).rejects.toThrow(BadRequestException);
-      expect(mockPrismaService.registrationJob.findFirst).not.toHaveBeenCalled();
-      expect(mockPrismaService.registrationJob.delete).not.toHaveBeenCalled();
     });
   });
 
