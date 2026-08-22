@@ -580,7 +580,9 @@ export default function RegistrationPage() {
 
         if (campingJobsRequired > 0) {
           const selectedCampingJobs = selectedJobs.filter(
-            job => selectedCampingCategoryIds.has(job.categoryId),
+            job =>
+              selectedCampingCategoryIds.has(job.categoryId) &&
+              !alwaysRequiredCategoryIds.has(job.categoryId),
           );
 
           if (selectedCampingJobs.length < campingJobsRequired) {

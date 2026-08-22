@@ -1,4 +1,9 @@
 import { api } from '../api';
+import { isAxiosError } from 'axios';
+
+interface ApiErrorResponse {
+  readonly message?: string | string[];
+}
 
 export interface AdminRegistrationResult {
   id: string;
@@ -238,7 +243,24 @@ export const adminRegistrationsApi = {
       conflictOverrideConfirmed: data.conflictOverrideConfirmed,
     };
     
-    await api.put(`/admin/registrations/${registrationId}`, backendData);
+    try {
+      await api.put(`/admin/registrations/${registrationId}`, backendData);
+    } catch (error) {
+      if (isAxiosError<ApiErrorResponse>(error) && error.response?.status === 409) {
+        const responseMessage = error.response.data?.message;
+        const message = Array.isArray(responseMessage)
+          ? responseMessage.join(', ')
+          : responseMessage;
+
+        if (message) {
+          throw new Error(
+            `${message}. Close and reopen the editor to load the latest registration before retrying.`,
+          );
+        }
+      }
+
+      throw error;
+    }
   },
 
   /**

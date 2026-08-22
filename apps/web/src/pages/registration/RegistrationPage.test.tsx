@@ -561,8 +561,8 @@ describe('RegistrationPage', () => {
         id: 'assigned-cleaning-job',
         name: 'Assigned Cleaning Shift',
         active: true,
-        shiftId: 'shift2',
-        shift: mockShifts[1],
+        shiftId: 'shift4',
+        shift: mockShifts[3],
       },
       {
         ...mockJobs[0],
@@ -631,10 +631,21 @@ describe('RegistrationPage', () => {
     await screen.findByText('Select Work Shifts');
     fireEvent.click(screen.getByText('Continue'));
 
+    expect(
+      await screen.findAllByText(
+        'You must select at least 2 Standard Camping work shifts',
+      ),
+    ).toHaveLength(2);
+
+    fireEvent.click(screen.getByRole('button', { name: /Cleaning/ }));
+    fireEvent.click(screen.getByLabelText(/^Cleaning/));
+    fireEvent.click(screen.getByText('Continue'));
+
     await screen.findByText('Review & Accept Terms');
     expect(screen.getByText(/Inactive Kitchen Shift \|/)).toBeInTheDocument();
     expect(screen.getByText(/Assigned Cleaning Shift \|/)).toBeInTheDocument();
     expect(screen.getByText(/Staff-only Assigned Shift \|/)).toBeInTheDocument();
+    expect(screen.getByText(/^Cleaning \|/)).toBeInTheDocument();
     expect(
       screen.queryByText('You must select at least one Kitchen shift'),
     ).not.toBeInTheDocument();
