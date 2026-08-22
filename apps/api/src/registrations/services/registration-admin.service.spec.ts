@@ -82,6 +82,7 @@ describe('RegistrationAdminService', () => {
         findMany: jest.fn(),
         count: jest.fn(),
         update: jest.fn(),
+        updateMany: jest.fn(),
       },
       user: {
         findUnique: jest.fn(),
@@ -145,6 +146,9 @@ describe('RegistrationAdminService', () => {
     adminAuditService = module.get(AdminAuditService);
     cleanupService = module.get(RegistrationCleanupService);
     paymentsService = module.get(PaymentsService);
+    (prismaService.registration.updateMany as jest.Mock).mockResolvedValue({
+      count: 1,
+    });
   });
 
   afterEach(() => {
@@ -232,6 +236,30 @@ describe('RegistrationAdminService', () => {
 
       expect(prismaService.registration.update).not.toHaveBeenCalled();
       expect(adminAuditService.createAuditRecord).not.toHaveBeenCalled();
+    });
+
+    it('should reject an edit when the registration changes concurrently', async () => {
+      const inputEditData: AdminEditRegistrationDto = {
+        jobIds: ['job-1'],
+      };
+
+      prismaService.$transaction.mockImplementation(async callback =>
+        callback(prismaService),
+      );
+      (prismaService.registration.findUnique as jest.Mock).mockResolvedValue(
+        mockRegistration,
+      );
+      (prismaService.registration.updateMany as jest.Mock).mockResolvedValue({
+        count: 0,
+      });
+
+      await expect(
+        service.editRegistration('reg-123', inputEditData, 'admin-123'),
+      ).rejects.toThrow(
+        'Registration changed concurrently; refresh and retry the edit',
+      );
+      expect(prismaService.registrationJob.create).not.toHaveBeenCalled();
+      expect(prismaService.registrationJob.deleteMany).not.toHaveBeenCalled();
     });
 
     // Task 5.2.3: Test editRegistration() handles camping option modifications with availability checks

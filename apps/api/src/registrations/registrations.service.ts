@@ -986,6 +986,7 @@ export class RegistrationsService {
         where: {
           id: registration.id,
           status: { in: validStatuses },
+          updatedAt: registration.updatedAt,
         },
         data: {
           status,
@@ -993,7 +994,9 @@ export class RegistrationsService {
         },
       });
       if (updateResult.count === 0) {
-        throw new ConflictException('Registration has already been completed or is no longer in a valid state');
+        throw new ConflictException(
+          'Registration changed concurrently or is no longer in a valid state',
+        );
       }
 
       if (newSubmittedJobIds.length > 0) {

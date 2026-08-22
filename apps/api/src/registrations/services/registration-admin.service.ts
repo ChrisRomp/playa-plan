@@ -285,6 +285,21 @@ export class RegistrationAdminService {
           throw new BadRequestException('Cannot edit a cancelled registration');
         }
 
+        const versionClaim = await prisma.registration.updateMany({
+          where: {
+            id: registrationId,
+            updatedAt: currentRegistration.updatedAt,
+          },
+          data: {
+            updatedAt: new Date(currentRegistration.updatedAt.getTime() + 1),
+          },
+        });
+        if (versionClaim.count === 0) {
+          throw new ConflictException(
+            'Registration changed concurrently; refresh and retry the edit',
+          );
+        }
+
         const auditRecords: CreateAuditRecordDto[] = [];
 
         // Update status if provided

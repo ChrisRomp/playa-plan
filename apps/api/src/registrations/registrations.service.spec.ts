@@ -1165,6 +1165,7 @@ describe('RegistrationsService', () => {
       userId,
       year: registrationYear,
       status: RegistrationStatus.APPLICATION_APPROVED,
+      updatedAt: new Date('2026-08-22T17:00:00.000Z'),
       jobs: [],
       campingOptionRegistrations: [
         {
@@ -1262,6 +1263,7 @@ describe('RegistrationsService', () => {
         where: {
           id: approvedRegistration.id,
           status: { in: [RegistrationStatus.APPLICATION_APPROVED] },
+          updatedAt: approvedRegistration.updatedAt,
         },
         data: {
           status: RegistrationStatus.PENDING,
@@ -1425,10 +1427,10 @@ describe('RegistrationsService', () => {
       expect(mockPrismaService.registrationJob.createMany).not.toHaveBeenCalled();
       expect(mockPrismaService.registration.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: {
+          where: expect.objectContaining({
             id: approvedRegistration.id,
             status: { in: [RegistrationStatus.APPLICATION_APPROVED] },
-          },
+          }),
         }),
       );
     });
