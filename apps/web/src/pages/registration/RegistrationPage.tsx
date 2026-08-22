@@ -1,4 +1,4 @@
-import { useState, useEffect, useContext, useCallback } from 'react';
+import { useState, useEffect, useContext, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useRegistration, RegistrationFormData } from '../../hooks/useRegistration';
 import { useCampingOptions } from '../../hooks/useCampingOptions';
@@ -126,10 +126,81 @@ export default function RegistrationPage() {
     }
   }, [profile]);
 
-  // Get always required categories
-  const getAlwaysRequiredCategories = useCallback((): JobCategory[] => {
+  const alwaysRequiredCategories = useMemo((): JobCategory[] => {
     return jobCategories.filter(category => category.alwaysRequired);
   }, [jobCategories]);
+
+  const alwaysRequiredCategoryIds = useMemo(
+    () => new Set(alwaysRequiredCategories.map(category => category.id)),
+    [alwaysRequiredCategories]
+  );
+
+  const selectedCampingOptions = useMemo(
+    () => campingOptions.filter(option => formData.campingOptions.includes(option.id)),
+    [campingOptions, formData.campingOptions]
+  );
+
+  const selectedCampingCategoryIds = useMemo(
+    () => new Set(selectedCampingOptions.flatMap(option => option.jobCategoryIds)),
+    [selectedCampingOptions]
+  );
+
+  const canSeeStaffJobs = isStaffOrAdmin(user);
+  const visibleJobs = useMemo(
+    () => jobs.filter(job => !job.staffOnly || canSeeStaffJobs),
+    [canSeeStaffJobs, jobs]
+  );
+
+  const alwaysRequiredJobs = useMemo(
+    () => visibleJobs.filter(job => alwaysRequiredCategoryIds.has(job.categoryId)),
+    [alwaysRequiredCategoryIds, visibleJobs]
+  );
+
+  const campingOptionJobs = useMemo(
+    () => visibleJobs.filter(job =>
+      selectedCampingCategoryIds.has(job.categoryId)
+      && !alwaysRequiredCategoryIds.has(job.categoryId)
+    ),
+    [alwaysRequiredCategoryIds, selectedCampingCategoryIds, visibleJobs]
+  );
+
+  const campingJobCategories = useMemo(
+    () => jobCategories.filter(category =>
+      selectedCampingCategoryIds.has(category.id)
+      && !category.alwaysRequired
+      && (!category.staffOnly || canSeeStaffJobs)
+    ),
+    [canSeeStaffJobs, jobCategories, selectedCampingCategoryIds]
+  );
+
+  const groupedCampingJobs = useMemo(
+    () => Object.fromEntries(
+      campingJobCategories.map(category => [
+        category.id,
+        {
+          category,
+          jobs: campingOptionJobs.filter(job => job.categoryId === category.id),
+        },
+      ])
+    ) as Record<string, { category: JobCategory; jobs: Job[] }>,
+    [campingJobCategories, campingOptionJobs]
+  );
+
+  const misconfiguredCampingOptions = useMemo(
+    () => selectedCampingOptions.filter(option => {
+      if (option.workShiftsRequired <= 0 || jobCategories.length === 0) {
+        return false;
+      }
+
+      return !option.jobCategoryIds.some(categoryId => {
+        const category = jobCategories.find(item => item.id === categoryId);
+        return category
+          && !category.alwaysRequired
+          && (!category.staffOnly || canSeeStaffJobs);
+      });
+    }),
+    [canSeeStaffJobs, jobCategories, selectedCampingOptions]
+  );
 
   // Auto-expand categories with selected jobs or errors when on shifts step
   useEffect(() => {
@@ -154,7 +225,6 @@ export default function RegistrationPage() {
         });
         
         // Always expand all always-required categories by default
-        const alwaysRequiredCategories = getAlwaysRequiredCategories();
         alwaysRequiredCategories.forEach(category => {
           categoriesToExpand.add(category.id);
         });
@@ -170,7 +240,7 @@ export default function RegistrationPage() {
         return categoriesToExpand;
       });
     }
-  }, [currentStep, formData.jobs, formErrors, jobs, jobCategories, getAlwaysRequiredCategories]);
+  }, [alwaysRequiredCategories, currentStep, formData.jobs, formErrors, jobs, jobCategories]);
   
   // Track loaded custom fields for selected camping options
   const [customFieldsByOption, setCustomFieldsByOption] = useState<Record<string, CampingOptionField[]>>({});
@@ -250,16 +320,8 @@ export default function RegistrationPage() {
     fetchCampingOptions();
     fetchJobCategories();
     fetchShifts();
-  }, [fetchCampingOptions, fetchJobCategories, fetchShifts]);
-
-  // When camping options change, fetch jobs and custom fields
-  useEffect(() => {
-    // Only fetch jobs if we have job categories loaded and either have selected camping options 
-    // or there are always required categories
-    if (jobCategories.length > 0 && (formData.campingOptions.length > 0 || hasAlwaysRequiredCategories(jobCategories))) {
-      fetchJobs(formData.campingOptions);
-    }
-  }, [formData.campingOptions, jobCategories, fetchJobs]);
+    fetchJobs();
+  }, [fetchCampingOptions, fetchJobCategories, fetchJobs, fetchShifts]);
 
   // Load custom fields for selected camping options
   useEffect(() => {
@@ -276,41 +338,6 @@ export default function RegistrationPage() {
     });
   }, [formData.campingOptions, customFieldsByOption, loadCampingOptionFields]);
 
-  // Check if there are any always required job categories
-  const hasAlwaysRequiredCategories = (categories: JobCategory[]): boolean => {
-    return categories.some(category => category.alwaysRequired);
-  };
-
-  // Get jobs for always required categories
-  const getAlwaysRequiredJobs = (): Job[] => {
-    // Get job categories that are always required
-    const alwaysRequiredCategoryIds = jobCategories
-      .filter(cat => cat.alwaysRequired)
-      .map(cat => cat.id);
-
-    // Return jobs from always required categories
-    // Filter out staffOnly jobs for participants
-    return jobs.filter(job => 
-      alwaysRequiredCategoryIds.includes(job.categoryId) &&
-      // Only show staffOnly jobs to staff and admin users
-      (!job.staffOnly || isStaffOrAdmin(user))
-    );
-  };
-
-  // Get jobs for selected camping options (excluding always required)
-  const getCampingOptionJobs = (): Job[] => {
-    // Get jobs from non-always-required categories
-    const alwaysRequiredCategoryIds = jobCategories
-      .filter(cat => cat.alwaysRequired)
-      .map(cat => cat.id);
-
-    return jobs.filter(job => 
-      !alwaysRequiredCategoryIds.includes(job.categoryId) &&
-      // Only show staffOnly jobs to staff and admin users
-      (!job.staffOnly || isStaffOrAdmin(user))
-    );
-  };
-
   // Calculate total jobs required based on camping options and always required categories
   const calculateRequiredJobCount = (): number => {
     // Users with the allowNoJob flag are exempt from all job requirements
@@ -319,17 +346,13 @@ export default function RegistrationPage() {
     }
 
     // Get job requirements from camping options
-    const selectedOptions = campingOptions.filter(option => 
-      formData.campingOptions.includes(option.id)
-    );
-    
-    const campingJobsRequired = selectedOptions.reduce(
+    const campingJobsRequired = selectedCampingOptions.reduce(
       (total, option) => total + option.workShiftsRequired, 
       0
     );
     
     // Every always required category adds at least one required job
-    const alwaysRequiredCount = getAlwaysRequiredCategories().length;
+    const alwaysRequiredCount = alwaysRequiredCategories.length;
     
     return campingJobsRequired + alwaysRequiredCount;
   };
@@ -358,28 +381,6 @@ export default function RegistrationPage() {
       }
       return newSet;
     });
-  };
-
-  // Group jobs by category
-  const groupJobsByCategory = (jobList: Job[]): Record<string, { category: JobCategory; jobs: Job[] }> => {
-    const grouped: Record<string, { category: JobCategory; jobs: Job[] }> = {};
-    
-    // Filter jobs based on user role first
-    const filteredJobs = jobList.filter(job => 
-      !job.staffOnly || isStaffOrAdmin(user)
-    );
-    
-    filteredJobs.forEach(job => {
-      const category = jobCategories.find(cat => cat.id === job.categoryId);
-      if (category) {
-        if (!grouped[category.id]) {
-          grouped[category.id] = { category, jobs: [] };
-        }
-        grouped[category.id].jobs.push(job);
-      }
-    });
-    
-    return grouped;
   };
 
   // Validate the current step
@@ -474,10 +475,8 @@ export default function RegistrationPage() {
         }
 
         // Ensure all always required categories have at least one job
-        const alwaysRequiredCategories = getAlwaysRequiredCategories();
-
         alwaysRequiredCategories.forEach(category => {
-          const categoryJobs = getAlwaysRequiredJobs().filter(
+          const categoryJobs = alwaysRequiredJobs.filter(
             job => job.categoryId === category.id
           );
 
@@ -492,24 +491,19 @@ export default function RegistrationPage() {
         });
 
         // Ensure camping option job requirements are met
-        const selectedOptions = campingOptions.filter(option =>
-          formData.campingOptions.includes(option.id)
-        );
-
-        const campingJobsRequired = selectedOptions.reduce(
+        const campingJobsRequired = selectedCampingOptions.reduce(
           (total, option) => total + option.workShiftsRequired,
           0
         );
 
         if (campingJobsRequired > 0) {
-          const campingOptionJobs = getCampingOptionJobs();
           const selectedCampingJobs = campingOptionJobs.filter(
             job => formData.jobs.includes(job.id)
           );
 
           if (selectedCampingJobs.length < campingJobsRequired) {
             // Create a detailed error message showing each camping option's requirements
-            const optionMessages = selectedOptions
+            const optionMessages = selectedCampingOptions
               .filter(option => option.workShiftsRequired > 0)
               .map(option => {
                 const shiftText = option.workShiftsRequired === 1 ? 'work shift' : 'work shifts';
@@ -1206,21 +1200,12 @@ export default function RegistrationPage() {
   // Render jobs step
   const renderJobsStep = () => {
     const requiredCount = calculateRequiredJobCount();
-    const alwaysRequiredJobs = getAlwaysRequiredJobs();
-    const campingOptionJobs = getCampingOptionJobs();
-    const alwaysRequiredCategories = getAlwaysRequiredCategories();
     const jobsAreOptional = !!user?.allowNoJob;
 
-    // Group camping option jobs by category
-    const groupedCampingJobs = groupJobsByCategory(campingOptionJobs);
-
     // Calculate required shifts for camping options
-    const selectedOptions = campingOptions.filter(option =>
-      formData.campingOptions.includes(option.id)
-    );
     const campingShiftsRequired = jobsAreOptional
       ? 0
-      : selectedOptions.reduce(
+      : selectedCampingOptions.reduce(
           (total, option) => total + option.workShiftsRequired,
           0
         );
@@ -1233,6 +1218,14 @@ export default function RegistrationPage() {
             ? 'Work shifts are optional for your account. You may select any shifts you would like to sign up for.'
             : `You need to select at least ${requiredCount} shifts to complete registration.`}
         </p>
+
+        {!jobsAreOptional && misconfiguredCampingOptions.length > 0 && (
+          <div className="text-red-700 mb-4 p-3 bg-red-50 border border-red-200 rounded">
+            Work shifts are not configured for{' '}
+            {misconfiguredCampingOptions.map(option => option.name).join(', ')}.
+            Please contact an administrator before completing registration.
+          </div>
+        )}
         
         {/* Camp Shifts Section */}
         {Object.keys(groupedCampingJobs).length > 0 && (

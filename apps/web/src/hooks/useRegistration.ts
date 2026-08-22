@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { JobCategory, Job, api, jobCategories, jobs, shifts, Shift, CampingOption } from '../lib/api';
 
 // Define types for registration data
@@ -25,6 +25,7 @@ export function useRegistration() {
   const [shiftsList, setShiftsList] = useState<Shift[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const jobsRequestId = useRef(0);
 
   // Fetch camping options
   const fetchCampingOptions = useCallback(async () => {
@@ -71,57 +72,28 @@ export function useRegistration() {
     }
   }, []);
 
-  // Fetch jobs 
-  const fetchJobs = useCallback(async (campingOptionIds: string[] = []) => {
+  // Fetch the complete role-filtered collection. Eligibility is derived by the page.
+  const fetchJobs = useCallback(async () => {
+    const requestId = ++jobsRequestId.current;
     setLoading(true);
     setError(null);
     try {
-      // Get always required categories
-      const alwaysRequiredCategories = categories
-        .filter(cat => cat.alwaysRequired)
-        .map(cat => cat.id);
-      
-      // Build query to fetch jobs for selected camping options
-      // and always required categories
-      const params = new URLSearchParams();
-      
-      // Add always required categories
-      alwaysRequiredCategories.forEach(id => {
-        params.append('categoryIds', id);
-      });
-      
-      // Find categories associated with the selected camping options
-      const selectedCampingOptions = campingOptions.filter(
-        option => campingOptionIds.includes(option.id)
-      );
-      
-      // Add job categories from selected camping options
-      selectedCampingOptions.forEach(option => {
-        if (option.jobCategoryIds) {
-          option.jobCategoryIds.forEach((catId: string) => {
-            params.append('categoryIds', catId);
-          });
-        }
-      });
-      
-      // Fetch all jobs and filter client-side based on required parameters
-      // This is a temporary solution until we implement proper filtering on the API
       const allJobs = await jobs.getAll();
-      
-      // Filter jobs based on the categories we're interested in
-      const categoryIds = Array.from(params.getAll('categoryIds'));
-      const filteredJobs = categoryIds.length > 0 
-        ? allJobs.filter(job => categoryIds.includes(job.categoryId))
-        : allJobs;
-        
-      setJobsList(filteredJobs);
+
+      if (requestId === jobsRequestId.current) {
+        setJobsList(allJobs);
+      }
     } catch (err) {
-      setError('Failed to fetch jobs');
-      console.error(err);
+      if (requestId === jobsRequestId.current) {
+        setError('Failed to fetch jobs');
+        console.error(err);
+      }
     } finally {
-      setLoading(false);
+      if (requestId === jobsRequestId.current) {
+        setLoading(false);
+      }
     }
-  }, [categories, campingOptions]);
+  }, []);
 
   // Submit registration
   const submitRegistration = async (formData: RegistrationFormData) => {

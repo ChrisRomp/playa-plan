@@ -199,42 +199,25 @@ describe('useRegistration', () => {
   });
 
   describe('fetchJobs', () => {
-    it('should include alwaysRequired categories in request even when no camping options selected', async () => {
+    it('should retain the complete job collection independently of option and category state', async () => {
       const { result } = renderHook(() => useRegistration());
-      
-      // First load job categories so we have the alwaysRequired data
+      const initialFetchJobs = result.current.fetchJobs;
+
+      await act(async () => {
+        await result.current.fetchJobs();
+      });
+
+      expect(result.current.jobs).toEqual(mockJobs);
+      expect(apiModule.jobs.getAll).toHaveBeenCalledTimes(1);
+
       await act(async () => {
         await result.current.fetchJobCategories();
-      });
-      
-      // Now fetch jobs without selecting any camping options
-      await act(async () => {
-        await result.current.fetchJobs([]);
-      });
-      
-      expect(apiModule.jobs.getAll).toHaveBeenCalled();
-    });
-    
-    it('should include both camping option categories and alwaysRequired categories', async () => {
-      const { result } = renderHook(() => useRegistration());
-      
-      // First load job categories so we have the alwaysRequired data
-      await act(async () => {
-        await result.current.fetchJobCategories();
-      });
-      
-      // Also load camping options
-      await act(async () => {
         await result.current.fetchCampingOptions();
       });
-      
-      // Now fetch jobs selecting the first camping option
-      await act(async () => {
-        await result.current.fetchJobs(['camp-1']);
-      });
-      
-      // Verify jobs.getAll was called
-      expect(apiModule.jobs.getAll).toHaveBeenCalled();
+
+      expect(result.current.fetchJobs).toBe(initialFetchJobs);
+      expect(result.current.jobs).toEqual(mockJobs);
+      expect(apiModule.jobs.getAll).toHaveBeenCalledTimes(1);
     });
 
     it('should handle errors when fetching jobs', async () => {
@@ -244,11 +227,49 @@ describe('useRegistration', () => {
       (apiModule.jobs.getAll as Mock).mockRejectedValueOnce(new Error('Failed to fetch jobs'));
       
       await act(async () => {
-        await result.current.fetchJobs(['camp-1']);
+        await result.current.fetchJobs();
       });
       
       expect(result.current.error).toBe('Failed to fetch jobs');
       expect(result.current.jobs).toEqual([]);
+    });
+
+    it('should ignore an older failed request after a newer request succeeds', async () => {
+      let rejectFirstRequest: (error: Error) => void = () => undefined;
+      let resolveSecondRequest: (jobs: typeof mockJobs) => void = () => undefined;
+      const firstRequest = new Promise<typeof mockJobs>((_resolve, reject) => {
+        rejectFirstRequest = reject;
+      });
+      const secondRequest = new Promise<typeof mockJobs>((resolve) => {
+        resolveSecondRequest = resolve;
+      });
+
+      (apiModule.jobs.getAll as Mock)
+        .mockImplementationOnce(() => firstRequest)
+        .mockImplementationOnce(() => secondRequest);
+
+      const { result } = renderHook(() => useRegistration());
+      let firstFetch = Promise.resolve();
+      let secondFetch = Promise.resolve();
+
+      act(() => {
+        firstFetch = result.current.fetchJobs();
+        secondFetch = result.current.fetchJobs();
+      });
+
+      await act(async () => {
+        resolveSecondRequest(mockJobs);
+        await secondFetch;
+      });
+
+      await act(async () => {
+        rejectFirstRequest(new Error('Stale failure'));
+        await firstFetch;
+      });
+
+      expect(result.current.jobs).toEqual(mockJobs);
+      expect(result.current.error).toBeNull();
+      expect(result.current.loading).toBe(false);
     });
   });
 

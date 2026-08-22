@@ -832,6 +832,69 @@ describe('RegistrationPage', () => {
       });
     });
 
+    it('should show configured categories that have no active jobs', async () => {
+      vi.spyOn(useRegistrationModule, 'useRegistration').mockReturnValue({
+        campingOptions: [mockSkydivingOption],
+        jobCategories: [mockTeardownCategory, mockArtCarCategory, mockManifestCategory],
+        jobs: [mockTeardownJob1, mockTeardownJob2, mockManifestJob],
+        shifts: mockShifts,
+        loading: false,
+        error: null,
+        fetchCampingOptions: vi.fn(),
+        fetchJobCategories: vi.fn(),
+        fetchShifts: vi.fn(),
+        fetchJobs: vi.fn(),
+        submitRegistration: vi.fn().mockResolvedValue({}),
+      });
+
+      await navigateToJobsStep();
+
+      const artCarButton = screen.getAllByRole('button').find(
+        button => button.textContent?.includes('Art Car Driver')
+      );
+      expect(artCarButton).toBeDefined();
+
+      fireEvent.click(artCarButton!);
+
+      expect(
+        screen.getByText('No shifts available for this category')
+      ).toBeInTheDocument();
+    });
+
+    it('should block required options that have no configured job categories', async () => {
+      vi.spyOn(useRegistrationModule, 'useRegistration').mockReturnValue({
+        campingOptions: [{ ...mockSkydivingOption, jobCategoryIds: [] }],
+        jobCategories: [mockTeardownCategory, mockArtCarCategory, mockManifestCategory],
+        jobs: [mockTeardownJob1, mockTeardownJob2, mockArtCarJob, mockManifestJob],
+        shifts: mockShifts,
+        loading: false,
+        error: null,
+        fetchCampingOptions: vi.fn(),
+        fetchJobCategories: vi.fn(),
+        fetchShifts: vi.fn(),
+        fetchJobs: vi.fn(),
+        submitRegistration: vi.fn().mockResolvedValue({}),
+      });
+
+      await navigateToJobsStep();
+
+      expect(
+        screen.getByText(
+          /Work shifts are not configured for Skydiving.*contact an administrator/i
+        )
+      ).toBeInTheDocument();
+      expect(screen.queryByText('Art Car Driver')).not.toBeInTheDocument();
+      expect(screen.queryByText('Manifest Assistant')).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByText('Continue'));
+
+      await waitFor(() => {
+        expect(
+          screen.getAllByText('You must select at least 1 Skydiving work shift')
+        ).toHaveLength(1);
+      });
+    });
+
     it('should reject selection of only teardown jobs when camping jobs are required', async () => {
       await navigateToJobsStep();
       
