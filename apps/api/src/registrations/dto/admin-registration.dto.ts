@@ -6,6 +6,7 @@ import {
   IsArray, 
   IsNotEmpty,
   IsBoolean,
+  IsISO8601,
   IsInt,
   Min,
   ValidateNested
@@ -18,6 +19,13 @@ import { RegistrationStatus, Registration, FieldType } from '@prisma/client';
  * DTO for editing a registration by an admin
  */
 export class AdminEditRegistrationDto {
+  @ApiProperty({
+    description: 'Registration updatedAt value shown when the edit form was loaded',
+    example: '2024-01-01T00:00:00.000Z',
+  })
+  @IsISO8601({}, { message: 'Expected updated timestamp must be a valid ISO 8601 value' })
+  expectedUpdatedAt!: string;
+
   @ApiPropertyOptional({
     description: 'Updated status of the registration',
     enum: RegistrationStatus,

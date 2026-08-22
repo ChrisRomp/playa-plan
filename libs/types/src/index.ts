@@ -10,5 +10,11 @@ export * from './enums/payment-refund-status.enum';
 
 // Export utilities
 export * from './utils/day-utils';
+export { findJobScheduleConflicts } from './utils/job-schedule-conflicts';
+export type {
+  JobScheduleConflict,
+  ScheduleJob,
+  ScheduleShift,
+} from './utils/job-schedule-conflicts';
 
 // Export other shared types as needed 

@@ -288,7 +288,7 @@ export class RegistrationAdminService {
         const versionClaim = await prisma.registration.updateMany({
           where: {
             id: registrationId,
-            updatedAt: currentRegistration.updatedAt,
+            updatedAt: new Date(editData.expectedUpdatedAt),
           },
           data: {
             updatedAt: new Date(currentRegistration.updatedAt.getTime() + 1),

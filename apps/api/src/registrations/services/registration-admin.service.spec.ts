@@ -159,6 +159,7 @@ describe('RegistrationAdminService', () => {
     // Task 5.2.1: Test editRegistration() successfully updates registration and creates audit record
     it('should successfully update registration and create audit record', async () => {
       const editData: AdminEditRegistrationDto = {
+        expectedUpdatedAt: mockRegistration.updatedAt.toISOString(),
         status: RegistrationStatus.WAITLISTED,
         notes: 'Admin update for testing',
         sendNotification: false,
@@ -220,6 +221,7 @@ describe('RegistrationAdminService', () => {
       };
 
       const editData: AdminEditRegistrationDto = {
+        expectedUpdatedAt: cancelledRegistration.updatedAt.toISOString(),
         status: RegistrationStatus.CONFIRMED,
         notes: 'Trying to edit cancelled registration',
       };
@@ -238,8 +240,10 @@ describe('RegistrationAdminService', () => {
       expect(adminAuditService.createAuditRecord).not.toHaveBeenCalled();
     });
 
-    it('should reject an edit when the registration changes concurrently', async () => {
+    it('should reject an edit when the form version is stale', async () => {
+      const staleUpdatedAt = new Date('2023-12-31T23:00:00.000Z');
       const inputEditData: AdminEditRegistrationDto = {
+        expectedUpdatedAt: staleUpdatedAt.toISOString(),
         jobIds: ['job-1'],
       };
 
@@ -258,6 +262,15 @@ describe('RegistrationAdminService', () => {
       ).rejects.toThrow(
         'Registration changed concurrently; refresh and retry the edit',
       );
+      expect(prismaService.registration.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: 'reg-123',
+          updatedAt: staleUpdatedAt,
+        },
+        data: {
+          updatedAt: new Date(mockRegistration.updatedAt.getTime() + 1),
+        },
+      });
       expect(prismaService.registrationJob.create).not.toHaveBeenCalled();
       expect(prismaService.registrationJob.deleteMany).not.toHaveBeenCalled();
     });
@@ -265,6 +278,7 @@ describe('RegistrationAdminService', () => {
     // Task 5.2.3: Test editRegistration() handles camping option modifications with availability checks
     it('should handle camping option modifications with availability checks', async () => {
       const editData: AdminEditRegistrationDto = {
+        expectedUpdatedAt: mockRegistration.updatedAt.toISOString(),
         campingOptionIds: ['camping-option-1', 'camping-option-2'],
         notes: 'Adding camping options',
       };
@@ -313,6 +327,7 @@ describe('RegistrationAdminService', () => {
     // Task 5.2.4: Test editRegistration() handles work shift modifications with availability checks
     it('should handle work shift modifications with availability checks', async () => {
       const editData: AdminEditRegistrationDto = {
+        expectedUpdatedAt: mockRegistration.updatedAt.toISOString(),
         jobIds: ['job-1', 'job-2'],
         notes: 'Adding work shifts',
       };
@@ -367,6 +382,7 @@ describe('RegistrationAdminService', () => {
         ],
       };
       const inputEditData: AdminEditRegistrationDto = {
+        expectedUpdatedAt: mockRegistration.updatedAt.toISOString(),
         jobIds: ['job-1', 'job-2'],
       };
 
@@ -420,6 +436,7 @@ describe('RegistrationAdminService', () => {
         ],
       };
       const inputEditData: AdminEditRegistrationDto = {
+        expectedUpdatedAt: mockRegistration.updatedAt.toISOString(),
         jobIds: ['job-1', 'job-2'],
         conflictOverrideConfirmed: true,
       };
@@ -464,6 +481,7 @@ describe('RegistrationAdminService', () => {
 
     it('should reject adding an inactive job while preserving existing assignments', async () => {
       const editData: AdminEditRegistrationDto = {
+        expectedUpdatedAt: mockRegistration.updatedAt.toISOString(),
         jobIds: ['retained-job', 'inactive-job'],
         notes: 'Test inactive assignment',
       };
@@ -495,6 +513,7 @@ describe('RegistrationAdminService', () => {
 
     it('should retain unaffected jobs when removing one assignment', async () => {
       const editData: AdminEditRegistrationDto = {
+        expectedUpdatedAt: mockRegistration.updatedAt.toISOString(),
         jobIds: ['retained-job'],
         notes: 'Remove one assignment',
       };
@@ -537,6 +556,7 @@ describe('RegistrationAdminService', () => {
     // Task 5.2.5: Test editRegistration() uses Prisma transactions for atomicity
     it('should use Prisma transactions for atomicity', async () => {
       const editData: AdminEditRegistrationDto = {
+        expectedUpdatedAt: mockRegistration.updatedAt.toISOString(),
         status: RegistrationStatus.WAITLISTED,
         notes: 'Transaction test',
       };
@@ -558,6 +578,7 @@ describe('RegistrationAdminService', () => {
     // Task 5.2.8: Test error handling for invalid registration IDs and unauthorized access
     it('should handle invalid registration IDs', async () => {
       const editData: AdminEditRegistrationDto = {
+        expectedUpdatedAt: mockRegistration.updatedAt.toISOString(),
         status: RegistrationStatus.CONFIRMED,
         notes: 'Invalid ID test',
       };

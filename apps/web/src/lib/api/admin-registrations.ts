@@ -3,6 +3,7 @@ import { api } from '../api';
 export interface AdminRegistrationResult {
   id: string;
   year: number;
+  updatedAt: string;
   status:
     | 'PENDING'
     | 'CONFIRMED'
@@ -26,6 +27,7 @@ export interface Registration {
   status: 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'WAITLISTED';
   paymentDeferred?: boolean;
   createdAt: string;
+  updatedAt: string;
   user: {
     id: string;
     email: string;
@@ -93,6 +95,7 @@ interface CampingOption {
 }
 
 interface RegistrationEditData {
+  expectedUpdatedAt: string;
   status: 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'WAITLISTED';
   jobIds: string[];
   campingOptionIds: string[];
@@ -147,6 +150,7 @@ interface AuditRecord {
 
 // Backend interface for API compatibility
 interface BackendRegistrationEditData {
+  expectedUpdatedAt: string;
   status: 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'WAITLISTED';
   jobIds: string[];
   campingOptionIds: string[];
@@ -225,6 +229,7 @@ export const adminRegistrationsApi = {
   editRegistration: async (registrationId: string, data: RegistrationEditData): Promise<void> => {
     // Transform frontend data to backend format (no transformation needed now)
     const backendData: BackendRegistrationEditData = {
+      expectedUpdatedAt: data.expectedUpdatedAt,
       status: data.status,
       jobIds: data.jobIds,
       campingOptionIds: data.campingOptionIds,

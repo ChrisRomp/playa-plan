@@ -1,21 +1,4 @@
-interface AnalyzedShift {
-  readonly id: string;
-  readonly name: string;
-  readonly dayOfWeek: string;
-  readonly startTime: string;
-  readonly endTime: string;
-}
-
-interface AnalyzedJob {
-  readonly id: string;
-  readonly name: string;
-  readonly shift: AnalyzedShift;
-}
-
-interface JobScheduleConflict {
-  readonly firstJob: AnalyzedJob;
-  readonly secondJob: AnalyzedJob;
-}
+import { JobScheduleConflict } from '@playa-plan/types';
 
 /** Result of applying work-shift requirement and schedule-conflict rules. */
 export interface RegistrationJobSelectionAnalysis {

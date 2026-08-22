@@ -9,6 +9,7 @@ interface Registration {
   year: number;
   status: 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'WAITLISTED';
   createdAt: string;
+  updatedAt: string;
   user: {
     id: string;
     email: string;
@@ -94,6 +95,7 @@ interface RegistrationEditFormProps {
 }
 
 interface RegistrationEditData {
+  expectedUpdatedAt: string;
   status: 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'WAITLISTED';
   jobIds: string[];
   campingOptionIds: string[];
@@ -115,6 +117,7 @@ export function RegistrationEditForm({
   onClose,
 }: RegistrationEditFormProps) {
   const [formData, setFormData] = useState<RegistrationEditData>({
+    expectedUpdatedAt: registration.updatedAt,
     status: registration.status,
     jobIds: registration.jobs.map(j => j.job.id),
     campingOptionIds: registration.campingOptions?.map(co => co.campingOption.id) || [],

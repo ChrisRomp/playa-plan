@@ -225,6 +225,7 @@ describe('AdminRegistrationsController', () => {
     // Task 5.4.2: Test PUT /admin/registrations/:id endpoint with validation and audit logging
     it('should edit registration with validation and audit logging', async () => {
       const editData: AdminEditRegistrationDto = {
+        expectedUpdatedAt: mockRegistration.updatedAt.toISOString(),
         status: RegistrationStatus.WAITLISTED,
         notes: 'Admin update',
         sendNotification: false,
@@ -243,6 +244,7 @@ describe('AdminRegistrationsController', () => {
     // Task 5.4.6: Test validation errors return appropriate error messages
     it('should handle validation errors', async () => {
       const editData: AdminEditRegistrationDto = {
+        expectedUpdatedAt: mockRegistration.updatedAt.toISOString(),
         status: RegistrationStatus.CONFIRMED,
         notes: 'Invalid data',
       };
@@ -262,6 +264,7 @@ describe('AdminRegistrationsController', () => {
 
     it('should handle not found errors', async () => {
       const editData: AdminEditRegistrationDto = {
+        expectedUpdatedAt: mockRegistration.updatedAt.toISOString(),
         status: RegistrationStatus.CONFIRMED,
         notes: 'Update non-existent registration',
       };
@@ -279,6 +282,7 @@ describe('AdminRegistrationsController', () => {
 
     it('should handle conflict errors for capacity exceeded', async () => {
       const editData: AdminEditRegistrationDto = {
+        expectedUpdatedAt: mockRegistration.updatedAt.toISOString(),
         campingOptionIds: ['camping-option-1'],
         notes: 'Adding camping option',
       };
@@ -590,6 +594,7 @@ describe('AdminRegistrationsController', () => {
       );
 
       const editData: AdminEditRegistrationDto = {
+        expectedUpdatedAt: mockRegistration.updatedAt.toISOString(),
         status: RegistrationStatus.CONFIRMED,
         notes: 'Test update',
       };
@@ -607,6 +612,7 @@ describe('AdminRegistrationsController', () => {
       // This test ensures that the DTO validation is working
       // In a real application, the ValidationPipe would validate the incoming data
       const editData: AdminEditRegistrationDto = {
+        expectedUpdatedAt: mockRegistration.updatedAt.toISOString(),
         status: RegistrationStatus.CONFIRMED,
         notes: 'Valid update',
         sendNotification: true,

@@ -7,6 +7,7 @@ interface Registration {
   year: number;
   status: 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'WAITLISTED';
   createdAt: string;
+  updatedAt: string;
   user: {
     id: string;
     email: string;
@@ -33,6 +34,7 @@ interface Registration {
 }
 
 interface RegistrationEditData {
+  expectedUpdatedAt: string;
   status: 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'WAITLISTED';
   jobIds: string[];
   campingOptionIds: string[];

@@ -13,6 +13,7 @@ describe('RegistrationEditForm', () => {
     year: 2024,
     status: 'CONFIRMED' as const,
     createdAt: '2024-01-01T10:00:00Z',
+    updatedAt: '2024-01-01T11:00:00Z',
     user: {
       id: 'user-1',
       email: 'test@example.com',
@@ -442,6 +443,7 @@ describe('RegistrationEditForm', () => {
 
       await waitFor(() => {
         expect(defaultProps.onSubmit).toHaveBeenCalledWith({
+          expectedUpdatedAt: '2024-01-01T11:00:00Z',
           status: 'PENDING',
           jobIds: ['job-1', 'job-2'],
           campingOptionIds: ['camp-1', 'camp-2'],
