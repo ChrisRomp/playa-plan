@@ -119,6 +119,15 @@ export default function RegistrationPage() {
     () => new Set(preassignedJobs.map(({ jobId }) => jobId)),
     [preassignedJobs],
   );
+  const selectedJobs = useMemo(() => {
+    const jobsById = new Map(
+      [...jobs, ...preassignedJobs.map(({ job }) => job)].map(job => [job.id, job]),
+    );
+
+    return formData.jobs
+      .map(jobId => jobsById.get(jobId))
+      .filter((job): job is Job => job !== undefined);
+  }, [formData.jobs, jobs, preassignedJobs]);
   // Treat cancelled registrations as no registration for application entry purposes
   const isApplicationEntryFlow = isApplicationMode && (myRegistration === null || isCancelledRegistration);
   const visibleSteps = canCompleteApplication
@@ -413,22 +422,11 @@ export default function RegistrationPage() {
   };
 
   const selectedScheduledJobs = useMemo(
-    () => {
-      const jobsById = new Map(
-        [...jobs, ...preassignedJobs.map(({ job }) => job)].map(job => [
-          job.id,
-          job,
-        ]),
-      );
-
-      return [...jobsById.values()]
-        .filter(job => formData.jobs.includes(job.id))
-        .map(job => ({
-          ...job,
-          shift: job.shift ?? shifts.find(shift => shift.id === job.shiftId),
-        }));
-    },
-    [formData.jobs, jobs, preassignedJobs, shifts],
+    () => selectedJobs.map(job => ({
+      ...job,
+      shift: job.shift ?? shifts.find(shift => shift.id === job.shiftId),
+    })),
+    [selectedJobs, shifts],
   );
 
   const selectedJobConflicts = useMemo(
@@ -564,12 +562,8 @@ export default function RegistrationPage() {
 
         // Ensure all always required categories have at least one job
         alwaysRequiredCategories.forEach(category => {
-          const categoryJobs = alwaysRequiredJobs.filter(
-            job => job.categoryId === category.id
-          );
-
-          const selectedCategoryJobs = categoryJobs.filter(
-            job => formData.jobs.includes(job.id)
+          const selectedCategoryJobs = selectedJobs.filter(
+            job => job.categoryId === category.id,
           );
 
           if (selectedCategoryJobs.length === 0) {
@@ -585,8 +579,8 @@ export default function RegistrationPage() {
         );
 
         if (campingJobsRequired > 0) {
-          const selectedCampingJobs = campingOptionJobs.filter(
-            job => formData.jobs.includes(job.id)
+          const selectedCampingJobs = selectedJobs.filter(
+            job => selectedCampingCategoryIds.has(job.categoryId),
           );
 
           if (selectedCampingJobs.length < campingJobsRequired) {
@@ -1514,14 +1508,11 @@ export default function RegistrationPage() {
             <p className="text-gray-600 italic">No work shifts selected.</p>
           ) : (
             <ul className="list-disc pl-5">
-              {formData.jobs.map(jobId => {
-                const job = jobs.find(j => j.id === jobId);
-                return job ? (
-                  <li key={jobId}>
-                    {job.name} | {getShiftInfoForJob(job)}
-                  </li>
-                ) : null;
-              })}
+              {selectedJobs.map(job => (
+                <li key={job.id}>
+                  {job.name} | {getShiftInfoForJob(job)}
+                </li>
+              ))}
             </ul>
           )}
         </div>
@@ -1529,8 +1520,9 @@ export default function RegistrationPage() {
         {extraShiftCount > 0 && (
           <div className="mb-6 rounded border border-amber-300 bg-amber-50 p-4">
             <p className="font-medium text-amber-900">
-              You selected {formData.jobs.length} shifts, but only{' '}
-              {calculateRequiredJobCount()} are required.
+              You selected {formData.jobs.length} shifts, but the requirement is{' '}
+              {calculateRequiredJobCount()}{' '}
+              {calculateRequiredJobCount() === 1 ? 'shift' : 'shifts'}.
             </p>
             <label className="mt-3 flex items-start text-amber-900">
               <input

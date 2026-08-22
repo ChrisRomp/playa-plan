@@ -98,6 +98,7 @@ interface RegistrationEditData {
   campingOptionIds: string[];
   notes: string;
   sendNotification: boolean;
+  conflictOverrideConfirmed?: boolean;
 }
 
 interface RegistrationCancelData {
@@ -151,6 +152,7 @@ interface BackendRegistrationEditData {
   campingOptionIds: string[];
   notes: string;
   sendNotification: boolean;
+  conflictOverrideConfirmed?: boolean;
 }
 
 interface UserCampingOptionRegistration {
@@ -228,6 +230,7 @@ export const adminRegistrationsApi = {
       campingOptionIds: data.campingOptionIds,
       notes: data.notes || '', // Backend now expects 'notes' field
       sendNotification: data.sendNotification,
+      conflictOverrideConfirmed: data.conflictOverrideConfirmed,
     };
     
     await api.put(`/admin/registrations/${registrationId}`, backendData);

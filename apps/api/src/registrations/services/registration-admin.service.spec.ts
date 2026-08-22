@@ -5,6 +5,7 @@ import { PrismaService } from '../../common/prisma/prisma.service';
 import { AdminAuditService } from '../../admin-audit/services/admin-audit.service';
 import { AdminNotificationsService } from '../../notifications/services/admin-notifications.service';
 import { RegistrationCleanupService } from './registration-cleanup.service';
+import { RegistrationJobSelectionService } from './registration-job-selection.service';
 import { PaymentsService } from '../../payments/services/payments.service';
 import { 
   RegistrationStatus, 
@@ -135,6 +136,7 @@ describe('RegistrationAdminService', () => {
         { provide: AdminNotificationsService, useValue: mockAdminNotificationsService },
         { provide: RegistrationCleanupService, useValue: mockCleanupService },
         { provide: PaymentsService, useValue: mockPaymentsService },
+        RegistrationJobSelectionService,
       ],
     }).compile();
 
@@ -312,6 +314,124 @@ describe('RegistrationAdminService', () => {
       expect(adminAuditService.createMultipleAuditRecords).toHaveBeenCalled();
 
       expect(result.message).toBe('Registration successfully updated');
+    });
+
+    it('should reject conflicting work shifts without override confirmation', async () => {
+      const inputShift = {
+        id: 'shift-1',
+        name: 'Monday Morning',
+        dayOfWeek: 'MONDAY',
+        startTime: '09:00',
+        endTime: '13:00',
+      };
+      const inputRegistration = {
+        ...mockRegistration,
+        jobs: [
+          {
+            jobId: 'job-1',
+            job: {
+              id: 'job-1',
+              name: 'Kitchen Duty',
+              active: true,
+              shift: inputShift,
+            },
+          },
+        ],
+      };
+      const inputEditData: AdminEditRegistrationDto = {
+        jobIds: ['job-1', 'job-2'],
+      };
+
+      prismaService.$transaction.mockImplementation(async callback =>
+        callback(prismaService),
+      );
+      (prismaService.registration.findUnique as jest.Mock).mockResolvedValue(
+        inputRegistration,
+      );
+      (prismaService.job.findUnique as jest.Mock).mockResolvedValue({
+        id: 'job-2',
+        name: 'Gate Duty',
+        active: true,
+        shift: {
+          ...inputShift,
+          id: 'shift-2',
+          name: 'Overlapping Monday Shift',
+          startTime: '12:00',
+          endTime: '14:00',
+        },
+      });
+
+      await expect(
+        service.editRegistration('reg-123', inputEditData, 'admin-123'),
+      ).rejects.toThrow(
+        'Schedule conflicts require explicit administrator override confirmation',
+      );
+      expect(prismaService.registrationJob.create).not.toHaveBeenCalled();
+    });
+
+    it('should save conflicting work shifts with override confirmation', async () => {
+      const inputShift = {
+        id: 'shift-1',
+        name: 'Monday Morning',
+        dayOfWeek: 'MONDAY',
+        startTime: '09:00',
+        endTime: '13:00',
+      };
+      const inputRegistration = {
+        ...mockRegistration,
+        jobs: [
+          {
+            jobId: 'job-1',
+            job: {
+              id: 'job-1',
+              name: 'Kitchen Duty',
+              active: true,
+              shift: inputShift,
+            },
+          },
+        ],
+      };
+      const inputEditData: AdminEditRegistrationDto = {
+        jobIds: ['job-1', 'job-2'],
+        conflictOverrideConfirmed: true,
+      };
+
+      prismaService.$transaction.mockImplementation(async callback =>
+        callback(prismaService),
+      );
+      (prismaService.registration.findUnique as jest.Mock).mockResolvedValue(
+        inputRegistration,
+      );
+      (prismaService.job.findUnique as jest.Mock).mockResolvedValue({
+        id: 'job-2',
+        name: 'Gate Duty',
+        active: true,
+        shift: {
+          ...inputShift,
+          id: 'shift-2',
+          name: 'Overlapping Monday Shift',
+          startTime: '12:00',
+          endTime: '14:00',
+        },
+      });
+      (prismaService.registrationJob.create as jest.Mock).mockResolvedValue({});
+      adminAuditService.createMultipleAuditRecords.mockResolvedValue([
+        mockAuditRecord,
+      ]);
+
+      const actualResult = await service.editRegistration(
+        'reg-123',
+        inputEditData,
+        'admin-123',
+      );
+
+      expect(prismaService.registrationJob.create).toHaveBeenCalledWith({
+        data: {
+          registrationId: 'reg-123',
+          jobId: 'job-2',
+        },
+      });
+      expect(actualResult.message).toBe('Registration successfully updated');
     });
 
     it('should reject adding an inactive job while preserving existing assignments', async () => {

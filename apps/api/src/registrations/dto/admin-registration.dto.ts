@@ -61,6 +61,15 @@ export class AdminEditRegistrationDto {
   @IsOptional()
   @IsBoolean({ message: 'Send notification must be a boolean' })
   sendNotification?: boolean = false;
+
+  @ApiPropertyOptional({
+    description: 'Confirms an administrator intends to save conflicting work shifts',
+    example: false,
+    default: false,
+  })
+  @IsOptional()
+  @IsBoolean({ message: 'Conflict override confirmation must be a boolean' })
+  conflictOverrideConfirmed?: boolean = false;
 }
 
 /**

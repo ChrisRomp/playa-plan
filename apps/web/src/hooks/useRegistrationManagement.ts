@@ -38,6 +38,7 @@ interface RegistrationEditData {
   campingOptionIds: string[];
   notes: string;
   sendNotification: boolean;
+  conflictOverrideConfirmed?: boolean;
 }
 
 interface RegistrationCancelData {

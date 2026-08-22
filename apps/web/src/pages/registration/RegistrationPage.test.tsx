@@ -546,6 +546,100 @@ describe('RegistrationPage', () => {
     expect(screen.queryByText('Your Profile Information')).not.toBeInTheDocument();
   });
 
+  it('validates and reviews filtered administrator-assigned shifts', async () => {
+    const inputAssignedJobs = [
+      {
+        ...mockJobs[0],
+        id: 'inactive-kitchen-job',
+        name: 'Inactive Kitchen Shift',
+        active: false,
+        shiftId: 'shift1',
+        shift: mockShifts[0],
+      },
+      {
+        ...mockJobs[1],
+        id: 'assigned-cleaning-job',
+        name: 'Assigned Cleaning Shift',
+        active: true,
+        shiftId: 'shift2',
+        shift: mockShifts[1],
+      },
+      {
+        ...mockJobs[0],
+        id: 'staff-only-job',
+        name: 'Staff-only Assigned Shift',
+        active: true,
+        categoryId: 'staff-category',
+        category: {
+          id: 'staff-category',
+          name: 'Staff',
+          description: 'Staff duties',
+          staffOnly: true,
+          alwaysRequired: false,
+        },
+        shiftId: 'shift3',
+        shift: mockShifts[2],
+      },
+    ];
+    vi.spyOn(useConfigModule, 'useConfig').mockReturnValue({
+      config: {
+        name: 'Test Camp',
+        description: 'Test Description',
+        homePageBlurb: 'Welcome!',
+        registrationOpen: true,
+        earlyRegistrationOpen: false,
+        currentYear: 2025,
+        registrationTerms: '<p>These are the test terms and conditions.</p>',
+        applicationApprovalRequired: true,
+      },
+      isLoading: false,
+      error: null,
+      refreshConfig: vi.fn(),
+      isConnecting: false,
+      isConnected: true,
+      connectionError: null,
+    });
+    vi.spyOn(useCampRegistrationModule, 'useCampRegistration').mockReturnValue({
+      campRegistration: {
+        campingOptions: [{ campingOptionId: 'option1' }],
+        customFieldValues: [],
+        jobRegistrations: [],
+        hasRegistration: true,
+      },
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    vi.spyOn(useMyRegistrationModule, 'useMyRegistration').mockReturnValue({
+      registration: {
+        id: 'registration-1',
+        status: 'APPLICATION_APPROVED',
+        year: 2025,
+        createdAt: '2025-05-01T00:00:00Z',
+        jobs: inputAssignedJobs.map(job => ({
+          jobId: job.id,
+          job,
+        })),
+      },
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    renderWithAuth();
+
+    await screen.findByText('Select Work Shifts');
+    fireEvent.click(screen.getByText('Continue'));
+
+    await screen.findByText('Review & Accept Terms');
+    expect(screen.getByText(/Inactive Kitchen Shift \|/)).toBeInTheDocument();
+    expect(screen.getByText(/Assigned Cleaning Shift \|/)).toBeInTheDocument();
+    expect(screen.getByText(/Staff-only Assigned Shift \|/)).toBeInTheDocument();
+    expect(
+      screen.queryByText('You must select at least one Kitchen shift'),
+    ).not.toBeInTheDocument();
+  });
+
   it('allows APPLICATION_SUBMITTED users to complete when approval mode is disabled', async () => {
     // Scenario: admin disables approval mode while user has APPLICATION_SUBMITTED status
     vi.spyOn(useConfigModule, 'useConfig').mockReturnValue({
@@ -1155,7 +1249,7 @@ describe('RegistrationPage', () => {
         expect(screen.getByText('Review & Accept Terms')).toBeInTheDocument();
       });
       expect(
-        screen.getByText('You selected 3 shifts, but only 2 are required.'),
+        screen.getByText('You selected 3 shifts, but the requirement is 2 shifts.'),
       ).toBeInTheDocument();
 
       fireEvent.click(screen.getByLabelText('I accept the terms and conditions'));

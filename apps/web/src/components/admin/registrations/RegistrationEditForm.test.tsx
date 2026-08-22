@@ -410,6 +410,7 @@ describe('RegistrationEditForm', () => {
         expect(defaultProps.onSubmit).toHaveBeenCalledWith(
           expect.objectContaining({
             jobIds: ['job-1', 'job-3'],
+            conflictOverrideConfirmed: true,
           }),
         );
       });
@@ -446,6 +447,7 @@ describe('RegistrationEditForm', () => {
           campingOptionIds: ['camp-1', 'camp-2'],
           notes: 'Updated by admin',
           sendNotification: true,
+          conflictOverrideConfirmed: false,
         });
       });
     });

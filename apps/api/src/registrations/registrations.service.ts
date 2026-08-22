@@ -1832,7 +1832,9 @@ export class RegistrationsService {
     if (analysis.extraCount > 0 && !extraShiftsConfirmed) {
       throw new BadRequestException(
         `You selected ${analysis.selectedCount} work shifts, but ` +
-          `${analysis.requiredCount} are required. Confirm the extra shifts before continuing.`,
+          `${analysis.requiredCount} ${
+            analysis.requiredCount === 1 ? 'shift is' : 'shifts are'
+          } required. Confirm the extra shifts before continuing.`,
       );
     }
   }

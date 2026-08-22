@@ -99,6 +99,7 @@ interface RegistrationEditData {
   campingOptionIds: string[];
   notes: string;
   sendNotification: boolean;
+  conflictOverrideConfirmed: boolean;
 }
 
 /**
@@ -119,10 +120,10 @@ export function RegistrationEditForm({
     campingOptionIds: registration.campingOptions?.map(co => co.campingOption.id) || [],
     notes: '',
     sendNotification: false,
+    conflictOverrideConfirmed: false,
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [conflictOverrideConfirmed, setConflictOverrideConfirmed] = useState(false);
 
   const originallyAssignedJobIds = useMemo(
     () => new Set(registration.jobs.map((j) => j.job.id)),
@@ -176,12 +177,12 @@ export function RegistrationEditForm({
   };
 
   const handleJobToggle = (jobId: string) => {
-    setConflictOverrideConfirmed(false);
     setFormData(prev => ({
       ...prev,
       jobIds: prev.jobIds.includes(jobId)
         ? prev.jobIds.filter(id => id !== jobId)
-        : [...prev.jobIds, jobId]
+        : [...prev.jobIds, jobId],
+      conflictOverrideConfirmed: false,
     }));
   };
 
@@ -214,7 +215,7 @@ export function RegistrationEditForm({
       newErrors.status = 'Use the cancel registration function to cancel registrations.';
     }
 
-    if (jobScheduleConflicts.length > 0 && !conflictOverrideConfirmed) {
+    if (jobScheduleConflicts.length > 0 && !formData.conflictOverrideConfirmed) {
       newErrors.conflictOverride =
         'Confirm that you intend to override the schedule conflicts.';
     }
@@ -416,9 +417,13 @@ export function RegistrationEditForm({
                         <input
                           type="checkbox"
                           className="mt-1 h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
-                          checked={conflictOverrideConfirmed}
+                          checked={formData.conflictOverrideConfirmed}
                           onChange={() => {
-                            setConflictOverrideConfirmed(previous => !previous);
+                            setFormData(previous => ({
+                              ...previous,
+                              conflictOverrideConfirmed:
+                                !previous.conflictOverrideConfirmed,
+                            }));
                             setErrors(previousErrors => {
                               const remainingErrors = { ...previousErrors };
                               delete remainingErrors.conflictOverride;
