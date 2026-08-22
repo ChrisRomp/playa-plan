@@ -5,6 +5,7 @@ import { AuthenticatedRequest } from '../../auth/types/safe-user';
 import { GenerateTicketReceiptReportDto } from '../dto/generate-ticket-receipt-report.dto';
 import { GenerateWorkScheduleReportDto } from '../dto/generate-work-schedule-report.dto';
 import { ReportConfigurationService } from '../services/report-configuration.service';
+import { ScheduleExceptionsReportService } from '../services/schedule-exceptions-report.service';
 import { TicketReceiptReportService } from '../services/ticket-receipt-report.service';
 import { WorkScheduleReportService } from '../services/work-schedule-report.service';
 import { ReportsController } from './reports.controller';
@@ -13,6 +14,7 @@ describe('ReportsController', () => {
   const mockGetSettings = jest.fn();
   const mockGenerateTicketReceipt = jest.fn();
   const mockGenerateWorkSchedule = jest.fn();
+  const mockGetScheduleExceptions = jest.fn();
   const mockSetHeader = jest.fn();
   let controller: ReportsController;
 
@@ -27,7 +29,10 @@ describe('ReportsController', () => {
       } as unknown as TicketReceiptReportService,
       {
         generate: mockGenerateWorkSchedule,
-      } as unknown as WorkScheduleReportService
+      } as unknown as WorkScheduleReportService,
+      {
+        getReportData: mockGetScheduleExceptions,
+      } as unknown as ScheduleExceptionsReportService,
     );
   });
 
@@ -48,6 +53,15 @@ describe('ReportsController', () => {
     const actualSettings = await controller.getTicketReceiptConfiguration();
 
     expect(actualSettings).toBe(expectedSettings);
+  });
+
+  it('shouldReturnScheduleExceptions', async () => {
+    const expectedReport = { year: 2026, exceptions: [] };
+    mockGetScheduleExceptions.mockResolvedValue(expectedReport);
+
+    await expect(controller.getScheduleExceptions()).resolves.toBe(
+      expectedReport,
+    );
   });
 
   it('shouldReturnPdfWithSafeDownloadHeaders', async () => {

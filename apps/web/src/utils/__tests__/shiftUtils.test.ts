@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { getFriendlyDayName, formatTime, getTimeInMinutes } from '../shiftUtils';
+import {
+  findJobScheduleConflicts,
+  formatTime,
+  getFriendlyDayName,
+  getTimeInMinutes,
+} from '../shiftUtils';
 
 describe('shiftUtils', () => {
   describe('getFriendlyDayName', () => {
@@ -65,6 +70,94 @@ describe('shiftUtils', () => {
       expect(getTimeInMinutes('8:00')).toBe(480);
       expect(getTimeInMinutes('08:00')).toBe(480);
       expect(getTimeInMinutes('13:30')).toBe(810);
+    });
+  });
+
+  describe('findJobScheduleConflicts', () => {
+    const createJob = (
+      id: string,
+      dayOfWeek: string,
+      startTime: string,
+      endTime: string,
+      shiftId = `shift-${id}`,
+    ) => ({
+      id,
+      name: `Job ${id}`,
+      shift: {
+        id: shiftId,
+        name: `Shift ${id}`,
+        dayOfWeek,
+        startTime,
+        endTime,
+      },
+    });
+
+    it.each([
+      {
+        name: 'same shift',
+        first: createJob('first', 'FRIDAY', '09:00', '10:00', 'shared-shift'),
+        second: createJob('second', 'FRIDAY', '09:00', '10:00', 'shared-shift'),
+        expectedConflicts: 1,
+      },
+      {
+        name: 'partial overlap',
+        first: createJob('first', 'FRIDAY', '09:00', '11:00'),
+        second: createJob('second', 'FRIDAY', '10:00', '12:00'),
+        expectedConflicts: 1,
+      },
+      {
+        name: 'contained overlap',
+        first: createJob('first', 'FRIDAY', '09:00', '13:00'),
+        second: createJob('second', 'FRIDAY', '10:00', '12:00'),
+        expectedConflicts: 1,
+      },
+      {
+        name: 'touching boundary',
+        first: createJob('first', 'FRIDAY', '09:00', '10:00'),
+        second: createJob('second', 'FRIDAY', '10:00', '11:00'),
+        expectedConflicts: 0,
+      },
+      {
+        name: 'overnight overlap',
+        first: createJob('first', 'FRIDAY', '23:00', '01:00'),
+        second: createJob('second', 'SATURDAY', '00:30', '02:00'),
+        expectedConflicts: 1,
+      },
+      {
+        name: '24-hour shift',
+        first: createJob('first', 'FRIDAY', '09:00', '09:00'),
+        second: createJob('second', 'SATURDAY', '08:00', '10:00'),
+        expectedConflicts: 1,
+      },
+      {
+        name: 'different non-overlapping days',
+        first: createJob('first', 'FRIDAY', '09:00', '10:00'),
+        second: createJob('second', 'SATURDAY', '09:00', '10:00'),
+        expectedConflicts: 0,
+      },
+      {
+        name: 'ignored pre-opening bucket',
+        first: createJob('first', 'PRE_OPENING', '09:00', '12:00', 'shared-shift'),
+        second: createJob('second', 'PRE_OPENING', '10:00', '11:00', 'shared-shift'),
+        expectedConflicts: 0,
+      },
+      {
+        name: 'ignored post-event bucket',
+        first: createJob('first', 'POST_EVENT', '09:00', '12:00'),
+        second: createJob('second', 'POST_EVENT', '10:00', '11:00'),
+        expectedConflicts: 0,
+      },
+    ])('should analyze $name correctly', ({ first, second, expectedConflicts }) => {
+      expect(findJobScheduleConflicts([first, second])).toHaveLength(expectedConflicts);
+    });
+
+    it('should ignore jobs without shift details', () => {
+      expect(
+        findJobScheduleConflicts([
+          { id: 'unknown', name: 'Unknown schedule' },
+          createJob('known', 'FRIDAY', '09:00', '10:00'),
+        ]),
+      ).toEqual([]);
     });
   });
 });

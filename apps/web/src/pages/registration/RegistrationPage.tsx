@@ -1,4 +1,11 @@
-import { useState, useEffect, useContext, useCallback, useMemo } from 'react';
+import {
+  useState,
+  useEffect,
+  useContext,
+  useCallback,
+  useMemo,
+  useRef,
+} from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useRegistration, RegistrationFormData } from '../../hooks/useRegistration';
 import { useCampingOptions } from '../../hooks/useCampingOptions';
@@ -8,7 +15,11 @@ import { useConfig } from '../../hooks/useConfig';
 import { useMyRegistration } from '../../hooks/useMyRegistration';
 import { AuthContext } from '../../store/authUtils';
 import { JobCategory, Job, CampingOptionField, api } from '../../lib/api';
-import { getFriendlyDayName, formatTime } from '../../utils/shiftUtils';
+import {
+  findJobScheduleConflicts,
+  formatTime,
+  getFriendlyDayName,
+} from '../../utils/shiftUtils';
 import {
   canUserRegister,
   getRegistrationStatusMessage,
@@ -18,6 +29,20 @@ import { isStaffOrAdmin } from '../../utils/userUtils';
 import { PATHS } from '../../routes';
 import PaymentButton from '../../components/payment/PaymentButton';
 import { ApplicationStatusBanner } from '../../components/registration/ApplicationStatusBanner';
+import { isAxiosError } from 'axios';
+
+const getApiErrorMessage = (error: unknown, fallback: string): string => {
+  if (!isAxiosError(error)) {
+    return fallback;
+  }
+
+  const message = error.response?.data?.message;
+  if (Array.isArray(message)) {
+    return message.join(', ');
+  }
+
+  return typeof message === 'string' ? message : fallback;
+};
 
 /**
  * RegistrationPage component for user camp registration
@@ -67,6 +92,7 @@ export default function RegistrationPage() {
     campingOptions: [],
     customFields: {},
     jobs: [],
+    extraShiftsConfirmed: false,
     acceptedTerms: false,
   });
   
@@ -75,6 +101,7 @@ export default function RegistrationPage() {
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [registrationId, setRegistrationId] = useState<string | null>(null);
   const [approvedRegistrationCompleted, setApprovedRegistrationCompleted] = useState(false);
+  const hydratedRegistrationId = useRef<string | null>(null);
 
   const isApplicationMode = config?.applicationApprovalRequired ?? false;
   const registrationStatus = myRegistration?.status ?? null;
@@ -84,6 +111,23 @@ export default function RegistrationPage() {
   const isApplicationDeclined = registrationStatus === 'APPLICATION_DECLINED';
   // User can complete if explicitly approved OR if approval mode was disabled while they had a pending application
   const canCompleteApplication = isApplicationApproved || (!isApplicationMode && isApplicationSubmitted);
+  const preassignedJobs = useMemo(
+    () => (canCompleteApplication ? myRegistration?.jobs ?? [] : []),
+    [canCompleteApplication, myRegistration?.jobs],
+  );
+  const preassignedJobIds = useMemo(
+    () => new Set(preassignedJobs.map(({ jobId }) => jobId)),
+    [preassignedJobs],
+  );
+  const selectedJobs = useMemo(() => {
+    const jobsById = new Map(
+      [...jobs, ...preassignedJobs.map(({ job }) => job)].map(job => [job.id, job]),
+    );
+
+    return formData.jobs
+      .map(jobId => jobsById.get(jobId))
+      .filter((job): job is Job => job !== undefined);
+  }, [formData.jobs, jobs, preassignedJobs]);
   // Treat cancelled registrations as no registration for application entry purposes
   const isApplicationEntryFlow = isApplicationMode && (myRegistration === null || isCancelledRegistration);
   const visibleSteps = canCompleteApplication
@@ -126,9 +170,12 @@ export default function RegistrationPage() {
     }
   }, [profile]);
 
+  const canSeeStaffJobs = isStaffOrAdmin(user);
   const alwaysRequiredCategories = useMemo((): JobCategory[] => {
-    return jobCategories.filter(category => category.alwaysRequired);
-  }, [jobCategories]);
+    return jobCategories.filter(
+      category => category.alwaysRequired && (!category.staffOnly || canSeeStaffJobs),
+    );
+  }, [canSeeStaffJobs, jobCategories]);
 
   const alwaysRequiredCategoryIds = useMemo(
     () => new Set(alwaysRequiredCategories.map(category => category.id)),
@@ -145,7 +192,6 @@ export default function RegistrationPage() {
     [selectedCampingOptions]
   );
 
-  const canSeeStaffJobs = isStaffOrAdmin(user);
   const visibleJobs = useMemo(
     () => jobs.filter(job => !job.staffOnly || canSeeStaffJobs),
     [canSeeStaffJobs, jobs]
@@ -290,6 +336,24 @@ export default function RegistrationPage() {
   }, [myRegistration]);
 
   useEffect(() => {
+    if (
+      !canCompleteApplication ||
+      !myRegistration?.jobs?.length ||
+      hydratedRegistrationId.current === myRegistration.id
+    ) {
+      return;
+    }
+
+    const assignedJobIds = myRegistration.jobs.map(job => job.jobId);
+    hydratedRegistrationId.current = myRegistration.id;
+    setFormData(previousData => ({
+      ...previousData,
+      jobs: [...new Set([...assignedJobIds, ...previousData.jobs])],
+      extraShiftsConfirmed: false,
+    }));
+  }, [canCompleteApplication, myRegistration]);
+
+  useEffect(() => {
     if (canCompleteApplication && currentStep < 4) {
       setCurrentStep(4);
     }
@@ -356,6 +420,24 @@ export default function RegistrationPage() {
     
     return campingJobsRequired + alwaysRequiredCount;
   };
+
+  const selectedScheduledJobs = useMemo(
+    () => selectedJobs.map(job => ({
+      ...job,
+      shift: job.shift ?? shifts.find(shift => shift.id === job.shiftId),
+    })),
+    [selectedJobs, shifts],
+  );
+
+  const selectedJobConflicts = useMemo(
+    () => findJobScheduleConflicts(selectedScheduledJobs),
+    [selectedScheduledJobs],
+  );
+
+  const extraShiftCount = Math.max(
+    0,
+    formData.jobs.length - calculateRequiredJobCount(),
+  );
 
   // Get all custom fields for selected camping options
   const getAllCustomFields = (): CampingOptionField[] => {
@@ -466,6 +548,10 @@ export default function RegistrationPage() {
       });
     }
     else if (currentStep === 4) {
+      if (selectedJobConflicts.length > 0) {
+        errors.jobs = 'Selected work shifts cannot overlap.';
+      }
+
       // Users with the allowNoJob flag may complete registration without selecting any shifts
       if (!user?.allowNoJob) {
         // Validate jobs selection
@@ -476,12 +562,8 @@ export default function RegistrationPage() {
 
         // Ensure all always required categories have at least one job
         alwaysRequiredCategories.forEach(category => {
-          const categoryJobs = alwaysRequiredJobs.filter(
-            job => job.categoryId === category.id
-          );
-
-          const selectedCategoryJobs = categoryJobs.filter(
-            job => formData.jobs.includes(job.id)
+          const selectedCategoryJobs = selectedJobs.filter(
+            job => job.categoryId === category.id,
           );
 
           if (selectedCategoryJobs.length === 0) {
@@ -497,8 +579,10 @@ export default function RegistrationPage() {
         );
 
         if (campingJobsRequired > 0) {
-          const selectedCampingJobs = campingOptionJobs.filter(
-            job => formData.jobs.includes(job.id)
+          const selectedCampingJobs = selectedJobs.filter(
+            job =>
+              selectedCampingCategoryIds.has(job.categoryId) &&
+              !alwaysRequiredCategoryIds.has(job.categoryId),
           );
 
           if (selectedCampingJobs.length < campingJobsRequired) {
@@ -524,6 +608,10 @@ export default function RegistrationPage() {
       // Validate terms acceptance
       if (!formData.acceptedTerms) {
         errors.acceptedTerms = 'You must accept the terms to continue';
+      }
+      if (extraShiftCount > 0 && !formData.extraShiftsConfirmed) {
+        errors.extraShiftsConfirmed =
+          'Confirm that you intend to take the additional shifts.';
       }
     }
     // No validation needed for step 6 (payment) as it's handled by the payment component
@@ -566,7 +654,8 @@ export default function RegistrationPage() {
     }
 
     const response = await api.post('/registrations/complete', {
-      jobs: formData.jobs,
+      jobs: formData.jobs.filter(jobId => !preassignedJobIds.has(jobId)),
+      extraShiftsConfirmed: formData.extraShiftsConfirmed,
       acceptedTerms: formData.acceptedTerms,
       deferPayment,
     });
@@ -619,13 +708,50 @@ export default function RegistrationPage() {
       
       return {
         ...prev,
-        campingOptions: updatedOptions
+        campingOptions: updatedOptions,
+        extraShiftsConfirmed: false,
       };
     });
   };
 
   // Handle job selection
   const handleJobChange = (jobId: string) => {
+    if (preassignedJobIds.has(jobId)) {
+      return;
+    }
+
+    const isSelected = formData.jobs.includes(jobId);
+    if (!isSelected) {
+      const candidateJob = jobs.find(job => job.id === jobId);
+      if (candidateJob) {
+        const candidateWithSchedule = {
+          ...candidateJob,
+          shift:
+            candidateJob.shift ??
+            shifts.find(shift => shift.id === candidateJob.shiftId),
+        };
+        const newConflicts = findJobScheduleConflicts([
+          ...selectedScheduledJobs,
+          candidateWithSchedule,
+        ]).filter(
+          conflict =>
+            conflict.firstJob.id === jobId || conflict.secondJob.id === jobId,
+        );
+        if (newConflicts.length > 0) {
+          const conflictingNames = newConflicts.map(conflict =>
+            conflict.firstJob.id === jobId
+              ? conflict.secondJob.name
+              : conflict.firstJob.name,
+          );
+          setFormErrors(previousErrors => ({
+            ...previousErrors,
+            jobs: `${candidateJob.name} conflicts with ${conflictingNames.join(', ')}.`,
+          }));
+          return;
+        }
+      }
+    }
+
     setFormData(prev => {
       const updatedJobs = prev.jobs.includes(jobId)
         ? prev.jobs.filter(id => id !== jobId)
@@ -633,8 +759,14 @@ export default function RegistrationPage() {
       
       return {
         ...prev,
-        jobs: updatedJobs
+        jobs: updatedJobs,
+        extraShiftsConfirmed: false,
       };
+    });
+    setFormErrors(previousErrors => {
+      const remainingErrors = { ...previousErrors };
+      delete remainingErrors.jobs;
+      return remainingErrors;
     });
   };
 
@@ -1158,27 +1290,60 @@ export default function RegistrationPage() {
                 const spotsAvailable = job.maxRegistrations - (job.currentRegistrations || 0);
                 const isJobFull = spotsAvailable <= 0;
                 const isJobSelected = formData.jobs.includes(job.id);
+                const isPreassigned = preassignedJobIds.has(job.id);
+                const candidateWithSchedule = {
+                  ...job,
+                  shift: job.shift ?? shifts.find(shift => shift.id === job.shiftId),
+                };
+                const candidateConflicts = isJobSelected
+                  ? []
+                  : findJobScheduleConflicts([
+                      ...selectedScheduledJobs,
+                      candidateWithSchedule,
+                    ]).filter(
+                      conflict =>
+                        conflict.firstJob.id === job.id ||
+                        conflict.secondJob.id === job.id,
+                    );
+                const conflictingJobNames = candidateConflicts.map(conflict =>
+                  conflict.firstJob.id === job.id
+                    ? conflict.secondJob.name
+                    : conflict.firstJob.name,
+                );
+                const isJobUnavailable =
+                  isPreassigned ||
+                  (!isJobSelected && (isJobFull || candidateConflicts.length > 0));
                 
                 return (
-                  <div key={job.id} className={`border p-3 rounded ${isJobFull && !isJobSelected ? 'bg-gray-100' : 'bg-white'}`}>
-                    <label className={`flex items-start ${isJobFull && !isJobSelected ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+                  <div key={job.id} className={`border p-3 rounded ${isJobUnavailable ? 'bg-gray-100' : 'bg-white'}`}>
+                    <label className={`flex items-start ${isJobUnavailable ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
                       <input
                         type="checkbox"
                         className="mt-1 h-4 w-4"
                         checked={isJobSelected}
                         onChange={() => handleJobChange(job.id)}
-                        disabled={isJobFull && !isJobSelected}
+                        disabled={isJobUnavailable}
                       />
                       <div className="ml-2">
-                        <div className={`font-medium ${isJobFull && !isJobSelected ? 'text-gray-500' : ''}`}>
+                        <div className={`font-medium ${isJobUnavailable ? 'text-gray-500' : ''}`}>
                           {job.name}
                         </div>
-                        <div className={`text-sm ${isJobFull && !isJobSelected ? 'text-gray-400' : 'text-gray-600'}`}>
+                        <div className={`text-sm ${isJobUnavailable ? 'text-gray-400' : 'text-gray-600'}`}>
                           {getShiftInfoForJob(job)}
                         </div>
-                        <div className={`text-sm ${isJobFull && !isJobSelected ? 'text-gray-400' : 'text-gray-600'}`}>
+                        <div className={`text-sm ${isJobUnavailable ? 'text-gray-400' : 'text-gray-600'}`}>
                           Spots: {spotsAvailable} of {job.maxRegistrations} available{isJobFull && !isJobSelected && <span className="ml-1 text-red-600">(Full)</span>}
                         </div>
+                        {isPreassigned && (
+                          <div className="text-sm text-amber-700">
+                            Assigned by an administrator
+                          </div>
+                        )}
+                        {conflictingJobNames.length > 0 && (
+                          <div className="text-sm text-red-600">
+                            Conflicts with {conflictingJobNames.join(', ')}
+                          </div>
+                        )}
                       </div>
                     </label>
                   </div>
@@ -1218,6 +1383,25 @@ export default function RegistrationPage() {
             ? 'Work shifts are optional for your account. You may select any shifts you would like to sign up for.'
             : `You need to select at least ${requiredCount} shifts to complete registration.`}
         </p>
+
+        {preassignedJobs.length > 0 && (
+          <div className="mb-4 rounded border border-amber-200 bg-amber-50 p-3">
+            <p className="font-medium text-amber-900">
+              Administrator-assigned shifts
+            </p>
+            <ul className="mt-2 list-disc pl-5 text-sm text-amber-900">
+              {preassignedJobs.map(({ job }) => (
+                <li key={job.id}>
+                  {job.name}: {getShiftInfoForJob(job)}
+                </li>
+              ))}
+            </ul>
+            <p className="mt-2 text-sm text-amber-800">
+              These assignments count toward your required shifts and cannot be
+              removed here.
+            </p>
+          </div>
+        )}
 
         {!jobsAreOptional && misconfiguredCampingOptions.length > 0 && (
           <div className="text-red-700 mb-4 p-3 bg-red-50 border border-red-200 rounded">
@@ -1326,17 +1510,50 @@ export default function RegistrationPage() {
             <p className="text-gray-600 italic">No work shifts selected.</p>
           ) : (
             <ul className="list-disc pl-5">
-              {formData.jobs.map(jobId => {
-                const job = jobs.find(j => j.id === jobId);
-                return job ? (
-                  <li key={jobId}>
-                    {job.name} | {getShiftInfoForJob(job)}
-                  </li>
-                ) : null;
-              })}
+              {selectedJobs.map(job => (
+                <li key={job.id}>
+                  {job.name} | {getShiftInfoForJob(job)}
+                </li>
+              ))}
             </ul>
           )}
         </div>
+
+        {extraShiftCount > 0 && (
+          <div className="mb-6 rounded border border-amber-300 bg-amber-50 p-4">
+            <p className="font-medium text-amber-900">
+              You selected {formData.jobs.length} shifts, but the requirement is{' '}
+              {calculateRequiredJobCount()}{' '}
+              {calculateRequiredJobCount() === 1 ? 'shift' : 'shifts'}.
+            </p>
+            <label className="mt-3 flex items-start text-amber-900">
+              <input
+                type="checkbox"
+                className="mt-1 h-4 w-4"
+                checked={formData.extraShiftsConfirmed}
+                onChange={() => {
+                  setFormData(previousData => ({
+                    ...previousData,
+                    extraShiftsConfirmed: !previousData.extraShiftsConfirmed,
+                  }));
+                  setFormErrors(previousErrors => {
+                    const remainingErrors = { ...previousErrors };
+                    delete remainingErrors.extraShiftsConfirmed;
+                    return remainingErrors;
+                  });
+                }}
+              />
+              <span className="ml-2">
+                I understand and intend to take these additional shifts.
+              </span>
+            </label>
+            {formErrors.extraShiftsConfirmed && (
+              <div className="mt-2 text-sm text-red-600">
+                {formErrors.extraShiftsConfirmed}
+              </div>
+            )}
+          </div>
+        )}
         
         <div className="mb-6">
           <h3 className="text-lg font-medium mb-2">Terms & Conditions</h3>
@@ -1424,7 +1641,13 @@ export default function RegistrationPage() {
                   return { registrationId: actualRegistrationId };
                 } catch (err) {
                   console.error('Registration creation failed:', err);
-                  setFormErrors(prev => ({ ...prev, payment: 'Failed to create registration. Please try again.' }));
+                  setFormErrors(prev => ({
+                    ...prev,
+                    payment: getApiErrorMessage(
+                      err,
+                      'Failed to create registration. Please try again.',
+                    ),
+                  }));
                   throw err;
                 }
               }}
@@ -1476,7 +1699,13 @@ export default function RegistrationPage() {
                   navigate('/dashboard');
                 } catch (err) {
                   console.error('Registration completion failed:', err);
-                  setFormErrors(prev => ({ ...prev, payment: 'Failed to complete registration. Please try again.' }));
+                  setFormErrors(prev => ({
+                    ...prev,
+                    payment: getApiErrorMessage(
+                      err,
+                      'Failed to complete registration. Please try again.',
+                    ),
+                  }));
                 }
               }}
               className="w-full bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium"

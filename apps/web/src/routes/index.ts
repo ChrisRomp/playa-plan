@@ -154,6 +154,12 @@ export const ROUTES = {
     requiresAuth: true,
     allowedRoles: [ROLES.STAFF, ROLES.ADMIN],
   },
+  REPORTS_SCHEDULE_EXCEPTIONS: {
+    path: '/reports/schedule-exceptions',
+    name: 'Schedule Exceptions Report',
+    requiresAuth: true,
+    allowedRoles: [ROLES.STAFF, ROLES.ADMIN],
+  },
   REPORTS_PAYMENTS: {
     path: '/reports/payments',
     name: 'Payment Reports',

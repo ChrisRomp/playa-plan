@@ -1,6 +1,10 @@
 /**
  * Shared utility functions for shift-related formatting
  */
+export {
+  findJobScheduleConflicts,
+  type JobScheduleConflict,
+} from '@playa-plan/types';
 
 /**
  * Convert a day enum value to a friendly display name

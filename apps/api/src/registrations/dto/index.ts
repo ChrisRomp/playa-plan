@@ -1,4 +1,4 @@
-export { CreateRegistrationDto, AddJobToRegistrationDto } from './create-registration.dto';
+export { CreateRegistrationDto } from './create-registration.dto';
 export { UpdateRegistrationDto } from './update-registration.dto';
 export { CreateCampRegistrationDto } from './create-camp-registration.dto';
 export { CompleteRegistrationDto } from './complete-registration.dto';

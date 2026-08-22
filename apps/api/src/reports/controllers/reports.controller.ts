@@ -20,7 +20,9 @@ import { AuthenticatedRequest } from '../../auth/types/safe-user';
 import { GenerateTicketReceiptReportDto } from '../dto/generate-ticket-receipt-report.dto';
 import { GenerateWorkScheduleReportDto } from '../dto/generate-work-schedule-report.dto';
 import { TicketReceiptSettingsDto } from '../dto/ticket-receipt-settings.dto';
+import { ScheduleExceptionsReportData } from '../models/schedule-exceptions-report-data';
 import { ReportConfigurationService } from '../services/report-configuration.service';
+import { ScheduleExceptionsReportService } from '../services/schedule-exceptions-report.service';
 import { TicketReceiptReportService } from '../services/ticket-receipt-report.service';
 import { WorkScheduleReportService } from '../services/work-schedule-report.service';
 
@@ -34,8 +36,17 @@ export class ReportsController {
   constructor(
     private readonly configurationService: ReportConfigurationService,
     private readonly ticketReceiptReportService: TicketReceiptReportService,
-    private readonly workScheduleReportService: WorkScheduleReportService
+    private readonly workScheduleReportService: WorkScheduleReportService,
+    private readonly scheduleExceptionsReportService: ScheduleExceptionsReportService,
   ) {}
+
+  /**
+   * Return current-year confirmed registrations with schedule exceptions.
+   */
+  @Get('schedule-exceptions')
+  async getScheduleExceptions(): Promise<ScheduleExceptionsReportData> {
+    return this.scheduleExceptionsReportService.getReportData();
+  }
 
   @Get('ticket-receipt/configuration')
   @ApiOperation({ summary: 'Get shared ticket-receipt report defaults' })

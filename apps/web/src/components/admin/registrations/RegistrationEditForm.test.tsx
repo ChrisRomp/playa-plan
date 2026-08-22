@@ -13,6 +13,7 @@ describe('RegistrationEditForm', () => {
     year: 2024,
     status: 'CONFIRMED' as const,
     createdAt: '2024-01-01T10:00:00Z',
+    updatedAt: '2024-01-01T11:00:00Z',
     user: {
       id: 'user-1',
       email: 'test@example.com',
@@ -32,10 +33,11 @@ describe('RegistrationEditForm', () => {
             name: 'Kitchen',
           },
           shift: {
+            id: 'shift-1',
             name: 'Morning Shift',
             startTime: '09:00',
             endTime: '13:00',
-            dayOfWeek: 'Monday',
+            dayOfWeek: 'MONDAY',
           },
         },
       },
@@ -62,10 +64,11 @@ describe('RegistrationEditForm', () => {
         name: 'Kitchen',
       },
       shift: {
+        id: 'shift-1',
         name: 'Morning Shift',
         startTime: '09:00',
         endTime: '13:00',
-        dayOfWeek: 'Monday',
+        dayOfWeek: 'MONDAY',
       },
       description: 'Help in the kitchen',
     },
@@ -77,10 +80,11 @@ describe('RegistrationEditForm', () => {
         name: 'Maintenance',
       },
       shift: {
+        id: 'shift-2',
         name: 'Evening Shift',
         startTime: '18:00',
         endTime: '22:00',
-        dayOfWeek: 'Tuesday',
+        dayOfWeek: 'TUESDAY',
       },
       description: 'Help with cleanup',
     },
@@ -355,6 +359,63 @@ describe('RegistrationEditForm', () => {
 
       expect(saveButton).toBeEnabled();
     });
+
+    it('should require confirmation before overriding a schedule conflict', async () => {
+      const inputConflictingJob = {
+        id: 'job-3',
+        name: 'Overlapping Kitchen Shift',
+        active: true,
+        category: {
+          name: 'Kitchen',
+        },
+        shift: {
+          id: 'shift-3',
+          name: 'Midday Shift',
+          startTime: '12:00',
+          endTime: '14:00',
+          dayOfWeek: 'MONDAY',
+        },
+      };
+      render(
+        <RegistrationEditForm
+          {...defaultProps}
+          availableJobs={[...mockAvailableJobs, inputConflictingJob]}
+        />,
+      );
+
+      fireEvent.click(screen.getByLabelText(/Overlapping Kitchen Shift/));
+
+      expect(
+        screen.getByText('This assignment contains schedule conflicts:'),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText('Kitchen Helper conflicts with Overlapping Kitchen Shift'),
+      ).toBeInTheDocument();
+
+      fireEvent.click(screen.getByText('Save Changes'));
+      expect(defaultProps.onSubmit).not.toHaveBeenCalled();
+      expect(
+        await screen.findByText(
+          'Confirm that you intend to override the schedule conflicts.',
+        ),
+      ).toBeInTheDocument();
+
+      fireEvent.click(
+        screen.getByLabelText(
+          'I understand and want to override these schedule conflicts.',
+        ),
+      );
+      fireEvent.click(screen.getByText('Save Changes'));
+
+      await waitFor(() => {
+        expect(defaultProps.onSubmit).toHaveBeenCalledWith(
+          expect.objectContaining({
+            jobIds: ['job-1', 'job-3'],
+            conflictOverrideConfirmed: true,
+          }),
+        );
+      });
+    });
   });
 
   describe('Form Submission', () => {
@@ -382,11 +443,13 @@ describe('RegistrationEditForm', () => {
 
       await waitFor(() => {
         expect(defaultProps.onSubmit).toHaveBeenCalledWith({
+          expectedUpdatedAt: '2024-01-01T11:00:00Z',
           status: 'PENDING',
           jobIds: ['job-1', 'job-2'],
           campingOptionIds: ['camp-1', 'camp-2'],
           notes: 'Updated by admin',
           sendNotification: true,
+          conflictOverrideConfirmed: false,
         });
       });
     });

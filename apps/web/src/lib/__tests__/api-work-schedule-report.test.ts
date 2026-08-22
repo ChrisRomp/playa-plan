@@ -74,4 +74,15 @@ describe('work schedule report API', () => {
 
     expect(actualMessage).toBe('No work schedule is available.');
   });
+
+  it('shouldGetScheduleExceptions', async () => {
+    const expectedReport = { year: 2026, exceptions: [] };
+    mockApi.get.mockResolvedValue({ data: expectedReport });
+    const { reports } = await import('../api');
+
+    await expect(reports.getScheduleExceptions()).resolves.toEqual(
+      expectedReport,
+    );
+    expect(mockApi.get).toHaveBeenCalledWith('/reports/schedule-exceptions');
+  });
 });

@@ -576,6 +576,49 @@ export interface WorkScheduleReportOptions {
   includeStaffOnly?: boolean;
 }
 
+export interface ScheduleExceptionShift {
+  id: string;
+  name: string;
+  dayOfWeek: string;
+  startTime: string;
+  endTime: string;
+}
+
+export interface ScheduleExceptionJob {
+  id: string;
+  name: string;
+  categoryName: string;
+  shift: ScheduleExceptionShift;
+}
+
+export interface ScheduleExceptionConflict {
+  firstJob: Omit<ScheduleExceptionJob, 'categoryName'>;
+  secondJob: Omit<ScheduleExceptionJob, 'categoryName'>;
+}
+
+export interface ScheduleExceptionRegistration {
+  registrationId: string;
+  user: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    playaName: string | null;
+    email: string;
+    role: string;
+    allowNoJob: boolean;
+  };
+  requiredCount: number;
+  selectedCount: number;
+  extraCount: number;
+  jobs: ScheduleExceptionJob[];
+  conflicts: ScheduleExceptionConflict[];
+}
+
+export interface ScheduleExceptionsReportData {
+  year: number;
+  exceptions: ScheduleExceptionRegistration[];
+}
+
 function getDownloadFilename(contentDisposition: string | undefined, fallback: string): string {
   const encodedMatch = contentDisposition?.match(/filename\*=UTF-8''([^;]+)/i);
   if (encodedMatch?.[1]) {
@@ -1224,6 +1267,13 @@ export const registrations = {
 };
 
 export const reports = {
+  getScheduleExceptions: async (): Promise<ScheduleExceptionsReportData> => {
+    const response = await api.get<ScheduleExceptionsReportData>(
+      '/reports/schedule-exceptions',
+    );
+    return response.data;
+  },
+
   getTicketReceiptSettings: async (): Promise<TicketReceiptSettings> => {
     const response = await api.get<TicketReceiptSettings>('/reports/ticket-receipt/configuration');
     return response.data;

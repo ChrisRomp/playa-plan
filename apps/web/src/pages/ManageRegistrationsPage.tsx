@@ -33,6 +33,7 @@ interface Registration {
         name: string;
       };
       shift?: {
+        id: string;
         name: string;
         startTime: string;
         endTime: string;

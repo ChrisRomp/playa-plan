@@ -146,16 +146,40 @@ describe('RegistrationPage', () => {
       name: 'Morning Shift',
       description: 'Morning work period',
       dayOfWeek: 'MONDAY',
-      startTime: '2025-05-20T09:00:00Z',
-      endTime: '2025-05-20T12:00:00Z',
+      startTime: '09:00',
+      endTime: '12:00',
     },
     {
       id: 'shift2',
       name: 'Afternoon Shift',
       description: 'Afternoon work period',
       dayOfWeek: 'TUESDAY',
-      startTime: '2025-05-21T13:00:00Z',
-      endTime: '2025-05-21T17:00:00Z',
+      startTime: '13:00',
+      endTime: '17:00',
+    },
+    {
+      id: 'shift3',
+      name: 'Wednesday Shift',
+      description: 'Wednesday work period',
+      dayOfWeek: 'WEDNESDAY',
+      startTime: '09:00',
+      endTime: '12:00',
+    },
+    {
+      id: 'shift4',
+      name: 'Thursday Shift',
+      description: 'Thursday work period',
+      dayOfWeek: 'THURSDAY',
+      startTime: '09:00',
+      endTime: '12:00',
+    },
+    {
+      id: 'shift5',
+      name: 'Friday Shift',
+      description: 'Friday work period',
+      dayOfWeek: 'FRIDAY',
+      startTime: '09:00',
+      endTime: '12:00',
     },
   ];
 
@@ -447,6 +471,7 @@ describe('RegistrationPage', () => {
         status: 'APPLICATION_SUBMITTED',
         year: 2025,
         createdAt: '2025-05-01T00:00:00Z',
+        jobs: [],
       },
       loading: false,
       error: null,
@@ -496,6 +521,12 @@ describe('RegistrationPage', () => {
         status: 'APPLICATION_APPROVED',
         year: 2025,
         createdAt: '2025-05-01T00:00:00Z',
+        jobs: [
+          {
+            jobId: 'job1',
+            job: mockJobs[0],
+          },
+        ],
       },
       loading: false,
       error: null,
@@ -509,7 +540,115 @@ describe('RegistrationPage', () => {
     });
 
     expect(screen.getByText('Application approved')).toBeInTheDocument();
+    expect(screen.getByLabelText(/Cook/)).toBeChecked();
+    expect(screen.getByLabelText(/Cook/)).toBeDisabled();
+    expect(screen.getByText('Administrator-assigned shifts')).toBeInTheDocument();
     expect(screen.queryByText('Your Profile Information')).not.toBeInTheDocument();
+  });
+
+  it('validates and reviews filtered administrator-assigned shifts', async () => {
+    const inputAssignedJobs = [
+      {
+        ...mockJobs[0],
+        id: 'inactive-kitchen-job',
+        name: 'Inactive Kitchen Shift',
+        active: false,
+        shiftId: 'shift1',
+        shift: mockShifts[0],
+      },
+      {
+        ...mockJobs[1],
+        id: 'assigned-cleaning-job',
+        name: 'Assigned Cleaning Shift',
+        active: true,
+        shiftId: 'shift4',
+        shift: mockShifts[3],
+      },
+      {
+        ...mockJobs[0],
+        id: 'staff-only-job',
+        name: 'Staff-only Assigned Shift',
+        active: true,
+        categoryId: 'staff-category',
+        category: {
+          id: 'staff-category',
+          name: 'Staff',
+          description: 'Staff duties',
+          staffOnly: true,
+          alwaysRequired: false,
+        },
+        shiftId: 'shift3',
+        shift: mockShifts[2],
+      },
+    ];
+    vi.spyOn(useConfigModule, 'useConfig').mockReturnValue({
+      config: {
+        name: 'Test Camp',
+        description: 'Test Description',
+        homePageBlurb: 'Welcome!',
+        registrationOpen: true,
+        earlyRegistrationOpen: false,
+        currentYear: 2025,
+        registrationTerms: '<p>These are the test terms and conditions.</p>',
+        applicationApprovalRequired: true,
+      },
+      isLoading: false,
+      error: null,
+      refreshConfig: vi.fn(),
+      isConnecting: false,
+      isConnected: true,
+      connectionError: null,
+    });
+    vi.spyOn(useCampRegistrationModule, 'useCampRegistration').mockReturnValue({
+      campRegistration: {
+        campingOptions: [{ campingOptionId: 'option1' }],
+        customFieldValues: [],
+        jobRegistrations: [],
+        hasRegistration: true,
+      },
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    vi.spyOn(useMyRegistrationModule, 'useMyRegistration').mockReturnValue({
+      registration: {
+        id: 'registration-1',
+        status: 'APPLICATION_APPROVED',
+        year: 2025,
+        createdAt: '2025-05-01T00:00:00Z',
+        jobs: inputAssignedJobs.map(job => ({
+          jobId: job.id,
+          job,
+        })),
+      },
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    renderWithAuth();
+
+    await screen.findByText('Select Work Shifts');
+    fireEvent.click(screen.getByText('Continue'));
+
+    expect(
+      await screen.findAllByText(
+        'You must select at least 2 Standard Camping work shifts',
+      ),
+    ).toHaveLength(2);
+
+    fireEvent.click(screen.getByRole('button', { name: /Cleaning/ }));
+    fireEvent.click(screen.getByLabelText(/^Cleaning/));
+    fireEvent.click(screen.getByText('Continue'));
+
+    await screen.findByText('Review & Accept Terms');
+    expect(screen.getByText(/Inactive Kitchen Shift \|/)).toBeInTheDocument();
+    expect(screen.getByText(/Assigned Cleaning Shift \|/)).toBeInTheDocument();
+    expect(screen.getByText(/Staff-only Assigned Shift \|/)).toBeInTheDocument();
+    expect(screen.getByText(/^Cleaning \|/)).toBeInTheDocument();
+    expect(
+      screen.queryByText('You must select at least one Kitchen shift'),
+    ).not.toBeInTheDocument();
   });
 
   it('allows APPLICATION_SUBMITTED users to complete when approval mode is disabled', async () => {
@@ -549,6 +688,7 @@ describe('RegistrationPage', () => {
         status: 'APPLICATION_SUBMITTED', // User has pending application
         year: 2025,
         createdAt: '2025-05-01T00:00:00Z',
+        jobs: [],
       },
       loading: false,
       error: null,
@@ -600,6 +740,7 @@ describe('RegistrationPage', () => {
         status: 'CANCELLED',
         year: 2025,
         createdAt: '2025-05-01T00:00:00Z',
+        jobs: [],
       },
       loading: false,
       error: null,
@@ -762,7 +903,7 @@ describe('RegistrationPage', () => {
       id: 'teardown1',
       name: 'Teardown Team 1',
       categoryId: 'teardown',
-      shiftId: 'shift1',
+      shiftId: 'shift3',
       category: mockTeardownCategory,
       maxRegistrations: 50,
       currentRegistrations: 10,
@@ -773,7 +914,7 @@ describe('RegistrationPage', () => {
       id: 'teardown2',
       name: 'Teardown Team 2',
       categoryId: 'teardown',
-      shiftId: 'shift2',
+      shiftId: 'shift4',
       category: mockTeardownCategory,
       maxRegistrations: 20,
       currentRegistrations: 5,
@@ -795,7 +936,7 @@ describe('RegistrationPage', () => {
       id: 'manifest1',
       name: 'Manifest Assistant - Wednesday AM',
       categoryId: 'manifest',
-      shiftId: 'shift1',
+      shiftId: 'shift2',
       category: mockManifestCategory,
       maxRegistrations: 3,
       currentRegistrations: 1,
@@ -1096,6 +1237,102 @@ describe('RegistrationPage', () => {
       });
     });
 
+    it('should require confirmation before accepting extra shifts', async () => {
+      await navigateToJobsStep();
+
+      const artCarButton = screen
+        .getAllByRole('button')
+        .find(button => button.textContent?.includes('Art Car Driver'));
+      fireEvent.click(artCarButton!);
+
+      await waitFor(() => {
+        expect(screen.getByLabelText(/Art Car Driver/)).toBeInTheDocument();
+        expect(screen.getByLabelText(/Teardown Team 1/)).toBeInTheDocument();
+        expect(screen.getByLabelText(/Teardown Team 2/)).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByLabelText(/Art Car Driver/));
+      fireEvent.click(screen.getByLabelText(/Teardown Team 1/));
+      fireEvent.click(screen.getByLabelText(/Teardown Team 2/));
+      fireEvent.click(screen.getByText('Continue'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Review & Accept Terms')).toBeInTheDocument();
+      });
+      expect(
+        screen.getByText('You selected 3 shifts, but the requirement is 2 shifts.'),
+      ).toBeInTheDocument();
+
+      fireEvent.click(screen.getByLabelText('I accept the terms and conditions'));
+      fireEvent.click(screen.getByText('Review & Pay'));
+
+      expect(
+        await screen.findByText(
+          'Confirm that you intend to take the additional shifts.',
+        ),
+      ).toBeInTheDocument();
+
+      fireEvent.click(
+        screen.getByLabelText(
+          'I understand and intend to take these additional shifts.',
+        ),
+      );
+      fireEvent.click(screen.getByText('Review & Pay'));
+
+      await waitFor(() => {
+        expect(
+          screen.getByRole('heading', { name: 'Payment' }),
+        ).toBeInTheDocument();
+      });
+    });
+
+    it('should disable a job that overlaps a selected job', async () => {
+      const inputPrimaryJob = {
+        ...mockArtCarJob,
+        shiftId: 'shift5',
+      };
+      const inputConflictingJob = {
+        ...mockManifestJob,
+        shiftId: 'shift6',
+      };
+      vi.spyOn(useRegistrationModule, 'useRegistration').mockReturnValue({
+        campingOptions: [mockSkydivingOption],
+        jobCategories: [mockArtCarCategory, mockManifestCategory],
+        jobs: [inputPrimaryJob, inputConflictingJob],
+        shifts: [
+          ...mockShifts,
+          {
+            id: 'shift6',
+            name: 'Overlapping Friday Shift',
+            description: 'Overlapping Friday work period',
+            dayOfWeek: 'FRIDAY',
+            startTime: '10:00',
+            endTime: '11:00',
+          },
+        ],
+        initialDataLoaded: true,
+        loading: false,
+        error: null,
+        fetchCampingOptions: vi.fn(),
+        fetchJobCategories: vi.fn(),
+        fetchShifts: vi.fn(),
+        fetchJobs: vi.fn(),
+        submitRegistration: vi.fn().mockResolvedValue({}),
+      });
+
+      await navigateToJobsStep();
+      const manifestButton = screen
+        .getAllByRole('button')
+        .find(button => button.textContent?.includes('Manifest Assistant'));
+      fireEvent.click(manifestButton!);
+
+      fireEvent.click(screen.getByLabelText(/Art Car Driver/));
+
+      const conflictingCheckbox = screen.getByLabelText(/Manifest Assistant/);
+      expect(conflictingCheckbox).toBeDisabled();
+      expect(screen.getByText('Conflicts with Art Car Driver - Wednesday AM')).toBeInTheDocument();
+    });
+
     it('should handle multiple always required categories', async () => {
       // Add another always required category
       const mockSecondRequiredCategory = {
@@ -1110,7 +1347,7 @@ describe('RegistrationPage', () => {
         id: 'security1',
         name: 'Security Patrol',
         categoryId: 'security',
-        shiftId: 'shift1',
+        shiftId: 'shift5',
         category: mockSecondRequiredCategory,
         maxRegistrations: 5,
         currentRegistrations: 2,

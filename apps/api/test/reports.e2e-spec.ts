@@ -100,6 +100,8 @@ describe('ReportsController (e2e)', () => {
     await request(app.getHttpServer()).post('/reports/ticket-receipt').send({}).expect(401);
 
     await request(app.getHttpServer()).post('/reports/work-schedule').send({}).expect(401);
+
+    await request(app.getHttpServer()).get('/reports/schedule-exceptions').expect(401);
   });
 
   it('shouldRejectParticipantRequests', async () => {
@@ -119,6 +121,11 @@ describe('ReportsController (e2e)', () => {
       .set('Authorization', `Bearer ${participantToken}`)
       .send({})
       .expect(403);
+
+    await request(app.getHttpServer())
+      .get('/reports/schedule-exceptions')
+      .set('Authorization', `Bearer ${participantToken}`)
+      .expect(403);
   });
 
   it.each([
@@ -133,6 +140,21 @@ describe('ReportsController (e2e)', () => {
     expect(response.body).toEqual({
       title: 'Ticket Receipt Report',
       acknowledgementText: '',
+    });
+  });
+
+  it.each([
+    ['admin', () => adminToken],
+    ['staff', () => staffToken],
+  ])('shouldAllow%sToReadScheduleExceptions', async (_role, getToken) => {
+    const response = await request(app.getHttpServer())
+      .get('/reports/schedule-exceptions')
+      .set('Authorization', `Bearer ${getToken()}`)
+      .expect(200);
+
+    expect(response.body).toEqual({
+      year: expect.any(Number),
+      exceptions: expect.any(Array),
     });
   });
 

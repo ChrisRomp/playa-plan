@@ -1,8 +1,14 @@
 import { api } from '../api';
+import { isAxiosError } from 'axios';
+
+interface ApiErrorResponse {
+  readonly message?: string | string[];
+}
 
 export interface AdminRegistrationResult {
   id: string;
   year: number;
+  updatedAt: string;
   status:
     | 'PENDING'
     | 'CONFIRMED'
@@ -26,6 +32,7 @@ export interface Registration {
   status: 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'WAITLISTED';
   paymentDeferred?: boolean;
   createdAt: string;
+  updatedAt: string;
   user: {
     id: string;
     email: string;
@@ -42,6 +49,13 @@ export interface Registration {
       active: boolean;
       category?: {
         name: string;
+      };
+      shift?: {
+        id: string;
+        name: string;
+        startTime: string;
+        endTime: string;
+        dayOfWeek: string;
       };
     };
   }>;
@@ -86,11 +100,13 @@ interface CampingOption {
 }
 
 interface RegistrationEditData {
+  expectedUpdatedAt: string;
   status: 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'WAITLISTED';
   jobIds: string[];
   campingOptionIds: string[];
   notes: string;
   sendNotification: boolean;
+  conflictOverrideConfirmed?: boolean;
 }
 
 interface RegistrationCancelData {
@@ -139,11 +155,13 @@ interface AuditRecord {
 
 // Backend interface for API compatibility
 interface BackendRegistrationEditData {
+  expectedUpdatedAt: string;
   status: 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'WAITLISTED';
   jobIds: string[];
   campingOptionIds: string[];
   notes: string;
   sendNotification: boolean;
+  conflictOverrideConfirmed?: boolean;
 }
 
 interface UserCampingOptionRegistration {
@@ -216,14 +234,33 @@ export const adminRegistrationsApi = {
   editRegistration: async (registrationId: string, data: RegistrationEditData): Promise<void> => {
     // Transform frontend data to backend format (no transformation needed now)
     const backendData: BackendRegistrationEditData = {
+      expectedUpdatedAt: data.expectedUpdatedAt,
       status: data.status,
       jobIds: data.jobIds,
       campingOptionIds: data.campingOptionIds,
       notes: data.notes || '', // Backend now expects 'notes' field
       sendNotification: data.sendNotification,
+      conflictOverrideConfirmed: data.conflictOverrideConfirmed,
     };
     
-    await api.put(`/admin/registrations/${registrationId}`, backendData);
+    try {
+      await api.put(`/admin/registrations/${registrationId}`, backendData);
+    } catch (error) {
+      if (isAxiosError<ApiErrorResponse>(error) && error.response?.status === 409) {
+        const responseMessage = error.response.data?.message;
+        const message = Array.isArray(responseMessage)
+          ? responseMessage.join(', ')
+          : responseMessage;
+
+        if (message) {
+          throw new Error(
+            `${message}. Close and reopen the editor to load the latest registration before retrying.`,
+          );
+        }
+      }
+
+      throw error;
+    }
   },
 
   /**

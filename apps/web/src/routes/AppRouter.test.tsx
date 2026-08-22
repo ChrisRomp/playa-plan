@@ -54,6 +54,12 @@ vi.mock('../pages/NotFoundPage.tsx', () => ({
   default: () => <div data-testid="not-found-page">Not Found Page</div>
 }));
 
+vi.mock('../pages/ScheduleExceptionsReportPage.tsx', () => ({
+  ScheduleExceptionsReportPage: () => (
+    <div data-testid="schedule-exceptions-page">Schedule Exceptions</div>
+  ),
+}));
+
 // Mock the auth context
 vi.mock('../store/AuthContext', () => ({
   useAuth: vi.fn()
@@ -177,6 +183,30 @@ describe('AppRouter', () => {
   });
 
   describe('Role-Based Routes', () => {
+    it('should render schedule exceptions for staff', () => {
+      vi.mocked(useAuth).mockReturnValue({
+        isAuthenticated: true,
+        isLoading: false,
+        user: {
+          id: '1',
+          email: 'staff@example.playaplan.app',
+          name: 'Staff User',
+          role: ROLES.STAFF,
+          isAuthenticated: true,
+          isEarlyRegistrationEnabled: false,
+          hasRegisteredForCurrentYear: false,
+        },
+        error: null,
+        requestVerificationCode: vi.fn().mockResolvedValue(false),
+        verifyCode: vi.fn().mockResolvedValue(undefined),
+        logout: vi.fn().mockResolvedValue(undefined),
+      });
+
+      renderWithRoute(ROUTES.REPORTS_SCHEDULE_EXCEPTIONS.path);
+
+      expect(screen.getByTestId('schedule-exceptions-page')).toBeInTheDocument();
+    });
+
     it('should render AdminPage when authenticated as admin and accessing admin path', () => {
       // Mock admin authenticated state
       vi.mocked(useAuth).mockReturnValue({
