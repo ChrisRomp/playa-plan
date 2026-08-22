@@ -43,6 +43,13 @@ export interface Registration {
       category?: {
         name: string;
       };
+      shift?: {
+        id: string;
+        name: string;
+        startTime: string;
+        endTime: string;
+        dayOfWeek: string;
+      };
     };
   }>;
   payments: Array<{

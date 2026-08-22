@@ -1,12 +1,14 @@
 import { Module } from '@nestjs/common';
 import { PrismaModule } from '../common/prisma/prisma.module';
 import { CoreConfigModule } from '../core-config/core-config.module';
+import { RegistrationsModule } from '../registrations/registrations.module';
 import { ShiftsModule } from '../shifts/shifts.module';
 import { ReportsController } from './controllers/reports.controller';
 import { PdfRenderer } from './models/pdf-renderer';
 import { PdfDownloadService } from './services/pdf-download.service';
 import { PdfmakeRendererService } from './services/pdfmake-renderer.service';
 import { ReportConfigurationService } from './services/report-configuration.service';
+import { ScheduleExceptionsReportService } from './services/schedule-exceptions-report.service';
 import { TicketReceiptDataService } from './services/ticket-receipt-data.service';
 import { TicketReceiptDocumentService } from './services/ticket-receipt-document.service';
 import { TicketReceiptReportService } from './services/ticket-receipt-report.service';
@@ -16,12 +18,13 @@ import { WorkScheduleReportService } from './services/work-schedule-report.servi
 
 /** Reusable PDF infrastructure and concrete PlayaPlan reports. */
 @Module({
-  imports: [PrismaModule, CoreConfigModule, ShiftsModule],
+  imports: [PrismaModule, CoreConfigModule, ShiftsModule, RegistrationsModule],
   controllers: [ReportsController],
   providers: [
     PdfDownloadService,
     PdfmakeRendererService,
     ReportConfigurationService,
+    ScheduleExceptionsReportService,
     TicketReceiptDataService,
     TicketReceiptDocumentService,
     TicketReceiptReportService,

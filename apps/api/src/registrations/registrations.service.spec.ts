@@ -7,6 +7,7 @@ import { CoreConfigService } from '../core-config/services/core-config.service';
 import { NotFoundException, ConflictException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { NotificationType, RegistrationStatus, UserRole } from '@prisma/client';
 import { CompleteRegistrationDto, CreateRegistrationDto, SubmitApplicationDto } from './dto';
+import { RegistrationJobSelectionService } from './services/registration-job-selection.service';
 
 describe('RegistrationsService', () => {
   let service: RegistrationsService;
@@ -25,6 +26,7 @@ describe('RegistrationsService', () => {
     };
     registrationJob: { create: jest.Mock; createMany: jest.Mock; findMany: jest.Mock; findFirst: jest.Mock; delete: jest.Mock };
     job: { findUnique: jest.Mock; findMany: jest.Mock };
+    jobCategory: { findMany: jest.Mock };
     user: { findUnique: jest.Mock };
     payment: { findUnique: jest.Mock };
     campingOption: { findUnique: jest.Mock };
@@ -52,6 +54,9 @@ describe('RegistrationsService', () => {
     },
     job: {
       findUnique: jest.fn(),
+      findMany: jest.fn(),
+    },
+    jobCategory: {
       findMany: jest.fn(),
     },
     user: {
@@ -133,6 +138,7 @@ describe('RegistrationsService', () => {
             return mockCoreConfigService;
           },
         },
+        RegistrationJobSelectionService,
       ],
     }).compile();
 
@@ -1142,6 +1148,7 @@ describe('RegistrationsService', () => {
       jobs: ['job-1'],
       acceptedTerms: true,
       deferPayment: false,
+      extraShiftsConfirmed: true,
     };
     const baseUser = {
       id: userId,
@@ -1158,6 +1165,7 @@ describe('RegistrationsService', () => {
       userId,
       year: registrationYear,
       status: RegistrationStatus.APPLICATION_APPROVED,
+      jobs: [],
       campingOptionRegistrations: [
         {
           id: 'camp-reg-1',
@@ -1207,6 +1215,7 @@ describe('RegistrationsService', () => {
       mockPrismaService.registration.findUnique.mockResolvedValue(updatedRegistration);
       mockPrismaService.registration.updateMany.mockResolvedValue({ count: 1 });
       mockPrismaService.job.findMany.mockResolvedValue([]);
+      mockPrismaService.jobCategory.findMany.mockResolvedValue([]);
       mockPrismaService.job.findUnique.mockImplementation(({ where }: { where: { id: string } }) => ({
         id: where.id,
         name: 'Kitchen',
@@ -1229,6 +1238,15 @@ describe('RegistrationsService', () => {
           status: { in: [RegistrationStatus.APPLICATION_APPROVED] },
         },
         include: {
+          jobs: {
+            include: {
+              job: {
+                include: {
+                  shift: true,
+                },
+              },
+            },
+          },
           campingOptionRegistrations: {
             include: {
               campingOption: {
@@ -1372,6 +1390,60 @@ describe('RegistrationsService', () => {
       expect(mockPrismaService.registration.updateMany).not.toHaveBeenCalled();
     });
 
+    it('should preserve an existing inactive admin-assigned job without resubmitting it', async () => {
+      mockPrismaService.registration.findFirst.mockResolvedValue({
+        ...approvedRegistration,
+        jobs: [
+          {
+            id: 'registration-job-existing',
+            registrationId: approvedRegistration.id,
+            jobId: 'job-existing',
+            job: {
+              id: 'job-existing',
+              name: 'Existing staff job',
+              shift: null,
+            },
+          },
+        ],
+      });
+      mockPrismaService.job.findUnique.mockResolvedValue({
+        id: 'job-existing',
+        name: 'Existing staff job',
+        active: false,
+        maxRegistrations: 1,
+        registrations: [{ registration: { status: RegistrationStatus.CONFIRMED } }],
+        category: { staffOnly: true },
+        shift: null,
+      });
+
+      await service.completeRegistration(userId, {
+        ...completeDto,
+        jobs: [],
+      });
+
+      expect(mockPrismaService.job.findMany).not.toHaveBeenCalled();
+      expect(mockPrismaService.registrationJob.createMany).not.toHaveBeenCalled();
+      expect(mockPrismaService.registration.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            id: approvedRegistration.id,
+            status: { in: [RegistrationStatus.APPLICATION_APPROVED] },
+          },
+        }),
+      );
+    });
+
+    it('should reject a newly submitted staff-only job', async () => {
+      mockPrismaService.job.findMany.mockResolvedValue([{ id: 'job-1' }]);
+
+      await expect(
+        service.completeRegistration(userId, completeDto),
+      ).rejects.toThrow('Participants cannot register for staff-only jobs');
+
+      expect(mockPrismaService.job.findUnique).not.toHaveBeenCalled();
+      expect(mockPrismaService.registration.updateMany).not.toHaveBeenCalled();
+    });
+
     it('should reject completion with no jobs when the user is not allowNoJob', async () => {
       const noJobsDto: CompleteRegistrationDto = {
         jobs: [],
@@ -1381,6 +1453,66 @@ describe('RegistrationsService', () => {
       await expect(service.completeRegistration(userId, noJobsDto)).rejects.toThrow(
         new BadRequestException('You must select at least one work shift to register.'),
       );
+
+      expect(mockPrismaService.registration.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('should reject an unconfirmed extra shift', async () => {
+      await expect(
+        service.completeRegistration(userId, {
+          ...completeDto,
+          extraShiftsConfirmed: false,
+        }),
+      ).rejects.toThrow('Confirm the extra shifts before continuing');
+
+      expect(mockPrismaService.registration.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('should reject a submitted job that conflicts with a pre-assigned job', async () => {
+      mockPrismaService.registration.findFirst.mockResolvedValue({
+        ...approvedRegistration,
+        jobs: [
+          {
+            id: 'registration-job-existing',
+            registrationId: approvedRegistration.id,
+            jobId: 'job-existing',
+            job: {
+              id: 'job-existing',
+              name: 'Existing job',
+              shift: {
+                id: 'shift-existing',
+                name: 'Friday AM',
+                dayOfWeek: 'FRIDAY',
+                startTime: '09:00',
+                endTime: '12:00',
+              },
+            },
+          },
+        ],
+      });
+      mockPrismaService.job.findUnique.mockImplementation(
+        ({ where }: { where: { id: string } }) => ({
+          id: where.id,
+          name: where.id === 'job-existing' ? 'Existing job' : 'Submitted job',
+          active: true,
+          maxRegistrations: 10,
+          registrations: [],
+          shift: {
+            id: `shift-${where.id}`,
+            name: where.id === 'job-existing' ? 'Friday AM' : 'Friday Midday',
+            dayOfWeek: 'FRIDAY',
+            startTime: where.id === 'job-existing' ? '09:00' : '11:00',
+            endTime: where.id === 'job-existing' ? '12:00' : '13:00',
+          },
+        }),
+      );
+
+      await expect(
+        service.completeRegistration(userId, {
+          ...completeDto,
+          jobs: ['job-submitted'],
+        }),
+      ).rejects.toThrow('Selected work shifts conflict');
 
       expect(mockPrismaService.registration.updateMany).not.toHaveBeenCalled();
     });
@@ -1428,6 +1560,7 @@ describe('RegistrationsService', () => {
       campingOptions: [],
       jobs: ['job-1'],
       acceptedTerms: true,
+      extraShiftsConfirmed: true,
     } as unknown as Parameters<RegistrationsService['createCampRegistration']>[1];
 
     const buildCreatedRegistration = (overrides: Partial<{
@@ -1459,6 +1592,7 @@ describe('RegistrationsService', () => {
         staffOnly: false,
         registrations: [],
       }));
+      mockPrismaService.jobCategory.findMany.mockResolvedValue([]);
     });
 
     it('does not call the policy gate from inside the broad try/catch, so policy 4xx rejections do not trigger the error email', async () => {
@@ -1533,6 +1667,46 @@ describe('RegistrationsService', () => {
       await expect(service.createCampRegistration(userId, baseDto)).rejects.toThrow(
         'Inactive job cannot be assigned: Kitchen',
       );
+      expect(mockPrismaService.registration.create).not.toHaveBeenCalled();
+    });
+
+    it('rejects an unconfirmed extra shift before creating the registration', async () => {
+      await expect(
+        service.createCampRegistration(userId, {
+          ...baseDto,
+          extraShiftsConfirmed: false,
+        }),
+      ).rejects.toThrow('Confirm the extra shifts before continuing');
+
+      expect(mockPrismaService.registration.create).not.toHaveBeenCalled();
+    });
+
+    it('rejects conflicting jobs before creating the registration', async () => {
+      mockPrismaService.job.findUnique.mockImplementation(
+        ({ where }: { where: { id: string } }) => ({
+          id: where.id,
+          name: `Job ${where.id}`,
+          active: true,
+          maxRegistrations: 10,
+          staffOnly: false,
+          registrations: [],
+          shift: {
+            id: `shift-${where.id}`,
+            name: `Shift ${where.id}`,
+            dayOfWeek: 'FRIDAY',
+            startTime: where.id === 'job-1' ? '09:00' : '10:00',
+            endTime: where.id === 'job-1' ? '11:00' : '12:00',
+          },
+        }),
+      );
+
+      await expect(
+        service.createCampRegistration(userId, {
+          ...baseDto,
+          jobs: ['job-1', 'job-2'],
+        }),
+      ).rejects.toThrow('Selected work shifts conflict');
+
       expect(mockPrismaService.registration.create).not.toHaveBeenCalled();
     });
 

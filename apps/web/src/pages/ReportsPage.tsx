@@ -1,5 +1,12 @@
 import { Link } from 'react-router-dom';
-import { FileText, Users, CreditCard, Calendar, FileSignature } from 'lucide-react';
+import {
+  AlertTriangle,
+  Calendar,
+  CreditCard,
+  FileSignature,
+  FileText,
+  Users,
+} from 'lucide-react';
 import { useAuth } from '../store/authUtils';
 import { PATHS } from '../routes';
 
@@ -30,6 +37,13 @@ export function ReportsPage() {
       icon: <FileSignature size={24} />,
       title: 'Ticket Receipt Signature Form',
       description: 'Generate a printable ticket acknowledgement and signature form',
+      allowedRoles: ['staff', 'admin'],
+    },
+    {
+      to: PATHS.REPORTS_SCHEDULE_EXCEPTIONS,
+      icon: <AlertTriangle size={24} />,
+      title: 'Schedule Exceptions Report',
+      description: 'Review extra and conflicting shift assignments',
       allowedRoles: ['staff', 'admin'],
     },
     {

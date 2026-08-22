@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { X, Save, AlertTriangle } from 'lucide-react';
 import { LoadingSpinner } from '../../common/LoadingSpinner';
+import { findJobScheduleConflicts } from '../../../utils/shiftUtils';
 
 // TODO: Replace with actual API types when implemented
 interface Registration {
@@ -26,6 +27,7 @@ interface Registration {
         name: string;
       };
       shift?: {
+        id: string;
         name: string;
         startTime: string;
         endTime: string;
@@ -52,6 +54,7 @@ interface Job {
     name: string;
   };
   shift?: {
+    id: string;
     name: string;
     startTime: string;
     endTime: string;
@@ -119,6 +122,7 @@ export function RegistrationEditForm({
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [conflictOverrideConfirmed, setConflictOverrideConfirmed] = useState(false);
 
   const originallyAssignedJobIds = useMemo(
     () => new Set(registration.jobs.map((j) => j.job.id)),
@@ -141,8 +145,26 @@ export function RegistrationEditForm({
 
   // Get currently selected jobs and camping options
   const selectedJobs = useMemo(() => {
-    return availableJobs.filter(job => formData.jobIds.includes(job.id));
-  }, [availableJobs, formData.jobIds]);
+    const jobsById = new Map(
+      [...availableJobs, ...registration.jobs.map(item => item.job)].map(job => [
+        job.id,
+        job,
+      ]),
+    );
+    return formData.jobIds
+      .map(jobId => jobsById.get(jobId))
+      .filter((job): job is Job => job !== undefined);
+  }, [availableJobs, formData.jobIds, registration.jobs]);
+
+  const jobScheduleConflicts = useMemo(
+    () => findJobScheduleConflicts(selectedJobs),
+    [selectedJobs],
+  );
+
+  const jobsWithUnknownSchedules = useMemo(
+    () => selectedJobs.filter(job => !job.shift),
+    [selectedJobs],
+  );
 
   const selectedCampingOptions = useMemo(() => {
     return availableCampingOptions.filter(option => formData.campingOptionIds.includes(option.id));
@@ -154,6 +176,7 @@ export function RegistrationEditForm({
   };
 
   const handleJobToggle = (jobId: string) => {
+    setConflictOverrideConfirmed(false);
     setFormData(prev => ({
       ...prev,
       jobIds: prev.jobIds.includes(jobId)
@@ -189,6 +212,11 @@ export function RegistrationEditForm({
 
     if (formData.status === 'CANCELLED') {
       newErrors.status = 'Use the cancel registration function to cancel registrations.';
+    }
+
+    if (jobScheduleConflicts.length > 0 && !conflictOverrideConfirmed) {
+      newErrors.conflictOverride =
+        'Confirm that you intend to override the schedule conflicts.';
     }
 
     setErrors(newErrors);
@@ -368,6 +396,54 @@ export function RegistrationEditForm({
                     ))}
                   </div>
                 </div>
+              )}
+              {jobScheduleConflicts.length > 0 && (
+                <div className="mt-3 rounded-md border border-amber-300 bg-amber-50 p-4">
+                  <div className="flex">
+                    <AlertTriangle className="h-5 w-5 flex-shrink-0 text-amber-600" />
+                    <div className="ml-3">
+                      <p className="text-sm font-medium text-amber-900">
+                        This assignment contains schedule conflicts:
+                      </p>
+                      <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-amber-900">
+                        {jobScheduleConflicts.map(({ firstJob, secondJob }) => (
+                          <li key={`${firstJob.id}-${secondJob.id}`}>
+                            {firstJob.name} conflicts with {secondJob.name}
+                          </li>
+                        ))}
+                      </ul>
+                      <label className="mt-3 flex items-start text-sm text-amber-900">
+                        <input
+                          type="checkbox"
+                          className="mt-1 h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+                          checked={conflictOverrideConfirmed}
+                          onChange={() => {
+                            setConflictOverrideConfirmed(previous => !previous);
+                            setErrors(previousErrors => {
+                              const remainingErrors = { ...previousErrors };
+                              delete remainingErrors.conflictOverride;
+                              return remainingErrors;
+                            });
+                          }}
+                        />
+                        <span className="ml-2">
+                          I understand and want to override these schedule conflicts.
+                        </span>
+                      </label>
+                      {errors.conflictOverride && (
+                        <p className="mt-2 text-sm text-red-600">
+                          {errors.conflictOverride}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+              {jobsWithUnknownSchedules.length > 0 && (
+                <p className="mt-2 text-sm text-amber-700">
+                  Schedule conflicts could not be checked for:{' '}
+                  {jobsWithUnknownSchedules.map(job => job.name).join(', ')}.
+                </p>
               )}
             </div>
 

@@ -7,9 +7,8 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from '@prisma/client';
 import { ApiTags, ApiBearerAuth, ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiQuery } from '@nestjs/swagger';
-import { RegistrationsService } from '../registrations/registrations.service';
-import { CoreConfigService } from '../core-config/services/core-config.service';
 import { Request } from 'express';
+import { RegistrationsService } from '../registrations/registrations.service';
 
 interface RequestWithUser extends Request {
   user: {
@@ -28,7 +27,6 @@ export class JobsController {
   constructor(
     private readonly jobsService: JobsService,
     private readonly registrationsService: RegistrationsService,
-    private readonly coreConfigService: CoreConfigService,
   ) {}
 
   @Post()
@@ -74,20 +72,6 @@ export class JobsController {
   @ApiOkResponse({ description: 'The job has been successfully deleted.' })
   remove(@Param('id') id: string) {
     return this.jobsService.remove(id);
-  }
-
-  @Post(':id/register')
-  @ApiOperation({ summary: 'Register current user for a job' })
-  @ApiCreatedResponse({ description: 'User has been successfully registered for the job.' })
-  async register(@Param('id') jobId: string, @Req() req: RequestWithUser) {
-    const userId = req.user.id;
-    const config = await this.coreConfigService.findCurrent();
-    
-    return this.registrationsService.create({
-      userId,
-      year: config.registrationYear,
-      jobIds: [jobId],
-    });
   }
 
   @Get('/registrations/me')

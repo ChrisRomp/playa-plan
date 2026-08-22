@@ -21,6 +21,8 @@ import { DayOfWeek } from '../common/enums/day-of-week.enum';
 import { RegistrationPolicyService } from './services/registration-policy.service';
 import { CoreConfigService } from '../core-config/services/core-config.service';
 import { isCapacityReservingStatus } from './constants/registration-status.constants';
+import { RegistrationJobSelectionService } from './services/registration-job-selection.service';
+import { RegistrationJobSelectionAnalysis } from './models/registration-job-selection-analysis';
 
 interface JobRegistrationWithJobs extends Registration {
   jobs?: Array<{
@@ -62,15 +64,15 @@ export class RegistrationsService {
     private readonly notificationsService: NotificationsService,
     private readonly policyService: RegistrationPolicyService,
     private readonly coreConfigService: CoreConfigService,
+    private readonly jobSelectionService: RegistrationJobSelectionService,
   ) {}
 
   /**
    * Create a new registration for a user for a specific year.
    *
-   * Used by the admin/staff `POST /registrations` endpoint and the
-   * single-job participant `POST /jobs/:id/register` endpoint. Sets
-   * status to `WAITLISTED` when any chosen job is over capacity, else
-   * `PENDING`. The deferred-payment branch lives entirely in
+   * Used by the admin/staff `POST /registrations` endpoint. Sets status to
+   * `WAITLISTED` when any chosen job is over capacity, else `PENDING`.
+   * The deferred-payment branch lives entirely in
    * `createCampRegistration` and is intentionally not exposed here —
    * deferral is a participant choice tied to the policy gate, not a
    * standalone admin operation.
@@ -872,6 +874,15 @@ export class RegistrationsService {
         status: { in: validStatuses },
       },
       include: {
+        jobs: {
+          include: {
+            job: {
+              include: {
+                shift: true,
+              },
+            },
+          },
+        },
         campingOptionRegistrations: {
           include: {
             campingOption: {
@@ -901,8 +912,16 @@ export class RegistrationsService {
       }
     }
 
-    const jobIds = completeRegistrationDto.jobs ?? [];
-    await this.validateNoStaffOnlyJobsForParticipant(user.role, jobIds);
+    const submittedJobIds = [...new Set(completeRegistrationDto.jobs ?? [])];
+    const existingJobIds = registration.jobs.map((registrationJob) => registrationJob.jobId);
+    const newSubmittedJobIds = submittedJobIds.filter(
+      jobId => !existingJobIds.includes(jobId),
+    );
+    await this.validateNoStaffOnlyJobsForParticipant(
+      user.role,
+      newSubmittedJobIds,
+    );
+    const jobIds = [...new Set([...existingJobIds, ...submittedJobIds])];
 
     if (jobIds.length === 0 && !user.allowNoJob) {
       throw new BadRequestException('You must select at least one work shift to register.');
@@ -913,13 +932,16 @@ export class RegistrationsService {
         const job = await this.prisma.job.findUnique({
           where: { id: jobId },
           include: {
+            shift: true,
             registrations: { include: { registration: true } },
           },
         });
         if (!job) {
           throw new NotFoundException(`Job with ID ${jobId} not found`);
         }
-        this.assertJobActive(job);
+        if (newSubmittedJobIds.includes(jobId)) {
+          this.assertJobActive(job);
+        }
 
         const currentRegistrationCount = job.registrations.filter(
           (currentJobRegistration) => isCapacityReservingStatus(currentJobRegistration.registration.status)
@@ -931,7 +953,23 @@ export class RegistrationsService {
     );
 
     const hasWaitlistedJob = jobsWithCounts.some(
-      ({ job, currentRegistrationCount }) => currentRegistrationCount >= job.maxRegistrations,
+      ({ job, currentRegistrationCount }) =>
+        newSubmittedJobIds.includes(job.id) &&
+        currentRegistrationCount >= job.maxRegistrations,
+    );
+
+    const alwaysRequiredCategories = await this.findAlwaysRequiredCategories(user.role);
+    const selectionAnalysis = this.jobSelectionService.analyze({
+      jobs: jobsWithCounts.map(({ job }) => job),
+      allowNoJob: user.allowNoJob,
+      campingOptions: registration.campingOptionRegistrations.map(
+        ({ campingOption }) => campingOption,
+      ),
+      alwaysRequiredCategories,
+    });
+    this.assertValidParticipantJobSelection(
+      selectionAnalysis,
+      completeRegistrationDto.extraShiftsConfirmed ?? false,
     );
 
     let status: RegistrationStatus;
@@ -958,9 +996,9 @@ export class RegistrationsService {
         throw new ConflictException('Registration has already been completed or is no longer in a valid state');
       }
 
-      if (jobIds.length > 0) {
+      if (newSubmittedJobIds.length > 0) {
         await tx.registrationJob.createMany({
-          data: jobIds.map((jobId) => ({
+          data: newSubmittedJobIds.map((jobId) => ({
             registrationId: registration.id,
             jobId,
           })),
@@ -1099,6 +1137,7 @@ export class RegistrationsService {
       campingOptionId: string;
       fields: Array<{ id: string }>;
       name: string;
+      workShiftsRequired: number;
     }> = [];
     for (const campingOptionId of campingOptionIds) {
       const campingOption = await this.prisma.campingOption.findUnique({
@@ -1128,6 +1167,7 @@ export class RegistrationsService {
         campingOptionId,
         fields: campingOption.fields,
         name: campingOption.name,
+        workShiftsRequired: campingOption.workShiftsRequired,
       });
     }
 
@@ -1135,7 +1175,7 @@ export class RegistrationsService {
     // with concurrent writers — that's a pre-existing limitation we
     // accept) and used both to determine WAITLISTED status and to block
     // participants from grabbing staff-only jobs.
-    const jobIds = createCampRegistrationDto.jobs ?? [];
+    const jobIds = [...new Set(createCampRegistrationDto.jobs ?? [])];
     await this.validateNoStaffOnlyJobsForParticipant(user.role, jobIds);
 
     const jobsWithCounts = await Promise.all(
@@ -1143,6 +1183,7 @@ export class RegistrationsService {
         const job = await this.prisma.job.findUnique({
           where: { id: jobId },
           include: {
+            shift: true,
             registrations: { include: { registration: true } },
           },
         });
@@ -1168,11 +1209,22 @@ export class RegistrationsService {
     // load the form with a job at N-1 of N spots taken and both submit.
     // The check costs one extra prisma read per job and keeps capacity
     // enforced server-side, consistent with what
-    // `RegistrationsService.create()` (used by admin/staff and
-    // `POST /jobs/:id/register`) already does.
+    // `RegistrationsService.create()` (used by admin/staff) already does.
     const hasWaitlistedJob = jobsWithCounts.some(
       ({ job, currentRegistrationCount }) =>
         currentRegistrationCount >= job.maxRegistrations,
+    );
+
+    const alwaysRequiredCategories = await this.findAlwaysRequiredCategories(user.role);
+    const selectionAnalysis = this.jobSelectionService.analyze({
+      jobs: jobsWithCounts.map(({ job }) => job),
+      allowNoJob: user.allowNoJob,
+      campingOptions: validatedCampingOptions,
+      alwaysRequiredCategories,
+    });
+    this.assertValidParticipantJobSelection(
+      selectionAnalysis,
+      createCampRegistrationDto.extraShiftsConfirmed ?? false,
     );
 
     // Status semantics (Option A from issue #160 design):
@@ -1747,6 +1799,41 @@ export class RegistrationsService {
     });
     if (staffOnlyJobs.length > 0) {
       throw new ForbiddenException('Participants cannot register for staff-only jobs');
+    }
+  }
+
+  private async findAlwaysRequiredCategories(
+    userRole: UserRole,
+  ): Promise<Array<{ readonly id: string }>> {
+    return this.prisma.jobCategory.findMany({
+      where: {
+        alwaysRequired: true,
+        ...(userRole === UserRole.PARTICIPANT ? { staffOnly: false } : {}),
+      },
+      select: { id: true },
+    });
+  }
+
+  private assertValidParticipantJobSelection(
+    analysis: RegistrationJobSelectionAnalysis,
+    extraShiftsConfirmed: boolean,
+  ): void {
+    if (analysis.conflicts.length > 0) {
+      const conflictDescriptions = analysis.conflicts.map(
+        ({ firstJob, secondJob }) =>
+          `${firstJob.name} (${firstJob.shift.name}) conflicts with ` +
+          `${secondJob.name} (${secondJob.shift.name})`,
+      );
+      throw new BadRequestException(
+        `Selected work shifts conflict: ${conflictDescriptions.join('; ')}`,
+      );
+    }
+
+    if (analysis.extraCount > 0 && !extraShiftsConfirmed) {
+      throw new BadRequestException(
+        `You selected ${analysis.selectedCount} work shifts, but ` +
+          `${analysis.requiredCount} are required. Confirm the extra shifts before continuing.`,
+      );
     }
   }
 

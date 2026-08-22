@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { registrations } from '../lib/api';
+import { Job, registrations } from '../lib/api';
 import { useAuth } from '../store/authUtils';
 import { useConfig } from './useConfig';
 
@@ -11,6 +11,10 @@ export interface MyRegistration {
   reviewedAt?: string | null;
   decisionMessage?: string | null;
   createdAt: string;
+  jobs: Array<{
+    jobId: string;
+    job: Job;
+  }>;
 }
 
 interface UseMyRegistrationResult {
@@ -54,6 +58,7 @@ export function useMyRegistration(): UseMyRegistrationResult {
         reviewedAt: response.reviewedAt ?? null,
         decisionMessage: response.decisionMessage ?? null,
         createdAt: response.createdAt,
+        jobs: response.jobs?.map(({ jobId, job }) => ({ jobId, job })) ?? [],
       });
     } catch (err) {
       setRegistration(null);
