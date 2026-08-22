@@ -49,7 +49,7 @@ export default function RegistrationPage() {
     jobCategories,
     jobs,
     shifts,
-    loading: registrationLoading,
+    initialDataLoaded,
     error: registrationError,
     fetchCampingOptions,
     fetchJobCategories,
@@ -188,7 +188,7 @@ export default function RegistrationPage() {
 
   const misconfiguredCampingOptions = useMemo(
     () => selectedCampingOptions.filter(option => {
-      if (option.workShiftsRequired <= 0 || jobCategories.length === 0) {
+      if (option.workShiftsRequired <= 0) {
         return false;
       }
 
@@ -1555,7 +1555,7 @@ export default function RegistrationPage() {
     authLoading
     || campRegistrationLoading
     || myRegistrationLoading
-    || (registrationLoading && !jobs.length && !campingOptions.length)
+    || !initialDataLoaded
   ) {
     return (
       <div className="max-w-4xl mx-auto p-6">

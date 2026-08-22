@@ -155,8 +155,43 @@ describe('useRegistration', () => {
     expect(result.current.jobCategories).toEqual([]);
     expect(result.current.jobs).toEqual([]);
     expect(result.current.shifts).toEqual([]);
+    expect(result.current.initialDataLoaded).toBe(false);
     expect(result.current.loading).toBe(false);
     expect(result.current.error).toBeNull();
+  });
+
+  it('should remain uninitialized until every initial resource request settles', async () => {
+    let resolveCampingOptions: (response: { data: typeof mockCampingOptions }) => void =
+      () => undefined;
+    const campingOptionsRequest = new Promise<{ data: typeof mockCampingOptions }>(resolve => {
+      resolveCampingOptions = resolve;
+    });
+    (apiModule.api.get as Mock).mockReturnValueOnce(campingOptionsRequest);
+
+    const { result } = renderHook(() => useRegistration());
+    let requests: Promise<void>[] = [];
+
+    act(() => {
+      requests = [
+        result.current.fetchCampingOptions(),
+        result.current.fetchJobCategories(),
+        result.current.fetchJobs(),
+        result.current.fetchShifts(),
+      ];
+    });
+
+    await act(async () => {
+      await Promise.all(requests.slice(1));
+    });
+
+    expect(result.current.initialDataLoaded).toBe(false);
+
+    await act(async () => {
+      resolveCampingOptions({ data: mockCampingOptions });
+      await requests[0];
+    });
+
+    expect(result.current.initialDataLoaded).toBe(true);
   });
 
   it('should fetch camping options', async () => {

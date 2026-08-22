@@ -227,6 +227,7 @@ describe('RegistrationPage', () => {
       jobCategories: mockJobCategories,
       jobs: mockJobs,
       shifts: mockShifts,
+      initialDataLoaded: true,
       loading: false,
       error: null,
       fetchCampingOptions: vi.fn(),
@@ -379,6 +380,28 @@ describe('RegistrationPage', () => {
     expect(screen.getByLabelText('Email*')).toBeInTheDocument();
     expect(screen.getByLabelText('Phone Number*')).toBeInTheDocument();
     expect(screen.getByLabelText('Emergency Contact(s)*')).toBeInTheDocument();
+  });
+
+  it('should keep registration unavailable until all initial data has loaded', () => {
+    vi.spyOn(useRegistrationModule, 'useRegistration').mockReturnValue({
+      campingOptions: mockCampingOptions,
+      jobCategories: mockJobCategories,
+      jobs: mockJobs,
+      shifts: mockShifts,
+      initialDataLoaded: false,
+      loading: false,
+      error: null,
+      fetchCampingOptions: vi.fn(),
+      fetchJobCategories: vi.fn(),
+      fetchShifts: vi.fn(),
+      fetchJobs: vi.fn(),
+      submitRegistration: vi.fn().mockResolvedValue({}),
+    });
+
+    renderWithAuth();
+
+    expect(screen.getByText('Loading registration...')).toBeInTheDocument();
+    expect(screen.queryByText('Continue')).not.toBeInTheDocument();
   });
 
   it('shows login message when not authenticated', () => {
@@ -786,6 +809,7 @@ describe('RegistrationPage', () => {
         jobCategories: [mockTeardownCategory, mockArtCarCategory, mockManifestCategory],
         jobs: [mockTeardownJob1, mockTeardownJob2, mockArtCarJob, mockManifestJob],
         shifts: mockShifts,
+        initialDataLoaded: true,
         loading: false,
         error: null,
         fetchCampingOptions: vi.fn(),
@@ -838,6 +862,7 @@ describe('RegistrationPage', () => {
         jobCategories: [mockTeardownCategory, mockArtCarCategory, mockManifestCategory],
         jobs: [mockTeardownJob1, mockTeardownJob2, mockManifestJob],
         shifts: mockShifts,
+        initialDataLoaded: true,
         loading: false,
         error: null,
         fetchCampingOptions: vi.fn(),
@@ -867,6 +892,7 @@ describe('RegistrationPage', () => {
         jobCategories: [mockTeardownCategory, mockArtCarCategory, mockManifestCategory],
         jobs: [mockTeardownJob1, mockTeardownJob2, mockArtCarJob, mockManifestJob],
         shifts: mockShifts,
+        initialDataLoaded: true,
         loading: false,
         error: null,
         fetchCampingOptions: vi.fn(),
@@ -893,6 +919,31 @@ describe('RegistrationPage', () => {
           screen.getAllByText('You must select at least 1 Skydiving work shift')
         ).toHaveLength(1);
       });
+    });
+
+    it('should report required options as misconfigured when the category catalog is empty', async () => {
+      vi.spyOn(useRegistrationModule, 'useRegistration').mockReturnValue({
+        campingOptions: [mockSkydivingOption],
+        jobCategories: [],
+        jobs: [],
+        shifts: mockShifts,
+        initialDataLoaded: true,
+        loading: false,
+        error: null,
+        fetchCampingOptions: vi.fn(),
+        fetchJobCategories: vi.fn(),
+        fetchShifts: vi.fn(),
+        fetchJobs: vi.fn(),
+        submitRegistration: vi.fn().mockResolvedValue({}),
+      });
+
+      await navigateToJobsStep();
+
+      expect(
+        screen.getByText(
+          /Work shifts are not configured for Skydiving.*contact an administrator/i
+        )
+      ).toBeInTheDocument();
     });
 
     it('should reject selection of only teardown jobs when camping jobs are required', async () => {
@@ -988,6 +1039,7 @@ describe('RegistrationPage', () => {
         jobCategories: [mockTeardownCategory, mockArtCarCategory, mockManifestCategory],
         jobs: [mockTeardownJob1, mockTeardownJob2, mockArtCarJob, mockManifestJob],
         shifts: mockShifts,
+        initialDataLoaded: true,
         loading: false,
         error: null,
         fetchCampingOptions: vi.fn(),
@@ -1070,6 +1122,7 @@ describe('RegistrationPage', () => {
         jobCategories: [mockTeardownCategory, mockSecondRequiredCategory, mockArtCarCategory, mockManifestCategory],
         jobs: [mockTeardownJob1, mockTeardownJob2, mockSecurityJob, mockArtCarJob, mockManifestJob],
         shifts: mockShifts,
+        initialDataLoaded: true,
         loading: false,
         error: null,
         fetchCampingOptions: vi.fn(),
@@ -1145,6 +1198,7 @@ describe('RegistrationPage', () => {
         jobCategories: [mockTeardownCategory, mockArtCarCategory, mockManifestCategory],
         jobs: [mockTeardownJob1, mockTeardownJob2, mockArtCarJob, mockManifestJob],
         shifts: mockShifts,
+        initialDataLoaded: true,
         loading: false,
         error: null,
         fetchCampingOptions: vi.fn(),

@@ -23,73 +23,113 @@ export function useRegistration() {
   const [categories, setCategories] = useState<JobCategory[]>([]);
   const [jobsList, setJobsList] = useState<Job[]>([]);
   const [shiftsList, setShiftsList] = useState<Shift[]>([]);
+  const [loadedResources, setLoadedResources] = useState({
+    campingOptions: false,
+    jobCategories: false,
+    jobs: false,
+    shifts: false,
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const jobsRequestId = useRef(0);
+  const requestIds = useRef({
+    campingOptions: 0,
+    jobCategories: 0,
+    jobs: 0,
+    shifts: 0,
+  });
 
   // Fetch camping options
   const fetchCampingOptions = useCallback(async () => {
+    const requestId = ++requestIds.current.campingOptions;
+    setLoadedResources(current => ({ ...current, campingOptions: false }));
     setLoading(true);
     setError(null);
     try {
       const response = await api.get('/camping-options');
-      setCampingOptions(response.data);
+      if (requestId === requestIds.current.campingOptions) {
+        setCampingOptions(response.data);
+      }
     } catch (err) {
-      setError('Failed to fetch camping options');
-      console.error(err);
+      if (requestId === requestIds.current.campingOptions) {
+        setError('Failed to fetch camping options');
+        console.error(err);
+      }
     } finally {
-      setLoading(false);
+      if (requestId === requestIds.current.campingOptions) {
+        setLoadedResources(current => ({ ...current, campingOptions: true }));
+        setLoading(false);
+      }
     }
   }, []);
 
   // Fetch job categories
   const fetchJobCategories = useCallback(async () => {
+    const requestId = ++requestIds.current.jobCategories;
+    setLoadedResources(current => ({ ...current, jobCategories: false }));
     setLoading(true);
     setError(null);
     try {
       const result = await jobCategories.getAll();
-      setCategories(result);
+      if (requestId === requestIds.current.jobCategories) {
+        setCategories(result);
+      }
     } catch (err) {
-      setError('Failed to fetch job categories');
-      console.error(err);
+      if (requestId === requestIds.current.jobCategories) {
+        setError('Failed to fetch job categories');
+        console.error(err);
+      }
     } finally {
-      setLoading(false);
+      if (requestId === requestIds.current.jobCategories) {
+        setLoadedResources(current => ({ ...current, jobCategories: true }));
+        setLoading(false);
+      }
     }
   }, []);
 
   // Fetch shifts
   const fetchShifts = useCallback(async () => {
+    const requestId = ++requestIds.current.shifts;
+    setLoadedResources(current => ({ ...current, shifts: false }));
     setLoading(true);
     setError(null);
     try {
       const result = await shifts.getAll();
-      setShiftsList(result);
+      if (requestId === requestIds.current.shifts) {
+        setShiftsList(result);
+      }
     } catch (err) {
-      setError('Failed to fetch shifts');
-      console.error(err);
+      if (requestId === requestIds.current.shifts) {
+        setError('Failed to fetch shifts');
+        console.error(err);
+      }
     } finally {
-      setLoading(false);
+      if (requestId === requestIds.current.shifts) {
+        setLoadedResources(current => ({ ...current, shifts: true }));
+        setLoading(false);
+      }
     }
   }, []);
 
   // Fetch the complete role-filtered collection. Eligibility is derived by the page.
   const fetchJobs = useCallback(async () => {
-    const requestId = ++jobsRequestId.current;
+    const requestId = ++requestIds.current.jobs;
+    setLoadedResources(current => ({ ...current, jobs: false }));
     setLoading(true);
     setError(null);
     try {
       const allJobs = await jobs.getAll();
 
-      if (requestId === jobsRequestId.current) {
+      if (requestId === requestIds.current.jobs) {
         setJobsList(allJobs);
       }
     } catch (err) {
-      if (requestId === jobsRequestId.current) {
+      if (requestId === requestIds.current.jobs) {
         setError('Failed to fetch jobs');
         console.error(err);
       }
     } finally {
-      if (requestId === jobsRequestId.current) {
+      if (requestId === requestIds.current.jobs) {
+        setLoadedResources(current => ({ ...current, jobs: true }));
         setLoading(false);
       }
     }
@@ -116,6 +156,7 @@ export function useRegistration() {
     jobCategories: categories,
     jobs: jobsList,
     shifts: shiftsList,
+    initialDataLoaded: Object.values(loadedResources).every(Boolean),
     loading,
     error,
     fetchCampingOptions,

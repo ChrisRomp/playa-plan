@@ -293,11 +293,6 @@ describe('RegistrationPage job loading integration', () => {
       expect(jobCategories.getAll).toHaveBeenCalledTimes(1);
     });
 
-    await act(async () => {
-      campingOptionsResponse.resolve({ data: [skydivingOption] });
-      await campingOptionsResponse.promise;
-    });
-
     campRegistrationState = {
       campRegistration: {
         campingOptions: [{ campingOptionId: skydivingOption.id }],
@@ -317,6 +312,14 @@ describe('RegistrationPage job loading integration', () => {
         </AuthContext.Provider>
       </BrowserRouter>
     );
+
+    expect(screen.getByText('Loading registration...')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Continue' })).not.toBeInTheDocument();
+
+    await act(async () => {
+      campingOptionsResponse.resolve({ data: [skydivingOption] });
+      await campingOptionsResponse.promise;
+    });
 
     await waitFor(() => {
       expect(screen.getByText('Camp Shifts: 1 required')).toBeInTheDocument();

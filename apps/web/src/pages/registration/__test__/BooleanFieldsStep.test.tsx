@@ -109,6 +109,7 @@ describe('Boolean Fields Step', () => {
       jobCategories: [],
       jobs: [],
       shifts: [],
+      initialDataLoaded: true,
       loading: false,
       error: null,
       fetchCampingOptions: vi.fn(),
