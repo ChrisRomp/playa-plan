@@ -137,10 +137,11 @@ test.describe(
             acceptedTerms: true,
             jobs: [targetJob!.id, teardownJob!.id],
             campingOptions: [],
+            extraShiftsConfirmed: true,
           },
         });
 
-        expect(res.ok()).toBeTruthy();
+        expect(res.ok(), await res.text()).toBeTruthy();
 
         // Verify the registration was created with PENDING status (not WAITLISTED)
         const reg = await prisma.registration.findFirst({
