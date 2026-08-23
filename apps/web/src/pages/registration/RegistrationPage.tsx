@@ -548,7 +548,12 @@ export default function RegistrationPage() {
       });
     }
     else if (currentStep === 4) {
-      if (selectedJobConflicts.length > 0) {
+      const hasParticipantJobConflict = selectedJobConflicts.some(
+        conflict =>
+          !preassignedJobIds.has(conflict.firstJob.id) ||
+          !preassignedJobIds.has(conflict.secondJob.id),
+      );
+      if (hasParticipantJobConflict) {
         errors.jobs = 'Selected work shifts cannot overlap.';
       }
 

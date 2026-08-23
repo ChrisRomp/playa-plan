@@ -546,6 +546,77 @@ describe('RegistrationPage', () => {
     expect(screen.queryByText('Your Profile Information')).not.toBeInTheDocument();
   });
 
+  it('should allow conflicting administrator-assigned shifts to proceed', async () => {
+    const inputAssignedJobs = [
+      {
+        ...mockJobs[0],
+        id: 'assigned-job-1',
+        shift: mockShifts[0],
+      },
+      {
+        ...mockJobs[1],
+        id: 'assigned-job-2',
+        shiftId: 'shift1',
+        shift: mockShifts[0],
+      },
+    ];
+    vi.spyOn(useMyRegistrationModule, 'useMyRegistration').mockReturnValue({
+      registration: {
+        id: 'registration-1',
+        status: 'APPLICATION_APPROVED',
+        year: 2025,
+        createdAt: '2025-05-01T00:00:00Z',
+        jobs: inputAssignedJobs.map(job => ({
+          jobId: job.id,
+          job,
+        })),
+      },
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    renderWithAuth(true, { ...mockUser, allowNoJob: true });
+
+    await screen.findByText('Select Work Shifts');
+    fireEvent.click(screen.getByText('Continue'));
+
+    expect(await screen.findByText('Review & Accept Terms')).toBeInTheDocument();
+    expect(
+      screen.queryByText('Selected work shifts cannot overlap.'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('should block a new shift that conflicts with an administrator-assigned shift', async () => {
+    const inputAssignedJob = {
+      ...mockJobs[1],
+      id: 'assigned-job',
+      shiftId: 'shift1',
+      shift: mockShifts[0],
+    };
+    vi.spyOn(useMyRegistrationModule, 'useMyRegistration').mockReturnValue({
+      registration: {
+        id: 'registration-1',
+        status: 'APPLICATION_APPROVED',
+        year: 2025,
+        createdAt: '2025-05-01T00:00:00Z',
+        jobs: [{ jobId: inputAssignedJob.id, job: inputAssignedJob }],
+      },
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    renderWithAuth(true, { ...mockUser, allowNoJob: true });
+
+    await screen.findByText('Select Work Shifts');
+
+    expect(screen.getByLabelText(/^Cook/)).toBeDisabled();
+    expect(
+      screen.getByText('Conflicts with Cleaning'),
+    ).toBeInTheDocument();
+  });
+
   it('validates and reviews filtered administrator-assigned shifts', async () => {
     const inputAssignedJobs = [
       {
