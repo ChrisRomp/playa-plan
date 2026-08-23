@@ -31,6 +31,42 @@ export async function walkRegistrationToPayment(
   page: Page,
   opts: FillRegistrationOpts = {},
 ): Promise<void> {
+  await walkRegistrationToJobs(page, opts);
+
+  // Step 4 — Shifts. Pick by capacity, not by index, so parallel tests don't
+  // collide on 1-slot jobs. Strategy:
+  //   - For each Camp Shift category button (Art Car Driver, Firefly Greeter,
+  //     Landing Area, Manifest Assistant, Manifest Manager, etc.), expand it and
+  //     pick the FIRST checkbox whose accessible name contains "Spots: N of M
+  //     available" with N >= 2. Stop after one camp shift.
+  //   - Always-required Teardown category exposes 50- and 20-spot shifts; pick
+  //     the 50-spot one to avoid contention.
+  await selectFirstAvailableCampShift(page);
+  await selectTeardownShift(page);
+
+  await page.getByRole('button', { name: 'Continue' }).click();
+
+  // Step 5 — Review & Accept Terms.
+  await expect(page.getByRole('heading', { name: 'Review & Accept Terms' })).toBeVisible();
+  await page.getByRole('checkbox', { name: /i accept the terms/i }).check();
+  await page.getByRole('button', { name: /Review & Pay|Submit/ }).click();
+
+  // Step 6 — Payment. The page renders either a "Complete Registration"
+  // payment button (Stripe / PayPal path) or a "Pay Dues Later" button
+  // (deferred path, when both config and user flags allow). Match either so
+  // both payment and deferred specs can share this helper; the caller
+  // asserts which one it actually expected.
+  await expect(page.getByRole('heading', { name: 'Payment' })).toBeVisible({ timeout: 10_000 });
+  await expect(
+    page.getByRole('button', { name: /Complete Registration|Pay Dues Later/ }),
+  ).toBeVisible();
+}
+
+/** Walk a logged-in participant through profile, camping option, and details steps. */
+export async function walkRegistrationToJobs(
+  page: Page,
+  opts: FillRegistrationOpts = {},
+): Promise<void> {
   await page.goto(webUrl('/registration'));
   await expect(page.getByRole('heading', { name: 'Camp Registration' })).toBeVisible({
     timeout: 10_000,
@@ -72,34 +108,7 @@ export async function walkRegistrationToPayment(
   );
   await page.getByRole('button', { name: 'Continue' }).click();
 
-  // Step 4 — Shifts. Pick by capacity, not by index, so parallel tests don't
-  // collide on 1-slot jobs. Strategy:
-  //   - For each Camp Shift category button (Art Car Driver, Firefly Greeter,
-  //     Landing Area, Manifest Assistant, Manifest Manager, etc.), expand it and
-  //     pick the FIRST checkbox whose accessible name contains "Spots: N of M
-  //     available" with N >= 2. Stop after one camp shift.
-  //   - Always-required Teardown category exposes 50- and 20-spot shifts; pick
-  //     the 50-spot one to avoid contention.
   await expect(page.getByRole('heading', { name: 'Select Work Shifts' })).toBeVisible();
-  await selectFirstAvailableCampShift(page);
-  await selectTeardownShift(page);
-
-  await page.getByRole('button', { name: 'Continue' }).click();
-
-  // Step 5 — Review & Accept Terms.
-  await expect(page.getByRole('heading', { name: 'Review & Accept Terms' })).toBeVisible();
-  await page.getByRole('checkbox', { name: /i accept the terms/i }).check();
-  await page.getByRole('button', { name: /Review & Pay|Submit/ }).click();
-
-  // Step 6 — Payment. The page renders either a "Complete Registration"
-  // payment button (Stripe / PayPal path) or a "Pay Dues Later" button
-  // (deferred path, when both config and user flags allow). Match either so
-  // both payment and deferred specs can share this helper; the caller
-  // asserts which one it actually expected.
-  await expect(page.getByRole('heading', { name: 'Payment' })).toBeVisible({ timeout: 10_000 });
-  await expect(
-    page.getByRole('button', { name: /Complete Registration|Pay Dues Later/ }),
-  ).toBeVisible();
 }
 
 /**
