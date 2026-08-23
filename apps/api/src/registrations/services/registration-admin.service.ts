@@ -285,13 +285,16 @@ export class RegistrationAdminService {
           throw new BadRequestException('Cannot edit a cancelled registration');
         }
 
+        const claimedUpdatedAt = new Date(
+          Math.max(Date.now(), currentRegistration.updatedAt.getTime() + 1),
+        );
         const versionClaim = await prisma.registration.updateMany({
           where: {
             id: registrationId,
             updatedAt: new Date(editData.expectedUpdatedAt),
           },
           data: {
-            updatedAt: new Date(currentRegistration.updatedAt.getTime() + 1),
+            updatedAt: claimedUpdatedAt,
           },
         });
         if (versionClaim.count === 0) {

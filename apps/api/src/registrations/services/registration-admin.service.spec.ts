@@ -153,11 +153,14 @@ describe('RegistrationAdminService', () => {
 
   afterEach(() => {
     jest.clearAllMocks();
+    jest.restoreAllMocks();
   });
 
   describe('editRegistration', () => {
     // Task 5.2.1: Test editRegistration() successfully updates registration and creates audit record
     it('should successfully update registration and create audit record', async () => {
+      const expectedUpdatedAt = new Date('2024-02-01T12:00:00.000Z');
+      jest.spyOn(Date, 'now').mockReturnValue(expectedUpdatedAt.getTime());
       const editData: AdminEditRegistrationDto = {
         expectedUpdatedAt: mockRegistration.updatedAt.toISOString(),
         status: RegistrationStatus.WAITLISTED,
@@ -205,6 +208,15 @@ describe('RegistrationAdminService', () => {
         where: { id: 'reg-123' },
         data: { status: RegistrationStatus.WAITLISTED },
       });
+      expect(prismaService.registration.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: 'reg-123',
+          updatedAt: mockRegistration.updatedAt,
+        },
+        data: {
+          updatedAt: expectedUpdatedAt,
+        },
+      });
 
       // The service creates audit records via createMultipleAuditRecords, not individual createAuditRecord calls
       expect(adminAuditService.createMultipleAuditRecords).toHaveBeenCalled();
@@ -241,6 +253,9 @@ describe('RegistrationAdminService', () => {
     });
 
     it('should reject an edit when the form version is stale', async () => {
+      jest.spyOn(Date, 'now').mockReturnValue(
+        new Date('2023-12-31T22:00:00.000Z').getTime(),
+      );
       const staleUpdatedAt = new Date('2023-12-31T23:00:00.000Z');
       const inputEditData: AdminEditRegistrationDto = {
         expectedUpdatedAt: staleUpdatedAt.toISOString(),
