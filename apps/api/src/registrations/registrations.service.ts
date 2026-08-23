@@ -859,8 +859,13 @@ export class RegistrationsService {
       ),
       alwaysRequiredCategories,
     });
+    const participantConflicts = selectionAnalysis.conflicts.filter(
+      ({ firstJob, secondJob }) =>
+        newSubmittedJobIds.includes(firstJob.id) ||
+        newSubmittedJobIds.includes(secondJob.id),
+    );
     this.assertValidParticipantJobSelection(
-      selectionAnalysis,
+      { ...selectionAnalysis, conflicts: participantConflicts },
       completeRegistrationDto.extraShiftsConfirmed ?? false,
     );
 

@@ -5,6 +5,9 @@ interface ApiErrorResponse {
   readonly message?: string | string[];
 }
 
+const STALE_REGISTRATION_MESSAGE =
+  'Registration changed concurrently; refresh and retry the edit';
+
 export interface AdminRegistrationResult {
   id: string;
   year: number;
@@ -252,10 +255,14 @@ export const adminRegistrationsApi = {
           ? responseMessage.join(', ')
           : responseMessage;
 
-        if (message) {
+        if (message === STALE_REGISTRATION_MESSAGE) {
           throw new Error(
-            `${message}. Close and reopen the editor to load the latest registration before retrying.`,
+            `${STALE_REGISTRATION_MESSAGE}. Close and reopen the editor to load the latest registration before retrying.`,
           );
+        }
+
+        if (message) {
+          throw new Error(message);
         }
       }
 

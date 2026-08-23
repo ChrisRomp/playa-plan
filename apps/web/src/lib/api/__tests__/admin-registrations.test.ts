@@ -41,4 +41,29 @@ describe('adminRegistrationsApi', () => {
       'Registration changed concurrently; refresh and retry the edit. Close and reopen the editor to load the latest registration before retrying.',
     );
   });
+
+  it('should not label other conflicts as stale registration edits', async () => {
+    mockApiPut.mockRejectedValue({
+      isAxiosError: true,
+      response: {
+        status: 409,
+        data: {
+          message: 'Camping option is at capacity',
+        },
+      },
+    });
+
+    const editRequest = {
+      expectedUpdatedAt: '2026-08-22T18:00:00.000Z',
+      status: 'CONFIRMED' as const,
+      jobIds: ['job-1'],
+      campingOptionIds: ['camping-option-1'],
+      notes: '',
+      sendNotification: false,
+    };
+
+    await expect(
+      adminRegistrationsApi.editRegistration('registration-1', editRequest),
+    ).rejects.toThrow('Camping option is at capacity');
+  });
 });

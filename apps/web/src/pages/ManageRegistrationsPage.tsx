@@ -8,45 +8,15 @@ import RegistrationEditForm from '../components/admin/registrations/Registration
 import RegistrationCancelForm from '../components/admin/registrations/RegistrationCancelForm';
 import AuditTrailView from '../components/admin/registrations/AuditTrailView';
 import { useRegistrationManagement } from '../hooks/useRegistrationManagement';
-import { adminRegistrationsApi, PaginatedRegistrationsResponse, Job, CampingOption, UserCampingOptionRegistration } from '../lib/api/admin-registrations';
+import {
+  adminRegistrationsApi,
+  PaginatedRegistrationsResponse,
+  Registration,
+  Job,
+  CampingOption,
+  UserCampingOptionRegistration,
+} from '../lib/api/admin-registrations';
 import { useConfig } from '../hooks/useConfig';
-
-// TODO: Replace with actual API types when implemented
-interface Registration {
-  id: string;
-  year: number;
-  status: 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'WAITLISTED';
-  createdAt: string;
-  user: {
-    id: string;
-    email: string;
-    firstName: string;
-    lastName: string;
-    playaName?: string;
-    role: string;
-  };
-  jobs: Array<{
-    job: {
-      id: string;
-      name: string;
-      category?: {
-        name: string;
-      };
-      shift?: {
-        id: string;
-        name: string;
-        startTime: string;
-        endTime: string;
-        dayOfWeek: string;
-      };
-    };
-  }>;
-  payments: Array<{
-    id: string;
-    amount: number;
-    status: string;
-  }>;
-}
 
 interface RegistrationFilters {
   year?: number;

@@ -1384,6 +1384,64 @@ describe('RegistrationsService', () => {
       );
     });
 
+    it('should preserve conflicts between existing admin-assigned jobs', async () => {
+      const existingJobs = [
+        {
+          id: 'job-existing-1',
+          name: 'Existing Friday AM',
+          active: true,
+          maxRegistrations: 10,
+          registrations: [],
+          shift: {
+            id: 'shift-existing-1',
+            name: 'Friday AM',
+            dayOfWeek: 'FRIDAY',
+            startTime: '09:00',
+            endTime: '12:00',
+          },
+        },
+        {
+          id: 'job-existing-2',
+          name: 'Existing Friday Midday',
+          active: true,
+          maxRegistrations: 10,
+          registrations: [],
+          shift: {
+            id: 'shift-existing-2',
+            name: 'Friday Midday',
+            dayOfWeek: 'FRIDAY',
+            startTime: '11:00',
+            endTime: '13:00',
+          },
+        },
+      ];
+      mockPrismaService.registration.findFirst.mockResolvedValue({
+        ...approvedRegistration,
+        jobs: existingJobs.map((job) => ({
+          id: `registration-${job.id}`,
+          registrationId: approvedRegistration.id,
+          jobId: job.id,
+          job,
+        })),
+      });
+      mockPrismaService.job.findUnique.mockImplementation(
+        ({ where }: { where: { id: string } }) =>
+          existingJobs.find((job) => job.id === where.id),
+      );
+
+      await expect(
+        service.completeRegistration(userId, {
+          ...completeDto,
+          jobs: [],
+        }),
+      ).resolves.toEqual({
+        registration: updatedRegistration,
+        message: 'Registration completed successfully',
+      });
+
+      expect(mockPrismaService.registrationJob.createMany).not.toHaveBeenCalled();
+    });
+
     it('should reject a newly submitted staff-only job', async () => {
       mockPrismaService.job.findMany.mockResolvedValue([{ id: 'job-1' }]);
 
