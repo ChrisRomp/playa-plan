@@ -210,6 +210,7 @@ describe('RegistrationPage job loading integration', () => {
         status: 'APPLICATION_APPROVED',
         year: 2026,
         createdAt: '2026-08-12T00:00:00.000Z',
+        jobs: [],
       },
       loading: false,
       error: null,

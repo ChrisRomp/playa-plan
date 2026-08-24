@@ -9,6 +9,7 @@ import { PrismaService } from '../../common/prisma/prisma.service';
 import { AdminAuditService, CreateAuditRecordDto } from '../../admin-audit/services/admin-audit.service';
 import { AdminNotificationsService, AdminNotificationData } from '../../notifications/services/admin-notifications.service';
 import { RegistrationCleanupService } from './registration-cleanup.service';
+import { RegistrationJobSelectionService } from './registration-job-selection.service';
 import { PaymentsService } from '../../payments/services/payments.service';
 import { 
   Registration, 
@@ -17,7 +18,6 @@ import {
   AdminAuditTargetType, 
   PaymentStatus,
   PaymentProvider,
-  Job,
   Prisma 
 } from '@prisma/client';
 import { 
@@ -50,6 +50,7 @@ export class RegistrationAdminService {
     private readonly adminNotificationsService: AdminNotificationsService,
     private readonly cleanupService: RegistrationCleanupService,
     private readonly paymentsService: PaymentsService,
+    private readonly jobSelectionService: RegistrationJobSelectionService,
   ) {}
 
   /**
@@ -284,6 +285,24 @@ export class RegistrationAdminService {
           throw new BadRequestException('Cannot edit a cancelled registration');
         }
 
+        const claimedUpdatedAt = new Date(
+          Math.max(Date.now(), currentRegistration.updatedAt.getTime() + 1),
+        );
+        const versionClaim = await prisma.registration.updateMany({
+          where: {
+            id: registrationId,
+            updatedAt: new Date(editData.expectedUpdatedAt),
+          },
+          data: {
+            updatedAt: claimedUpdatedAt,
+          },
+        });
+        if (versionClaim.count === 0) {
+          throw new ConflictException(
+            'Registration changed concurrently; refresh and retry the edit',
+          );
+        }
+
         const auditRecords: CreateAuditRecordDto[] = [];
 
         // Update status if provided
@@ -312,9 +331,14 @@ export class RegistrationAdminService {
 
           const jobsToRemove = currentJobIds.filter(jobId => !newJobIds.includes(jobId));
           const jobIdsToAdd = newJobIds.filter(jobId => !currentJobIds.includes(jobId));
-          const jobsToAdd: Job[] = [];
+          const jobsToAdd: Array<
+            Prisma.JobGetPayload<{ include: { shift: true } }>
+          > = [];
           for (const jobId of jobIdsToAdd) {
-            const job = await prisma.job.findUnique({ where: { id: jobId } });
+            const job = await prisma.job.findUnique({
+              where: { id: jobId },
+              include: { shift: true },
+            });
             if (!job) {
               throw new BadRequestException(`Job ${jobId} not found`);
             }
@@ -322,6 +346,31 @@ export class RegistrationAdminService {
               throw new BadRequestException(`Inactive job cannot be assigned: ${job.name}`);
             }
             jobsToAdd.push(job);
+          }
+
+          const selectedJobs = [
+            ...currentRegistration.jobs
+              .filter(({ jobId }) => newJobIds.includes(jobId))
+              .map(({ job }) => job),
+            ...jobsToAdd,
+          ];
+          const selectionAnalysis = this.jobSelectionService.analyze({
+            jobs: selectedJobs.map(job => ({
+              id: job.id,
+              name: job.name,
+              shift: job.shift ?? undefined,
+            })),
+            allowNoJob: true,
+            campingOptions: [],
+            alwaysRequiredCategories: [],
+          });
+          if (
+            selectionAnalysis.conflicts.length > 0 &&
+            !editData.conflictOverrideConfirmed
+          ) {
+            throw new BadRequestException(
+              'Schedule conflicts require explicit administrator override confirmation',
+            );
           }
 
           if (jobsToRemove.length > 0) {

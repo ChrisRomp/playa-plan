@@ -7,7 +7,12 @@ import { RegistrationsModule } from '../registrations/registrations.module';
 import { CoreConfigModule } from '../core-config/core-config.module';
 
 @Module({
-  imports: [PrismaModule, CategoriesModule, RegistrationsModule, CoreConfigModule],
+  imports: [
+    PrismaModule,
+    CategoriesModule,
+    RegistrationsModule,
+    CoreConfigModule,
+  ],
   controllers: [JobsController],
   providers: [JobsService],
   exports: [JobsService],

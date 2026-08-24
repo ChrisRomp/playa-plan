@@ -7,16 +7,19 @@
   "author": "Chris Romp",
   "license": "MIT",
   "scripts": {
+    "prebuild": "npm run build --workspace=@playa-plan/types",
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
+    "pretest": "npm run build --workspace=@playa-plan/types",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@alloc/quick-lru": "^5.2.0",
+    "@playa-plan/types": "file:../../libs/types",
     "@simplewebauthn/browser": "^13.3.0",
     "@stripe/stripe-js": "^7.9.0",
     "@tanstack/react-query": "^5.80.6",

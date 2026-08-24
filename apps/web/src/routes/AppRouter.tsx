@@ -30,6 +30,7 @@ import { PaymentReportsPage } from '../pages/PaymentReportsPage.tsx';
 import { UserReportsPage } from '../pages/UserReportsPage.tsx';
 import { WorkScheduleReportPage } from '../pages/WorkScheduleReportPage.tsx';
 import { TicketReceiptReportPage } from '../pages/TicketReceiptReportPage.tsx';
+import { ScheduleExceptionsReportPage } from '../pages/ScheduleExceptionsReportPage.tsx';
 import HealthCheckPage from '../pages/HealthCheckPage.tsx';
 import { ROLES } from '../types/auth.ts';
 
@@ -68,6 +69,10 @@ const AppRouter: React.FC = () => {
         <Route path={ROUTES.REPORTS_USERS.path} element={<UserReportsPage />} />
         <Route path={ROUTES.REPORTS_WORK_SCHEDULE.path} element={<WorkScheduleReportPage />} />
         <Route path={ROUTES.REPORTS_TICKET_RECEIPT.path} element={<TicketReceiptReportPage />} />
+        <Route
+          path={ROUTES.REPORTS_SCHEDULE_EXCEPTIONS.path}
+          element={<ScheduleExceptionsReportPage />}
+        />
         <Route path={ROUTES.ADMIN_APPLICATIONS.path} element={<AdminApplicationsPage />} />
       </Route>
       

@@ -45,6 +45,15 @@ export class CreateCampRegistrationDto {
   jobs!: string[];
 
   @ApiProperty({
+    description: 'Whether the user confirmed selecting more shifts than required',
+    required: false,
+    default: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  extraShiftsConfirmed?: boolean = false;
+
+  @ApiProperty({
     description: 'Whether the user has accepted the terms and conditions',
     example: true,
   })

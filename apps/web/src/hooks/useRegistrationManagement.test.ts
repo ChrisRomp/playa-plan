@@ -17,6 +17,7 @@ describe('useRegistrationManagement', () => {
     year: 2024,
     status: 'CONFIRMED' as const,
     createdAt: '2024-01-01T10:00:00Z',
+    updatedAt: '2024-01-01T11:00:00Z',
     user: {
       id: 'user-1',
       email: 'test@example.com',
@@ -179,6 +180,7 @@ describe('useRegistrationManagement', () => {
       });
 
       const editData = {
+        expectedUpdatedAt: mockRegistration.updatedAt,
         status: 'PENDING' as const,
         jobIds: ['job-1', 'job-2'],
         campingOptionIds: ['camp-1'],
@@ -212,6 +214,7 @@ describe('useRegistrationManagement', () => {
       });
 
       const editData = {
+        expectedUpdatedAt: mockRegistration.updatedAt,
         status: 'PENDING' as const,
         jobIds: ['job-1'],
         campingOptionIds: ['camp-1'],
@@ -245,6 +248,7 @@ describe('useRegistrationManagement', () => {
       });
 
       const editData = {
+        expectedUpdatedAt: mockRegistration.updatedAt,
         status: 'PENDING' as const,
         jobIds: ['job-1'],
         campingOptionIds: ['camp-1'],
@@ -275,6 +279,7 @@ describe('useRegistrationManagement', () => {
       const { result } = renderHook(() => useRegistrationManagement());
 
       const editData = {
+        expectedUpdatedAt: mockRegistration.updatedAt,
         status: 'PENDING' as const,
         jobIds: ['job-1'],
         campingOptionIds: ['camp-1'],
@@ -464,6 +469,7 @@ describe('useRegistrationManagement', () => {
       });
 
       const editData = {
+        expectedUpdatedAt: mockRegistration.updatedAt,
         status: 'PENDING' as const,
         jobIds: ['job-1'],
         campingOptionIds: ['camp-1'],

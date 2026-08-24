@@ -1,5 +1,14 @@
-import { IsNotEmpty, IsString, IsUUID, IsInt, IsArray, Min } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import {
+  IsArray,
+  IsBoolean,
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Min,
+} from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 /**
  * Data Transfer Object for creating a new registration
@@ -31,18 +40,13 @@ export class CreateRegistrationDto {
   @IsArray()
   @IsUUID(undefined, { each: true })
   jobIds!: string[];
-}
 
-/**
- * Data Transfer Object for adding a job to an existing registration
- */
-export class AddJobToRegistrationDto {
-  @ApiProperty({
-    description: 'ID of the job to add to the registration',
-    example: '7c8d0d55-e0a3-4cf0-a620-2412acd4361d',
+  @ApiPropertyOptional({
+    description: 'Confirms an administrator intends to create a registration with conflicting work shifts',
+    example: false,
+    default: false,
   })
-  @IsNotEmpty()
-  @IsString()
-  @IsUUID()
-  jobId!: string;
+  @IsOptional()
+  @IsBoolean({ message: 'Conflict override confirmation must be a boolean' })
+  conflictOverrideConfirmed?: boolean = false;
 }

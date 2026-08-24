@@ -6,6 +6,7 @@ export interface RegistrationFormData {
   campingOptions: string[];
   customFields: Record<string, unknown>;
   jobs: string[];  // Changed from shifts to jobs
+  extraShiftsConfirmed: boolean;
   acceptedTerms: boolean;
   /**
    * When true, the participant is opting to defer dues payment. The server

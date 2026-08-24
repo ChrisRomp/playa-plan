@@ -4,9 +4,11 @@
   "license": "MIT",
   "description": "Shared types for PlayaPlan",
   "main": "dist/index.js",
+  "module": "src/index.ts",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "tsc"
+    "build": "tsc",
+    "prepare": "npm run build"
   },
   "devDependencies": {
     "typescript": "^5.8.2"

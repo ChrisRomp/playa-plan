@@ -240,10 +240,20 @@ describe('Admin Registration Management (Integration Tests)', () => {
     });
   }
 
+  async function getCurrentRegistrationUpdatedAt(): Promise<string> {
+    const registration = await prismaService.registration.findUniqueOrThrow({
+      where: { id: testRegistration.id },
+      select: { updatedAt: true },
+    });
+
+    return registration.updatedAt.toISOString();
+  }
+
   // Task 5.9.1: Test complete registration edit workflow from API to database
   describe('Registration Edit Workflow', () => {
     it('should complete full edit workflow from API to database', async () => {
       const editData = {
+        expectedUpdatedAt: await getCurrentRegistrationUpdatedAt(),
         status: RegistrationStatus.WAITLISTED,
         jobIds: [testJobs[1].id], // Change from Kitchen Helper to Cleanup Crew
         campingOptionIds: [testCampingOptions[1].id], // Change from Basic to Premium
@@ -327,10 +337,11 @@ describe('Admin Registration Management (Integration Tests)', () => {
       const initialAuditCount = await prismaService.adminAudit.count();
 
       // Perform multiple admin operations
-      await request(app.getHttpServer())
+      const firstEditResponse = await request(app.getHttpServer())
         .put(`/admin/registrations/${testRegistration.id}`)
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
+          expectedUpdatedAt: await getCurrentRegistrationUpdatedAt(),
           status: RegistrationStatus.PENDING,
           notes: 'First change',
           sendNotification: false,
@@ -341,6 +352,7 @@ describe('Admin Registration Management (Integration Tests)', () => {
         .put(`/admin/registrations/${testRegistration.id}`)
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
+          expectedUpdatedAt: firstEditResponse.body.registration.updatedAt,
           status: RegistrationStatus.CONFIRMED,
           notes: 'Second change',
           sendNotification: false,
@@ -369,6 +381,7 @@ describe('Admin Registration Management (Integration Tests)', () => {
   describe('Notification Integration', () => {
     it('should integrate notifications with admin operations', async () => {
       const editData = {
+        expectedUpdatedAt: await getCurrentRegistrationUpdatedAt(),
         status: RegistrationStatus.CONFIRMED,
         notes: 'Testing notification integration',
         sendNotification: true, // Enable notification
@@ -596,6 +609,7 @@ describe('Admin Registration Management (Integration Tests)', () => {
   describe('Email Notification Templates', () => {
     it('should handle notification templates with conditional content', async () => {
       const editData = {
+        expectedUpdatedAt: await getCurrentRegistrationUpdatedAt(),
         status: RegistrationStatus.WAITLISTED,
         notes: 'Testing conditional notification content',
         sendNotification: true,
@@ -621,6 +635,7 @@ describe('Admin Registration Management (Integration Tests)', () => {
         .put('/admin/registrations/non-existent-id')
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
+          expectedUpdatedAt: await getCurrentRegistrationUpdatedAt(),
           status: RegistrationStatus.CONFIRMED,
           notes: 'Test edit',
         })
@@ -654,6 +669,7 @@ describe('Admin Registration Management (Integration Tests)', () => {
         .put(`/admin/registrations/${testRegistration.id}`)
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
+          expectedUpdatedAt: await getCurrentRegistrationUpdatedAt(),
           status: 'INVALID_STATUS',
           notes: 'Test with invalid status',
         })

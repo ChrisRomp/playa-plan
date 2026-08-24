@@ -64,6 +64,7 @@ describe('ReportsPage', () => {
     expect(screen.getByText('Registration Reports')).toBeInTheDocument();
     expect(screen.getByText('User Reports')).toBeInTheDocument();
     expect(screen.getByText('Payment Reports')).toBeInTheDocument();
+    expect(screen.getByText('Schedule Exceptions Report')).toBeInTheDocument();
   });
 
   it('should show limited report types for staff users', () => {
@@ -81,6 +82,7 @@ describe('ReportsPage', () => {
     
     expect(screen.getByText('Registration Reports')).toBeInTheDocument();
     expect(screen.getByText('User Reports')).toBeInTheDocument();
+    expect(screen.getByText('Schedule Exceptions Report')).toBeInTheDocument();
     expect(screen.queryByText('Payment Reports')).not.toBeInTheDocument();
   });
 
@@ -117,9 +119,16 @@ describe('ReportsPage', () => {
     const registrationLink = screen.getByRole('link', { name: /registration reports/i });
     const userLink = screen.getByRole('link', { name: /user reports/i });
     const paymentLink = screen.getByRole('link', { name: /payment reports/i });
+    const exceptionsLink = screen.getByRole('link', {
+      name: /schedule exceptions report/i,
+    });
     
     expect(registrationLink).toHaveAttribute('href', '/reports/registrations');
     expect(userLink).toHaveAttribute('href', '/reports/users');
     expect(paymentLink).toHaveAttribute('href', '/reports/payments');
+    expect(exceptionsLink).toHaveAttribute(
+      'href',
+      '/reports/schedule-exceptions',
+    );
   });
 });
