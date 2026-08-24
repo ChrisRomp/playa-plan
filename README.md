@@ -18,7 +18,7 @@ jobs, shifts, and pricing all controlled from an admin UI.
 - Browse and select camping options (with per-option custom fields and dues)
 - Sign up for required work shifts
 - Pay dues online via Stripe or PayPal, or defer payment when enabled
-- Update an existing registration when camp policy allows
+- View application status and continue registration after approval
 - Email confirmations and notifications
 
 **Staff**
