@@ -2,6 +2,14 @@
 
 This guide explains how to deploy the PlayaPlan application to Azure using Azure Developer CLI (AZD) and Azure Container Apps with GitHub Container Registry integration.
 
+> **Current status:** The Azure assets are a starting point and require review
+> before production use. The current Bicep template does not wire required API
+> values such as `JWT_SECRET` and `FRONTEND_URL`, and it sets `VITE_API_URL`
+> although the production web container consumes runtime `API_URL`. The API
+> container also runs `prisma db push --accept-data-loss` and the development
+> seed at startup. See [`setup.md`](./setup.md#deployment-assets) before
+> deploying.
+
 ## Prerequisites
 
 1. [Azure CLI](https://docs.microsoft.com/en-us/cli/azure/install-azure-cli)
@@ -91,6 +99,11 @@ azd env set GITHUB_USERNAME <your-github-username>
 azd env set GITHUB_TOKEN <your-github-token>
 ```
 
+The current Bicep template does not consume every required application runtime
+value. Before provisioning, extend `infra/main.bicep` and the deployment
+workflow to pass a strong `JWT_SECRET`, the public `FRONTEND_URL`, a temporary
+`INITIAL_ADMIN_CODE`, and the web container's `API_URL`.
+
 ### 5. Build and Push Container Images
 
 Build and push the container images to GitHub Container Registry:
@@ -115,7 +128,7 @@ azd env set SKIP_CONTAINER_BUILD true
 # Preview the deployment
 azd provision --preview
 
-# Provision infrastructure 
+# Provision infrastructure
 azd provision
 ```
 
@@ -124,7 +137,10 @@ The infrastructure provisioning will:
 2. Create PostgreSQL database
 3. Configure the apps to use your GitHub Container Registry images
 
-### 5. Access the Application
+Provisioning does not currently complete the missing runtime-variable wiring
+described above.
+
+### 7. Access the Application
 
 After deployment completes, you can find the URLs to access your application:
 
@@ -155,6 +171,8 @@ az ad sp create-for-rbac --name "playaplan-github-actions" --role contributor \
    - `AZURE_SUBSCRIPTION_ID`
    - `POSTGRES_ADMIN_USERNAME`
    - `POSTGRES_ADMIN_PASSWORD`
+   - `JWT_SECRET`
+   - `INITIAL_ADMIN_CODE` (bootstrap only; remove after the first admin login)
    - `GITHUB_TOKEN` (not needed if using default `${{ secrets.GITHUB_TOKEN }}`)
 
 4. For each environment, add the following variables:
@@ -163,7 +181,11 @@ az ad sp create-for-rbac --name "playaplan-github-actions" --role contributor \
    - `WEB_DOMAIN_NAME` (e.g., `test.playaplan.app` for test, `playaplan.app` for prod)
    - `API_DOMAIN_NAME` (e.g., `api-test.playaplan.app` for test, `api.playaplan.app` for prod)
 
-5. Push to the main branch to trigger the deployment or use the manual workflow_dispatch to select the environment.
+5. Extend the Bicep template and workflow to pass the required API secrets,
+   public origins, and web `API_URL`.
+
+6. Run the manual `workflow_dispatch` action and select the environment. The
+   current workflow does not trigger automatically on pushes to `main`.
 
 ### DNS Configuration
 
@@ -183,6 +205,9 @@ azd env get-values
 ## Using the Deployment Script
 
 For convenience, a deployment script is included that automates the entire process:
+
+The script inherits the current template gaps described above; update the
+template and script before treating it as a complete production deployment.
 
 ```bash
 # Make the script executable
@@ -211,12 +236,21 @@ For local development with the same Docker setup that will be used in Azure:
 ```bash
 # Start the API container
 docker build -t playaplan-api -f ./apps/api/Dockerfile .
-docker run -p 3000:3000 -e DATABASE_URL=<your-db-url> playaplan-api
+docker run -p 3000:3000 \
+  -e DATABASE_URL=<your-db-url> \
+  -e JWT_SECRET=<your-jwt-secret> \
+  -e FRONTEND_URL=http://localhost:5173 \
+  playaplan-api
 
 # Start the Web container
 docker build -t playaplan-web -f ./apps/web/Dockerfile --target production .
-docker run -p 5173:5173 -e VITE_API_URL=http://localhost:3000 playaplan-web
+docker run -p 5173:5173 -e API_URL=http://localhost:3000 playaplan-web
 ```
+
+The API image's current entrypoint performs automatic schema synchronization
+with `prisma db push --accept-data-loss` and runs the development seed. Review
+that behavior and take a verified database backup before using the image with
+production data.
 
 ## Troubleshooting
 

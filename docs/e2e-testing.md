@@ -1,6 +1,13 @@
 # End-to-End Testing Guide
 
-This document describes the end-to-end (e2e) testing setup for PlayaPlan.
+> **Canonical guide:** The actively maintained E2E setup, tags, seed pipeline,
+> local workflows, and Playwright authoring instructions are in
+> [`../tests/README.md`](../tests/README.md). This document is retained as a
+> legacy architecture and troubleshooting reference.
+
+This document describes the original end-to-end testing architecture for
+PlayaPlan. If a command or workflow detail differs from `tests/README.md`, use
+`tests/README.md`.
 
 ## Overview
 
