@@ -13,24 +13,27 @@ jobs, shifts, and pricing all controlled from an admin UI.
 ## Features
 
 **Participants**
-- Passwordless login via emailed one-time code (JWT session)
+- Passwordless login via emailed one-time code, with optional passkeys
 - Profile with required and camp-customizable fields
 - Browse and select camping options (with per-option custom fields and dues)
 - Sign up for required work shifts
-- Pay dues online via Stripe or PayPal
+- Pay dues online via Stripe or PayPal, or defer payment when enabled
+- View application status and continue registration after approval
 - Email confirmations and notifications
 
 **Staff**
-- View registrations and reports
+- Review registration applications when approval is enabled
+- View registration, user, work schedule, ticket/receipt, and exception reports
+- Export report data as CSV or PDF where supported
 - Edit user profiles and add internal notes
 - Manage participant access flags (allow registration, allow no-job, etc.)
 
 **Admins**
 - Camp/site configuration (name, branding, contact, payment providers, email)
-- Manage camping options, custom fields, jobs, shift schedules, and dues
+- Manage registration policy, camping options, custom fields, jobs, shifts, and dues
 - User and role management (Participant / Staff / Admin)
 - Process payments and refunds
-- Configure transactional email (SMTP / SendGrid / Mailgun)
+- Configure and test transactional email over SMTP
 - Admin audit log of sensitive actions
 
 ## Tech stack
@@ -40,10 +43,10 @@ jobs, shifts, and pricing all controlled from an admin UI.
 - **Frontend** — React 18 + [Vite](https://vitejs.dev/) + Tailwind CSS (`apps/web`)
 - **Auth** — JWT with email one-time codes (Passport.js)
 - **Payments** — Stripe and PayPal
-- **Email** — SMTP, SendGrid, or Mailgun (configurable)
+- **Email** — SMTP via Nodemailer
 - **Testing** — Jest (API), Vitest (web), Playwright (E2E)
 - **Containers** — Dockerfiles for API and web; Compose file for E2E
-- **Deployment** — Azure-ready (`infra/`, `azure.yaml`); runs anywhere Docker does
+- **Deployment assets** — Dockerfiles plus Azure/Bicep templates (`infra/`, `azure.yaml`)
 
 ## Requirements
 
@@ -57,7 +60,7 @@ Optional, depending on what you want to exercise:
 
 - **Docker** / **Docker Compose** — for containerized runs and the E2E test stack
 - **Stripe** and/or **PayPal** account — for live payment flows (test mode is fine)
-- **SMTP / SendGrid / Mailgun** credentials — for live transactional email
+- **SMTP credentials** — for live transactional email
 
 ## Getting started
 
@@ -69,7 +72,9 @@ npm install
 
 # 2. Configure
 cp .env.sample .env
-# edit .env — at minimum set DATABASE_URL and JWT_SECRET
+# edit .env and set DATABASE_URL and JWT_SECRET
+# example to set JWT_SECRET with a random string:
+sed -i.bak "s|^JWT_SECRET=.*|JWT_SECRET=$(openssl rand -hex 32)|" .env && rm .env.bak
 
 # 3. Initialize the database (generate client, run migrations, seed)
 npm run db:setup --workspace=api
@@ -82,7 +87,12 @@ Defaults:
 
 - API: <http://localhost:3000>
 - Web: <http://localhost:5173>
-- Dev mode login code: `123456` (any login code emailed in dev is logged to the API console)
+- API docs: <http://localhost:3000/api/docs>
+- Dev mode login code: `123456`
+- The first user to complete login becomes an admin
+
+For production configuration, first-admin bootstrap, containers, passkeys, and
+reverse-proxy settings, see the [setup and self-hosting guide](./docs/setup.md).
 
 ## Common scripts
 
@@ -114,11 +124,12 @@ playa-plan/
 
 More detail lives in [`docs/`](./docs):
 
+- [`setup.md`](./docs/setup.md) — local setup, configuration, and self-hosting
 - [`app-spec.md`](./docs/app-spec.md) — full application specification
 - [`frontend-spec.md`](./docs/frontend-spec.md) — frontend specification
-- [`copilot-setup.md`](./docs/copilot-setup.md) — development environment setup
-- [`e2e-testing.md`](./docs/e2e-testing.md) — running the Playwright suite
-- [`azure-deployment.md`](./docs/azure-deployment.md) — deploying to Azure
+- [`tests/README.md`](./tests/README.md) — running and authoring Playwright tests
+- [`copilot-setup.md`](./docs/copilot-setup.md) — Copilot cloud agent environment
+- [`azure-deployment.md`](./docs/azure-deployment.md) — Azure deployment assets and caveats
 
 ## License
 

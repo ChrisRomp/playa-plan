@@ -1,96 +1,46 @@
-# GitHub Copilot Development Environment Setup
+# GitHub Copilot cloud agent environment
 
-This document describes how to set up the GitHub Copilot development environment for the PlayaPlan project.
+PlayaPlan uses
+[`.github/workflows/copilot-setup-steps.yml`](../.github/workflows/copilot-setup-steps.yml)
+to prepare the ephemeral GitHub Actions environment used by GitHub Copilot
+cloud agent. It is not the setup procedure for a developer's local checkout.
+For local development, use [`setup.md`](./setup.md).
 
-## Node.js Version
+GitHub documents this workflow in
+[Customizing the development environment for GitHub Copilot cloud agent](https://docs.github.com/en/copilot/how-tos/copilot-on-github/customize-copilot/customize-cloud-agent/customize-the-agent-environment).
 
-The project requires Node.js version 22 or higher. This is specified in the `engines` field in package.json.
+## What the workflow provides
 
-```bash
-# Verify your Node.js version
-node --version
-```
+Before the cloud agent starts working, the `copilot-setup-steps` job:
 
-## Dependencies
+- Starts PostgreSQL for the agent session
+- Checks out the repository
+- Installs Node.js 22
+- Creates the root `.env`
+- Installs all npm workspace dependencies
+- Generates the Prisma client
+- Applies committed database migrations
+- Seeds the agent's database
 
-The project has dependencies at both the root level and the application level (web and API).
+The environment is temporary and exists only for the cloud agent session.
 
-### Installing Dependencies
+## Workflow requirements
 
-```bash
-# Install all dependencies (root, api, web)
-npm install
+- The file must remain at `.github/workflows/copilot-setup-steps.yml`.
+- The job must remain named `copilot-setup-steps`.
+- The workflow must be present on the repository's default branch before cloud
+  agent sessions can use it.
+- The workflow can be run manually from the repository's **Actions** tab to
+  validate changes.
 
-# Install only API dependencies
-npm install --workspace=api
-
-# Install only web dependencies
-npm install --workspace=web
-```
-
-## Development Environment
-
-The project has two applications:
-- API service (NestJS) in `apps/api`
-- Web frontend (React) in `apps/web`
-
-### Starting the Development Environment
-
-```bash
-# Start both API and web app
-npm run dev
-
-# Start only API
-npm run dev:api
-
-# Start only web app
-npm run dev:web
-```
-
-### Ports
-
-- API service runs on port 3000
-- Web application runs on port 5173
-
-## Environment Configuration
-
-Copy the `.env.sample` file to create a `.env` file in the repository root:
+The workflow should install deterministic prerequisites only. The cloud agent
+can run the normal repository scripts after setup:
 
 ```bash
-cp .env.sample .env
+npm run build
+npm run lint
+npm test
 ```
 
-Make sure to update any configuration values as needed for your local development environment.
-
-## Testing
-
-```bash
-# Run all tests
-npm run test
-
-# Run only API tests
-npm run test:api
-
-# Run only web tests
-npm run test:web
-
-# Run tests in watch mode
-npm run test:watch
-```
-
-## GitHub Copilot Configuration
-
-The repository includes a GitHub workflow in `.github/workflows/copilot-setup-steps.yml` that sets up the development environment for GitHub Copilot.
-
-## Database Setup
-
-For API development, you need to set up a PostgreSQL database:
-
-1. Create a PostgreSQL database named `playaplan`
-2. Update the `DATABASE_URL` in your `.env` file
-3. Initialize the database schema:
-
-```bash
-cd apps/api
-npm run db:setup
-```
+For cloud-agent-only secrets or variables, configure them on the repository's
+`copilot` GitHub Actions environment rather than committing them to this file.
