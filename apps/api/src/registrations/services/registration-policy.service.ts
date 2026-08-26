@@ -11,14 +11,16 @@ import { CreateCampRegistrationDto } from '../dto/create-camp-registration.dto';
 /**
  * Centralized policy enforcement for participant camp registrations.
  *
- * Used by the participant endpoint (`POST /registrations/camp`) only. The
- * admin/staff endpoint `POST /registrations` (gated by `@Roles(ADMIN, STAFF)`)
- * intentionally bypasses these checks so admins can create or modify
- * registrations as an override path.
+ * Used by participant registration, application submission, and approved
+ * application completion endpoints. The admin/staff endpoint
+ * `POST /registrations` (gated by `@Roles(ADMIN, STAFF)`) intentionally
+ * bypasses these checks so admins can create or modify registrations as an
+ * override path.
  *
- * The public API exposes two assertion methods:
+ * The public API exposes three assertion methods:
  * - `assertCanCreateCampRegistration(user, dto)` — full registration (no approval mode)
  * - `assertCanSubmitApplication(user)` — application-only submission (approval mode)
+ * - `assertCanCompleteRegistration(user, config)` — approved application completion
  *
  * Plus a helper:
  * - `shouldAutoApprove(user)` — whether the user bypasses the approval queue
@@ -81,6 +83,17 @@ export class RegistrationPolicyService {
       registrationOpen: config.registrationOpen,
       earlyRegistrationOpen: config.earlyRegistrationOpen,
     });
+  }
+
+  /**
+   * Assert that a user may complete an approved application under the current
+   * registration window and per-user eligibility flags.
+   */
+  assertCanCompleteRegistration(
+    user: Pick<User, 'id' | 'allowRegistration' | 'allowEarlyRegistration'>,
+    config: { registrationOpen: boolean; earlyRegistrationOpen: boolean },
+  ): void {
+    this.assertRegistrationOpen(user, config);
   }
 
   /**

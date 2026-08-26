@@ -1274,6 +1274,105 @@ describe('DashboardPage - Registration after cancellation', () => {
       });
     });
 
+    it('should hide Complete Registration when registration is closed', async () => {
+      const approvedRegistration = {
+        id: 'approved-reg-id',
+        userId: '1',
+        year: 2024,
+        status: 'APPLICATION_APPROVED' as const,
+        decisionMessage: null,
+        createdAt: '2024-01-10T10:00:00.000Z',
+        updatedAt: '2024-01-12T10:00:00.000Z',
+        jobs: [],
+        payments: [],
+      };
+
+      mockUseConfig.mockReturnValue({
+        config: {
+          name: 'Test Camp',
+          description: 'Test',
+          homePageBlurb: 'Test',
+          registrationOpen: false,
+          earlyRegistrationOpen: false,
+          currentYear: 2024,
+        },
+        isLoading: false,
+        error: null,
+        refreshConfig: vi.fn(),
+        isConnecting: false,
+        isConnected: true,
+        connectionError: null,
+      });
+      mockUseUserRegistrations.mockReturnValue({
+        registrations: [approvedRegistration],
+        loading: false,
+        error: null,
+        refetch: vi.fn(),
+      });
+      vi.mocked(registrationUtils.getActiveRegistrations).mockReturnValue([approvedRegistration]);
+
+      render(<DashboardPage />, { wrapper: createWrapper() });
+
+      await waitFor(() => {
+        expect(screen.getByText('Application Approved')).toBeInTheDocument();
+      });
+      expect(screen.queryByRole('link', { name: 'Complete Registration' })).not.toBeInTheDocument();
+    });
+
+    it('should show Complete Registration during early registration for an eligible user', async () => {
+      const approvedRegistration = {
+        id: 'approved-reg-id',
+        userId: '1',
+        year: 2024,
+        status: 'APPLICATION_APPROVED' as const,
+        decisionMessage: null,
+        createdAt: '2024-01-10T10:00:00.000Z',
+        updatedAt: '2024-01-12T10:00:00.000Z',
+        jobs: [],
+        payments: [],
+      };
+
+      mockUseAuth.mockReturnValue({
+        user: { ...mockUser, isEarlyRegistrationEnabled: true },
+        isAuthenticated: true,
+        isLoading: false,
+        error: null,
+        requestVerificationCode: vi.fn(),
+        verifyCode: vi.fn(),
+        logout: vi.fn(),
+        isConnecting: false,
+        isConnected: true,
+        connectionError: null,
+      });
+      mockUseConfig.mockReturnValue({
+        config: {
+          name: 'Test Camp',
+          description: 'Test',
+          homePageBlurb: 'Test',
+          registrationOpen: false,
+          earlyRegistrationOpen: true,
+          currentYear: 2024,
+        },
+        isLoading: false,
+        error: null,
+        refreshConfig: vi.fn(),
+        isConnecting: false,
+        isConnected: true,
+        connectionError: null,
+      });
+      mockUseUserRegistrations.mockReturnValue({
+        registrations: [approvedRegistration],
+        loading: false,
+        error: null,
+        refetch: vi.fn(),
+      });
+      vi.mocked(registrationUtils.getActiveRegistrations).mockReturnValue([approvedRegistration]);
+
+      render(<DashboardPage />, { wrapper: createWrapper() });
+
+      expect(await screen.findByRole('link', { name: 'Complete Registration' })).toBeInTheDocument();
+    });
+
     it('should not show Complete Registration button for non-approved statuses', async () => {
       const submittedRegistration = {
         id: 'submitted-reg-id',
@@ -1476,6 +1575,107 @@ describe('DashboardPage - Registration after cancellation', () => {
         const link = screen.getByRole('link', { name: 'Review Applications' });
         expect(link).toHaveAttribute('href', '/admin/applications');
       });
+    });
+
+    it('should not load or show pending applications when both registration windows are closed', async () => {
+      const fetchApplications = vi.fn().mockResolvedValue(undefined);
+      mockUseAuth.mockReturnValue({
+        user: { ...mockUser, role: 'admin' as const },
+        isAuthenticated: true,
+        isLoading: false,
+        error: null,
+        requestVerificationCode: vi.fn(),
+        verifyCode: vi.fn(),
+        logout: vi.fn(),
+        isConnecting: false,
+        isConnected: true,
+        connectionError: null,
+      });
+      mockUseConfig.mockReturnValue({
+        config: {
+          name: 'Test Camp',
+          description: 'Test',
+          homePageBlurb: 'Test',
+          registrationOpen: false,
+          earlyRegistrationOpen: false,
+          currentYear: 2024,
+          applicationApprovalRequired: true,
+        },
+        isLoading: false,
+        error: null,
+        refreshConfig: vi.fn(),
+        isConnecting: false,
+        isConnected: true,
+        connectionError: null,
+      });
+      mockUseApplications.mockReturnValue({
+        applications: [],
+        total: 3,
+        loading: false,
+        error: null,
+        fetchApplications,
+        approveApplication: vi.fn(),
+        declineApplication: vi.fn(),
+        bulkProcess: vi.fn(),
+        getApplicationDetail: vi.fn(),
+      });
+
+      render(<DashboardPage />, { wrapper: createWrapper() });
+
+      await screen.findByText('Welcome, TestPlaya!');
+      expect(fetchApplications).not.toHaveBeenCalled();
+      expect(screen.queryByRole('link', { name: 'Review Applications' })).not.toBeInTheDocument();
+    });
+
+    it('should show pending applications during early registration regardless of reviewer eligibility', async () => {
+      mockUseAuth.mockReturnValue({
+        user: {
+          ...mockUser,
+          role: 'admin' as const,
+          isEarlyRegistrationEnabled: false,
+        },
+        isAuthenticated: true,
+        isLoading: false,
+        error: null,
+        requestVerificationCode: vi.fn(),
+        verifyCode: vi.fn(),
+        logout: vi.fn(),
+        isConnecting: false,
+        isConnected: true,
+        connectionError: null,
+      });
+      mockUseConfig.mockReturnValue({
+        config: {
+          name: 'Test Camp',
+          description: 'Test',
+          homePageBlurb: 'Test',
+          registrationOpen: false,
+          earlyRegistrationOpen: true,
+          currentYear: 2024,
+          applicationApprovalRequired: true,
+        },
+        isLoading: false,
+        error: null,
+        refreshConfig: vi.fn(),
+        isConnecting: false,
+        isConnected: true,
+        connectionError: null,
+      });
+      mockUseApplications.mockReturnValue({
+        applications: [],
+        total: 2,
+        loading: false,
+        error: null,
+        fetchApplications: vi.fn().mockResolvedValue(undefined),
+        approveApplication: vi.fn(),
+        declineApplication: vi.fn(),
+        bulkProcess: vi.fn(),
+        getApplicationDetail: vi.fn(),
+      });
+
+      render(<DashboardPage />, { wrapper: createWrapper() });
+
+      expect(await screen.findByRole('link', { name: 'Review Applications' })).toBeInTheDocument();
     });
 
     it('should not show pending applications notice for regular users', async () => {

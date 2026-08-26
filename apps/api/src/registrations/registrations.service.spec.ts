@@ -91,6 +91,7 @@ describe('RegistrationsService', () => {
     // set this mock to reject when they want to assert policy failures.
     assertCanCreateCampRegistration: jest.fn().mockResolvedValue(undefined),
     assertCanSubmitApplication: jest.fn().mockResolvedValue(undefined),
+    assertCanCompleteRegistration: jest.fn(),
     shouldAutoApprove: jest.fn().mockReturnValue(false),
   };
 
@@ -1106,6 +1107,8 @@ describe('RegistrationsService', () => {
       lastName: 'User',
       playaName: 'Dusty',
       role: UserRole.PARTICIPANT,
+      allowRegistration: true,
+      allowEarlyRegistration: false,
       allowNoJob: false,
       allowDeferredDuesPayment: true,
     };
@@ -1157,6 +1160,8 @@ describe('RegistrationsService', () => {
     beforeEach(() => {
       mockCoreConfigService.findCurrent.mockResolvedValue({
         registrationYear,
+        registrationOpen: true,
+        earlyRegistrationOpen: false,
         applicationApprovalRequired: true,
         allowDeferredDuesPayment: true,
       });
@@ -1181,6 +1186,13 @@ describe('RegistrationsService', () => {
     it('should complete an approved application as PENDING when payment is not deferred', async () => {
       const result = await service.completeRegistration(userId, completeDto);
 
+      expect(mockPolicyService.assertCanCompleteRegistration).toHaveBeenCalledWith(
+        baseUser,
+        {
+          registrationOpen: true,
+          earlyRegistrationOpen: false,
+        },
+      );
       expect(mockPrismaService.registration.findFirst).toHaveBeenCalledWith({
         where: {
           userId,
@@ -1265,6 +1277,17 @@ describe('RegistrationsService', () => {
         'registration.payments.0.idempotencyKey',
       );
       expect(result).not.toHaveProperty('registration.payments.0.refunds');
+    });
+
+    it('should reject completion before loading the application when registration is closed', async () => {
+      const expectedError = new ForbiddenException('Registration is not currently open.');
+      mockPolicyService.assertCanCompleteRegistration.mockImplementationOnce(() => {
+        throw expectedError;
+      });
+
+      await expect(service.completeRegistration(userId, completeDto)).rejects.toBe(expectedError);
+
+      expect(mockPrismaService.registration.findFirst).not.toHaveBeenCalled();
     });
 
     it('should bypass the approval gate for submitted applications when approval mode is disabled', async () => {

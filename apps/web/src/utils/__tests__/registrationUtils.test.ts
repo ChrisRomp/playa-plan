@@ -41,7 +41,7 @@ describe('registrationUtils', () => {
     });
 
     it('should return true when early registration is open and user is enabled', () => {
-      const config = { ...mockConfig, registrationOpen: true, earlyRegistrationOpen: true };
+      const config = { ...mockConfig, earlyRegistrationOpen: true };
       const user = { ...mockUser, isEarlyRegistrationEnabled: true };
       expect(isRegistrationAccessible(config, user)).toBe(true);
     });
@@ -135,6 +135,31 @@ describe('registrationUtils', () => {
       const hasActiveRegistration = true;
 
       const result = canUserRegister(config, mockUser, hasActiveRegistration, 'APPLICATION_APPROVED');
+      expect(result).toBe(true);
+    });
+
+    it('should prevent application workflow access when registration is closed', () => {
+      const result = canUserRegister(
+        mockConfig,
+        mockUser,
+        true,
+        'APPLICATION_APPROVED',
+      );
+
+      expect(result).toBe(false);
+    });
+
+    it('should allow application workflow access during early registration for an eligible user', () => {
+      const config = { ...mockConfig, earlyRegistrationOpen: true };
+      const user = { ...mockUser, isEarlyRegistrationEnabled: true };
+
+      const result = canUserRegister(
+        config,
+        user,
+        true,
+        'APPLICATION_APPROVED',
+      );
+
       expect(result).toBe(true);
     });
 
