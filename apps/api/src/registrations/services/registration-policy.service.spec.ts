@@ -342,7 +342,7 @@ describe('RegistrationPolicyService', () => {
   });
 
   describe('assertCanCompleteRegistration', () => {
-    it('allows completion when general registration is open', () => {
+    it('should allow completion when general registration is open', () => {
       const inputUser = buildUser();
       const inputConfig = buildConfig({ registrationOpen: true });
 
@@ -351,7 +351,7 @@ describe('RegistrationPolicyService', () => {
       ).not.toThrow();
     });
 
-    it('allows completion during early registration for an eligible user', () => {
+    it('should allow completion during early registration for an eligible user', () => {
       const inputUser = buildUser({ allowEarlyRegistration: true });
       const inputConfig = buildConfig({ earlyRegistrationOpen: true });
 
@@ -360,7 +360,7 @@ describe('RegistrationPolicyService', () => {
       ).not.toThrow();
     });
 
-    it('rejects completion when the registration window is not accessible', () => {
+    it('should reject completion when the registration window is not accessible', () => {
       const inputUser = buildUser({ allowEarlyRegistration: false });
       const inputConfig = buildConfig({ earlyRegistrationOpen: true });
 

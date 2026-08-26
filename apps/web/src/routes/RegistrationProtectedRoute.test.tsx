@@ -81,14 +81,14 @@ describe('RegistrationProtectedRoute', () => {
     mockConfig();
   });
 
-  it('redirects to the dashboard when both registration windows are closed', () => {
+  it('should redirect to the dashboard when both registration windows are closed', () => {
     renderRegistrationRoute();
 
     expect(screen.getByText('Dashboard')).toBeInTheDocument();
     expect(screen.queryByText('Registration Flow')).not.toBeInTheDocument();
   });
 
-  it('redirects an ineligible user during early registration', () => {
+  it('should redirect an ineligible user during early registration', () => {
     mockConfig({ earlyRegistrationOpen: true });
 
     renderRegistrationRoute();
@@ -96,7 +96,7 @@ describe('RegistrationProtectedRoute', () => {
     expect(screen.getByText('Dashboard')).toBeInTheDocument();
   });
 
-  it('allows an eligible user during early registration', () => {
+  it('should allow an eligible user during early registration', () => {
     mockAuth({ isEarlyRegistrationEnabled: true });
     mockConfig({ earlyRegistrationOpen: true });
 
@@ -105,7 +105,7 @@ describe('RegistrationProtectedRoute', () => {
     expect(screen.getByText('Registration Flow')).toBeInTheDocument();
   });
 
-  it('allows a user while general registration is open', () => {
+  it('should allow a user while general registration is open', () => {
     mockConfig({ registrationOpen: true });
 
     renderRegistrationRoute();
