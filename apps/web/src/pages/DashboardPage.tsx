@@ -25,14 +25,34 @@ const DashboardPage: React.FC = () => {
   const [pendingCountLoaded, setPendingCountLoaded] = useState(false);
 
   const isStaffOrAdmin = user?.role === 'staff' || user?.role === 'admin';
+  const isApplicationReviewOpen = Boolean(
+    config?.registrationOpen || config?.earlyRegistrationOpen,
+  );
 
   useEffect(() => {
-    if (isStaffOrAdmin && config?.applicationApprovalRequired) {
-      fetchApplications({ status: 'APPLICATION_SUBMITTED', year: config.currentYear, limit: 1 }).then(() => {
-        setPendingCountLoaded(true);
-      });
+    if (!isStaffOrAdmin || !config?.applicationApprovalRequired || !isApplicationReviewOpen) {
+      setPendingCountLoaded(false);
+      return;
     }
-  }, [isStaffOrAdmin, config?.applicationApprovalRequired, config?.currentYear, fetchApplications]);
+
+    let isCurrentRequest = true;
+    setPendingCountLoaded(false);
+    fetchApplications({ status: 'APPLICATION_SUBMITTED', year: config.currentYear, limit: 1 }).then(() => {
+      if (isCurrentRequest) {
+        setPendingCountLoaded(true);
+      }
+    });
+
+    return () => {
+      isCurrentRequest = false;
+    };
+  }, [
+    isApplicationReviewOpen,
+    isStaffOrAdmin,
+    config?.applicationApprovalRequired,
+    config?.currentYear,
+    fetchApplications,
+  ]);
   
   // Show loading state while config is loading
   if (configLoading || !config) {
@@ -85,7 +105,7 @@ const DashboardPage: React.FC = () => {
         </div>
       )}
 
-      {isStaffOrAdmin && config?.applicationApprovalRequired && pendingCountLoaded && pendingApplicationsCount > 0 && (
+      {isStaffOrAdmin && isApplicationReviewOpen && config?.applicationApprovalRequired && pendingCountLoaded && pendingApplicationsCount > 0 && (
         <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
           <div className="flex items-center justify-between">
             <p className="text-sm text-blue-800">
@@ -171,7 +191,7 @@ const DashboardPage: React.FC = () => {
                       {currentRegistration.decisionMessage}
                     </p>
                   )}
-                  {currentRegistration.status === 'APPLICATION_APPROVED' && (
+                  {currentRegistration.status === 'APPLICATION_APPROVED' && canAccessRegistration && (
                     <div className="mt-3">
                       <Link
                         to={PATHS.REGISTRATION}

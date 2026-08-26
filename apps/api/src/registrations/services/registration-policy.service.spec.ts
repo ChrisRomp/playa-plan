@@ -338,5 +338,35 @@ describe('RegistrationPolicyService', () => {
         expect(coreConfig.findCurrent).toHaveBeenCalledTimes(1);
       });
     });
+
+  });
+
+  describe('assertCanCompleteRegistration', () => {
+    it('allows completion when general registration is open', () => {
+      const inputUser = buildUser();
+      const inputConfig = buildConfig({ registrationOpen: true });
+
+      expect(() =>
+        service.assertCanCompleteRegistration(inputUser, inputConfig),
+      ).not.toThrow();
+    });
+
+    it('allows completion during early registration for an eligible user', () => {
+      const inputUser = buildUser({ allowEarlyRegistration: true });
+      const inputConfig = buildConfig({ earlyRegistrationOpen: true });
+
+      expect(() =>
+        service.assertCanCompleteRegistration(inputUser, inputConfig),
+      ).not.toThrow();
+    });
+
+    it('rejects completion when the registration window is not accessible', () => {
+      const inputUser = buildUser({ allowEarlyRegistration: false });
+      const inputConfig = buildConfig({ earlyRegistrationOpen: true });
+
+      expect(() =>
+        service.assertCanCompleteRegistration(inputUser, inputConfig),
+      ).toThrow(ForbiddenException);
+    });
   });
 });

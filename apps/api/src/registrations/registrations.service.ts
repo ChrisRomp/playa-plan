@@ -754,6 +754,11 @@ export class RegistrationsService {
     }
 
     const config = await this.coreConfigService.findCurrent();
+    this.policyService.assertCanCompleteRegistration(user, {
+      registrationOpen: config.registrationOpen,
+      earlyRegistrationOpen: config.earlyRegistrationOpen,
+    });
+
     const validStatuses: RegistrationStatus[] = [RegistrationStatus.APPLICATION_APPROVED];
     if (!config.applicationApprovalRequired) {
       validStatuses.push(RegistrationStatus.APPLICATION_SUBMITTED);
