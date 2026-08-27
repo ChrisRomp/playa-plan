@@ -313,7 +313,7 @@ test.describe(
           timeout: 15_000,
         });
         await expect(page.getByText('Application approved')).toBeVisible();
-        await expect(page.getByText(/complete your registration below/i)).toBeVisible();
+        await expect(page.getByText('Please complete your registration.')).toBeVisible();
         await expect.poll(async () => (await findLatestRegistration(freshParticipant.id))?.status ?? null).toBe(
           RegistrationStatus.APPLICATION_APPROVED,
         );
