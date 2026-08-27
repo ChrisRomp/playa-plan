@@ -1,3 +1,5 @@
+import { RegistrationIncompleteNotice } from './RegistrationIncompleteNotice';
+
 interface ApplicationStatusBannerProps {
   status: string;
   decisionMessage?: string | null;
@@ -16,8 +18,7 @@ function getBannerState(status: string): BannerState {
       return {
         accentClassName: 'border-green-200 bg-green-50 text-green-900',
         title: 'Application approved',
-        message:
-          'Your application has been approved! Please complete your registration below by selecting your jobs and paying camp dues.',
+        message: 'Your application has been approved.',
       };
     case 'APPLICATION_DECLINED':
       return {
@@ -51,6 +52,10 @@ export function ApplicationStatusBanner({
           <h2 className="text-lg font-semibold">{bannerState.title}</h2>
           <p className="mt-1 text-sm leading-6">{bannerState.message}</p>
         </div>
+
+        {status === 'APPLICATION_APPROVED' && (
+          <RegistrationIncompleteNotice completionAvailable />
+        )}
 
         {submittedAt && (
           <p className="text-xs font-medium uppercase tracking-wide opacity-80">

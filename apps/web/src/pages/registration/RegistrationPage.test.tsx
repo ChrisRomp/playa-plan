@@ -482,6 +482,9 @@ describe('RegistrationPage', () => {
 
     expect(screen.getByText('Application pending review')).toBeInTheDocument();
     expect(screen.getByText(/nothing else to do right now/i)).toBeInTheDocument();
+    expect(
+      screen.queryByText('Registration incomplete — action required'),
+    ).not.toBeInTheDocument();
     expect(screen.queryByText('Your Profile Information')).not.toBeInTheDocument();
   });
 
@@ -540,6 +543,12 @@ describe('RegistrationPage', () => {
     });
 
     expect(screen.getByText('Application approved')).toBeInTheDocument();
+    expect(screen.getByText('Registration incomplete — action required')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Complete your work shifts, accept the camp terms, and arrange camp dues to finish registering.',
+      ),
+    ).toBeInTheDocument();
     expect(screen.getByLabelText(/Cook/)).toBeChecked();
     expect(screen.getByLabelText(/Cook/)).toBeDisabled();
     expect(screen.getByText('Administrator-assigned shifts')).toBeInTheDocument();
