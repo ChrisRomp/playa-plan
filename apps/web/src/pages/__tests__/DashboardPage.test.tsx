@@ -1273,11 +1273,7 @@ describe('DashboardPage - Registration after cancellation', () => {
         expect(link).toHaveAttribute('href', '/registration');
       });
       expect(screen.getByText('Registration incomplete — action required')).toBeInTheDocument();
-      expect(
-        screen.getByText(
-          'Complete your work shifts, accept the camp terms, and arrange camp dues to finish registering.',
-        ),
-      ).toBeInTheDocument();
+      expect(screen.getByText('Please complete your registration.')).toBeInTheDocument();
     });
 
     it('should explain the incomplete status when completion is unavailable', async () => {
@@ -1323,11 +1319,7 @@ describe('DashboardPage - Registration after cancellation', () => {
         expect(screen.getByText('Application Approved')).toBeInTheDocument();
       });
       expect(screen.getByText('Registration incomplete — action required')).toBeInTheDocument();
-      expect(
-        screen.getByText(
-          'Your application is approved, but registration completion is not currently available. You still need to select work shifts, accept the camp terms, and arrange camp dues before your registration is complete.',
-        ),
-      ).toBeInTheDocument();
+      expect(screen.getByText('Registration is closed.')).toBeInTheDocument();
       expect(screen.queryByRole('link', { name: 'Complete Registration' })).not.toBeInTheDocument();
     });
 
@@ -1383,11 +1375,7 @@ describe('DashboardPage - Registration after cancellation', () => {
       render(<DashboardPage />, { wrapper: createWrapper() });
 
       expect(await screen.findByRole('link', { name: 'Complete Registration' })).toBeInTheDocument();
-      expect(
-        screen.getByText(
-          'Complete your work shifts, accept the camp terms, and arrange camp dues to finish registering.',
-        ),
-      ).toBeInTheDocument();
+      expect(screen.getByText('Please complete your registration.')).toBeInTheDocument();
     });
 
     it('should not show Complete Registration button for non-approved statuses', async () => {

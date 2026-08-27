@@ -7,9 +7,7 @@ describe('ApplicationStatusBanner', () => {
     render(<ApplicationStatusBanner status="APPLICATION_APPROVED" />);
 
     expect(screen.getByText('Registration incomplete — action required')).toBeInTheDocument();
-    expect(screen.getByText(/work shifts/i)).toBeInTheDocument();
-    expect(screen.getByText(/camp terms/i)).toBeInTheDocument();
-    expect(screen.getByText(/camp dues/i)).toBeInTheDocument();
+    expect(screen.getByText('Please complete your registration.')).toBeInTheDocument();
   });
 
   it.each(['APPLICATION_SUBMITTED', 'APPLICATION_DECLINED'])(
