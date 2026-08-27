@@ -1225,7 +1225,7 @@ describe('DashboardPage - Registration after cancellation', () => {
   });
 
   describe('Complete Registration CTA for approved applications', () => {
-    it('should show Complete Registration button when status is APPLICATION_APPROVED', async () => {
+    it('should show incomplete status and Complete Registration when completion is available', async () => {
       const approvedRegistration = {
         id: 'approved-reg-id',
         userId: '1',
@@ -1272,9 +1272,11 @@ describe('DashboardPage - Registration after cancellation', () => {
         expect(link).toBeInTheDocument();
         expect(link).toHaveAttribute('href', '/registration');
       });
+      expect(screen.getByText('Registration incomplete — action required')).toBeInTheDocument();
+      expect(screen.getByText('Please complete your registration.')).toBeInTheDocument();
     });
 
-    it('should hide Complete Registration when registration is closed', async () => {
+    it('should explain the incomplete status when completion is unavailable', async () => {
       const approvedRegistration = {
         id: 'approved-reg-id',
         userId: '1',
@@ -1316,6 +1318,8 @@ describe('DashboardPage - Registration after cancellation', () => {
       await waitFor(() => {
         expect(screen.getByText('Application Approved')).toBeInTheDocument();
       });
+      expect(screen.getByText('Registration incomplete — action required')).toBeInTheDocument();
+      expect(screen.getByText('Registration is closed.')).toBeInTheDocument();
       expect(screen.queryByRole('link', { name: 'Complete Registration' })).not.toBeInTheDocument();
     });
 
@@ -1371,6 +1375,7 @@ describe('DashboardPage - Registration after cancellation', () => {
       render(<DashboardPage />, { wrapper: createWrapper() });
 
       expect(await screen.findByRole('link', { name: 'Complete Registration' })).toBeInTheDocument();
+      expect(screen.getByText('Please complete your registration.')).toBeInTheDocument();
     });
 
     it('should not show Complete Registration button for non-approved statuses', async () => {
@@ -1420,6 +1425,9 @@ describe('DashboardPage - Registration after cancellation', () => {
       });
 
       expect(screen.queryByRole('link', { name: 'Complete Registration' })).not.toBeInTheDocument();
+      expect(
+        screen.queryByText('Registration incomplete — action required'),
+      ).not.toBeInTheDocument();
     });
   });
 

@@ -10,6 +10,7 @@ import { getFriendlyDayName, formatTime } from '../utils/shiftUtils';
 import { isRegistrationAccessible, getRegistrationStatusMessage, getActiveRegistrations, formatRegistrationStatus } from '../utils/registrationUtils';
 import { PATHS } from '../routes';
 import PaymentButton from '../components/payment/PaymentButton';
+import { RegistrationIncompleteNotice } from '../components/registration/RegistrationIncompleteNotice';
 
 /**
  * Dashboard page component
@@ -191,14 +192,17 @@ const DashboardPage: React.FC = () => {
                       {currentRegistration.decisionMessage}
                     </p>
                   )}
-                  {currentRegistration.status === 'APPLICATION_APPROVED' && canAccessRegistration && (
-                    <div className="mt-3">
-                      <Link
-                        to={PATHS.REGISTRATION}
-                        className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors"
-                      >
-                        Complete Registration
-                      </Link>
+                  {currentRegistration.status === 'APPLICATION_APPROVED' && (
+                    <div className="mt-3 space-y-3">
+                      <RegistrationIncompleteNotice completionAvailable={canAccessRegistration} />
+                      {canAccessRegistration && (
+                        <Link
+                          to={PATHS.REGISTRATION}
+                          className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors"
+                        >
+                          Complete Registration
+                        </Link>
+                      )}
                     </div>
                   )}
                 </div>
