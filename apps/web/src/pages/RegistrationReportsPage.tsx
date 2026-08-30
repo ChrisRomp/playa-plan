@@ -62,6 +62,7 @@ export function RegistrationReportsPage() {
   });
   const [campingOptionData, setCampingOptionData] = useState<CampingOptionRegistrationWithFields[]>([]);
   const [campingOptionsLoading, setCampingOptionsLoading] = useState(false);
+  const [campingOptionsError, setCampingOptionsError] = useState<string | null>(null);
 
   useEffect(() => {
     if (defaultYearApplied.current || configLoading) {
@@ -97,10 +98,12 @@ export function RegistrationReportsPage() {
   const fetchCampingOptionData = useCallback(async () => {
     if (!showCampingOptions) {
       setCampingOptionData([]);
+      setCampingOptionsError(null);
       return;
     }
 
     setCampingOptionsLoading(true);
+    setCampingOptionsError(null);
     try {
       // Convert RegistrationReportFilters to CampingOptionReportFilters
       // by filtering out parameters not supported by the camping options endpoint
@@ -113,7 +116,8 @@ export function RegistrationReportsPage() {
       setCampingOptionData(data);
     } catch (err) {
       console.error('Error fetching camping option data:', err);
-      // Don't set main error state for camping options - fail gracefully
+      setCampingOptionData([]);
+      setCampingOptionsError('Registration field data could not be loaded');
     } finally {
       setCampingOptionsLoading(false);
     }
@@ -660,6 +664,15 @@ export function RegistrationReportsPage() {
             >
               Try again
             </button>
+          </div>
+        )}
+
+        {campingOptionsError && (
+          <div
+            role="alert"
+            className="bg-yellow-50 border border-yellow-200 rounded-md p-4 mb-6 text-yellow-800"
+          >
+            {campingOptionsError}
           </div>
         )}
 

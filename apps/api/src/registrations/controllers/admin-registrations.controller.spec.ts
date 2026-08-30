@@ -10,6 +10,7 @@ import {
   AdminCancelRegistrationDto,
   AdminRegistrationQueryDto,
   AdminRegistrationResponseDto,
+  AdminCampingOptionQueryDto,
 } from '../dto/admin-registration.dto';
 
 interface MockAuthenticatedRequest {
@@ -473,14 +474,10 @@ describe('AdminRegistrationsController', () => {
         mockCampingOptionRegistrations as unknown as ReturnType<typeof adminService.getCampingOptionRegistrationsWithFields>
       );
 
-      const result = await controller.getCampingOptionRegistrationsWithFields();
+      const query: AdminCampingOptionQueryDto = {};
+      const result = await controller.getCampingOptionRegistrationsWithFields(query);
 
-      expect(adminService.getCampingOptionRegistrationsWithFields).toHaveBeenCalledWith({
-        year: undefined,
-        userId: undefined,
-        campingOptionId: undefined,
-        includeInactive: undefined,
-      });
+      expect(adminService.getCampingOptionRegistrationsWithFields).toHaveBeenCalledWith(query);
       expect(result).toEqual(mockCampingOptionRegistrations);
     });
 
@@ -489,26 +486,22 @@ describe('AdminRegistrationsController', () => {
         mockCampingOptionRegistrations as unknown as ReturnType<typeof adminService.getCampingOptionRegistrationsWithFields>
       );
 
-      const result = await controller.getCampingOptionRegistrationsWithFields(
-        2024,
-        'user-123',
-        'co-123',
-        true
-      );
-
-      expect(adminService.getCampingOptionRegistrationsWithFields).toHaveBeenCalledWith({
+      const query: AdminCampingOptionQueryDto = {
         year: 2024,
         userId: 'user-123',
         campingOptionId: 'co-123',
         includeInactive: true,
-      });
+      };
+      const result = await controller.getCampingOptionRegistrationsWithFields(query);
+
+      expect(adminService.getCampingOptionRegistrationsWithFields).toHaveBeenCalledWith(query);
       expect(result).toEqual(mockCampingOptionRegistrations);
     });
 
     it('should return empty array when no camping option registrations found', async () => {
       adminService.getCampingOptionRegistrationsWithFields.mockResolvedValue([]);
 
-      const result = await controller.getCampingOptionRegistrationsWithFields();
+      const result = await controller.getCampingOptionRegistrationsWithFields({});
 
       expect(result).toEqual([]);
     });
@@ -519,7 +512,7 @@ describe('AdminRegistrationsController', () => {
       );
 
       await expect(
-        controller.getCampingOptionRegistrationsWithFields()
+        controller.getCampingOptionRegistrationsWithFields({})
       ).rejects.toThrow('Database error');
     });
   });
