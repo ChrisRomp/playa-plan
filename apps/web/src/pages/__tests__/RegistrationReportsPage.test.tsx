@@ -1,4 +1,5 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { ReactNode } from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { RegistrationReportsPage } from '../RegistrationReportsPage';
@@ -20,8 +21,9 @@ vi.mock('../../components/common/LoadingSpinner', () => ({
 
 // Mock the DataTable component
 vi.mock('../../components/common/DataTable/DataTable', () => ({
-  DataTable: ({ data, emptyMessage, caption }: { 
+  DataTable: ({ data, columns, emptyMessage, caption }: {
     data: Registration[]; 
+    columns: Array<{ id: string; accessor: (item: Registration) => ReactNode }>;
     emptyMessage: string; 
     caption: string;
   }) => (
@@ -33,6 +35,9 @@ vi.mock('../../components/common/DataTable/DataTable', () => ({
           {data.map((item: Registration) => (
             <div key={item.id} data-testid={`registration-${item.id}`}>
               {item.user?.firstName} {item.user?.lastName} - {item.status}
+              {columns
+                .filter(column => column.id.startsWith('field_'))
+                .map(column => <div key={column.id}>{column.accessor(item)}</div>)}
             </div>
           ))}
         </div>
@@ -544,7 +549,6 @@ describe('RegistrationReportsPage', () => {
       const mockGetRegistrations = vi.mocked(reports.getRegistrations);
       mockGetRegistrations.mockResolvedValue(mockRegistrations);
 
-      // Mock browser APIs for CSV export
       mockCreateObjectURL = vi.fn(() => 'mock-blob-url');
       mockRevokeObjectURL = vi.fn();
       mockClick = vi.fn();
@@ -552,7 +556,6 @@ describe('RegistrationReportsPage', () => {
       global.URL.createObjectURL = mockCreateObjectURL;
       global.URL.revokeObjectURL = mockRevokeObjectURL;
 
-      // Mock document.createElement to return a mock link element for anchor tags
       const originalCreateElement = document.createElement.bind(document);
       vi.spyOn(document, 'createElement').mockImplementation((tagName) => {
         if (tagName === 'a') {
@@ -565,7 +568,6 @@ describe('RegistrationReportsPage', () => {
         return originalCreateElement(tagName);
       });
 
-      // Mock appendChild and removeChild specifically for link elements
       const originalAppendChild = document.body.appendChild.bind(document.body);
       const originalRemoveChild = document.body.removeChild.bind(document.body);
       
@@ -619,9 +621,128 @@ describe('RegistrationReportsPage', () => {
         })
       );
 
-      // Check that the blob was created with CSV content
       const blob = mockCreateObjectURL.mock.calls[0][0] as Blob;
       expect(blob.type).toBe('text/csv;charset=utf-8;');
+    });
+  });
+
+  describe('Camping Option Custom Fields', () => {
+    beforeEach(() => {
+      localStorage.removeItem('registrationReports_showCampingOptions');
+      global.URL.createObjectURL = vi.fn(() => 'mock-blob-url');
+      global.URL.revokeObjectURL = vi.fn();
+      HTMLAnchorElement.prototype.click = vi.fn();
+      vi.mocked(reports.getRegistrations).mockResolvedValue([
+        {
+          ...mockRegistrations[0],
+          id: 'registration-2026',
+          year: 2026,
+          campingOptions: [{
+            id: 'camping-registration-2026',
+            userId: 'user1',
+            campingOptionId: 'option-1',
+            createdAt: '2026-01-15T10:00:00Z',
+            updatedAt: '2026-01-15T10:00:00Z',
+          }],
+        },
+      ]);
+      vi.mocked(reports.getCampingOptionRegistrations).mockResolvedValue([
+        {
+          id: 'camping-registration-2025',
+          registrationId: null,
+          userId: 'user1',
+          campingOptionId: 'option-1',
+          user: {
+            id: 'user1',
+            email: 'john.doe@example.com',
+            firstName: 'John',
+            lastName: 'Doe',
+            playaName: null,
+          },
+          campingOption: {
+            id: 'option-1',
+            name: 'Tent',
+            description: null,
+            enabled: true,
+            fields: [],
+          },
+          fieldValues: [],
+          createdAt: '2025-01-15T10:00:00Z',
+          updatedAt: '2025-01-15T10:00:00Z',
+        },
+        {
+          id: 'camping-registration-2026',
+          registrationId: 'registration-2026',
+          userId: 'user1',
+          campingOptionId: 'option-1',
+          user: {
+            id: 'user1',
+            email: 'john.doe@example.com',
+            firstName: 'John',
+            lastName: 'Doe',
+            playaName: null,
+          },
+          campingOption: {
+            id: 'option-1',
+            name: 'Tent',
+            description: null,
+            enabled: true,
+            fields: [{
+              id: 'field-1',
+              displayName: 'Tent Size',
+              dataType: 'STRING',
+              required: true,
+              order: 1,
+            }],
+          },
+          fieldValues: [{
+            id: 'value-1',
+            value: 'Large',
+            fieldId: 'field-1',
+            registrationId: 'camping-registration-2026',
+            field: {
+              id: 'field-1',
+              displayName: 'Tent Size',
+              dataType: 'STRING',
+              required: true,
+            },
+            createdAt: '2026-01-15T10:00:00Z',
+            updatedAt: '2026-01-15T10:00:00Z',
+          }],
+          createdAt: '2026-01-15T10:00:00Z',
+          updatedAt: '2026-01-15T10:00:00Z',
+        },
+      ]);
+    });
+
+    it('should show current registration custom field values when an orphaned prior-year row exists', async () => {
+      renderComponent(2026);
+      await screen.findByText('Show Registration Fields');
+      fireEvent.click(document.getElementById('camping-options-toggle')!);
+
+      const registration = await screen.findByTestId('registration-registration-2026');
+
+      expect(within(registration).getByText('Large')).toBeInTheDocument();
+    });
+
+    it('should export current registration custom field values when an orphaned prior-year row exists', async () => {
+      renderComponent(2026);
+      await screen.findByText('Show Registration Fields');
+      fireEvent.click(document.getElementById('camping-options-toggle')!);
+      await screen.findByText('Large');
+
+      fireEvent.click(screen.getByText('Export'));
+
+      const blob = vi.mocked(URL.createObjectURL).mock.calls[0][0] as Blob;
+      const csv = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = () => reject(reader.error);
+        reader.readAsText(blob);
+      });
+
+      expect(csv).toContain('Tent Size');
+      expect(csv).toContain('Large');
     });
   });
 
