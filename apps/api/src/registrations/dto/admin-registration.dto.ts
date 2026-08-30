@@ -311,6 +311,13 @@ export class CampingOptionRegistrationWithFieldsDto {
   userId: string;
 
   @ApiProperty({
+    description: 'Associated registration ID',
+    example: '123e4567-e89b-12d3-a456-426614174009',
+    nullable: true,
+  })
+  registrationId: string | null;
+
+  @ApiProperty({
     description: 'Camping option ID',
     example: '123e4567-e89b-12d3-a456-426614174008',
   })

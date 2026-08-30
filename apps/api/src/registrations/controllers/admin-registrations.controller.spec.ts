@@ -425,6 +425,7 @@ describe('AdminRegistrationsController', () => {
       {
         id: 'cor-123',
         userId: 'user-123',
+        registrationId: 'reg-123',
         campingOptionId: 'co-123',
         createdAt: new Date('2024-01-01'),
         updatedAt: new Date('2024-01-01'),

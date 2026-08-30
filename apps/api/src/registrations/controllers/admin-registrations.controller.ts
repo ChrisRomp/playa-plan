@@ -86,6 +86,7 @@ export class AdminRegistrationsController {
         properties: {
           id: { type: 'string' },
           userId: { type: 'string' },
+          registrationId: { type: 'string', nullable: true },
           campingOptionId: { type: 'string' },
           createdAt: { type: 'string', format: 'date-time' },
           updatedAt: { type: 'string', format: 'date-time' },
