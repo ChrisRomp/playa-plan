@@ -216,10 +216,10 @@ export function RegistrationReportsPage() {
       return '';
     }
 
-    // Find matching detailed data for any of the user's camping options
+    // Find matching detailed data for any of the registration's camping options
     for (const co of registration.campingOptions) {
       const detailData = campingOptionData.find(detail => 
-        detail.userId === registration.userId && detail.campingOptionId === co.campingOptionId
+        detail.registrationId === registration.id && detail.campingOptionId === co.campingOptionId
       );
       
       if (detailData) {

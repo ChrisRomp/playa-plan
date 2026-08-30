@@ -33,6 +33,7 @@ describe('API Camping Option Integration', () => {
     it('should have properly typed CampingOptionRegistrationWithFields interface', () => {
       const mockRegistration: CampingOptionRegistrationWithFields = {
         id: 'cor-123',
+        registrationId: 'registration-123',
         userId: 'user-123',
         campingOptionId: 'co-123',
         user: {

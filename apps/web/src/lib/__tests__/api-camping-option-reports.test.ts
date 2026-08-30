@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 // Define types for better type safety
 interface CampingOptionRegistrationWithFields {
   id: string;
+  registrationId: string | null;
   userId: string;
   campingOptionId: string;
   createdAt: string;
@@ -73,6 +74,7 @@ describe('API Camping Option Reports', () => {
       const mockData = [
         {
           id: 'cor-123',
+          registrationId: 'registration-123',
           userId: 'user-123',
           campingOptionId: 'co-123',
           user: {

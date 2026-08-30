@@ -515,6 +515,7 @@ export interface CampingOptionFieldValue {
 // Camping Option Registration with Field Values interface for admin responses
 export interface CampingOptionRegistrationWithFields {
   id: string;
+  registrationId: string | null;
   userId: string;
   campingOptionId: string;
   user: {

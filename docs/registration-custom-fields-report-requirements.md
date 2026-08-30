@@ -1,8 +1,10 @@
-# Registration Custom Fields in Reports - Requirements Analysis
+# Registration Custom Fields in Reports
 
 ## Overview
 
-This document analyzes the requirements to enable camping registration custom field values to be displayed in the registration reports. Currently, users can enter custom field values when registering for camping options, but these values are not visible in the admin registration reports.
+This feature is implemented. When **Show Registration Fields** is enabled, `/reports/registrations` displays camping options and their custom field values in both the table and CSV export. The report matches camping option details to the selected-year registration by `registrationId`.
+
+The remaining sections document the original design requirements and the implemented API shape.
 
 ## Current State Analysis
 
@@ -21,17 +23,16 @@ The database schema already supports custom fields and their values:
 - `GET /camping-options/:id/fields` - Get custom fields for a camping option
 - `GET /registrations/camp/me` - Get user's complete camp registration including camping options and custom field values
 - `GET /admin/registrations/:id/camping-options` - Get camping options for a specific registration (but NO field values)
-
-#### ❌ Missing
-- **No admin endpoint to get ALL users' camping option registrations with field values for reporting**
+- `GET /admin/registrations/camping-options-with-fields` - Get registration-scoped camping options and field values for reporting
 
 ### Current Frontend Report
 
-The registration report (`/reports/registrations`) currently displays:
+The registration report (`/reports/registrations`) displays:
 - ✅ User information (name, email)
 - ✅ Registration status and date
 - ✅ Work shifts/jobs assigned
-- ❌ **Missing: Camping option selections and custom field values**
+- ✅ Camping option selections and custom field values when enabled
+- ✅ Camping option selections and custom field values in CSV exports when enabled
 
 ## Requirements for Implementation
 
@@ -54,6 +55,7 @@ GET /admin/registrations/camping-options-with-fields
 ```typescript
 interface CampingOptionRegistrationWithFields {
   id: string;
+  registrationId: string | null;
   userId: string;
   campingOptionId: string;
   createdAt: string;
