@@ -110,6 +110,7 @@ export function RegistrationReportsPage() {
       const campingFilters = {
         year: filters.year,
         userId: filters.userId,
+        includeInactive: true,
         // Note: jobId and includeCampingOptions are not supported by camping options endpoint
       };
       const data = await reports.getCampingOptionRegistrations(campingFilters);

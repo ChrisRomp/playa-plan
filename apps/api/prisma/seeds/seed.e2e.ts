@@ -17,6 +17,7 @@ import { PrismaClient, UserRole } from '@prisma/client';
 
 const prisma = new PrismaClient();
 const REPORT_USER_EMAIL = 'e2e-staff@test.playaplan.local';
+const REPORT_OPTION_NAME = 'Archived E2E Camping';
 const REPORT_FIELD_NAME = 'Camping Footprint';
 const CURRENT_REPORT_FIELD_VALUE = 'Current year E2E camping footprint';
 const HISTORICAL_REPORT_FIELD_VALUE = 'Historical E2E camping footprint';
@@ -178,15 +179,7 @@ async function seedRegistrationReportData(): Promise<void> {
   const reportUser = await prisma.user.findUniqueOrThrow({
     where: { email: REPORT_USER_EMAIL },
   });
-  const campingOption = await prisma.campingOption.findFirstOrThrow({
-    where: { enabled: true },
-  });
-  const reportField = await prisma.campingOptionField.findFirstOrThrow({
-    where: {
-      campingOptionId: campingOption.id,
-      displayName: REPORT_FIELD_NAME,
-    },
-  });
+  const reportCampingOption = await findOrCreateReportCampingOption();
 
   const reportYears = [
     {
@@ -208,13 +201,13 @@ async function seedRegistrationReportData(): Promise<void> {
       where: {
         registrationId_campingOptionId: {
           registrationId: registration.id,
-          campingOptionId: campingOption.id,
+          campingOptionId: reportCampingOption.campingOptionId,
         },
       },
       create: {
         userId: reportUser.id,
         registrationId: registration.id,
-        campingOptionId: campingOption.id,
+        campingOptionId: reportCampingOption.campingOptionId,
       },
       update: {
         userId: reportUser.id,
@@ -223,7 +216,7 @@ async function seedRegistrationReportData(): Promise<void> {
     const existingFieldValue = await prisma.campingOptionFieldValue.findFirst({
       where: {
         registrationId: campingRegistration.id,
-        fieldId: reportField.id,
+        fieldId: reportCampingOption.fieldId,
       },
     });
 
@@ -236,7 +229,7 @@ async function seedRegistrationReportData(): Promise<void> {
       await prisma.campingOptionFieldValue.create({
         data: {
           registrationId: campingRegistration.id,
-          fieldId: reportField.id,
+          fieldId: reportCampingOption.fieldId,
           value: reportYear.value,
         },
       });
@@ -244,6 +237,58 @@ async function seedRegistrationReportData(): Promise<void> {
   }
 
   console.log('✅ Created current and historical registration report field values');
+}
+
+async function findOrCreateReportCampingOption(): Promise<{
+  campingOptionId: string;
+  fieldId: string;
+}> {
+  let campingOption = await prisma.campingOption.findFirst({
+    where: { name: REPORT_OPTION_NAME },
+  });
+
+  if (campingOption) {
+    campingOption = await prisma.campingOption.update({
+      where: { id: campingOption.id },
+      data: { enabled: false },
+    });
+  } else {
+    campingOption = await prisma.campingOption.create({
+      data: {
+        name: REPORT_OPTION_NAME,
+        description: 'Disabled camping option for report E2E coverage',
+        enabled: false,
+        workShiftsRequired: 0,
+        participantDues: 0,
+        staffDues: 0,
+        maxSignups: 0,
+      },
+    });
+  }
+
+  let reportField = await prisma.campingOptionField.findFirst({
+    where: {
+      campingOptionId: campingOption.id,
+      displayName: REPORT_FIELD_NAME,
+    },
+  });
+
+  if (!reportField) {
+    reportField = await prisma.campingOptionField.create({
+      data: {
+        campingOptionId: campingOption.id,
+        displayName: REPORT_FIELD_NAME,
+        dataType: 'MULTILINE_STRING',
+        required: false,
+        order: 0,
+      },
+    });
+  }
+
+  return {
+    campingOptionId: campingOption.id,
+    fieldId: reportField.id,
+  };
 }
 
 async function findOrCreateReportRegistration(

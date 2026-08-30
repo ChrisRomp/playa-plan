@@ -169,9 +169,6 @@ export class RegistrationAdminService {
         const campingOptionRegistrations = await this.prisma.campingOptionRegistration.findMany({
           where: {
             registrationId: { in: registrationIds },
-            campingOption: {
-              enabled: true, // Only include active camping options
-            },
           },
           include: {
             campingOption: {

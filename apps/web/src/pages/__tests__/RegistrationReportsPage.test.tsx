@@ -722,6 +722,11 @@ describe('RegistrationReportsPage', () => {
 
       const registration = await screen.findByTestId('registration-registration-2026');
 
+      expect(reports.getCampingOptionRegistrations).toHaveBeenCalledWith({
+        year: 2026,
+        userId: undefined,
+        includeInactive: true,
+      });
       expect(within(registration).getByText('Large')).toBeInTheDocument();
     });
 
