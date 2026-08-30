@@ -744,6 +744,20 @@ describe('RegistrationReportsPage', () => {
       expect(csv).toContain('Tent Size');
       expect(csv).toContain('Large');
     });
+
+    it('should show a non-fatal error when registration field data cannot be loaded', async () => {
+      vi.mocked(reports.getCampingOptionRegistrations).mockRejectedValue(
+        new Error('Camping field request failed'),
+      );
+
+      renderComponent(2026);
+      await screen.findByText('Show Registration Fields');
+      fireEvent.click(document.getElementById('camping-options-toggle')!);
+
+      const alert = await screen.findByRole('alert');
+      expect(alert).toHaveTextContent('Registration field data could not be loaded');
+      expect(screen.getByTestId('data-table')).toBeInTheDocument();
+    });
   });
 
   describe('Empty State', () => {

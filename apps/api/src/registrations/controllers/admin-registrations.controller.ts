@@ -29,6 +29,7 @@ import {
   AdminCancelRegistrationDto,
   AdminRegistrationResponseDto,
   AdminRegistrationQueryDto,
+  AdminCampingOptionQueryDto,
 } from '../dto/admin-registration.dto';
 
 interface AuthenticatedRequest {
@@ -150,18 +151,9 @@ export class AdminRegistrationsController {
   @ApiResponse({ status: 401, description: 'Unauthorized - Invalid or missing JWT token' })
   @ApiResponse({ status: 403, description: 'Forbidden - Admin role required' })
   async getCampingOptionRegistrationsWithFields(
-    @Query('year') year?: number,
-    @Query('userId') userId?: string,
-    @Query('campingOptionId') campingOptionId?: string,
-    @Query('includeInactive') includeInactive?: boolean,
+    @Query() query: AdminCampingOptionQueryDto,
   ) {
-    const filters = {
-      year,
-      userId,
-      campingOptionId,
-      includeInactive,
-    };
-    return this.adminService.getCampingOptionRegistrationsWithFields(filters);
+    return this.adminService.getCampingOptionRegistrationsWithFields(query);
   }
 
   @Get('year-users')

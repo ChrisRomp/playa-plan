@@ -20,6 +20,51 @@ test.describe('Reports (admin)', { tag: ['@reports'] }, () => {
       });
     });
   }
+
+  test('registration fields load for current and historical report years', async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.removeItem('registrationReports_showCampingOptions');
+    });
+    await page.goto(webUrl('/reports/registrations'));
+
+    const campingFieldsResponse = page.waitForResponse((response) =>
+      response.url().includes('/admin/registrations/camping-options-with-fields?year='),
+    );
+    await page.getByRole('button', { name: 'Show Registration Fields' }).click();
+
+    expect((await campingFieldsResponse).ok()).toBe(true);
+    await expect(page.getByRole('columnheader', { name: 'Camping Option' })).toBeVisible();
+    await expect(page.getByRole('columnheader', { name: 'Camping Footprint' })).toBeVisible();
+    const currentReportRow = page.getByRole('row').filter({
+      hasText: 'e2e-staff@test.playaplan.local',
+    });
+    await expect(currentReportRow).toContainText('Current year E2E camping footprint');
+
+    await page.getByRole('button', { name: 'Filters' }).click();
+    const yearFilter = page.getByLabel('Year');
+    const currentYear = await yearFilter.inputValue();
+    const availableYears = await yearFilter.locator('option').evaluateAll((options) =>
+      options.map((option) => (option as HTMLOptionElement).value),
+    );
+    const historicalYear = availableYears
+      .filter((value) => value && value !== currentYear)
+      .sort()
+      .at(0) ?? '';
+    expect(historicalYear).not.toBe('');
+
+    const historicalFieldsResponse = page.waitForResponse((response) =>
+      response.url().includes(
+        `/admin/registrations/camping-options-with-fields?year=${historicalYear}`,
+      ),
+    );
+    await yearFilter.selectOption(historicalYear);
+
+    expect((await historicalFieldsResponse).ok()).toBe(true);
+    const historicalReportRow = page.getByRole('row').filter({
+      hasText: 'e2e-staff@test.playaplan.local',
+    });
+    await expect(historicalReportRow).toContainText('Historical E2E camping footprint');
+  });
 });
 
 test.describe('Reports (staff)', { tag: ['@reports'] }, () => {
