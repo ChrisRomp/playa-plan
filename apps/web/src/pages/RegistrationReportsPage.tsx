@@ -58,6 +58,15 @@ const STATUS_BADGE_CLASSES: Record<RegistrationStatus, string> = {
   CANCELLED: 'bg-gray-100 text-gray-800',
 };
 
+function getUserProfileFieldValue(
+  registration: Registration,
+  fieldKey: typeof USER_PROFILE_FIELDS[number]['key'],
+): string | undefined {
+  const user = registration.user as UserWithProfile | undefined;
+  const value = user?.[fieldKey];
+  return typeof value === 'string' && value.length > 0 ? value : undefined;
+}
+
 function matchesStatusFilter(
   status: RegistrationStatus,
   filterGroup?: StatusFilterGroup,
@@ -290,13 +299,14 @@ export function RegistrationReportsPage() {
       id: field.key,
       header: field.label,
       accessor: (row) => {
-        const user = row.user as UserWithProfile | undefined;
+        const value = getUserProfileFieldValue(row, field.key);
         return (
           <div className="max-w-xs">
-            <span className="text-sm">{user?.[field.key as keyof UserWithProfile] || '-'}</span>
+            <span className="text-sm">{value ?? '-'}</span>
           </div>
         );
       },
+      getCellTitle: (row) => getUserProfileFieldValue(row, field.key),
       sortable: true,
       hideOnMobile: true,
       minWidth: 100,
@@ -348,6 +358,7 @@ export function RegistrationReportsPage() {
           {formatRegistrationStatus(row.status)}
         </span>
       ),
+      getCellTitle: (row) => formatRegistrationStatus(row.status),
       sortable: true,
       width: 100,
     },
@@ -392,6 +403,7 @@ export function RegistrationReportsPage() {
             )}
           </div>
         ),
+        getCellTitle: (row) => formatCampingOptionName(row),
         sortable: true,
         hideOnMobile: true,
         minWidth: 120,
@@ -410,6 +422,7 @@ export function RegistrationReportsPage() {
               </div>
             );
           },
+          getCellTitle: (row) => getFieldValue(row, field.id) || undefined,
           sortable: true,
           hideOnMobile: true,
           minWidth: 100,
