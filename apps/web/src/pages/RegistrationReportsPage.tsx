@@ -1,10 +1,16 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { ArrowLeft, Download, Filter, X } from 'lucide-react';
+import { ArrowLeft, Download, Eye, Filter, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { DataTable, DataTableColumn } from '../components/common/DataTable/DataTable';
-import { reports, Registration, RegistrationReportFilters, CampingOptionRegistrationWithFields } from '../lib/api';
+import {
+  reports,
+  Registration,
+  RegistrationReportFilters,
+  CampingOptionRegistrationWithFields,
+} from '../lib/api';
 import { PATHS } from '../routes';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
+import RegistrationReportDetailModal from '../components/reports/RegistrationReportDetailModal';
 import { downloadCsv } from '../utils/csv';
 import {
   formatRegistrationStatus,
@@ -13,6 +19,7 @@ import {
 } from '../utils/registrationUtils';
 import type { RegistrationStatusGroup } from '../utils/registrationUtils';
 import { useConfig } from '../hooks/useConfig';
+import { REGISTRATION_REPORT_USER_PROFILE_FIELDS } from './registrationReportFields';
 
 // Extended user type for registration reports that includes profile fields
 interface UserWithProfile {
@@ -29,24 +36,13 @@ interface UserWithProfile {
   emergencyContact?: string;
 }
 
-// User profile field definitions for consistent ordering
-const USER_PROFILE_FIELDS = [
-  { key: 'playaName', label: 'Playa Name' },
-  { key: 'role', label: 'Role' },
-  { key: 'phone', label: 'Phone' },
-  { key: 'emergencyContact', label: 'Emergency Contact' },
-  { key: 'city', label: 'City' },
-  { key: 'stateProvince', label: 'State/Province' },
-  { key: 'country', label: 'Country' },
-] as const;
-
 interface RegistrationReportViewFilters extends Omit<RegistrationReportFilters, 'status'> {
   status?: RegistrationStatusGroup;
 }
 
 function getUserProfileFieldValue(
   registration: Registration,
-  fieldKey: typeof USER_PROFILE_FIELDS[number]['key'],
+  fieldKey: (typeof REGISTRATION_REPORT_USER_PROFILE_FIELDS)[number]['key']
 ): string | undefined {
   const user = registration.user as UserWithProfile | undefined;
   const value = user?.[fieldKey];
@@ -66,9 +62,7 @@ export function RegistrationReportsPage() {
     config ? { year: config.currentYear } : {}
   );
   const [showFilters, setShowFilters] = useState(false);
-  const [yearFilterReady, setYearFilterReady] = useState(
-    config !== null || !configLoading
-  );
+  const [yearFilterReady, setYearFilterReady] = useState(config !== null || !configLoading);
   const defaultYearApplied = useRef(config !== null || !configLoading);
   const [showCampingOptions, setShowCampingOptions] = useState(() => {
     // Restore from localStorage
@@ -78,9 +72,12 @@ export function RegistrationReportsPage() {
     // Restore from localStorage
     return localStorage.getItem('registrationReports_showUserProfile') === 'true';
   });
-  const [campingOptionData, setCampingOptionData] = useState<CampingOptionRegistrationWithFields[]>([]);
+  const [campingOptionData, setCampingOptionData] = useState<CampingOptionRegistrationWithFields[]>(
+    []
+  );
   const [campingOptionsLoading, setCampingOptionsLoading] = useState(false);
   const [campingOptionsError, setCampingOptionsError] = useState<string | null>(null);
+  const [selectedRegistration, setSelectedRegistration] = useState<Registration | null>(null);
 
   useEffect(() => {
     if (defaultYearApplied.current || configLoading) {
@@ -99,9 +96,9 @@ export function RegistrationReportsPage() {
     setLoading(true);
     setError(null);
     try {
-      const data = await reports.getRegistrations({ 
+      const data = await reports.getRegistrations({
         includeCampingOptions: showCampingOptions,
-        includeUserProfile: showUserProfile
+        includeUserProfile: showUserProfile,
       });
       setRegistrations(data);
     } catch (err) {
@@ -165,37 +162,40 @@ export function RegistrationReportsPage() {
       if (filters.year && registration.year !== filters.year) {
         return false;
       }
-      
+
       // Status filter
       if (!matchesRegistrationStatusGroup(registration.status, filters.status)) {
         return false;
       }
-      
+
       // User ID filter (for future use)
       if (filters.userId && registration.user?.id !== filters.userId) {
         return false;
       }
-      
+
       // Job ID filter (for future use)
       if (filters.jobId && !registration.jobs.some(job => job.job.id === filters.jobId)) {
         return false;
       }
-      
+
       return true;
     });
   }, [registrations, filters]);
 
-  const statusSummary = useMemo(() => ({
-    confirmed: filteredRegistrations.filter(registration =>
-      matchesRegistrationStatusGroup(registration.status, 'CONFIRMED')
-    ).length,
-    pending: filteredRegistrations.filter(registration =>
-      matchesRegistrationStatusGroup(registration.status, 'PENDING')
-    ).length,
-    cancelled: filteredRegistrations.filter(registration =>
-      matchesRegistrationStatusGroup(registration.status, 'CANCELLED')
-    ).length,
-  }), [filteredRegistrations]);
+  const statusSummary = useMemo(
+    () => ({
+      confirmed: filteredRegistrations.filter(registration =>
+        matchesRegistrationStatusGroup(registration.status, 'CONFIRMED')
+      ).length,
+      pending: filteredRegistrations.filter(registration =>
+        matchesRegistrationStatusGroup(registration.status, 'PENDING')
+      ).length,
+      cancelled: filteredRegistrations.filter(registration =>
+        matchesRegistrationStatusGroup(registration.status, 'CANCELLED')
+      ).length,
+    }),
+    [filteredRegistrations]
+  );
 
   // Get unique years for filter dropdown
   const availableYears = useMemo(() => {
@@ -213,7 +213,7 @@ export function RegistrationReportsPage() {
     }
 
     const fieldMap = new Map<string, { displayName: string; order: number }>();
-    
+
     campingOptionData.forEach(registration => {
       registration.campingOption.fields.forEach(field => {
         if (!fieldMap.has(field.id)) {
@@ -239,45 +239,61 @@ export function RegistrationReportsPage() {
   }, [showCampingOptions, campingOptionData]);
 
   // Helper function to get field value for a specific user and field
-  const getFieldValue = useCallback((registration: Registration, fieldId: string) => {
-    if (!showCampingOptions || !registration.campingOptions || registration.campingOptions.length === 0) {
-      return '';
-    }
+  const getFieldValue = useCallback(
+    (registration: Registration, fieldId: string) => {
+      if (
+        !showCampingOptions ||
+        !registration.campingOptions ||
+        registration.campingOptions.length === 0
+      ) {
+        return '';
+      }
 
-    // Find matching detailed data for any of the registration's camping options
-    for (const co of registration.campingOptions) {
-      const detailData = campingOptionData.find(detail => 
-        detail.registrationId === registration.id && detail.campingOptionId === co.campingOptionId
-      );
-      
-      if (detailData) {
-        const fieldValue = detailData.fieldValues.find(fv => fv.field.id === fieldId);
-        if (fieldValue) {
-          return fieldValue.value;
+      // Find matching detailed data for any of the registration's camping options
+      for (const co of registration.campingOptions) {
+        const detailData = campingOptionData.find(
+          detail =>
+            detail.registrationId === registration.id &&
+            detail.campingOptionId === co.campingOptionId
+        );
+
+        if (detailData) {
+          const fieldValue = detailData.fieldValues.find(fv => fv.field.id === fieldId);
+          if (fieldValue) {
+            return fieldValue.value;
+          }
         }
       }
-    }
 
-    return '';
-  }, [showCampingOptions, campingOptionData]);
+      return '';
+    },
+    [showCampingOptions, campingOptionData]
+  );
 
   // Helper function to format camping option name(s) for a user
-  const formatCampingOptionName = useCallback((registration: Registration) => {
-    if (!showCampingOptions || !registration.campingOptions || registration.campingOptions.length === 0) {
-      return 'No camping options';
-    }
+  const formatCampingOptionName = useCallback(
+    (registration: Registration) => {
+      if (
+        !showCampingOptions ||
+        !registration.campingOptions ||
+        registration.campingOptions.length === 0
+      ) {
+        return 'No camping options';
+      }
 
-    return registration.campingOptions
-      .map(co => co.campingOption?.name || 'Unknown Option')
-      .join(', ');
-  }, [showCampingOptions]);
+      return registration.campingOptions
+        .map(co => co.campingOption?.name || 'Unknown Option')
+        .join(', ');
+    },
+    [showCampingOptions]
+  );
 
   // Helper function to create user profile columns from field definitions
   const createUserProfileColumns = (): DataTableColumn<Registration>[] => {
-    return USER_PROFILE_FIELDS.map(field => ({
+    return REGISTRATION_REPORT_USER_PROFILE_FIELDS.map(field => ({
       id: field.key,
       header: field.label,
-      accessor: (row) => {
+      accessor: row => {
         const value = getUserProfileFieldValue(row, field.key);
         return (
           <div className="max-w-xs">
@@ -285,7 +301,7 @@ export function RegistrationReportsPage() {
           </div>
         );
       },
-      getCellTitle: (row) => getUserProfileFieldValue(row, field.key),
+      getCellTitle: row => getUserProfileFieldValue(row, field.key),
       sortable: true,
       hideOnMobile: true,
       minWidth: 100,
@@ -295,70 +311,72 @@ export function RegistrationReportsPage() {
   // Define table columns
   const columns: DataTableColumn<Registration>[] = useMemo(() => {
     const baseColumns: DataTableColumn<Registration>[] = [
-    {
-      id: 'user',
-      header: 'User',
-      accessor: (row) => row.user ? `${row.user.firstName} ${row.user.lastName}` : 'Unknown User',
-      sortable: true,
-      minWidth: 120,
-    },
-    {
-      id: 'email',
-      header: 'Email',
-      accessor: (row) => row.user?.email || 'No email',
-      sortable: true,
-      hideOnMobile: true,
-      minWidth: 150,
-    },
-    {
-      id: 'year',
-      header: 'Year',
-      accessor: (row) => row.year,
-      sortable: true,
-      width: 70,
-    },
-    {
-      id: 'shift',
-      header: 'Shift',
-      accessor: (row) => {
-        if (row.jobs.length === 0) return 'No shifts assigned';
-        return row.jobs.map(j => j.job.name).join(', ');
+      {
+        id: 'user',
+        header: 'User',
+        accessor: row => (row.user ? `${row.user.firstName} ${row.user.lastName}` : 'Unknown User'),
+        sortable: true,
+        minWidth: 120,
       },
-      sortable: true,
-      minWidth: 120,
-    },
-    {
-      id: 'status',
-      header: 'Status',
-      accessor: (row) => (
-        <span
-          className={`px-2 py-1 rounded-full text-xs font-medium ${getRegistrationStatusBadgeClasses(row.status)}`}
-        >
-          {formatRegistrationStatus(row.status)}
-        </span>
-      ),
-      getCellTitle: (row) => formatRegistrationStatus(row.status),
-      sortable: true,
-      width: 100,
-    },
-    {
-      id: 'createdAt',
-      header: 'Registered',
-      accessor: (row) => new Date(row.createdAt).toLocaleDateString(),
-      sortable: true,
-      hideOnMobile: true,
-      width: 110,
-    },
-  ];
+      {
+        id: 'email',
+        header: 'Email',
+        accessor: row => row.user?.email || 'No email',
+        sortable: true,
+        hideOnMobile: true,
+        minWidth: 150,
+      },
+      {
+        id: 'year',
+        header: 'Year',
+        accessor: row => row.year,
+        sortable: true,
+        width: 70,
+      },
+      {
+        id: 'shift',
+        header: 'Shift',
+        accessor: row => {
+          if (row.jobs.length === 0) return 'No shifts assigned';
+          return row.jobs.map(j => j.job.name).join(', ');
+        },
+        sortable: true,
+        minWidth: 120,
+      },
+      {
+        id: 'status',
+        header: 'Status',
+        accessor: row => (
+          <span
+            className={`px-2 py-1 rounded-full text-xs font-medium ${getRegistrationStatusBadgeClasses(row.status)}`}
+          >
+            {formatRegistrationStatus(row.status)}
+          </span>
+        ),
+        getCellTitle: row => formatRegistrationStatus(row.status),
+        sortable: true,
+        width: 100,
+      },
+      {
+        id: 'createdAt',
+        header: 'Registered',
+        accessor: row => new Date(row.createdAt).toLocaleDateString(),
+        sortable: true,
+        hideOnMobile: true,
+        width: 110,
+      },
+    ];
 
     // Add user profile columns if enabled
     if (showUserProfile) {
       const emailIndex = baseColumns.findIndex(col => col.id === 'email');
       if (emailIndex === -1) {
-        console.warn('Email column not found in base columns, user profile columns will be appended at the end');
+        console.warn(
+          'Email column not found in base columns, user profile columns will be appended at the end'
+        );
       }
       const userProfileColumns = createUserProfileColumns();
-      
+
       // Insert user profile columns after email (or at end if email not found)
       const insertIndex = emailIndex === -1 ? baseColumns.length : emailIndex + 1;
       userProfileColumns.forEach((column, index) => {
@@ -369,12 +387,12 @@ export function RegistrationReportsPage() {
     // Add camping options columns if enabled
     if (showCampingOptions) {
       const statusIndex = baseColumns.findIndex(col => col.id === 'status');
-      
+
       // Add camping option name column
       baseColumns.splice(statusIndex, 0, {
         id: 'campingOptionName',
         header: 'Camping Option',
-        accessor: (row) => (
+        accessor: row => (
           <div className="max-w-xs">
             <span className="text-sm">{formatCampingOptionName(row)}</span>
             {campingOptionsLoading && (
@@ -382,7 +400,7 @@ export function RegistrationReportsPage() {
             )}
           </div>
         ),
-        getCellTitle: (row) => formatCampingOptionName(row),
+        getCellTitle: row => formatCampingOptionName(row),
         sortable: true,
         hideOnMobile: true,
         minWidth: 120,
@@ -393,7 +411,7 @@ export function RegistrationReportsPage() {
         baseColumns.splice(statusIndex + 1 + index, 0, {
           id: `field_${field.id}`,
           header: field.displayName,
-          accessor: (row) => {
+          accessor: row => {
             const value = getFieldValue(row, field.id);
             return (
               <div className="max-w-xs">
@@ -401,7 +419,7 @@ export function RegistrationReportsPage() {
               </div>
             );
           },
-          getCellTitle: (row) => getFieldValue(row, field.id) || undefined,
+          getCellTitle: row => getFieldValue(row, field.id) || undefined,
           sortable: true,
           hideOnMobile: true,
           minWidth: 100,
@@ -409,13 +427,43 @@ export function RegistrationReportsPage() {
       });
     }
 
+    baseColumns.push({
+      id: 'actions',
+      header: 'Actions',
+      accessor: row => {
+        const userName = row.user
+          ? `${row.user.firstName} ${row.user.lastName}`.trim()
+          : 'unknown user';
+
+        return (
+          <button
+            type="button"
+            onClick={() => setSelectedRegistration(row)}
+            className="inline-flex items-center whitespace-nowrap rounded-md px-2 py-1 text-sm font-medium text-amber-600 hover:bg-amber-50 hover:text-amber-700 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2"
+            aria-label={`View details for ${userName}`}
+          >
+            <Eye size={16} className="mr-1" />
+            View details
+          </button>
+        );
+      },
+      width: 175,
+    });
+
     return baseColumns;
-  }, [showCampingOptions, showUserProfile, formatCampingOptionName, campingOptionsLoading, uniqueFields, getFieldValue]);
+  }, [
+    showCampingOptions,
+    showUserProfile,
+    formatCampingOptionName,
+    campingOptionsLoading,
+    uniqueFields,
+    getFieldValue,
+  ]);
 
   const handleFilterChange = (key: keyof RegistrationReportViewFilters, value: string) => {
     setFilters(prev => ({
       ...prev,
-      [key]: value === '' ? undefined : key === 'year' ? parseInt(value) : value
+      [key]: value === '' ? undefined : key === 'year' ? parseInt(value) : value,
     }));
   };
 
@@ -425,24 +473,17 @@ export function RegistrationReportsPage() {
 
   const exportData = () => {
     // Convert registrations data to CSV format
-    const baseHeaders = [
-      'User Name',
-      'Email',
-      'Shift',
-      'Status',
-      'Year',
-      'Registered Date'
-    ];
+    const baseHeaders = ['User Name', 'Email', 'Shift', 'Status', 'Year', 'Registered Date'];
 
     // Add user profile headers if enabled
     let headers = baseHeaders;
     if (showUserProfile) {
       const emailIndex = baseHeaders.indexOf('Email');
-      const userProfileHeaders = USER_PROFILE_FIELDS.map(field => field.label);
+      const userProfileHeaders = REGISTRATION_REPORT_USER_PROFILE_FIELDS.map(field => field.label);
       headers = [
         ...baseHeaders.slice(0, emailIndex + 1), // User Name, Email
         ...userProfileHeaders, // User profile fields
-        ...baseHeaders.slice(emailIndex + 1) // Shift, Status, Year, Registered Date
+        ...baseHeaders.slice(emailIndex + 1), // Shift, Status, Year, Registered Date
       ];
     }
 
@@ -450,21 +491,19 @@ export function RegistrationReportsPage() {
     if (showCampingOptions) {
       const shiftIndex = headers.indexOf('Shift');
       const campingHeaders = ['Camping Option', ...uniqueFields.map(field => field.displayName)];
-      headers = [
-        ...headers.slice(0, shiftIndex),
-        ...campingHeaders,
-        ...headers.slice(shiftIndex)
-      ];
+      headers = [...headers.slice(0, shiftIndex), ...campingHeaders, ...headers.slice(shiftIndex)];
     }
 
     const csvData = filteredRegistrations.map(registration => {
       const baseData = [
-        registration.user ? `${registration.user.firstName} ${registration.user.lastName}` : 'Unknown User',
+        registration.user
+          ? `${registration.user.firstName} ${registration.user.lastName}`
+          : 'Unknown User',
         registration.user?.email || '',
         registration.jobs.map(rj => rj.job.name).join('; ') || '',
         registration.status,
         registration.year.toString(),
-        new Date(registration.createdAt).toLocaleDateString()
+        new Date(registration.createdAt).toLocaleDateString(),
       ];
 
       let data = [...baseData];
@@ -473,17 +512,20 @@ export function RegistrationReportsPage() {
       if (showUserProfile) {
         const emailIndex = headers.indexOf('Email');
         if (emailIndex === -1) {
-          console.warn('Email header not found in CSV headers, user profile data will be appended at the end');
+          console.warn(
+            'Email header not found in CSV headers, user profile data will be appended at the end'
+          );
         }
-        const userProfileData = USER_PROFILE_FIELDS.map(field =>
-          (registration.user as UserWithProfile)?.[field.key as keyof UserWithProfile] || ''
+        const userProfileData = REGISTRATION_REPORT_USER_PROFILE_FIELDS.map(
+          field =>
+            (registration.user as UserWithProfile)?.[field.key as keyof UserWithProfile] || ''
         );
-        
+
         const insertIndex = emailIndex === -1 ? data.length : emailIndex + 1;
         data = [
           ...data.slice(0, insertIndex), // Up to and including Email
           ...userProfileData, // User profile fields
-          ...data.slice(insertIndex) // Remaining fields
+          ...data.slice(insertIndex), // Remaining fields
         ];
       }
 
@@ -491,17 +533,18 @@ export function RegistrationReportsPage() {
       if (showCampingOptions) {
         // Calculate shift position based on current data structure
         const EMAIL_INDEX = 1; // Position of Email in original baseData structure
-        const afterUserProfileIndex = EMAIL_INDEX + 1 + USER_PROFILE_FIELDS.length;
+        const afterUserProfileIndex =
+          EMAIL_INDEX + 1 + REGISTRATION_REPORT_USER_PROFILE_FIELDS.length;
         const shiftIndex = showUserProfile ? afterUserProfileIndex : 2;
-        
+
         const campingOptionName = formatCampingOptionName(registration);
         const fieldValues = uniqueFields.map(field => getFieldValue(registration, field.id) || '');
-        
+
         data = [
           ...data.slice(0, shiftIndex), // Everything before Shift
           campingOptionName, // Camping Option
           ...fieldValues, // Dynamic field values
-          ...data.slice(shiftIndex) // Shift, Status, Year, Registered Date
+          ...data.slice(shiftIndex), // Shift, Status, Year, Registered Date
         ];
       }
 
@@ -510,7 +553,7 @@ export function RegistrationReportsPage() {
 
     // Generate filename with current date
     const filename = `registration_report_${new Date().toISOString().split('T')[0]}.csv`;
-    
+
     downloadCsv(headers, csvData, { filename });
   };
 
@@ -573,29 +616,37 @@ export function RegistrationReportsPage() {
             <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <label htmlFor="year-filter" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label
+                    htmlFor="year-filter"
+                    className="block text-sm font-medium text-gray-700 mb-1"
+                  >
                     Year
                   </label>
                   <select
                     id="year-filter"
                     value={filters.year || ''}
-                    onChange={(e) => handleFilterChange('year', e.target.value)}
+                    onChange={e => handleFilterChange('year', e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-amber-500 focus:border-amber-500"
                   >
                     <option value="">All Years</option>
                     {availableYears.map(year => (
-                      <option key={year} value={year}>{year}</option>
+                      <option key={year} value={year}>
+                        {year}
+                      </option>
                     ))}
                   </select>
                 </div>
                 <div>
-                  <label htmlFor="status-filter" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label
+                    htmlFor="status-filter"
+                    className="block text-sm font-medium text-gray-700 mb-1"
+                  >
                     Status
                   </label>
                   <select
                     id="status-filter"
                     value={filters.status || ''}
-                    onChange={(e) => handleFilterChange('status', e.target.value)}
+                    onChange={e => handleFilterChange('status', e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-amber-500 focus:border-amber-500"
                   >
                     <option value="">All Statuses</option>
@@ -622,7 +673,10 @@ export function RegistrationReportsPage() {
           {/* Show User Profile Fields Toggle */}
           <div className="flex items-center justify-between">
             <div>
-              <label htmlFor="user-profile-toggle" className="block text-sm font-medium text-gray-700">
+              <label
+                htmlFor="user-profile-toggle"
+                className="block text-sm font-medium text-gray-700"
+              >
                 Show User Profile Fields
               </label>
               <p className="text-xs text-gray-500 mt-1">
@@ -650,7 +704,10 @@ export function RegistrationReportsPage() {
           {/* Show Registration Fields Toggle */}
           <div className="flex items-center justify-between">
             <div>
-              <label htmlFor="camping-options-toggle" className="block text-sm font-medium text-gray-700">
+              <label
+                htmlFor="camping-options-toggle"
+                className="block text-sm font-medium text-gray-700"
+              >
                 Show Registration Fields
               </label>
               <p className="text-xs text-gray-500 mt-1">
@@ -703,7 +760,7 @@ export function RegistrationReportsPage() {
           <DataTable
             data={filteredRegistrations}
             columns={columns}
-            getRowKey={(row) => row.id}
+            getRowKey={row => row.id}
             filterable={true}
             paginated={true}
             defaultPageSize={25}
@@ -723,24 +780,28 @@ export function RegistrationReportsPage() {
             </div>
             <div>
               <span className="font-medium">Confirmed:</span>
-              <span className="ml-2 text-green-600">
-                {statusSummary.confirmed}
-              </span>
+              <span className="ml-2 text-green-600">{statusSummary.confirmed}</span>
             </div>
             <div>
               <span className="font-medium">Pending:</span>
-              <span className="ml-2 text-amber-600">
-                {statusSummary.pending}
-              </span>
+              <span className="ml-2 text-amber-600">{statusSummary.pending}</span>
             </div>
             <div>
               <span className="font-medium">Cancelled:</span>
-              <span className="ml-2 text-red-600">
-                {statusSummary.cancelled}
-              </span>
+              <span className="ml-2 text-red-600">{statusSummary.cancelled}</span>
             </div>
           </div>
         </div>
+
+        <RegistrationReportDetailModal
+          registration={selectedRegistration}
+          campingOptionData={campingOptionData}
+          showUserProfile={showUserProfile}
+          showRegistrationFields={showCampingOptions}
+          registrationFieldsLoading={campingOptionsLoading}
+          registrationFieldsError={campingOptionsError}
+          onClose={() => setSelectedRegistration(null)}
+        />
       </div>
     </div>
   );
