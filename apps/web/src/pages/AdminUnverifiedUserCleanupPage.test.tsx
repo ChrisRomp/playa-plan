@@ -130,7 +130,7 @@ describe('AdminUnverifiedUserCleanupPage', () => {
       });
     });
     expect(await screen.findByRole('status')).toHaveTextContent(
-      '1 account permanently removed. 1 skipped: email was verified.'
+      '1 account permanently removed. 1 skipped: unused-two@example.com: email was verified.'
     );
   });
 
@@ -139,6 +139,10 @@ describe('AdminUnverifiedUserCleanupPage', () => {
     renderPage();
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Cleanup unavailable');
+    expect(screen.getByText('Eligibility could not be loaded.')).toBeInTheDocument();
+    expect(
+      screen.queryByText('No unused unverified accounts are eligible for cleanup.')
+    ).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Try Again' }));
 
     await waitFor(() => {

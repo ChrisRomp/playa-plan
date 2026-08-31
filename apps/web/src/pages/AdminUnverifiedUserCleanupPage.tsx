@@ -188,8 +188,12 @@ export default function AdminUnverifiedUserCleanupPage() {
         { ids: selectedIds }
       );
       const deletedCount = response.data.deleted.length;
+      const selectedUsersById = new Map(selectedUsers.map(user => [user.id, user]));
       const skippedSummary = response.data.skipped
-        .map(skipped => formatSkipReason(skipped.reason))
+        .map(skipped => {
+          const accountLabel = selectedUsersById.get(skipped.id)?.email ?? skipped.id;
+          return `${accountLabel}: ${formatSkipReason(skipped.reason)}`;
+        })
         .join(', ');
       setFeedback(
         response.data.skipped.length > 0
@@ -309,7 +313,13 @@ export default function AdminUnverifiedUserCleanupPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {users.length === 0 ? (
+                {error && !candidatePage ? (
+                  <tr>
+                    <td colSpan={4} className="px-4 py-12 text-center text-sm text-gray-500">
+                      Eligibility could not be loaded.
+                    </td>
+                  </tr>
+                ) : users.length === 0 ? (
                   <tr>
                     <td colSpan={4} className="px-4 py-12 text-center text-sm text-gray-500">
                       No unused unverified accounts are eligible for cleanup.
