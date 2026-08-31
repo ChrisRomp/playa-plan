@@ -439,7 +439,7 @@ export function RegistrationReportsPage() {
           <button
             type="button"
             onClick={() => setSelectedRegistration(row)}
-            className="inline-flex items-center whitespace-nowrap text-sm font-medium text-amber-600 hover:text-amber-700 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2"
+            className="inline-flex items-center whitespace-nowrap rounded-md px-2 py-1 text-sm font-medium text-amber-600 hover:bg-amber-50 hover:text-amber-700 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2"
             aria-label={`View details for ${userName}`}
           >
             <Eye size={16} className="mr-1" />
@@ -447,7 +447,7 @@ export function RegistrationReportsPage() {
           </button>
         );
       },
-      width: 120,
+      width: 145,
     });
 
     return baseColumns;
