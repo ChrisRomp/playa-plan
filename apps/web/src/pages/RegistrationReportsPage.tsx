@@ -35,6 +35,36 @@ const USER_PROFILE_FIELDS = [
   { key: 'country', label: 'Country' },
 ] as const;
 
+type RegistrationStatus = Registration['status'];
+type StatusFilterGroup = 'CONFIRMED' | 'PENDING' | 'CANCELLED';
+
+interface RegistrationReportViewFilters extends Omit<RegistrationReportFilters, 'status'> {
+  status?: StatusFilterGroup;
+}
+
+const STATUS_FILTER_GROUPS: Record<StatusFilterGroup, readonly RegistrationStatus[]> = {
+  CONFIRMED: ['CONFIRMED'],
+  PENDING: ['PENDING', 'WAITLISTED', 'APPLICATION_SUBMITTED', 'APPLICATION_APPROVED'],
+  CANCELLED: ['CANCELLED', 'APPLICATION_DECLINED'],
+};
+
+const STATUS_BADGE_CLASSES: Record<RegistrationStatus, string> = {
+  CONFIRMED: 'bg-green-100 text-green-800',
+  PENDING: 'bg-amber-100 text-amber-800',
+  WAITLISTED: 'bg-orange-100 text-orange-800',
+  APPLICATION_SUBMITTED: 'bg-blue-100 text-blue-800',
+  APPLICATION_APPROVED: 'bg-purple-100 text-purple-800',
+  APPLICATION_DECLINED: 'bg-red-100 text-red-800',
+  CANCELLED: 'bg-gray-100 text-gray-800',
+};
+
+function matchesStatusFilter(
+  status: RegistrationStatus,
+  filterGroup?: StatusFilterGroup,
+): boolean {
+  return filterGroup === undefined || STATUS_FILTER_GROUPS[filterGroup].includes(status);
+}
+
 /**
  * Registration Reports page
  * Displays all registrations in a filterable, sortable table for staff/admin
@@ -44,7 +74,7 @@ export function RegistrationReportsPage() {
   const [registrations, setRegistrations] = useState<Registration[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [filters, setFilters] = useState<RegistrationReportFilters>(() =>
+  const [filters, setFilters] = useState<RegistrationReportViewFilters>(() =>
     config ? { year: config.currentYear } : {}
   );
   const [showFilters, setShowFilters] = useState(false);
@@ -149,7 +179,7 @@ export function RegistrationReportsPage() {
       }
       
       // Status filter
-      if (filters.status && registration.status !== filters.status) {
+      if (!matchesStatusFilter(registration.status, filters.status)) {
         return false;
       }
       
@@ -166,6 +196,18 @@ export function RegistrationReportsPage() {
       return true;
     });
   }, [registrations, filters]);
+
+  const statusSummary = useMemo(() => ({
+    confirmed: filteredRegistrations.filter(registration =>
+      matchesStatusFilter(registration.status, 'CONFIRMED')
+    ).length,
+    pending: filteredRegistrations.filter(registration =>
+      matchesStatusFilter(registration.status, 'PENDING')
+    ).length,
+    cancelled: filteredRegistrations.filter(registration =>
+      matchesStatusFilter(registration.status, 'CANCELLED')
+    ).length,
+  }), [filteredRegistrations]);
 
   // Get unique years for filter dropdown
   const availableYears = useMemo(() => {
@@ -301,13 +343,7 @@ export function RegistrationReportsPage() {
       header: 'Status',
       accessor: (row) => (
         <span
-          className={`px-2 py-1 rounded-full text-xs font-medium ${
-            row.status === 'CONFIRMED'
-              ? 'bg-green-100 text-green-800'
-              : row.status === 'PENDING' || row.status === 'APPLICATION_APPROVED'
-              ? 'bg-yellow-100 text-yellow-800'
-              : 'bg-red-100 text-red-800'
-          }`}
+          className={`px-2 py-1 rounded-full text-xs font-medium ${STATUS_BADGE_CLASSES[row.status]}`}
         >
           {formatRegistrationStatus(row.status)}
         </span>
@@ -384,7 +420,7 @@ export function RegistrationReportsPage() {
     return baseColumns;
   }, [showCampingOptions, showUserProfile, formatCampingOptionName, campingOptionsLoading, uniqueFields, getFieldValue]);
 
-  const handleFilterChange = (key: keyof RegistrationReportFilters, value: string) => {
+  const handleFilterChange = (key: keyof RegistrationReportViewFilters, value: string) => {
     setFilters(prev => ({
       ...prev,
       [key]: value === '' ? undefined : key === 'year' ? parseInt(value) : value
@@ -696,19 +732,19 @@ export function RegistrationReportsPage() {
             <div>
               <span className="font-medium">Confirmed:</span>
               <span className="ml-2 text-green-600">
-                {filteredRegistrations.filter(r => r.status === 'CONFIRMED').length}
+                {statusSummary.confirmed}
               </span>
             </div>
             <div>
               <span className="font-medium">Pending:</span>
-              <span className="ml-2 text-yellow-600">
-                {filteredRegistrations.filter(r => r.status === 'PENDING').length}
+              <span className="ml-2 text-amber-600">
+                {statusSummary.pending}
               </span>
             </div>
             <div>
               <span className="font-medium">Cancelled:</span>
               <span className="ml-2 text-red-600">
-                {filteredRegistrations.filter(r => r.status === 'CANCELLED').length}
+                {statusSummary.cancelled}
               </span>
             </div>
           </div>
