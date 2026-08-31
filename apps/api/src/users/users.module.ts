@@ -4,12 +4,15 @@ import { UserService } from './services/user.service';
 import { UserTransformInterceptor } from './interceptors/user-transform.interceptor';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { APP_INTERCEPTOR } from '@nestjs/core';
+import { UnverifiedUserCleanupController } from './controllers/unverified-user-cleanup.controller';
+import { UnverifiedUserCleanupService } from './services/unverified-user-cleanup.service';
 
 @Module({
   imports: [NotificationsModule],
-  controllers: [UserController],
+  controllers: [UserController, UnverifiedUserCleanupController],
   providers: [
     UserService,
+    UnverifiedUserCleanupService,
     {
       provide: APP_INTERCEPTOR,
       useClass: UserTransformInterceptor,

@@ -71,6 +71,12 @@ export const ROUTES = {
     requiresAuth: true,
     allowedRoles: [ROLES.ADMIN],
   },
+  ADMIN_UNVERIFIED_USER_CLEANUP: {
+    path: '/admin/users/unverified-cleanup',
+    name: 'Unverified Email Cleanup',
+    requiresAuth: true,
+    allowedRoles: [ROLES.ADMIN],
+  },
   ADMIN_CAMPING_OPTIONS: {
     path: '/admin/camping-options',
     name: 'Camping Options',

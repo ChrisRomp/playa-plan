@@ -7,7 +7,7 @@ import { ROLES } from '../types/auth';
 
 // Mock the useAuth hook
 vi.mock('../store/authUtils', () => ({
-  useAuth: vi.fn()
+  useAuth: vi.fn(),
 }));
 
 // Import after mocking to get the mocked version
@@ -15,43 +15,47 @@ import { useAuth } from '../store/authUtils';
 
 // Mock the page components to simplify testing
 vi.mock('../pages/HomePage.tsx', () => ({
-  default: () => <div data-testid="home-page">Home Page</div>
+  default: () => <div data-testid="home-page">Home Page</div>,
 }));
 
 vi.mock('../pages/LoginPage.tsx', () => ({
-  default: () => <div data-testid="login-page">Login Page</div>
+  default: () => <div data-testid="login-page">Login Page</div>,
 }));
 
 vi.mock('../pages/DashboardPage.tsx', () => ({
-  default: () => <div data-testid="dashboard-page">Dashboard Page</div>
+  default: () => <div data-testid="dashboard-page">Dashboard Page</div>,
 }));
 
 vi.mock('../pages/ProfilePage.tsx', () => ({
-  default: () => <div data-testid="profile-page">Profile Page</div>
+  default: () => <div data-testid="profile-page">Profile Page</div>,
 }));
 
 vi.mock('../pages/AdminPage.tsx', () => ({
-  default: () => <div data-testid="admin-page">Admin Page</div>
+  default: () => <div data-testid="admin-page">Admin Page</div>,
+}));
+
+vi.mock('../pages/AdminUnverifiedUserCleanupPage.tsx', () => ({
+  default: () => <div data-testid="admin-unverified-user-cleanup-page">Admin Cleanup Page</div>,
 }));
 
 vi.mock('../pages/AdminJobCategoriesPage.tsx', () => ({
-  default: () => <div data-testid="admin-job-categories-page">Admin Job Categories Page</div>
+  default: () => <div data-testid="admin-job-categories-page">Admin Job Categories Page</div>,
 }));
 
 vi.mock('../pages/AdminShiftsPage.tsx', () => ({
-  default: () => <div data-testid="admin-shifts-page">Admin Shifts Page</div>
+  default: () => <div data-testid="admin-shifts-page">Admin Shifts Page</div>,
 }));
 
 vi.mock('../pages/AdminJobsPage.tsx', () => ({
-  default: () => <div data-testid="admin-jobs-page">Admin Jobs Page</div>
+  default: () => <div data-testid="admin-jobs-page">Admin Jobs Page</div>,
 }));
 
 vi.mock('../pages/ShiftsPage.tsx', () => ({
-  default: () => <div data-testid="shifts-page">Shifts Page</div>
+  default: () => <div data-testid="shifts-page">Shifts Page</div>,
 }));
 
 vi.mock('../pages/NotFoundPage.tsx', () => ({
-  default: () => <div data-testid="not-found-page">Not Found Page</div>
+  default: () => <div data-testid="not-found-page">Not Found Page</div>,
 }));
 
 vi.mock('../pages/ScheduleExceptionsReportPage.tsx', () => ({
@@ -62,7 +66,7 @@ vi.mock('../pages/ScheduleExceptionsReportPage.tsx', () => ({
 
 // Mock the auth context
 vi.mock('../store/AuthContext', () => ({
-  useAuth: vi.fn()
+  useAuth: vi.fn(),
 }));
 
 describe('AppRouter', () => {
@@ -98,19 +102,19 @@ describe('AppRouter', () => {
       vi.mocked(useAuth).mockReturnValue({
         isAuthenticated: true,
         isLoading: false,
-        user: { 
-          id: '1', 
-          email: 'user@example.playaplan.app', 
+        user: {
+          id: '1',
+          email: 'user@example.playaplan.app',
           name: 'Test User',
           role: ROLES.USER,
           isAuthenticated: true,
           isEarlyRegistrationEnabled: false,
-          hasRegisteredForCurrentYear: false
+          hasRegisteredForCurrentYear: false,
         },
         error: null,
         requestVerificationCode: vi.fn().mockResolvedValue(false),
         verifyCode: vi.fn().mockResolvedValue(undefined),
-        logout: vi.fn().mockResolvedValue(undefined)
+        logout: vi.fn().mockResolvedValue(undefined),
       });
 
       renderWithRoute(ROUTES.DASHBOARD.path);
@@ -126,7 +130,7 @@ describe('AppRouter', () => {
         error: null,
         requestVerificationCode: vi.fn().mockResolvedValue(false),
         verifyCode: vi.fn().mockResolvedValue(undefined),
-        logout: vi.fn().mockResolvedValue(undefined)
+        logout: vi.fn().mockResolvedValue(undefined),
       });
 
       renderWithRoute(ROUTES.DASHBOARD.path);
@@ -138,19 +142,19 @@ describe('AppRouter', () => {
       vi.mocked(useAuth).mockReturnValue({
         isAuthenticated: true,
         isLoading: false,
-        user: { 
-          id: '1', 
-          email: 'user@example.playaplan.app', 
+        user: {
+          id: '1',
+          email: 'user@example.playaplan.app',
           name: 'Test User',
           role: ROLES.USER,
           isAuthenticated: true,
           isEarlyRegistrationEnabled: false,
-          hasRegisteredForCurrentYear: false
+          hasRegisteredForCurrentYear: false,
         },
         error: null,
         requestVerificationCode: vi.fn().mockResolvedValue(false),
         verifyCode: vi.fn().mockResolvedValue(undefined),
-        logout: vi.fn().mockResolvedValue(undefined)
+        logout: vi.fn().mockResolvedValue(undefined),
       });
 
       renderWithRoute(ROUTES.PROFILE.path);
@@ -162,19 +166,19 @@ describe('AppRouter', () => {
       vi.mocked(useAuth).mockReturnValue({
         isAuthenticated: true,
         isLoading: false,
-        user: { 
-          id: '1', 
-          email: 'user@example.playaplan.app', 
+        user: {
+          id: '1',
+          email: 'user@example.playaplan.app',
           name: 'Test User',
           role: ROLES.USER,
           isAuthenticated: true,
           isEarlyRegistrationEnabled: false,
-          hasRegisteredForCurrentYear: false
+          hasRegisteredForCurrentYear: false,
         },
         error: null,
         requestVerificationCode: vi.fn().mockResolvedValue(false),
         verifyCode: vi.fn().mockResolvedValue(undefined),
-        logout: vi.fn().mockResolvedValue(undefined)
+        logout: vi.fn().mockResolvedValue(undefined),
       });
 
       renderWithRoute(ROUTES.SHIFTS.path);
@@ -212,23 +216,47 @@ describe('AppRouter', () => {
       vi.mocked(useAuth).mockReturnValue({
         isAuthenticated: true,
         isLoading: false,
-        user: { 
-          id: '1', 
-          email: 'admin@example.playaplan.app', 
+        user: {
+          id: '1',
+          email: 'admin@example.playaplan.app',
           name: 'Admin User',
           role: ROLES.ADMIN,
           isAuthenticated: true,
           isEarlyRegistrationEnabled: false,
-          hasRegisteredForCurrentYear: false
+          hasRegisteredForCurrentYear: false,
         },
         error: null,
         requestVerificationCode: vi.fn().mockResolvedValue(false),
         verifyCode: vi.fn().mockResolvedValue(undefined),
-        logout: vi.fn().mockResolvedValue(undefined)
+        logout: vi.fn().mockResolvedValue(undefined),
       });
 
       renderWithRoute(ROUTES.ADMIN.path);
       expect(screen.getByTestId('admin-page')).toBeInTheDocument();
+    });
+
+    it('should render the unverified user cleanup page for an admin', () => {
+      vi.mocked(useAuth).mockReturnValue({
+        isAuthenticated: true,
+        isLoading: false,
+        user: {
+          id: '1',
+          email: 'admin@example.playaplan.app',
+          name: 'Admin User',
+          role: ROLES.ADMIN,
+          isAuthenticated: true,
+          isEarlyRegistrationEnabled: false,
+          hasRegisteredForCurrentYear: false,
+        },
+        error: null,
+        requestVerificationCode: vi.fn().mockResolvedValue(false),
+        verifyCode: vi.fn().mockResolvedValue(undefined),
+        logout: vi.fn().mockResolvedValue(undefined),
+      });
+
+      renderWithRoute(ROUTES.ADMIN_UNVERIFIED_USER_CLEANUP.path);
+
+      expect(screen.getByTestId('admin-unverified-user-cleanup-page')).toBeInTheDocument();
     });
 
     it('should redirect to dashboard when authenticated as non-admin and accessing admin path', () => {
@@ -236,19 +264,19 @@ describe('AppRouter', () => {
       vi.mocked(useAuth).mockReturnValue({
         isAuthenticated: true,
         isLoading: false,
-        user: { 
-          id: '1', 
-          email: 'user@example.playaplan.app', 
+        user: {
+          id: '1',
+          email: 'user@example.playaplan.app',
           name: 'Regular User',
           role: ROLES.USER,
           isAuthenticated: true,
           isEarlyRegistrationEnabled: false,
-          hasRegisteredForCurrentYear: false
+          hasRegisteredForCurrentYear: false,
         },
         error: null,
         requestVerificationCode: vi.fn().mockResolvedValue(false),
         verifyCode: vi.fn().mockResolvedValue(undefined),
-        logout: vi.fn().mockResolvedValue(undefined)
+        logout: vi.fn().mockResolvedValue(undefined),
       });
 
       renderWithRoute(ROUTES.ADMIN.path);
@@ -274,7 +302,7 @@ describe('AppRouter', () => {
         error: null,
         requestVerificationCode: vi.fn().mockResolvedValue(false),
         verifyCode: vi.fn().mockResolvedValue(undefined),
-        logout: vi.fn().mockResolvedValue(undefined)
+        logout: vi.fn().mockResolvedValue(undefined),
       });
 
       renderWithRoute(ROUTES.DASHBOARD.path);
