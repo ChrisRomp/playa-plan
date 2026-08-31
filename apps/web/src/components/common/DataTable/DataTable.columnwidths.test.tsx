@@ -139,6 +139,67 @@ describe('DataTable column widths', () => {
     expect(cells[1]).toHaveAttribute('title', 'alice@example.com');
   });
 
+  it('uses an explicit cell title for React element values', () => {
+    const columns: DataTableColumn<TestItem>[] = [
+      {
+        id: 'name',
+        header: 'Name',
+        accessor: (row) => <span>{row.name}</span>,
+        getCellTitle: (row) => row.name,
+      },
+    ];
+
+    const { container } = render(
+      <DataTable data={testData} columns={columns} getRowKey={(row) => row.id} />
+    );
+
+    expect(container.querySelector('tbody td')).toHaveAttribute('title', 'Alice Smith');
+  });
+
+  it('omits the title attribute when an explicit cell title is empty', () => {
+    const columns: DataTableColumn<TestItem>[] = [
+      {
+        id: 'name',
+        header: 'Name',
+        accessor: () => <span>-</span>,
+        getCellTitle: () => '',
+      },
+    ];
+
+    const { container } = render(
+      <DataTable data={testData} columns={columns} getRowKey={(row) => row.id} />
+    );
+
+    expect(container.querySelector('tbody td')).not.toHaveAttribute('title');
+  });
+
+  it('uses explicit cell titles in grouped rows', () => {
+    const columns: DataTableColumn<TestItem>[] = [
+      {
+        id: 'name',
+        header: 'Name',
+        accessor: (row) => <span>{row.name}</span>,
+        getCellTitle: (row) => row.name,
+      },
+    ];
+
+    const { container } = render(
+      <DataTable
+        data={testData}
+        columns={columns}
+        getRowKey={(row) => row.id}
+        groupable={true}
+        groupByField={(row) => row.name.charAt(0)}
+      />
+    );
+
+    const groupRow = container.querySelector('tbody tr[aria-expanded]') as HTMLElement;
+    fireEvent.click(groupRow);
+
+    const titledCell = container.querySelector('tbody td[title]');
+    expect(titledCell).toHaveAttribute('title', 'Alice Smith');
+  });
+
   it('renders extra col for groupable table with groupByField', () => {
     const columns: DataTableColumn<TestItem>[] = [
       { id: 'name', header: 'Name', accessor: (row) => row.name },

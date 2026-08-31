@@ -120,8 +120,17 @@ interface DataTableColumn<T> {
     value: React.ReactNode;
     row: T
   }) => React.ReactNode;
+  getCellTitle?: (row: T) =>                     // Optional native browser tooltip text
+    string | number | null | undefined;
+  width?: number | string;                       // Initial column width
+  minWidth?: number;                             // Width fallback when width is not set
 }
 ```
+
+String and number accessor values automatically become native browser tooltips. Use
+`getCellTitle` when an accessor returns a React element and supply the equivalent
+plain-text value. Returning `null`, `undefined`, or an empty string omits the
+`title` attribute.
 
 ## Accessibility
 

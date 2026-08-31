@@ -23,7 +23,12 @@ vi.mock('../../components/common/LoadingSpinner', () => ({
 vi.mock('../../components/common/DataTable/DataTable', () => ({
   DataTable: ({ data, columns, emptyMessage, caption }: {
     data: Registration[]; 
-    columns: Array<{ id: string; header: string; accessor: (item: Registration) => ReactNode }>;
+    columns: Array<{
+      id: string;
+      header: string;
+      accessor: (item: Registration) => ReactNode;
+      getCellTitle?: (item: Registration) => string | number | null | undefined;
+    }>;
     emptyMessage: string; 
     caption: string;
   }) => (
@@ -48,6 +53,13 @@ vi.mock('../../components/common/DataTable/DataTable', () => ({
               {columns
                 .filter(column =>
                   column.id === 'status'
+                  || column.id === 'playaName'
+                  || column.id === 'role'
+                  || column.id === 'phone'
+                  || column.id === 'emergencyContact'
+                  || column.id === 'city'
+                  || column.id === 'stateProvince'
+                  || column.id === 'country'
                   || column.id === 'campingOptionName'
                   || column.id.startsWith('field_')
                 )
@@ -55,6 +67,7 @@ vi.mock('../../components/common/DataTable/DataTable', () => ({
                   <div
                     key={column.id}
                     data-testid={`cell-${item.id}-${column.id}`}
+                    title={column.getCellTitle?.(item) ?? undefined}
                   >
                     {column.accessor(item)}
                   </div>
@@ -260,6 +273,8 @@ const renderComponent = (
 describe('RegistrationReportsPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorage.removeItem('registrationReports_showCampingOptions');
+    localStorage.removeItem('registrationReports_showUserProfile');
   });
 
   afterEach(() => {
@@ -340,8 +355,20 @@ describe('RegistrationReportsPage', () => {
         const statusPill = within(statusCell).getByText(label);
 
         expect(statusPill).toHaveClass(backgroundClass, textClass);
+        expect(statusCell).toHaveAttribute('title', label);
       },
     );
+
+    it('should add hover text to user profile fields without titling missing values', async () => {
+      renderComponent();
+      await screen.findByText('Show User Profile Fields');
+
+      fireEvent.click(document.getElementById('user-profile-toggle')!);
+
+      const roleCell = await screen.findByTestId('cell-1-role');
+      expect(roleCell).toHaveAttribute('title', 'PARTICIPANT');
+      expect(screen.getByTestId('cell-1-playaName')).not.toHaveAttribute('title');
+    });
 
     it('should render summary statistics using grouped status definitions', async () => {
       vi.mocked(reports.getRegistrations).mockResolvedValue(
@@ -886,10 +913,16 @@ describe('RegistrationReportsPage', () => {
       expect(within(activeRegistration).getByText('20 by 30 feet')).toBeInTheDocument();
       expect(within(inactiveRegistration).getByText('RV Camping')).toBeInTheDocument();
       expect(within(inactiveRegistration).getByText('24 feet')).toBeInTheDocument();
+      expect(screen.getByTestId(
+        'cell-registration-active-2026-campingOptionName',
+      )).toHaveAttribute('title', 'Skydiving');
+      expect(screen.getByTestId(
+        'cell-registration-active-2026-field_field-active',
+      )).toHaveAttribute('title', '20 by 30 feet');
 
       expect(screen.getByTestId(
         'cell-registration-active-2026-field_field-inactive',
-      ).textContent).toBe('');
+      )).not.toHaveAttribute('title');
       expect(screen.getByTestId(
         'cell-registration-inactive-2026-field_field-active',
       ).textContent).toBe('');

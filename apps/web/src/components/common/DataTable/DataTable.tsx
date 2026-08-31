@@ -17,6 +17,8 @@ export interface DataTableColumn<T> {
   hideOnMobile?: boolean;
   /** Optional custom cell renderer */
   Cell?: (props: { value: React.ReactNode; row: T }) => React.ReactNode;
+  /** Optional plain-text value shown by the browser when the cell is hovered */
+  getCellTitle?: (row: T) => string | number | null | undefined;
   /** Initial column width (px number or CSS string like '20%') */
   width?: number | string;
   /** Fallback column width in px, used when `width` is not set */
@@ -34,6 +36,25 @@ export type SortDirection = 'asc' | 'desc' | null;
 interface SortState {
   id: string;
   direction: SortDirection;
+}
+
+function resolveCellTitle<T>(
+  column: DataTableColumn<T>,
+  row: T,
+  cellValue: React.ReactNode,
+): string | undefined {
+  if (column.getCellTitle) {
+    const explicitTitle = column.getCellTitle(row);
+    return explicitTitle !== null
+      && explicitTitle !== undefined
+      && String(explicitTitle).length > 0
+      ? String(explicitTitle)
+      : undefined;
+  }
+
+  return typeof cellValue === 'string' || typeof cellValue === 'number'
+    ? String(cellValue)
+    : undefined;
 }
 
 /**
@@ -481,8 +502,7 @@ export function DataTable<T>({
                       <td className="px-4 py-2" role="gridcell" />
                       {columns.map((column, colIndex) => {
                         const cellValue = column.accessor(row);
-                        const titleText = typeof cellValue === 'string' || typeof cellValue === 'number'
-                          ? String(cellValue) : undefined;
+                        const titleText = resolveCellTitle(column, row, cellValue);
                         return (
                           <td 
                             key={`${getRowKey(row)}-${column.id}`}
@@ -522,8 +542,7 @@ export function DataTable<T>({
                   {groupable && groupByField && <td className="px-4 py-2" role="gridcell" />}
                   {columns.map((column, colIndex) => {
                     const cellValue = column.accessor(row);
-                    const titleText = typeof cellValue === 'string' || typeof cellValue === 'number'
-                      ? String(cellValue) : undefined;
+                    const titleText = resolveCellTitle(column, row, cellValue);
                     return (
                       <td 
                         key={`${getRowKey(row)}-${column.id}`}
