@@ -6,7 +6,12 @@ import { reports, Registration, RegistrationReportFilters, CampingOptionRegistra
 import { PATHS } from '../routes';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import { downloadCsv } from '../utils/csv';
-import { formatRegistrationStatus } from '../utils/registrationUtils';
+import {
+  formatRegistrationStatus,
+  getRegistrationStatusBadgeClasses,
+  matchesRegistrationStatusGroup,
+} from '../utils/registrationUtils';
+import type { RegistrationStatusGroup } from '../utils/registrationUtils';
 import { useConfig } from '../hooks/useConfig';
 
 // Extended user type for registration reports that includes profile fields
@@ -35,28 +40,9 @@ const USER_PROFILE_FIELDS = [
   { key: 'country', label: 'Country' },
 ] as const;
 
-type RegistrationStatus = Registration['status'];
-type StatusFilterGroup = 'CONFIRMED' | 'PENDING' | 'CANCELLED';
-
 interface RegistrationReportViewFilters extends Omit<RegistrationReportFilters, 'status'> {
-  status?: StatusFilterGroup;
+  status?: RegistrationStatusGroup;
 }
-
-const STATUS_FILTER_GROUPS: Record<StatusFilterGroup, readonly RegistrationStatus[]> = {
-  CONFIRMED: ['CONFIRMED'],
-  PENDING: ['PENDING', 'WAITLISTED', 'APPLICATION_SUBMITTED', 'APPLICATION_APPROVED'],
-  CANCELLED: ['CANCELLED', 'APPLICATION_DECLINED'],
-};
-
-const STATUS_BADGE_CLASSES: Record<RegistrationStatus, string> = {
-  CONFIRMED: 'bg-green-100 text-green-800',
-  PENDING: 'bg-amber-100 text-amber-800',
-  WAITLISTED: 'bg-orange-100 text-orange-800',
-  APPLICATION_SUBMITTED: 'bg-blue-100 text-blue-800',
-  APPLICATION_APPROVED: 'bg-purple-100 text-purple-800',
-  APPLICATION_DECLINED: 'bg-red-100 text-red-800',
-  CANCELLED: 'bg-gray-100 text-gray-800',
-};
 
 function getUserProfileFieldValue(
   registration: Registration,
@@ -65,13 +51,6 @@ function getUserProfileFieldValue(
   const user = registration.user as UserWithProfile | undefined;
   const value = user?.[fieldKey];
   return typeof value === 'string' && value.length > 0 ? value : undefined;
-}
-
-function matchesStatusFilter(
-  status: RegistrationStatus,
-  filterGroup?: StatusFilterGroup,
-): boolean {
-  return filterGroup === undefined || STATUS_FILTER_GROUPS[filterGroup].includes(status);
 }
 
 /**
@@ -188,7 +167,7 @@ export function RegistrationReportsPage() {
       }
       
       // Status filter
-      if (!matchesStatusFilter(registration.status, filters.status)) {
+      if (!matchesRegistrationStatusGroup(registration.status, filters.status)) {
         return false;
       }
       
@@ -208,13 +187,13 @@ export function RegistrationReportsPage() {
 
   const statusSummary = useMemo(() => ({
     confirmed: filteredRegistrations.filter(registration =>
-      matchesStatusFilter(registration.status, 'CONFIRMED')
+      matchesRegistrationStatusGroup(registration.status, 'CONFIRMED')
     ).length,
     pending: filteredRegistrations.filter(registration =>
-      matchesStatusFilter(registration.status, 'PENDING')
+      matchesRegistrationStatusGroup(registration.status, 'PENDING')
     ).length,
     cancelled: filteredRegistrations.filter(registration =>
-      matchesStatusFilter(registration.status, 'CANCELLED')
+      matchesRegistrationStatusGroup(registration.status, 'CANCELLED')
     ).length,
   }), [filteredRegistrations]);
 
@@ -353,7 +332,7 @@ export function RegistrationReportsPage() {
       header: 'Status',
       accessor: (row) => (
         <span
-          className={`px-2 py-1 rounded-full text-xs font-medium ${STATUS_BADGE_CLASSES[row.status]}`}
+          className={`px-2 py-1 rounded-full text-xs font-medium ${getRegistrationStatusBadgeClasses(row.status)}`}
         >
           {formatRegistrationStatus(row.status)}
         </span>

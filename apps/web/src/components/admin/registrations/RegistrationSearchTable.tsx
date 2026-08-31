@@ -1,13 +1,17 @@
 import { useMemo } from 'react';
 import { Edit, Trash2, Eye } from 'lucide-react';
 import { DataTable, DataTableColumn } from '../../common/DataTable/DataTable';
-import { formatRegistrationStatus } from '../../../utils/registrationUtils';
+import {
+  formatRegistrationStatus,
+  getRegistrationStatusBadgeClasses,
+} from '../../../utils/registrationUtils';
+import type { RegistrationStatus } from '../../../types';
 
 // TODO: Replace with actual API types when implemented
 interface Registration {
   id: string;
   year: number;
-  status: 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'WAITLISTED';
+  status: RegistrationStatus;
   /**
    * When true the registration was created as CONFIRMED with payment
    * deferred. Surfaced in the admin table next to the status so admins
@@ -112,21 +116,7 @@ export function RegistrationSearchTable({
         accessor: (row) => (
           <div className="flex items-center gap-1">
             <span
-              className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                row.status === 'CONFIRMED'
-                  ? 'bg-green-100 text-green-800'
-                  : row.status === 'PENDING'
-                  ? 'bg-yellow-100 text-yellow-800'
-                  : row.status === 'WAITLISTED'
-                  ? 'bg-blue-100 text-blue-800'
-                  : row.status === 'APPLICATION_SUBMITTED'
-                  ? 'bg-yellow-100 text-yellow-800'
-                  : row.status === 'APPLICATION_APPROVED'
-                  ? 'bg-yellow-100 text-yellow-800'
-                  : row.status === 'APPLICATION_DECLINED'
-                  ? 'bg-red-100 text-red-800'
-                  : 'bg-red-100 text-red-800'
-              }`}
+              className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getRegistrationStatusBadgeClasses(row.status)}`}
             >
               {formatRegistrationStatus(row.status)}
             </span>
