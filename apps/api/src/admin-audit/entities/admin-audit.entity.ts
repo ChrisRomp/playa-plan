@@ -70,6 +70,7 @@ export class AdminAudit {
     const actionMap: Record<AdminAuditActionType, string> = {
       [AdminAuditActionType.REGISTRATION_EDIT]: 'edited registration',
       [AdminAuditActionType.REGISTRATION_CANCEL]: 'cancelled registration',
+      [AdminAuditActionType.USER_DELETE]: 'deleted user',
       [AdminAuditActionType.PAYMENT_EXTERNAL]: 'recorded external payment',
       [AdminAuditActionType.PAYMENT_REFUND]: 'processed refund',
       [AdminAuditActionType.WORK_SHIFT_ADD]: 'added work shift',
