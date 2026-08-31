@@ -187,7 +187,7 @@ function renderModal(overrides: Partial<Parameters<typeof RegistrationReportDeta
 }
 
 describe('RegistrationReportDetailModal', () => {
-  it('renders core registration data while respecting disabled report toggles', () => {
+  it('should render core registration data while respecting disabled report toggles', () => {
     renderModal();
 
     expect(screen.getByRole('dialog', { name: 'Registration Details' })).toBeInTheDocument();
@@ -197,7 +197,7 @@ describe('RegistrationReportDetailModal', () => {
     expect(screen.queryByText('Registration Fields')).not.toBeInTheDocument();
   });
 
-  it('renders profile fields and groups dynamic responses by selected camping option', () => {
+  it('should render profile fields and group dynamic responses by selected camping option', () => {
     renderModal({
       showUserProfile: true,
       showRegistrationFields: true,
@@ -221,7 +221,7 @@ describe('RegistrationReportDetailModal', () => {
     expect(within(vehicleOption).queryByText('Camp Setup')).not.toBeInTheDocument();
   });
 
-  it('closes from the close button and Escape key', () => {
+  it('should close from the close button and Escape key', () => {
     const onClose = vi.fn();
     renderModal({ onClose });
 
@@ -229,5 +229,37 @@ describe('RegistrationReportDetailModal', () => {
     fireEvent.keyDown(document, { key: 'Escape' });
 
     expect(onClose).toHaveBeenCalledTimes(2);
+  });
+
+  it('should trap forward and reverse focus and make background content inert', () => {
+    const { rerender } = render(
+      <>
+        <button type="button">Background action</button>
+        <RegistrationReportDetailModal
+          registration={mockRegistration}
+          campingOptionData={mockCampingOptionData}
+          showUserProfile={false}
+          showRegistrationFields={false}
+          registrationFieldsLoading={false}
+          registrationFieldsError={null}
+          onClose={vi.fn()}
+        />
+      </>
+    );
+    const backgroundButton = screen.getByRole('button', { name: 'Background action' });
+    const closeButton = screen.getByRole('button', { name: 'Close registration details' });
+
+    expect(backgroundButton).toHaveAttribute('inert');
+    expect(closeButton).toHaveFocus();
+
+    expect(fireEvent.keyDown(document, { key: 'Tab' })).toBe(false);
+    expect(closeButton).toHaveFocus();
+
+    expect(fireEvent.keyDown(document, { key: 'Tab', shiftKey: true })).toBe(false);
+    expect(closeButton).toHaveFocus();
+
+    rerender(<button type="button">Background action</button>);
+
+    expect(screen.getByRole('button', { name: 'Background action' })).not.toHaveAttribute('inert');
   });
 });

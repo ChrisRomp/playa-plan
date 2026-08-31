@@ -121,6 +121,8 @@ export default function RegistrationReportDetailModal({
   registrationFieldsError,
   onClose,
 }: RegistrationReportDetailModalProps) {
+  const overlayRef = useRef<HTMLDivElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const campingOptionDetails = useMemo(
     () => getCampingOptionDetails(registration, campingOptionData),
@@ -133,17 +135,59 @@ export default function RegistrationReportDetailModal({
     }
 
     const previouslyFocusedElement = document.activeElement as HTMLElement | null;
+    const backgroundElements: Array<{ element: Element; wasInert: boolean }> = [];
+    let currentElement: Element | null = overlayRef.current;
+
+    while (currentElement && currentElement !== document.body && currentElement.parentElement) {
+      for (const sibling of currentElement.parentElement.children) {
+        if (sibling !== currentElement) {
+          backgroundElements.push({
+            element: sibling,
+            wasInert: sibling.hasAttribute('inert'),
+          });
+          sibling.setAttribute('inert', '');
+        }
+      }
+      currentElement = currentElement.parentElement;
+    }
+
     closeButtonRef.current?.focus();
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         onClose();
+        return;
+      }
+
+      if (event.key === 'Tab') {
+        const dialog = dialogRef.current;
+        const focusableElements = Array.from(
+          dialog?.querySelectorAll<HTMLElement>(
+            'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+          ) ?? []
+        );
+        const firstFocusableElement = focusableElements[0];
+        const lastFocusableElement = focusableElements.at(-1);
+
+        if (
+          !dialog?.contains(document.activeElement) ||
+          (event.shiftKey && document.activeElement === firstFocusableElement) ||
+          (!event.shiftKey && document.activeElement === lastFocusableElement)
+        ) {
+          event.preventDefault();
+          (event.shiftKey ? lastFocusableElement : firstFocusableElement)?.focus();
+        }
       }
     };
 
     document.addEventListener('keydown', handleKeyDown);
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
+      for (const { element, wasInert } of backgroundElements) {
+        if (!wasInert) {
+          element.removeAttribute('inert');
+        }
+      }
       previouslyFocusedElement?.focus();
     };
   }, [registration, onClose]);
@@ -156,6 +200,7 @@ export default function RegistrationReportDetailModal({
 
   return (
     <div
+      ref={overlayRef}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
       onMouseDown={event => {
         if (event.target === event.currentTarget) {
@@ -164,6 +209,7 @@ export default function RegistrationReportDetailModal({
       }}
     >
       <div
+        ref={dialogRef}
         className="flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-xl bg-white shadow-xl"
         role="dialog"
         aria-modal="true"
