@@ -74,17 +74,31 @@ describe('AdminUnverifiedUserCleanupPage', () => {
     await screen.findByText('Unused One');
 
     fireEvent.click(screen.getByLabelText('Select all unused accounts on this page'));
-    fireEvent.click(screen.getByRole('button', { name: 'Permanently Remove' }));
+    const removeButton = screen.getByRole('button', { name: 'Permanently Remove' });
+    fireEvent.click(removeButton);
 
     const dialog = screen.getByRole('dialog', {
       name: 'Permanently remove 2 unused accounts?',
     });
+    const cancelButton = within(dialog).getByRole('button', { name: 'Cancel' });
+    const confirmButton = within(dialog).getByRole('button', { name: 'Permanently Remove' });
     expect(within(dialog).getByText('This operation cannot be undone.')).toBeInTheDocument();
     expect(within(dialog).getByText('unused-one@example.com')).toBeInTheDocument();
     expect(within(dialog).getByText('unused-two@example.com')).toBeInTheDocument();
+    expect(cancelButton).toHaveFocus();
 
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    confirmButton.focus();
+    fireEvent.keyDown(dialog, { key: 'Tab' });
+    expect(cancelButton).toHaveFocus();
+
+    fireEvent.keyDown(dialog, { key: 'Tab', shiftKey: true });
+    expect(confirmButton).toHaveFocus();
+
+    fireEvent.keyDown(dialog, { key: 'Escape' });
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(removeButton).toHaveFocus();
+    });
   });
 
   it('should delete selected accounts and report skipped reasons', async () => {
@@ -147,5 +161,64 @@ describe('AdminUnverifiedUserCleanupPage', () => {
 
     expect(await screen.findByText('Deletion failed')).toBeInTheDocument();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('should return to the final valid page when deletion shrinks pagination', async () => {
+    const pageOne = {
+      ...candidatePage,
+      total: 101,
+      totalPages: 2,
+    };
+    const pageTwo = {
+      ...candidatePage,
+      users: [candidatePage.users[1]],
+      total: 101,
+      page: 2,
+      totalPages: 2,
+    };
+    const stalePageTwo = {
+      ...candidatePage,
+      users: [],
+      total: 100,
+      page: 2,
+      totalPages: 1,
+    };
+    const refreshedPageOne = {
+      ...candidatePage,
+      users: [candidatePage.users[0]],
+      total: 100,
+      totalPages: 1,
+    };
+    vi.mocked(api.get)
+      .mockResolvedValueOnce({ data: pageOne })
+      .mockResolvedValueOnce({ data: pageTwo })
+      .mockResolvedValueOnce({ data: stalePageTwo })
+      .mockResolvedValueOnce({ data: refreshedPageOne });
+    vi.mocked(api.post).mockResolvedValue({
+      data: {
+        deleted: [candidatePage.users[1]],
+        skipped: [],
+      },
+    });
+    renderPage();
+    await screen.findByText('Page 1 of 2 (101 eligible)');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    await screen.findByText('Page 2 of 2 (101 eligible)');
+    fireEvent.click(screen.getByLabelText('Select Unused Two'));
+    fireEvent.click(screen.getByRole('button', { name: 'Permanently Remove' }));
+    fireEvent.click(
+      within(screen.getByRole('dialog')).getByRole('button', {
+        name: 'Permanently Remove',
+      })
+    );
+
+    expect(await screen.findByText('Page 1 of 1 (100 eligible)')).toBeInTheDocument();
+    expect(api.get).toHaveBeenLastCalledWith('/admin/users/unverified-cleanup', {
+      params: {
+        page: 1,
+        limit: 100,
+      },
+    });
   });
 });

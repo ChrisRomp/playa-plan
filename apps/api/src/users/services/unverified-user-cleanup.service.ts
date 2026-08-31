@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { ConflictException, Injectable, Logger } from '@nestjs/common';
 import { AdminAuditActionType, AdminAuditTargetType, Prisma, UserRole } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../../common/prisma/prisma.service';
@@ -97,83 +97,100 @@ export class UnverifiedUserCleanupService {
     const eligibilityWhere = this.buildEligibilityWhere(now);
     const transactionId = randomUUID();
 
-    const result = await this.prisma.$transaction(async transaction => {
-      const snapshots = await transaction.user.findMany({
-        where: {
-          ...eligibilityWhere,
-          id: { in: uniqueIds },
-        },
-        select: {
-          ...CLEANUP_CANDIDATE_SELECT,
-          emailAudit: {
+    let result: DeleteUnverifiedUsersResult;
+    try {
+      result = await this.prisma.$transaction(
+        async transaction => {
+          const snapshots = await transaction.user.findMany({
+            where: {
+              ...eligibilityWhere,
+              id: { in: uniqueIds },
+            },
+            select: {
+              ...CLEANUP_CANDIDATE_SELECT,
+              emailAudit: {
+                select: {
+                  id: true,
+                },
+              },
+            },
+          });
+
+          await transaction.user.deleteMany({
+            where: {
+              ...eligibilityWhere,
+              id: { in: snapshots.map(user => user.id) },
+            },
+          });
+
+          const skippedIds = uniqueIds.filter(id => !snapshots.some(user => user.id === id));
+          const remainingEligibleSnapshotUsers = await transaction.user.findMany({
+            where: {
+              id: { in: snapshots.map(user => user.id) },
+            },
             select: {
               id: true,
             },
-          },
-        },
-      });
+          });
+          const remainingSnapshotIds = new Set(remainingEligibleSnapshotUsers.map(user => user.id));
+          const deletedSnapshots = snapshots.filter(user => !remainingSnapshotIds.has(user.id));
+          skippedIds.push(...remainingEligibleSnapshotUsers.map(user => user.id));
+          const emailAuditIds = deletedSnapshots.flatMap(user =>
+            user.emailAudit.map(audit => audit.id)
+          );
 
-      await transaction.user.deleteMany({
-        where: {
-          ...eligibilityWhere,
-          id: { in: snapshots.map(user => user.id) },
-        },
-      });
+          if (emailAuditIds.length > 0) {
+            await transaction.emailAudit.deleteMany({
+              where: {
+                id: { in: emailAuditIds },
+              },
+            });
+          }
 
-      const skippedIds = uniqueIds.filter(id => !snapshots.some(user => user.id === id));
-      const remainingEligibleSnapshotUsers = await transaction.user.findMany({
-        where: {
-          id: { in: snapshots.map(user => user.id) },
+          if (deletedSnapshots.length > 0) {
+            await transaction.adminAudit.createMany({
+              data: deletedSnapshots.map(user => ({
+                adminUserId,
+                actionType: AdminAuditActionType.USER_DELETE,
+                targetRecordType: AdminAuditTargetType.USER,
+                targetRecordId: user.id,
+                oldValues: {
+                  role: UserRole.PARTICIPANT,
+                  isEmailVerified: false,
+                  minimumAgeDays: UNVERIFIED_USER_CLEANUP_AGE_DAYS,
+                },
+                reason: 'Unverified account cleanup',
+                transactionId,
+              })),
+            });
+          }
+
+          const skipped = await this.getSkippedUsers(
+            transaction,
+            skippedIds,
+            now,
+            this.getCutoff(now)
+          );
+
+          const deleted = deletedSnapshots.map(user => ({
+            id: user.id,
+            email: user.email,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            createdAt: user.createdAt,
+          }));
+          return { deleted, skipped };
         },
-        select: {
-          id: true,
-        },
-      });
-      const remainingSnapshotIds = new Set(remainingEligibleSnapshotUsers.map(user => user.id));
-      const deletedSnapshots = snapshots.filter(user => !remainingSnapshotIds.has(user.id));
-      skippedIds.push(...remainingEligibleSnapshotUsers.map(user => user.id));
-      const emailAuditIds = deletedSnapshots.flatMap(user =>
-        user.emailAudit.map(audit => audit.id)
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
       );
-
-      if (emailAuditIds.length > 0) {
-        await transaction.emailAudit.deleteMany({
-          where: {
-            id: { in: emailAuditIds },
-          },
-        });
+    } catch (error: unknown) {
+      if (this.isSerializationConflict(error)) {
+        throw new ConflictException(
+          'Cleanup candidates changed during deletion. Refresh and try again.'
+        );
       }
-
-      if (deletedSnapshots.length > 0) {
-        await transaction.adminAudit.createMany({
-          data: deletedSnapshots.map(user => ({
-            adminUserId,
-            actionType: AdminAuditActionType.USER_DELETE,
-            targetRecordType: AdminAuditTargetType.USER,
-            targetRecordId: user.id,
-            oldValues: {
-              email: user.email,
-              firstName: user.firstName,
-              lastName: user.lastName,
-              createdAt: user.createdAt.toISOString(),
-            },
-            reason: 'Unverified account cleanup',
-            transactionId,
-          })),
-        });
-      }
-
-      const skipped = await this.getSkippedUsers(transaction, skippedIds, now, this.getCutoff(now));
-
-      const deleted = deletedSnapshots.map(user => ({
-        id: user.id,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        createdAt: user.createdAt,
-      }));
-      return { deleted, skipped };
-    });
+      throw error;
+    }
 
     this.logger.log(
       `Admin ${adminUserId} requested cleanup of ${uniqueIds.length} accounts: ` +
@@ -212,6 +229,10 @@ export class UnverifiedUserCleanupService {
 
   private getCutoff(now: Date): Date {
     return new Date(now.getTime() - UNVERIFIED_USER_CLEANUP_AGE_DAYS * MILLISECONDS_PER_DAY);
+  }
+
+  private isSerializationConflict(error: unknown): boolean {
+    return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034';
   }
 
   private async getSkippedUsers(

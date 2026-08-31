@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { KeyboardEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../lib/api';
 import { ROUTES } from '../routes';
@@ -66,6 +67,10 @@ export default function AdminUnverifiedUserCleanupPage() {
   const [error, setError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const confirmDialogRef = useRef<HTMLDivElement>(null);
+  const cancelButtonRef = useRef<HTMLButtonElement>(null);
+  const removeButtonRef = useRef<HTMLButtonElement>(null);
+  const shouldRestoreFocusRef = useRef(false);
 
   const fetchCandidates = useCallback(async (): Promise<void> => {
     setLoading(true);
@@ -78,6 +83,13 @@ export default function AdminUnverifiedUserCleanupPage() {
           limit: PAGE_LIMIT,
         },
       });
+      if (response.data.page > response.data.totalPages) {
+        setCandidatePage(null);
+        setSelectedIds([]);
+        setPage(response.data.totalPages);
+        return;
+      }
+
       setCandidatePage(response.data);
       setSelectedIds([]);
     } catch (fetchError) {
@@ -92,6 +104,18 @@ export default function AdminUnverifiedUserCleanupPage() {
   useEffect(() => {
     void fetchCandidates();
   }, [fetchCandidates]);
+
+  useEffect(() => {
+    if (isConfirmOpen) {
+      cancelButtonRef.current?.focus();
+      return;
+    }
+
+    if (shouldRestoreFocusRef.current) {
+      removeButtonRef.current?.focus();
+      shouldRestoreFocusRef.current = false;
+    }
+  }, [isConfirmOpen]);
 
   const users = useMemo(() => candidatePage?.users ?? [], [candidatePage]);
   const selectedUsers = useMemo(
@@ -108,6 +132,44 @@ export default function AdminUnverifiedUserCleanupPage() {
     setSelectedIds(currentIds =>
       currentIds.includes(userId) ? currentIds.filter(id => id !== userId) : [...currentIds, userId]
     );
+  };
+
+  const closeConfirmDialog = (): void => {
+    shouldRestoreFocusRef.current = true;
+    setIsConfirmOpen(false);
+  };
+
+  const handleConfirmKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
+    if (event.key === 'Escape' && !deleting) {
+      event.preventDefault();
+      closeConfirmDialog();
+      return;
+    }
+
+    if (event.key !== 'Tab') {
+      return;
+    }
+
+    const focusableElements = Array.from(
+      confirmDialogRef.current?.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      ) ?? []
+    );
+    const firstElement = focusableElements[0];
+    const lastElement = focusableElements[focusableElements.length - 1];
+
+    if (!firstElement || !lastElement) {
+      event.preventDefault();
+      return;
+    }
+
+    if (event.shiftKey && document.activeElement === firstElement) {
+      event.preventDefault();
+      lastElement.focus();
+    } else if (!event.shiftKey && document.activeElement === lastElement) {
+      event.preventDefault();
+      firstElement.focus();
+    }
   };
 
   const handleDelete = async (): Promise<void> => {
@@ -138,7 +200,7 @@ export default function AdminUnverifiedUserCleanupPage() {
       setSelectedIds([]);
       await fetchCandidates();
     } catch (deleteError) {
-      setIsConfirmOpen(false);
+      closeConfirmDialog();
       setError(getErrorMessage(deleteError, 'Unable to remove the selected accounts.'));
     } finally {
       setDeleting(false);
@@ -189,6 +251,7 @@ export default function AdminUnverifiedUserCleanupPage() {
           </span>
           <div className="flex flex-wrap gap-2">
             <button
+              ref={removeButtonRef}
               type="button"
               onClick={() => setIsConfirmOpen(true)}
               className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-700"
@@ -300,13 +363,15 @@ export default function AdminUnverifiedUserCleanupPage() {
       </div>
 
       {isConfirmOpen ? (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="cleanup-confirm-title"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-        >
-          <div className="w-full max-w-lg rounded-lg bg-white p-6 shadow-xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div
+            ref={confirmDialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="cleanup-confirm-title"
+            onKeyDown={handleConfirmKeyDown}
+            className="w-full max-w-lg rounded-lg bg-white p-6 shadow-xl"
+          >
             <h2 id="cleanup-confirm-title" className="text-lg font-semibold text-gray-900">
               Permanently remove {selectedIds.length} unused account
               {selectedIds.length === 1 ? '' : 's'}?
@@ -321,8 +386,9 @@ export default function AdminUnverifiedUserCleanupPage() {
             </ul>
             <div className="mt-6 flex justify-end gap-2">
               <button
+                ref={cancelButtonRef}
                 type="button"
-                onClick={() => setIsConfirmOpen(false)}
+                onClick={closeConfirmDialog}
                 disabled={deleting}
                 className="rounded-md bg-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-300 disabled:opacity-50"
               >

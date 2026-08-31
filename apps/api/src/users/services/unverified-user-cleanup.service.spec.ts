@@ -1,4 +1,5 @@
-import { AdminAuditActionType, AdminAuditTargetType, UserRole } from '@prisma/client';
+import { ConflictException } from '@nestjs/common';
+import { AdminAuditActionType, AdminAuditTargetType, Prisma, UserRole } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import {
   UNVERIFIED_USER_CLEANUP_AGE_DAYS,
@@ -147,10 +148,41 @@ describe('UnverifiedUserCleanupService', () => {
           actionType: AdminAuditActionType.USER_DELETE,
           targetRecordType: AdminAuditTargetType.USER,
           targetRecordId: candidate.id,
+          oldValues: {
+            role: UserRole.PARTICIPANT,
+            isEmailVerified: false,
+            minimumAgeDays: UNVERIFIED_USER_CLEANUP_AGE_DAYS,
+          },
           reason: 'Unverified account cleanup',
         }),
       ],
     });
+    expect(prismaMock.$transaction).toHaveBeenCalledWith(expect.any(Function), {
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+    });
+
+    const auditData = transactionMock.adminAudit.createMany.mock.calls[0][0].data[0].oldValues;
+    expect(auditData).not.toHaveProperty('email');
+    expect(auditData).not.toHaveProperty('firstName');
+    expect(auditData).not.toHaveProperty('lastName');
+  });
+
+  it('should return a conflict when concurrent cleanup changes the transaction snapshot', async () => {
+    const serializationConflict = new Prisma.PrismaClientKnownRequestError(
+      'Transaction write conflict',
+      {
+        code: 'P2034',
+        clientVersion: 'test',
+      }
+    );
+    prismaMock.$transaction.mockRejectedValue(serializationConflict);
+
+    await expect(
+      service.deleteEligibleUsers([candidate.id], 'admin-user-id', now)
+    ).rejects.toBeInstanceOf(ConflictException);
+    await expect(service.deleteEligibleUsers([candidate.id], 'admin-user-id', now)).rejects.toThrow(
+      'Cleanup candidates changed during deletion. Refresh and try again.'
+    );
   });
 
   it('should skip a user who verified after the candidate list was loaded', async () => {
