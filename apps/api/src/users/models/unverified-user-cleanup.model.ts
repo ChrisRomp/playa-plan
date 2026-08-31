@@ -20,6 +20,7 @@ export type UnverifiedUserCleanupSkipReason =
   | 'PROTECTED_ROLE'
   | 'ALREADY_VERIFIED'
   | 'TOO_NEW'
+  | 'RECENTLY_ACTIVE'
   | 'ACTIVE_LOGIN'
   | 'HAS_REGISTRATIONS'
   | 'HAS_PASSKEYS'

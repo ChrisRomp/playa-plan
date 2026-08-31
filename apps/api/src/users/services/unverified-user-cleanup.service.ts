@@ -39,6 +39,7 @@ type CleanupSkipSnapshot = Prisma.UserGetPayload<{
     role: true;
     isEmailVerified: true;
     createdAt: true;
+    updatedAt: true;
     loginCodeExpiry: true;
     _count: {
       select: typeof CLEANUP_RELATION_COUNT_SELECT;
@@ -207,6 +208,9 @@ export class UnverifiedUserCleanupService {
       createdAt: {
         lte: this.getCutoff(now),
       },
+      updatedAt: {
+        lte: this.getCutoff(now),
+      },
       OR: [
         { loginCodeExpiry: null },
         {
@@ -254,6 +258,7 @@ export class UnverifiedUserCleanupService {
         role: true,
         isEmailVerified: true,
         createdAt: true,
+        updatedAt: true,
         loginCodeExpiry: true,
         _count: {
           select: CLEANUP_RELATION_COUNT_SELECT,
@@ -287,6 +292,9 @@ export class UnverifiedUserCleanupService {
     }
     if (user.loginCodeExpiry && user.loginCodeExpiry > now) {
       return 'ACTIVE_LOGIN';
+    }
+    if (user.updatedAt > cutoff) {
+      return 'RECENTLY_ACTIVE';
     }
     if (user._count.registrations > 0) {
       return 'HAS_REGISTRATIONS';

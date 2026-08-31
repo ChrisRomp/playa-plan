@@ -42,6 +42,7 @@ function formatSkipReason(reason: UnverifiedUserCleanupSkipReason): string {
     PROTECTED_ROLE: 'account is no longer a participant',
     ALREADY_VERIFIED: 'email was verified',
     TOO_NEW: 'account is not yet 30 days old',
+    RECENTLY_ACTIVE: 'account was active within the last 30 days',
     ACTIVE_LOGIN: 'account has an active login code',
     HAS_REGISTRATIONS: 'account has a registration',
     HAS_PASSKEYS: 'account has a passkey',
@@ -213,8 +214,8 @@ export default function AdminUnverifiedUserCleanupPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Unverified Email Cleanup</h1>
           <p className="mt-1 text-sm text-gray-600">
-            Permanently remove unused participant accounts that have been unverified for at least{' '}
-            {candidatePage?.minimumAgeDays ?? 30} days.
+            Permanently remove participant accounts that have been unused and unverified for at
+            least {candidatePage?.minimumAgeDays ?? 30} days.
           </p>
         </div>
         <Link

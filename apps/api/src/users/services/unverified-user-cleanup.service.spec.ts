@@ -80,6 +80,7 @@ describe('UnverifiedUserCleanupService', () => {
         role: UserRole.PARTICIPANT,
         isEmailVerified: false,
         createdAt: { lte: cutoff },
+        updatedAt: { lte: cutoff },
         OR: [{ loginCodeExpiry: null }, { loginCodeExpiry: { lte: now } }],
         registrations: { none: {} },
         passkeys: { none: {} },
@@ -200,6 +201,7 @@ describe('UnverifiedUserCleanupService', () => {
           role: UserRole.PARTICIPANT,
           isEmailVerified: true,
           createdAt: candidate.createdAt,
+          updatedAt: candidate.createdAt,
           loginCodeExpiry: null,
           _count: {
             registrations: 0,
@@ -267,6 +269,12 @@ describe('UnverifiedUserCleanupService', () => {
       },
     ],
     [
+      'RECENTLY_ACTIVE',
+      {
+        updatedAt: new Date(cutoff.getTime() + 1),
+      },
+    ],
+    [
       'HAS_REGISTRATIONS',
       {
         _count: { registrations: 1 },
@@ -301,6 +309,7 @@ describe('UnverifiedUserCleanupService', () => {
       const typedOverrides = overrides as {
         role?: UserRole;
         createdAt?: Date;
+        updatedAt?: Date;
         loginCodeExpiry?: Date;
         _count?: Partial<typeof baseCounts>;
       };
@@ -314,6 +323,7 @@ describe('UnverifiedUserCleanupService', () => {
             role: UserRole.PARTICIPANT,
             isEmailVerified: false,
             createdAt: cutoff,
+            updatedAt: cutoff,
             loginCodeExpiry: null,
             _count: {
               ...baseCounts,
