@@ -25,6 +25,17 @@ test.describe('Reports (admin)', { tag: ['@reports'] }, () => {
     await page.addInitScript(() => {
       localStorage.removeItem('registrationReports_showCampingOptions');
     });
+    await page.route('**/public/config', async (route) => {
+      const response = await route.fetch();
+      const config = await response.json();
+      await route.fulfill({
+        response,
+        json: {
+          ...config,
+          registrationOpen: false,
+        },
+      });
+    });
     await page.goto(webUrl('/reports/registrations'));
 
     const campingFieldsResponse = page.waitForResponse((response) =>
@@ -35,10 +46,34 @@ test.describe('Reports (admin)', { tag: ['@reports'] }, () => {
     expect((await campingFieldsResponse).ok()).toBe(true);
     await expect(page.getByRole('columnheader', { name: 'Camping Option' })).toBeVisible();
     await expect(page.getByRole('columnheader', { name: 'Camping Footprint' })).toBeVisible();
-    const currentReportRow = page.getByRole('row').filter({
+    await expect(page.getByRole('columnheader', { name: 'Vehicle Length' })).toBeVisible();
+    await expect(page.getByRole('columnheader', {
+      name: 'How many skydives have you done in total?',
+    })).toBeVisible();
+    const activeReportRow = page.getByRole('row').filter({
+      hasText: 'e2e-admin@test.playaplan.local',
+    });
+    const inactiveReportRow = page.getByRole('row').filter({
       hasText: 'e2e-staff@test.playaplan.local',
     });
-    await expect(currentReportRow).toContainText('Current year E2E camping footprint');
+    await expect(activeReportRow).toContainText('Skydiving');
+    await expect(activeReportRow).toContainText('20 by 30 feet');
+    await expect(inactiveReportRow).toContainText('RV Camping');
+    await expect(inactiveReportRow).toContainText('24 feet');
+
+    const footprintColumnIndex = await page
+      .getByRole('columnheader', { name: 'Camping Footprint' })
+      .evaluate((element: HTMLTableCellElement) => element.cellIndex);
+    const vehicleLengthColumnIndex = await page
+      .getByRole('columnheader', { name: 'Vehicle Length' })
+      .evaluate((element: HTMLTableCellElement) => element.cellIndex);
+    const unfilledFieldColumnIndex = await page
+      .getByRole('columnheader', { name: 'How many skydives have you done in total?' })
+      .evaluate((element: HTMLTableCellElement) => element.cellIndex);
+
+    await expect(activeReportRow.locator('td').nth(vehicleLengthColumnIndex)).toHaveText('');
+    await expect(inactiveReportRow.locator('td').nth(footprintColumnIndex)).toHaveText('');
+    await expect(activeReportRow.locator('td').nth(unfilledFieldColumnIndex)).toHaveText('');
 
     await page.getByRole('button', { name: 'Filters' }).click();
     const yearFilter = page.getByLabel('Year');
@@ -63,7 +98,8 @@ test.describe('Reports (admin)', { tag: ['@reports'] }, () => {
     const historicalReportRow = page.getByRole('row').filter({
       hasText: 'e2e-staff@test.playaplan.local',
     });
-    await expect(historicalReportRow).toContainText('Historical E2E camping footprint');
+    await expect(historicalReportRow).toContainText('RV Camping');
+    await expect(historicalReportRow).toContainText('22 feet in prior year');
   });
 });
 

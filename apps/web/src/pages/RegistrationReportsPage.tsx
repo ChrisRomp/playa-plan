@@ -176,7 +176,7 @@ export function RegistrationReportsPage() {
     return [...years].sort((a, b) => b - a);
   }, [registrations, config]);
 
-  // Get unique field display names from camping option data
+  // Get the union of fields defined by the camping options in this report.
   const uniqueFields = useMemo(() => {
     if (!showCampingOptions || campingOptionData.length === 0) {
       return [];
@@ -185,32 +185,26 @@ export function RegistrationReportsPage() {
     const fieldMap = new Map<string, { displayName: string; order: number }>();
     
     campingOptionData.forEach(registration => {
-      registration.fieldValues.forEach(fieldValue => {
-        const fieldId = fieldValue.field.id;
-        if (!fieldMap.has(fieldId)) {
-          // Try to obtain an explicit order from the field value first,
-          // then fall back to the campingOption.fields definition if available.
-          const orderFromField = (fieldValue.field as unknown as { order?: number }).order;
-          const orderFromOption = registration.campingOption?.fields?.find(f => f.id === fieldId)?.order;
-          const order = typeof orderFromField === 'number' ? orderFromField : (typeof orderFromOption === 'number' ? orderFromOption : 0);
-
-          fieldMap.set(fieldId, {
-            displayName: fieldValue.field.displayName,
-            order,
+      registration.campingOption.fields.forEach(field => {
+        if (!fieldMap.has(field.id)) {
+          fieldMap.set(field.id, {
+            displayName: field.displayName,
+            order: field.order,
           });
         }
       });
     });
 
-    // Convert to array and sort by order
     return Array.from(fieldMap.entries())
       .map(([id, data]) => ({ id, ...data }))
       .sort((a, b) => {
-        const orderA = Number(a.order);
-        const orderB = Number(b.order);
-        const safeA = isNaN(orderA) ? 0 : orderA;
-        const safeB = isNaN(orderB) ? 0 : orderB;
-        return safeA - safeB;
+        const orderDifference = a.order - b.order;
+        if (orderDifference !== 0) {
+          return orderDifference;
+        }
+
+        const nameDifference = a.displayName.localeCompare(b.displayName);
+        return nameDifference !== 0 ? nameDifference : a.id.localeCompare(b.id);
       });
   }, [showCampingOptions, campingOptionData]);
 
@@ -376,7 +370,7 @@ export function RegistrationReportsPage() {
             const value = getFieldValue(row, field.id);
             return (
               <div className="max-w-xs">
-                <span className="text-sm">{value || '-'}</span>
+                <span className="text-sm">{value}</span>
               </div>
             );
           },

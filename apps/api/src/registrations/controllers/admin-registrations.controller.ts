@@ -73,8 +73,9 @@ export class AdminRegistrationsController {
   })
   @ApiQuery({
     name: 'includeInactive',
-    description: 'Include inactive camping options',
+    description: 'Deprecated; assigned inactive camping options are always included',
     required: false,
+    deprecated: true,
     type: Boolean,
   })
   @ApiResponse({

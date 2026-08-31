@@ -85,10 +85,8 @@ describe('API Camping Option Integration', () => {
         year: 2024,
         userId: 'user-123',
         campingOptionId: 'co-123',
-        includeInactive: false,
       };
 
-      expect(filters.includeInactive).toBe(false);
       expect(filters.campingOptionId).toBe('co-123');
     });
 

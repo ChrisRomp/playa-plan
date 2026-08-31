@@ -1239,9 +1239,9 @@ describe('RegistrationAdminService', () => {
       },
       campingOption: {
         id: 'co-123',
-        name: 'RV Camping',
+        name: 'Disabled RV Camping',
         description: 'RV camping with hookups',
-        enabled: true,
+        enabled: false,
         fields: [
           {
             id: 'field-123',
@@ -1268,18 +1268,14 @@ describe('RegistrationAdminService', () => {
       ],
     };
 
-    it('should get all camping option registrations with fields', async () => {
+    it('should get assigned camping options regardless of enabled state', async () => {
       (prismaService.campingOptionRegistration.findMany as jest.Mock).mockResolvedValue([mockCampingOptionRegistration]);
 
       const result = await service.getCampingOptionRegistrationsWithFields();
 
       expect(result).toEqual([mockCampingOptionRegistration]);
       expect(prismaService.campingOptionRegistration.findMany).toHaveBeenCalledWith({
-        where: {
-          campingOption: {
-            enabled: true,
-          },
-        },
+        where: {},
         include: {
           user: {
             select: {
@@ -1346,18 +1342,6 @@ describe('RegistrationAdminService', () => {
       );
     });
 
-    it('should include inactive camping options when requested', async () => {
-      (prismaService.campingOptionRegistration.findMany as jest.Mock).mockResolvedValue([mockCampingOptionRegistration]);
-
-      await service.getCampingOptionRegistrationsWithFields({ includeInactive: true });
-
-      expect(prismaService.campingOptionRegistration.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: {},
-        })
-      );
-    });
-
     it('should filter by year through registration relation', async () => {
       (prismaService.campingOptionRegistration.findMany as jest.Mock).mockResolvedValue([mockCampingOptionRegistration]);
 
@@ -1392,14 +1376,14 @@ describe('RegistrationAdminService', () => {
       updatedAt: new Date('2024-01-01'),
       campingOption: {
         id: 'co-123',
-        name: 'RV Camping',
-        enabled: true,
+        name: 'Archived RV Camping',
+        enabled: false,
         fields: [],
       },
       fieldValues: [],
     };
 
-    it('should include camping options when requested', async () => {
+    it('should include inactive camping options when requested for reports', async () => {
       (prismaService.registration.findMany as jest.Mock).mockResolvedValue([mockRegistration]);
       (prismaService.registration.count as jest.Mock).mockResolvedValue(1);
       (prismaService.campingOptionRegistration.findMany as jest.Mock).mockResolvedValue([mockCampingOptionRegistration]);
@@ -1414,9 +1398,6 @@ describe('RegistrationAdminService', () => {
       expect(prismaService.campingOptionRegistration.findMany).toHaveBeenCalledWith({
         where: {
           registrationId: { in: ['reg-123'] },
-          campingOption: {
-            enabled: true,
-          },
         },
         include: {
           campingOption: {

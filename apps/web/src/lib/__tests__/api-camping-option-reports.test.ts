@@ -115,13 +115,12 @@ describe('API Camping Option Reports', () => {
         year: 2024,
         userId: 'user-123',
         campingOptionId: 'co-123',
-        includeInactive: true,
       };
 
       await reports.getCampingOptionRegistrations(filters);
 
       expect(mockApi.get).toHaveBeenCalledWith(
-        '/admin/registrations/camping-options-with-fields?year=2024&userId=user-123&campingOptionId=co-123&includeInactive=true'
+        '/admin/registrations/camping-options-with-fields?year=2024&userId=user-123&campingOptionId=co-123'
       );
     });
 
