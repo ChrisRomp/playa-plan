@@ -1,5 +1,6 @@
 import { api } from '../api';
 import { isAxiosError } from 'axios';
+import type { RegistrationStatus } from '../../types';
 
 interface ApiErrorResponse {
   readonly message?: string | string[];
@@ -12,14 +13,7 @@ export interface AdminRegistrationResult {
   id: string;
   year: number;
   updatedAt: string;
-  status:
-    | 'PENDING'
-    | 'CONFIRMED'
-    | 'CANCELLED'
-    | 'WAITLISTED'
-    | 'APPLICATION_SUBMITTED'
-    | 'APPLICATION_APPROVED'
-    | 'APPLICATION_DECLINED';
+  status: RegistrationStatus;
   user: {
     id: string;
     email: string;
@@ -32,7 +26,7 @@ export interface AdminRegistrationResult {
 export interface Registration {
   id: string;
   year: number;
-  status: 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'WAITLISTED';
+  status: RegistrationStatus;
   paymentDeferred?: boolean;
   createdAt: string;
   updatedAt: string;

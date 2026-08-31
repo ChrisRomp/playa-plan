@@ -7,6 +7,8 @@ import {
   getCancelledRegistrations,
   isApplicationStatus,
   formatRegistrationStatus,
+  getRegistrationStatusBadgeClasses,
+  matchesRegistrationStatusGroup,
 } from '../registrationUtils';
 import { User, CampConfig } from '../../types';
 
@@ -279,4 +281,37 @@ describe('registrationUtils', () => {
       expect(formatRegistrationStatus('UNKNOWN_STATUS')).toBe('UNKNOWN_STATUS');
     });
   });
-}); 
+
+  describe('matchesRegistrationStatusGroup', () => {
+    it.each([
+      ['CONFIRMED', 'CONFIRMED', true],
+      ['PENDING', 'PENDING', true],
+      ['WAITLISTED', 'PENDING', true],
+      ['APPLICATION_SUBMITTED', 'PENDING', true],
+      ['APPLICATION_APPROVED', 'PENDING', true],
+      ['APPLICATION_DECLINED', 'CANCELLED', true],
+      ['CANCELLED', 'CANCELLED', true],
+      ['CONFIRMED', 'PENDING', false],
+    ] as const)('should match %s against the %s group as %s', (status, group, expected) => {
+      expect(matchesRegistrationStatusGroup(status, group)).toBe(expected);
+    });
+
+    it('should match every status when no group is selected', () => {
+      expect(matchesRegistrationStatusGroup('APPLICATION_SUBMITTED')).toBe(true);
+    });
+  });
+
+  describe('getRegistrationStatusBadgeClasses', () => {
+    it.each([
+      ['CONFIRMED', 'bg-green-100 text-green-800'],
+      ['PENDING', 'bg-amber-100 text-amber-800'],
+      ['WAITLISTED', 'bg-orange-100 text-orange-800'],
+      ['APPLICATION_SUBMITTED', 'bg-blue-100 text-blue-800'],
+      ['APPLICATION_APPROVED', 'bg-purple-100 text-purple-800'],
+      ['APPLICATION_DECLINED', 'bg-red-100 text-red-800'],
+      ['CANCELLED', 'bg-gray-100 text-gray-800'],
+    ] as const)('should return semantic classes for %s', (status, expectedClasses) => {
+      expect(getRegistrationStatusBadgeClasses(status)).toBe(expectedClasses);
+    });
+  });
+});

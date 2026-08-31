@@ -12,15 +12,18 @@ import {
   adminRegistrationsApi,
   PaginatedRegistrationsResponse,
   Registration,
+  RegistrationFilters as ApiRegistrationFilters,
   Job,
   CampingOption,
   UserCampingOptionRegistration,
 } from '../lib/api/admin-registrations';
 import { useConfig } from '../hooks/useConfig';
+import { matchesRegistrationStatusGroup } from '../utils/registrationUtils';
+import type { RegistrationStatusGroup } from '../utils/registrationUtils';
 
 interface RegistrationFilters {
   year?: number;
-  status?: string;
+  status?: RegistrationStatusGroup;
   email?: string;
   name?: string;
 }
@@ -48,6 +51,11 @@ export function ManageRegistrationsPage() {
   const [showFilters, setShowFilters] = useState(false);
   const debounceTimerRef = useRef<NodeJS.Timeout>();
   const defaultYearApplied = useRef(configuredYear !== undefined || !configLoading);
+  const apiFilters = useMemo<ApiRegistrationFilters>(() => ({
+    ...(filters.year !== undefined ? { year: filters.year } : {}),
+    ...(filters.email !== undefined ? { email: filters.email } : {}),
+    ...(filters.name !== undefined ? { name: filters.name } : {}),
+  }), [filters.email, filters.name, filters.year]);
 
   // Registration management state and actions
   const {
@@ -95,7 +103,7 @@ export function ManageRegistrationsPage() {
     setLoading(true);
     setError(null);
     try {
-      const data: PaginatedRegistrationsResponse = await adminRegistrationsApi.getRegistrations(filters);
+      const data: PaginatedRegistrationsResponse = await adminRegistrationsApi.getRegistrations(apiFilters);
       console.log('API response:', data); // Debug log
       // Extract registrations array from the response object
       const registrationsArray = data?.registrations || [];
@@ -107,7 +115,7 @@ export function ManageRegistrationsPage() {
     } finally {
       setLoading(false);
     }
-  }, [filters]);
+  }, [apiFilters]);
 
   // Debounced effect to update filters
   useEffect(() => {
@@ -149,17 +157,29 @@ export function ManageRegistrationsPage() {
     fetchAvailableOptions();
   }, [fetchAvailableOptions]);
 
+  const filteredRegistrations = useMemo(
+    () => registrations.filter(registration =>
+      matchesRegistrationStatusGroup(registration.status, filters.status)
+    ),
+    [registrations, filters.status],
+  );
+
   // Get summary statistics
   const stats = useMemo(() => {
-    // Ensure registrations is an array before filtering
-    const regArray = Array.isArray(registrations) ? registrations : [];
+    const regArray = Array.isArray(filteredRegistrations) ? filteredRegistrations : [];
     const total = regArray.length;
-    const confirmed = regArray.filter(r => r.status === 'CONFIRMED').length;
-    const pending = regArray.filter(r => r.status === 'PENDING').length;
-    const cancelled = regArray.filter(r => r.status === 'CANCELLED').length;
+    const confirmed = regArray.filter(r =>
+      matchesRegistrationStatusGroup(r.status, 'CONFIRMED')
+    ).length;
+    const pending = regArray.filter(r =>
+      matchesRegistrationStatusGroup(r.status, 'PENDING')
+    ).length;
+    const cancelled = regArray.filter(r =>
+      matchesRegistrationStatusGroup(r.status, 'CANCELLED')
+    ).length;
     
     return { total, confirmed, pending, cancelled };
-  }, [registrations]);
+  }, [filteredRegistrations]);
 
   // Get unique years for filter dropdown
   const availableYears = useMemo(() => {
@@ -354,18 +374,21 @@ export function ManageRegistrationsPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label
+                  htmlFor="registration-status-filter"
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                >
                   Status
                 </label>
                 <select
+                  id="registration-status-filter"
                   value={localFilters.status || ''}
                   onChange={(e) => handleFilterChange('status', e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500"
                 >
                   <option value="">All statuses</option>
-                  <option value="PENDING">Pending</option>
                   <option value="CONFIRMED">Confirmed</option>
-                  <option value="WAITLISTED">Waitlisted</option>
+                  <option value="PENDING">Pending</option>
                   <option value="CANCELLED">Cancelled</option>
                 </select>
               </div>
@@ -412,7 +435,7 @@ export function ManageRegistrationsPage() {
 
         {/* Data Table */}
         <RegistrationSearchTable
-          registrations={registrations}
+          registrations={filteredRegistrations}
           onEditRegistration={handleEditRegistration}
           onCancelRegistration={handleCancelRegistration}
           onViewAuditTrail={handleViewAuditTrail}

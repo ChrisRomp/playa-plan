@@ -1,5 +1,5 @@
 import { CoreConfig } from '../lib/api';
-import { CampConfig, User } from '../types';
+import { CampConfig, RegistrationStatus as RegistrationStatusType, User } from '../types';
 
 /**
  * Registration status enum to match backend
@@ -29,6 +29,39 @@ const REGISTRATION_STATUS_LABELS: Record<string, string> = {
   APPLICATION_APPROVED: 'Application Approved',
   APPLICATION_DECLINED: 'Application Not Approved',
 };
+
+export type RegistrationStatusGroup = 'CONFIRMED' | 'PENDING' | 'CANCELLED';
+
+export const REGISTRATION_STATUS_GROUPS: Record<
+  RegistrationStatusGroup,
+  readonly RegistrationStatusType[]
+> = {
+  CONFIRMED: ['CONFIRMED'],
+  PENDING: ['PENDING', 'WAITLISTED', 'APPLICATION_SUBMITTED', 'APPLICATION_APPROVED'],
+  CANCELLED: ['CANCELLED', 'APPLICATION_DECLINED'],
+};
+
+export const REGISTRATION_STATUS_BADGE_CLASSES: Record<RegistrationStatusType, string> = {
+  CONFIRMED: 'bg-green-100 text-green-800',
+  PENDING: 'bg-amber-100 text-amber-800',
+  WAITLISTED: 'bg-orange-100 text-orange-800',
+  APPLICATION_SUBMITTED: 'bg-blue-100 text-blue-800',
+  APPLICATION_APPROVED: 'bg-purple-100 text-purple-800',
+  APPLICATION_DECLINED: 'bg-red-100 text-red-800',
+  CANCELLED: 'bg-gray-100 text-gray-800',
+};
+
+export function matchesRegistrationStatusGroup(
+  status: RegistrationStatusType,
+  filterGroup?: RegistrationStatusGroup,
+): boolean {
+  return filterGroup === undefined
+    || REGISTRATION_STATUS_GROUPS[filterGroup].includes(status);
+}
+
+export function getRegistrationStatusBadgeClasses(status: RegistrationStatusType): string {
+  return REGISTRATION_STATUS_BADGE_CLASSES[status];
+}
 
 /**
  * Convert a registration status enum value to a human-readable label.

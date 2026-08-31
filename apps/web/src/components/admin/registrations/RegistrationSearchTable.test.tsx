@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { RegistrationSearchTable } from './RegistrationSearchTable';
 
@@ -208,18 +208,34 @@ describe('RegistrationSearchTable', () => {
       expect(screen.getByText('jane@example.com')).toBeInTheDocument();
     });
 
-    it('should render registration status with proper styling', () => {
-      render(<RegistrationSearchTable {...defaultProps} />);
+    it.each([
+      ['CONFIRMED', 'Confirmed', 'bg-green-100', 'text-green-800'],
+      ['PENDING', 'Pending', 'bg-amber-100', 'text-amber-800'],
+      ['WAITLISTED', 'Waitlisted', 'bg-orange-100', 'text-orange-800'],
+      ['APPLICATION_SUBMITTED', 'Application Submitted', 'bg-blue-100', 'text-blue-800'],
+      ['APPLICATION_APPROVED', 'Application Approved', 'bg-purple-100', 'text-purple-800'],
+      ['APPLICATION_DECLINED', 'Application Not Approved', 'bg-red-100', 'text-red-800'],
+      ['CANCELLED', 'Cancelled', 'bg-gray-100', 'text-gray-800'],
+    ] as const)(
+      'should render %s with its semantic badge color',
+      (status, label, backgroundClass, textClass) => {
+        const registration = {
+          ...mockRegistrations[0],
+          status,
+        };
 
-      // Status badges should be present
-      const confirmedStatus = screen.getByText('Confirmed');
-      const pendingStatus = screen.getByText('Pending');
-      const cancelledStatus = screen.getByText('Cancelled');
+        render(
+          <RegistrationSearchTable
+            {...defaultProps}
+            registrations={[registration]}
+          />
+        );
 
-      expect(confirmedStatus).toBeInTheDocument();
-      expect(pendingStatus).toBeInTheDocument();
-      expect(cancelledStatus).toBeInTheDocument();
-    });
+        const statusCell = screen.getByTestId('cell-0-status');
+        const statusBadge = within(statusCell).getByText(label);
+        expect(statusBadge).toHaveClass(backgroundClass, textClass);
+      }
+    );
 
     it('should display work shifts correctly', () => {
       render(<RegistrationSearchTable {...defaultProps} />);
@@ -466,6 +482,9 @@ describe('RegistrationSearchTable', () => {
         { ...mockRegistrations[1], status: 'PENDING' as const },
         { ...mockRegistrations[2], status: 'CANCELLED' as const },
         { ...mockRegistrations[0], id: 'reg-4', status: 'WAITLISTED' as const },
+        { ...mockRegistrations[0], id: 'reg-5', status: 'APPLICATION_SUBMITTED' as const },
+        { ...mockRegistrations[0], id: 'reg-6', status: 'APPLICATION_APPROVED' as const },
+        { ...mockRegistrations[0], id: 'reg-7', status: 'APPLICATION_DECLINED' as const },
       ];
 
       render(<RegistrationSearchTable {...defaultProps} registrations={registrationsWithAllStatuses} />);
@@ -474,6 +493,9 @@ describe('RegistrationSearchTable', () => {
       expect(screen.getByText('Pending')).toBeInTheDocument();
       expect(screen.getByText('Cancelled')).toBeInTheDocument();
       expect(screen.getByText('Waitlisted')).toBeInTheDocument();
+      expect(screen.getByText('Application Submitted')).toBeInTheDocument();
+      expect(screen.getByText('Application Approved')).toBeInTheDocument();
+      expect(screen.getByText('Application Not Approved')).toBeInTheDocument();
     });
 
     it('should properly calculate payment totals', () => {
