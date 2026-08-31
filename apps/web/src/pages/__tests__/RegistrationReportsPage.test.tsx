@@ -33,7 +33,10 @@ vi.mock('../../components/common/DataTable/DataTable', () => ({
       ) : (
         <div>
           {columns
-            .filter(column => column.id === 'campingOptionName' || column.id.startsWith('field_'))
+            .filter(column =>
+              column.id === 'campingOptionName'
+              || column.id.startsWith('field_')
+            )
             .map(column => (
               <span key={column.id} data-testid={`column-${column.id}`}>
                 {column.header}
@@ -43,7 +46,11 @@ vi.mock('../../components/common/DataTable/DataTable', () => ({
             <div key={item.id} data-testid={`registration-${item.id}`}>
               {item.user?.firstName} {item.user?.lastName} - {item.status}
               {columns
-                .filter(column => column.id === 'campingOptionName' || column.id.startsWith('field_'))
+                .filter(column =>
+                  column.id === 'status'
+                  || column.id === 'campingOptionName'
+                  || column.id.startsWith('field_')
+                )
                 .map(column => (
                   <div
                     key={column.id}
@@ -286,6 +293,22 @@ describe('RegistrationReportsPage', () => {
       expect(screen.getByTestId('registration-1')).toBeInTheDocument();
       expect(screen.getByTestId('registration-2')).toBeInTheDocument();
       expect(screen.getByTestId('registration-3')).toBeInTheDocument();
+    });
+
+    it('should render application approved status with a yellow pill', async () => {
+      const mockApprovedRegistration: Registration = {
+        ...mockRegistrations[0],
+        id: 'approved',
+        status: 'APPLICATION_APPROVED',
+      };
+      vi.mocked(reports.getRegistrations).mockResolvedValue([mockApprovedRegistration]);
+
+      renderComponent();
+
+      const statusPill = await screen.findByText('Application Approved');
+
+      expect(statusPill).toHaveClass('bg-yellow-100', 'text-yellow-800');
+      expect(statusPill).not.toHaveClass('bg-red-100', 'text-red-800');
     });
 
     it('should render summary statistics correctly', async () => {

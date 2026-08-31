@@ -304,7 +304,7 @@ export function RegistrationReportsPage() {
           className={`px-2 py-1 rounded-full text-xs font-medium ${
             row.status === 'CONFIRMED'
               ? 'bg-green-100 text-green-800'
-              : row.status === 'PENDING'
+              : row.status === 'PENDING' || row.status === 'APPLICATION_APPROVED'
               ? 'bg-yellow-100 text-yellow-800'
               : 'bg-red-100 text-red-800'
           }`}
