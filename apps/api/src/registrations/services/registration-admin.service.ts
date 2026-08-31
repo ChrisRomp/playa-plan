@@ -935,7 +935,6 @@ export class RegistrationAdminService {
     year?: number;
     userId?: string;
     campingOptionId?: string;
-    includeInactive?: boolean;
   }) {
     try {
       const where: Prisma.CampingOptionRegistrationWhereInput = {};
@@ -948,13 +947,6 @@ export class RegistrationAdminService {
       // Filter by camping option ID
       if (filters?.campingOptionId) {
         where.campingOptionId = filters.campingOptionId;
-      }
-
-      // Filter by camping option enabled status
-      if (!filters?.includeInactive) {
-        where.campingOption = {
-          enabled: true,
-        };
       }
 
       // Filter by year via the direct registration FK

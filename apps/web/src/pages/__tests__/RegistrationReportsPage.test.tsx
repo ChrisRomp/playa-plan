@@ -23,7 +23,7 @@ vi.mock('../../components/common/LoadingSpinner', () => ({
 vi.mock('../../components/common/DataTable/DataTable', () => ({
   DataTable: ({ data, columns, emptyMessage, caption }: {
     data: Registration[]; 
-    columns: Array<{ id: string; accessor: (item: Registration) => ReactNode }>;
+    columns: Array<{ id: string; header: string; accessor: (item: Registration) => ReactNode }>;
     emptyMessage: string; 
     caption: string;
   }) => (
@@ -32,12 +32,26 @@ vi.mock('../../components/common/DataTable/DataTable', () => ({
         <div data-testid="empty-message">{emptyMessage}</div>
       ) : (
         <div>
+          {columns
+            .filter(column => column.id === 'campingOptionName' || column.id.startsWith('field_'))
+            .map(column => (
+              <span key={column.id} data-testid={`column-${column.id}`}>
+                {column.header}
+              </span>
+            ))}
           {data.map((item: Registration) => (
             <div key={item.id} data-testid={`registration-${item.id}`}>
               {item.user?.firstName} {item.user?.lastName} - {item.status}
               {columns
-                .filter(column => column.id.startsWith('field_'))
-                .map(column => <div key={column.id}>{column.accessor(item)}</div>)}
+                .filter(column => column.id === 'campingOptionName' || column.id.startsWith('field_'))
+                .map(column => (
+                  <div
+                    key={column.id}
+                    data-testid={`cell-${item.id}-${column.id}`}
+                  >
+                    {column.accessor(item)}
+                  </div>
+                ))}
             </div>
           ))}
         </div>
@@ -172,14 +186,18 @@ const mockRegistrations: Registration[] = [
   },
 ];
 
-const createConfigContextValue = (currentYear?: number, isLoading = false): ConfigContextType => ({
+const createConfigContextValue = (
+  currentYear?: number,
+  isLoading = false,
+  registrationOpen = true,
+): ConfigContextType => ({
   config: currentYear === undefined
     ? null
     : {
         name: 'Test Camp',
         description: 'Test camp',
         homePageBlurb: '',
-        registrationOpen: true,
+        registrationOpen,
         earlyRegistrationOpen: false,
         currentYear,
       },
@@ -191,9 +209,15 @@ const createConfigContextValue = (currentYear?: number, isLoading = false): Conf
   connectionError: null,
 });
 
-const renderComponent = (currentYear?: number, isLoading = false) => {
+const renderComponent = (
+  currentYear?: number,
+  isLoading = false,
+  registrationOpen = true,
+) => {
   return render(
-    <ConfigContext.Provider value={createConfigContextValue(currentYear, isLoading)}>
+    <ConfigContext.Provider
+      value={createConfigContextValue(currentYear, isLoading, registrationOpen)}
+    >
       <MemoryRouter>
         <RegistrationReportsPage />
       </MemoryRouter>
@@ -635,14 +659,52 @@ describe('RegistrationReportsPage', () => {
       vi.mocked(reports.getRegistrations).mockResolvedValue([
         {
           ...mockRegistrations[0],
-          id: 'registration-2026',
+          id: 'registration-active-2026',
           year: 2026,
           campingOptions: [{
-            id: 'camping-registration-2026',
+            id: 'camping-registration-active-2026',
             userId: 'user1',
-            campingOptionId: 'option-1',
+            campingOptionId: 'option-active',
             createdAt: '2026-01-15T10:00:00Z',
             updatedAt: '2026-01-15T10:00:00Z',
+            campingOption: {
+              id: 'option-active',
+              name: 'Skydiving',
+              description: null,
+              enabled: true,
+              workShiftsRequired: 1,
+              participantDues: 600,
+              staffDues: 600,
+              maxSignups: 60,
+              createdAt: '2026-01-01T10:00:00Z',
+              updatedAt: '2026-01-01T10:00:00Z',
+              jobCategoryIds: [],
+            },
+          }],
+        },
+        {
+          ...mockRegistrations[1],
+          id: 'registration-inactive-2026',
+          year: 2026,
+          campingOptions: [{
+            id: 'camping-registration-inactive-2026',
+            userId: 'user2',
+            campingOptionId: 'option-inactive',
+            createdAt: '2026-01-16T10:00:00Z',
+            updatedAt: '2026-01-16T10:00:00Z',
+            campingOption: {
+              id: 'option-inactive',
+              name: 'RV Camping',
+              description: null,
+              enabled: false,
+              workShiftsRequired: 0,
+              participantDues: 0,
+              staffDues: 0,
+              maxSignups: 0,
+              createdAt: '2026-01-01T10:00:00Z',
+              updatedAt: '2026-01-01T10:00:00Z',
+              jobCategoryIds: [],
+            },
           }],
         },
       ]);
@@ -651,7 +713,7 @@ describe('RegistrationReportsPage', () => {
           id: 'camping-registration-2025',
           registrationId: null,
           userId: 'user1',
-          campingOptionId: 'option-1',
+          campingOptionId: 'option-active',
           user: {
             id: 'user1',
             email: 'john.doe@example.com',
@@ -660,8 +722,8 @@ describe('RegistrationReportsPage', () => {
             playaName: null,
           },
           campingOption: {
-            id: 'option-1',
-            name: 'Tent',
+            id: 'option-active',
+            name: 'Skydiving',
             description: null,
             enabled: true,
             fields: [],
@@ -671,10 +733,10 @@ describe('RegistrationReportsPage', () => {
           updatedAt: '2025-01-15T10:00:00Z',
         },
         {
-          id: 'camping-registration-2026',
-          registrationId: 'registration-2026',
+          id: 'camping-registration-active-2026',
+          registrationId: 'registration-active-2026',
           userId: 'user1',
-          campingOptionId: 'option-1',
+          campingOptionId: 'option-active',
           user: {
             id: 'user1',
             email: 'john.doe@example.com',
@@ -683,28 +745,37 @@ describe('RegistrationReportsPage', () => {
             playaName: null,
           },
           campingOption: {
-            id: 'option-1',
-            name: 'Tent',
+            id: 'option-active',
+            name: 'Skydiving',
             description: null,
             enabled: true,
-            fields: [{
-              id: 'field-1',
-              displayName: 'Tent Size',
-              dataType: 'STRING',
-              required: true,
-              order: 1,
-            }],
+            fields: [
+              {
+                id: 'field-active',
+                displayName: 'Camping Footprint',
+                dataType: 'MULTILINE_STRING',
+                required: false,
+                order: 0,
+              },
+              {
+                id: 'field-unfilled',
+                displayName: 'Radio Call Sign',
+                dataType: 'STRING',
+                required: false,
+                order: 2,
+              },
+            ],
           },
           fieldValues: [{
-            id: 'value-1',
-            value: 'Large',
-            fieldId: 'field-1',
-            registrationId: 'camping-registration-2026',
+            id: 'value-active',
+            value: '20 by 30 feet',
+            fieldId: 'field-active',
+            registrationId: 'camping-registration-active-2026',
             field: {
-              id: 'field-1',
-              displayName: 'Tent Size',
-              dataType: 'STRING',
-              required: true,
+              id: 'field-active',
+              displayName: 'Camping Footprint',
+              dataType: 'MULTILINE_STRING',
+              required: false,
             },
             createdAt: '2026-01-15T10:00:00Z',
             updatedAt: '2026-01-15T10:00:00Z',
@@ -712,29 +783,99 @@ describe('RegistrationReportsPage', () => {
           createdAt: '2026-01-15T10:00:00Z',
           updatedAt: '2026-01-15T10:00:00Z',
         },
+        {
+          id: 'camping-registration-inactive-2026',
+          registrationId: 'registration-inactive-2026',
+          userId: 'user2',
+          campingOptionId: 'option-inactive',
+          user: {
+            id: 'user2',
+            email: 'jane.smith@example.com',
+            firstName: 'Jane',
+            lastName: 'Smith',
+            playaName: null,
+          },
+          campingOption: {
+            id: 'option-inactive',
+            name: 'RV Camping',
+            description: null,
+            enabled: false,
+            fields: [{
+              id: 'field-inactive',
+              displayName: 'Vehicle Length',
+              dataType: 'STRING',
+              required: true,
+              order: 1,
+            }],
+          },
+          fieldValues: [{
+            id: 'value-inactive',
+            value: '24 feet',
+            fieldId: 'field-inactive',
+            registrationId: 'camping-registration-inactive-2026',
+            field: {
+              id: 'field-inactive',
+              displayName: 'Vehicle Length',
+              dataType: 'STRING',
+              required: true,
+            },
+            createdAt: '2026-01-16T10:00:00Z',
+            updatedAt: '2026-01-16T10:00:00Z',
+          }],
+          createdAt: '2026-01-16T10:00:00Z',
+          updatedAt: '2026-01-16T10:00:00Z',
+        },
       ]);
     });
 
-    it('should show current registration custom field values when an orphaned prior-year row exists', async () => {
+    it('should render one report with active and inactive options and blank cross-option fields', async () => {
       renderComponent(2026);
       await screen.findByText('Show Registration Fields');
       fireEvent.click(document.getElementById('camping-options-toggle')!);
-
-      const registration = await screen.findByTestId('registration-registration-2026');
 
       expect(reports.getCampingOptionRegistrations).toHaveBeenCalledWith({
         year: 2026,
         userId: undefined,
-        includeInactive: true,
       });
-      expect(within(registration).getByText('Large')).toBeInTheDocument();
+      expect(await screen.findByTestId('column-field_field-active')).toHaveTextContent('Camping Footprint');
+      expect(screen.getByTestId('column-field_field-inactive')).toHaveTextContent('Vehicle Length');
+      expect(screen.getByTestId('column-field_field-unfilled')).toHaveTextContent('Radio Call Sign');
+
+      const activeRegistration = screen.getByTestId('registration-registration-active-2026');
+      const inactiveRegistration = screen.getByTestId('registration-registration-inactive-2026');
+      expect(within(activeRegistration).getByText('Skydiving')).toBeInTheDocument();
+      expect(within(activeRegistration).getByText('20 by 30 feet')).toBeInTheDocument();
+      expect(within(inactiveRegistration).getByText('RV Camping')).toBeInTheDocument();
+      expect(within(inactiveRegistration).getByText('24 feet')).toBeInTheDocument();
+
+      expect(screen.getByTestId(
+        'cell-registration-active-2026-field_field-inactive',
+      ).textContent).toBe('');
+      expect(screen.getByTestId(
+        'cell-registration-inactive-2026-field_field-active',
+      ).textContent).toBe('');
+      expect(screen.getByTestId(
+        'cell-registration-active-2026-field_field-unfilled',
+      ).textContent).toBe('');
+      expect(screen.getByTestId(
+        'cell-registration-inactive-2026-field_field-unfilled',
+      ).textContent).toBe('');
     });
 
-    it('should export current registration custom field values when an orphaned prior-year row exists', async () => {
+    it('should render registration fields when registration is closed', async () => {
+      renderComponent(2026, false, false);
+      await screen.findByText('Show Registration Fields');
+      fireEvent.click(document.getElementById('camping-options-toggle')!);
+
+      expect(await screen.findByText('20 by 30 feet')).toBeInTheDocument();
+      expect(screen.getByText('24 feet')).toBeInTheDocument();
+    });
+
+    it('should export mixed option fields with blank cross-option values', async () => {
       renderComponent(2026);
       await screen.findByText('Show Registration Fields');
       fireEvent.click(document.getElementById('camping-options-toggle')!);
-      await screen.findByText('Large');
+      await screen.findByText('20 by 30 feet');
 
       fireEvent.click(screen.getByText('Export'));
 
@@ -746,8 +887,20 @@ describe('RegistrationReportsPage', () => {
         reader.readAsText(blob);
       });
 
-      expect(csv).toContain('Tent Size');
-      expect(csv).toContain('Large');
+      const [headerLine, ...dataLines] = csv.replace(/^\uFEFF/, '').split('\n');
+      const headers = headerLine.split(',');
+      const activeRow = dataLines.find(line => line.includes('john.doe@example.com'))!.split(',');
+      const inactiveRow = dataLines.find(line => line.includes('jane.smith@example.com'))!.split(',');
+      const footprintIndex = headers.indexOf('Camping Footprint');
+      const vehicleLengthIndex = headers.indexOf('Vehicle Length');
+      const callSignIndex = headers.indexOf('Radio Call Sign');
+
+      expect(activeRow[footprintIndex]).toBe('20 by 30 feet');
+      expect(activeRow[vehicleLengthIndex]).toBe('');
+      expect(activeRow[callSignIndex]).toBe('');
+      expect(inactiveRow[footprintIndex]).toBe('');
+      expect(inactiveRow[vehicleLengthIndex]).toBe('24 feet');
+      expect(inactiveRow[callSignIndex]).toBe('');
     });
 
     it('should show a non-fatal error when registration field data cannot be loaded', async () => {

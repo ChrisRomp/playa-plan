@@ -403,9 +403,8 @@ export class AdminCampingOptionQueryDto {
   campingOptionId?: string;
 
   @ApiPropertyOptional({
-    description: 'Include inactive camping options in results',
-    example: false,
-    default: false,
+    description: 'Deprecated; reports always include assigned inactive camping options',
+    deprecated: true,
   })
   @IsOptional()
   @Transform(({ value }) => {
@@ -414,5 +413,5 @@ export class AdminCampingOptionQueryDto {
     return value;
   })
   @IsBoolean({ message: 'Include inactive must be a boolean' })
-  includeInactive?: boolean = false;
-} 
+  includeInactive?: boolean;
+}

@@ -16,4 +16,15 @@ describe('AdminCampingOptionQueryDto', () => {
       expect(actualQuery.year).toBe(Number(inputYear));
     },
   );
+
+  it('should accept the deprecated includeInactive query parameter', async () => {
+    const actualQuery = plainToInstance(
+      AdminCampingOptionQueryDto,
+      { includeInactive: 'true' },
+    );
+    const validationErrors = await validate(actualQuery);
+
+    expect(validationErrors).toHaveLength(0);
+    expect(actualQuery.includeInactive).toBe(true);
+  });
 });

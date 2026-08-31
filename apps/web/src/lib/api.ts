@@ -558,7 +558,6 @@ export interface CampingOptionReportFilters {
   year?: number;
   userId?: string;
   campingOptionId?: string;
-  includeInactive?: boolean;
 }
 
 export interface TicketReceiptSettings {
@@ -1397,7 +1396,6 @@ export const reports = {
       if (filters?.year) params.append('year', filters.year.toString());
       if (filters?.userId) params.append('userId', filters.userId);
       if (filters?.campingOptionId) params.append('campingOptionId', filters.campingOptionId);
-      if (filters?.includeInactive) params.append('includeInactive', 'true');
       
       const url = `/admin/registrations/camping-options-with-fields${params.toString() ? `?${params.toString()}` : ''}`;
       const response = await api.get<CampingOptionRegistrationWithFields[]>(url);

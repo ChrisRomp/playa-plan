@@ -1239,9 +1239,9 @@ describe('RegistrationAdminService', () => {
       },
       campingOption: {
         id: 'co-123',
-        name: 'RV Camping',
+        name: 'Disabled RV Camping',
         description: 'RV camping with hookups',
-        enabled: true,
+        enabled: false,
         fields: [
           {
             id: 'field-123',
@@ -1268,18 +1268,14 @@ describe('RegistrationAdminService', () => {
       ],
     };
 
-    it('should get all camping option registrations with fields', async () => {
+    it('should get assigned camping options regardless of enabled state', async () => {
       (prismaService.campingOptionRegistration.findMany as jest.Mock).mockResolvedValue([mockCampingOptionRegistration]);
 
       const result = await service.getCampingOptionRegistrationsWithFields();
 
       expect(result).toEqual([mockCampingOptionRegistration]);
       expect(prismaService.campingOptionRegistration.findMany).toHaveBeenCalledWith({
-        where: {
-          campingOption: {
-            enabled: true,
-          },
-        },
+        where: {},
         include: {
           user: {
             select: {
@@ -1342,18 +1338,6 @@ describe('RegistrationAdminService', () => {
           where: expect.objectContaining({
             campingOptionId: 'co-123',
           }),
-        })
-      );
-    });
-
-    it('should include inactive camping options when requested', async () => {
-      (prismaService.campingOptionRegistration.findMany as jest.Mock).mockResolvedValue([mockCampingOptionRegistration]);
-
-      await service.getCampingOptionRegistrationsWithFields({ includeInactive: true });
-
-      expect(prismaService.campingOptionRegistration.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: {},
         })
       );
     });
