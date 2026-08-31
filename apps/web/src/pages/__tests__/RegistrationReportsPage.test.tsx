@@ -193,6 +193,31 @@ const mockRegistrations: Registration[] = [
   },
 ];
 
+const allRegistrationStatuses: Registration['status'][] = [
+  'CONFIRMED',
+  'PENDING',
+  'WAITLISTED',
+  'APPLICATION_SUBMITTED',
+  'APPLICATION_APPROVED',
+  'APPLICATION_DECLINED',
+  'CANCELLED',
+];
+
+const createRegistrationWithStatus = (
+  status: Registration['status'],
+  index: number,
+): Registration => ({
+  ...mockRegistrations[0],
+  id: `status-${index}`,
+  userId: `status-user-${index}`,
+  status,
+  user: {
+    ...mockRegistrations[0].user,
+    id: `status-user-${index}`,
+    firstName: `Status${index}`,
+  },
+});
+
 const createConfigContextValue = (
   currentYear?: number,
   isLoading = false,
@@ -295,38 +320,47 @@ describe('RegistrationReportsPage', () => {
       expect(screen.getByTestId('registration-3')).toBeInTheDocument();
     });
 
-    it('should render application approved status with a yellow pill', async () => {
-      const mockApprovedRegistration: Registration = {
-        ...mockRegistrations[0],
-        id: 'approved',
-        status: 'APPLICATION_APPROVED',
-      };
-      vi.mocked(reports.getRegistrations).mockResolvedValue([mockApprovedRegistration]);
+    it.each([
+      ['CONFIRMED', 'Confirmed', 'bg-green-100', 'text-green-800'],
+      ['PENDING', 'Pending', 'bg-amber-100', 'text-amber-800'],
+      ['WAITLISTED', 'Waitlisted', 'bg-orange-100', 'text-orange-800'],
+      ['APPLICATION_SUBMITTED', 'Application Submitted', 'bg-blue-100', 'text-blue-800'],
+      ['APPLICATION_APPROVED', 'Application Approved', 'bg-purple-100', 'text-purple-800'],
+      ['APPLICATION_DECLINED', 'Application Not Approved', 'bg-red-100', 'text-red-800'],
+      ['CANCELLED', 'Cancelled', 'bg-gray-100', 'text-gray-800'],
+    ] as const)(
+      'should render %s with its semantic badge color',
+      async (status, label, backgroundClass, textClass) => {
+        const registration = createRegistrationWithStatus(status, 0);
+        vi.mocked(reports.getRegistrations).mockResolvedValue([registration]);
 
-      renderComponent();
+        renderComponent();
 
-      const statusPill = await screen.findByText('Application Approved');
+        const statusCell = await screen.findByTestId('cell-status-0-status');
+        const statusPill = within(statusCell).getByText(label);
 
-      expect(statusPill).toHaveClass('bg-yellow-100', 'text-yellow-800');
-      expect(statusPill).not.toHaveClass('bg-red-100', 'text-red-800');
-    });
+        expect(statusPill).toHaveClass(backgroundClass, textClass);
+      },
+    );
 
-    it('should render summary statistics correctly', async () => {
+    it('should render summary statistics using grouped status definitions', async () => {
+      vi.mocked(reports.getRegistrations).mockResolvedValue(
+        allRegistrationStatuses.map(createRegistrationWithStatus),
+      );
+
       renderComponent();
 
       await waitFor(() => {
         expect(screen.getByText('Summary')).toBeInTheDocument();
       });
-
       expect(screen.getByText('Total Registrations:')).toBeInTheDocument();
-      expect(screen.getByText('3')).toBeInTheDocument(); // Total count
       expect(screen.getByText('Confirmed:')).toBeInTheDocument();
       
-      // Use more specific selectors for the counts to avoid ambiguity
       const summarySection = screen.getByText('Summary').closest('div');
       expect(summarySection).toHaveTextContent('Confirmed:1');
-      expect(summarySection).toHaveTextContent('Pending:1');
-      expect(summarySection).toHaveTextContent('Cancelled:1');
+      expect(summarySection).toHaveTextContent('Pending:4');
+      expect(summarySection).toHaveTextContent('Cancelled:2');
+      expect(summarySection).toHaveTextContent('Total Registrations:7');
     });
 
     it('should call getRegistrations on mount with default parameters', async () => {
@@ -513,59 +547,41 @@ describe('RegistrationReportsPage', () => {
       expect(screen.getByLabelText('Year')).toHaveValue('2025');
     });
 
-    it('should filter by status when status filter is changed', async () => {
-      const mockGetRegistrations = vi.mocked(reports.getRegistrations);
-      // Mock multiple registrations with different statuses
-      const multiStatusRegistrations: Registration[] = [
-        ...mockRegistrations,
-        {
-          id: '5',
-          userId: 'user5',
-          year: 2024,
-          status: 'PENDING' as const,
-          createdAt: '2024-01-02T00:00:00Z',
-          updatedAt: '2024-01-02T00:00:00Z',
-          user: {
-            id: 'user5',
-            firstName: 'Bob',
-            lastName: 'Wilson',
-            email: 'bob@example.com',
-            role: 'PARTICIPANT' as const,
-            isEmailVerified: true,
-            createdAt: '2024-01-02T00:00:00Z',
-            updatedAt: '2024-01-02T00:00:00Z',
-          },
-          jobs: []
-        }
-      ];
-      mockGetRegistrations.mockResolvedValue(multiStatusRegistrations);
-      
-      renderComponent();
+    it.each([
+      ['CONFIRMED', ['CONFIRMED']],
+      ['PENDING', ['PENDING', 'WAITLISTED', 'APPLICATION_SUBMITTED', 'APPLICATION_APPROVED']],
+      ['CANCELLED', ['APPLICATION_DECLINED', 'CANCELLED']],
+    ] as const)(
+      'should filter the %s status group',
+      async (filterValue, expectedStatuses) => {
+        const registrations = allRegistrationStatuses.map(createRegistrationWithStatus);
+        vi.mocked(reports.getRegistrations).mockResolvedValue(registrations);
 
-      await waitFor(() => {
-        expect(screen.getByText('Filters')).toBeInTheDocument();
-      });
+        renderComponent();
 
-      // Verify all registrations are initially shown
-      await waitFor(() => {
-        expect(screen.getByTestId('registration-1')).toBeInTheDocument();
-        expect(screen.getByTestId('registration-5')).toBeInTheDocument();
-      });
+        await waitFor(() => {
+          expect(screen.getByText('Filters')).toBeInTheDocument();
+        });
 
-      // Open filters panel
-      const filtersButton = screen.getByText('Filters');
-      fireEvent.click(filtersButton);
+        fireEvent.click(screen.getByText('Filters'));
+        const statusSelect = screen.getByLabelText('Status');
+        expect(Array.from((statusSelect as HTMLSelectElement).options).map(option => option.value))
+          .toEqual(['', 'CONFIRMED', 'PENDING', 'CANCELLED']);
 
-      // Change status filter to CONFIRMED
-      const statusSelect = screen.getByLabelText('Status');
-      fireEvent.change(statusSelect, { target: { value: 'CONFIRMED' } });
+        fireEvent.change(statusSelect, { target: { value: filterValue } });
 
-      // Verify only CONFIRMED registrations are shown (client-side filtering)
-      await waitFor(() => {
-        expect(screen.getByTestId('registration-1')).toBeInTheDocument();
-        expect(screen.queryByTestId('registration-5')).not.toBeInTheDocument();
-      });
-    });
+        await waitFor(() => {
+          registrations.forEach(registration => {
+            const row = screen.queryByTestId(`registration-${registration.id}`);
+            if (expectedStatuses.some(expectedStatus => expectedStatus === registration.status)) {
+              expect(row).toBeInTheDocument();
+            } else {
+              expect(row).not.toBeInTheDocument();
+            }
+          });
+        });
+      },
+    );
 
     it('should populate year dropdown with available years from data', async () => {
       renderComponent();
