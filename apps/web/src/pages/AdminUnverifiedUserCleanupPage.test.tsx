@@ -129,16 +129,16 @@ describe('AdminUnverifiedUserCleanupPage', () => {
         ids: candidatePage.users.map(user => user.id),
       });
     });
-    expect(
-      await screen.findByText('1 account permanently removed. 1 skipped: email was verified.')
-    ).toBeInTheDocument();
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      '1 account permanently removed. 1 skipped: email was verified.'
+    );
   });
 
   it('should display API errors and allow retrying', async () => {
     vi.mocked(api.get).mockRejectedValueOnce(new Error('Cleanup unavailable'));
     renderPage();
 
-    expect(await screen.findByText('Cleanup unavailable')).toBeInTheDocument();
+    expect(await screen.findByRole('alert')).toHaveTextContent('Cleanup unavailable');
     fireEvent.click(screen.getByRole('button', { name: 'Try Again' }));
 
     await waitFor(() => {
@@ -159,7 +159,7 @@ describe('AdminUnverifiedUserCleanupPage', () => {
       })
     );
 
-    expect(await screen.findByText('Deletion failed')).toBeInTheDocument();
+    expect(await screen.findByRole('alert')).toHaveTextContent('Deletion failed');
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 

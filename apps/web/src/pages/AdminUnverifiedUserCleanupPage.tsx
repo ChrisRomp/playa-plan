@@ -226,13 +226,20 @@ export default function AdminUnverifiedUserCleanupPage() {
       </div>
 
       {feedback ? (
-        <div className="mb-4 rounded-md border border-green-200 bg-green-50 p-4 text-sm text-green-800">
+        <div
+          role="status"
+          aria-live="polite"
+          className="mb-4 rounded-md border border-green-200 bg-green-50 p-4 text-sm text-green-800"
+        >
           {feedback}
         </div>
       ) : null}
 
       {error ? (
-        <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+        <div
+          role="alert"
+          className="mb-4 rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700"
+        >
           <p>{error}</p>
           <button
             type="button"
