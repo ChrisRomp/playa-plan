@@ -21,15 +21,20 @@ vi.mock('../../components/common/LoadingSpinner', () => ({
 
 // Mock the DataTable component
 vi.mock('../../components/common/DataTable/DataTable', () => ({
-  DataTable: ({ data, columns, emptyMessage, caption }: {
-    data: Registration[]; 
+  DataTable: ({
+    data,
+    columns,
+    emptyMessage,
+    caption,
+  }: {
+    data: Registration[];
     columns: Array<{
       id: string;
       header: string;
       accessor: (item: Registration) => ReactNode;
       getCellTitle?: (item: Registration) => string | number | null | undefined;
     }>;
-    emptyMessage: string; 
+    emptyMessage: string;
     caption: string;
   }) => (
     <div data-testid="data-table" aria-label={caption}>
@@ -38,10 +43,7 @@ vi.mock('../../components/common/DataTable/DataTable', () => ({
       ) : (
         <div>
           {columns
-            .filter(column =>
-              column.id === 'campingOptionName'
-              || column.id.startsWith('field_')
-            )
+            .filter(column => column.id === 'campingOptionName' || column.id.startsWith('field_'))
             .map(column => (
               <span key={column.id} data-testid={`column-${column.id}`}>
                 {column.header}
@@ -51,17 +53,19 @@ vi.mock('../../components/common/DataTable/DataTable', () => ({
             <div key={item.id} data-testid={`registration-${item.id}`}>
               {item.user?.firstName} {item.user?.lastName} - {item.status}
               {columns
-                .filter(column =>
-                  column.id === 'status'
-                  || column.id === 'playaName'
-                  || column.id === 'role'
-                  || column.id === 'phone'
-                  || column.id === 'emergencyContact'
-                  || column.id === 'city'
-                  || column.id === 'stateProvince'
-                  || column.id === 'country'
-                  || column.id === 'campingOptionName'
-                  || column.id.startsWith('field_')
+                .filter(
+                  column =>
+                    column.id === 'status' ||
+                    column.id === 'playaName' ||
+                    column.id === 'role' ||
+                    column.id === 'phone' ||
+                    column.id === 'emergencyContact' ||
+                    column.id === 'city' ||
+                    column.id === 'stateProvince' ||
+                    column.id === 'country' ||
+                    column.id === 'campingOptionName' ||
+                    column.id === 'actions' ||
+                    column.id.startsWith('field_')
                 )
                 .map(column => (
                   <div
@@ -218,7 +222,7 @@ const allRegistrationStatuses: Registration['status'][] = [
 
 const createRegistrationWithStatus = (
   status: Registration['status'],
-  index: number,
+  index: number
 ): Registration => ({
   ...mockRegistrations[0],
   id: `status-${index}`,
@@ -234,18 +238,19 @@ const createRegistrationWithStatus = (
 const createConfigContextValue = (
   currentYear?: number,
   isLoading = false,
-  registrationOpen = true,
+  registrationOpen = true
 ): ConfigContextType => ({
-  config: currentYear === undefined
-    ? null
-    : {
-        name: 'Test Camp',
-        description: 'Test camp',
-        homePageBlurb: '',
-        registrationOpen,
-        earlyRegistrationOpen: false,
-        currentYear,
-      },
+  config:
+    currentYear === undefined
+      ? null
+      : {
+          name: 'Test Camp',
+          description: 'Test camp',
+          homePageBlurb: '',
+          registrationOpen,
+          earlyRegistrationOpen: false,
+          currentYear,
+        },
   isLoading,
   error: null,
   refreshConfig: vi.fn(),
@@ -254,11 +259,7 @@ const createConfigContextValue = (
   connectionError: null,
 });
 
-const renderComponent = (
-  currentYear?: number,
-  isLoading = false,
-  registrationOpen = true,
-) => {
+const renderComponent = (currentYear?: number, isLoading = false, registrationOpen = true) => {
   return render(
     <ConfigContext.Provider
       value={createConfigContextValue(currentYear, isLoading, registrationOpen)}
@@ -335,6 +336,21 @@ describe('RegistrationReportsPage', () => {
       expect(screen.getByTestId('registration-3')).toBeInTheDocument();
     });
 
+    it('should open and close registration details from the row action', async () => {
+      renderComponent();
+
+      fireEvent.click(await screen.findByRole('button', { name: 'View details for John Doe' }));
+
+      expect(screen.getByRole('dialog', { name: 'Registration Details' })).toBeInTheDocument();
+      expect(screen.getByText('john.doe@example.com')).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Close registration details' }));
+
+      expect(
+        screen.queryByRole('dialog', { name: 'Registration Details' })
+      ).not.toBeInTheDocument();
+    });
+
     it.each([
       ['CONFIRMED', 'Confirmed', 'bg-green-100', 'text-green-800'],
       ['PENDING', 'Pending', 'bg-amber-100', 'text-amber-800'],
@@ -356,7 +372,7 @@ describe('RegistrationReportsPage', () => {
 
         expect(statusPill).toHaveClass(backgroundClass, textClass);
         expect(statusCell).toHaveAttribute('title', label);
-      },
+      }
     );
 
     it('should add hover text to user profile fields without titling missing values', async () => {
@@ -372,7 +388,7 @@ describe('RegistrationReportsPage', () => {
 
     it('should render summary statistics using grouped status definitions', async () => {
       vi.mocked(reports.getRegistrations).mockResolvedValue(
-        allRegistrationStatuses.map(createRegistrationWithStatus),
+        allRegistrationStatuses.map(createRegistrationWithStatus)
       );
 
       renderComponent();
@@ -382,7 +398,7 @@ describe('RegistrationReportsPage', () => {
       });
       expect(screen.getByText('Total Registrations:')).toBeInTheDocument();
       expect(screen.getByText('Confirmed:')).toBeInTheDocument();
-      
+
       const summarySection = screen.getByText('Summary').closest('div');
       expect(summarySection).toHaveTextContent('Confirmed:1');
       expect(summarySection).toHaveTextContent('Pending:4');
@@ -392,13 +408,13 @@ describe('RegistrationReportsPage', () => {
 
     it('should call getRegistrations on mount with default parameters', async () => {
       const mockGetRegistrations = vi.mocked(reports.getRegistrations);
-      
+
       renderComponent();
 
       await waitFor(() => {
-        expect(mockGetRegistrations).toHaveBeenCalledWith({ 
+        expect(mockGetRegistrations).toHaveBeenCalledWith({
           includeCampingOptions: false,
-          includeUserProfile: false
+          includeUserProfile: false,
         });
       });
     });
@@ -463,9 +479,9 @@ describe('RegistrationReportsPage', () => {
       expect(screen.getByText('Clear Filters')).toBeInTheDocument();
 
       // Click X to hide filters (button with no name that contains X icon)
-      const closeButton = screen.getAllByRole('button').find(button => 
-        button.className.includes('text-gray-400')
-      );
+      const closeButton = screen
+        .getAllByRole('button')
+        .find(button => button.className.includes('text-gray-400'));
       expect(closeButton).toBeDefined();
       fireEvent.click(closeButton!);
 
@@ -494,11 +510,11 @@ describe('RegistrationReportsPage', () => {
             createdAt: '2023-01-01T00:00:00Z',
             updatedAt: '2023-01-01T00:00:00Z',
           },
-          jobs: []
-        }
+          jobs: [],
+        },
       ];
       mockGetRegistrations.mockResolvedValue(multiYearRegistrations);
-      
+
       renderComponent();
 
       await waitFor(() => {
@@ -578,37 +594,35 @@ describe('RegistrationReportsPage', () => {
       ['CONFIRMED', ['CONFIRMED']],
       ['PENDING', ['PENDING', 'WAITLISTED', 'APPLICATION_SUBMITTED', 'APPLICATION_APPROVED']],
       ['CANCELLED', ['APPLICATION_DECLINED', 'CANCELLED']],
-    ] as const)(
-      'should filter the %s status group',
-      async (filterValue, expectedStatuses) => {
-        const registrations = allRegistrationStatuses.map(createRegistrationWithStatus);
-        vi.mocked(reports.getRegistrations).mockResolvedValue(registrations);
+    ] as const)('should filter the %s status group', async (filterValue, expectedStatuses) => {
+      const registrations = allRegistrationStatuses.map(createRegistrationWithStatus);
+      vi.mocked(reports.getRegistrations).mockResolvedValue(registrations);
 
-        renderComponent();
+      renderComponent();
 
-        await waitFor(() => {
-          expect(screen.getByText('Filters')).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByText('Filters')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Filters'));
+      const statusSelect = screen.getByLabelText('Status');
+      expect(
+        Array.from((statusSelect as HTMLSelectElement).options).map(option => option.value)
+      ).toEqual(['', 'CONFIRMED', 'PENDING', 'CANCELLED']);
+
+      fireEvent.change(statusSelect, { target: { value: filterValue } });
+
+      await waitFor(() => {
+        registrations.forEach(registration => {
+          const row = screen.queryByTestId(`registration-${registration.id}`);
+          if (expectedStatuses.some(expectedStatus => expectedStatus === registration.status)) {
+            expect(row).toBeInTheDocument();
+          } else {
+            expect(row).not.toBeInTheDocument();
+          }
         });
-
-        fireEvent.click(screen.getByText('Filters'));
-        const statusSelect = screen.getByLabelText('Status');
-        expect(Array.from((statusSelect as HTMLSelectElement).options).map(option => option.value))
-          .toEqual(['', 'CONFIRMED', 'PENDING', 'CANCELLED']);
-
-        fireEvent.change(statusSelect, { target: { value: filterValue } });
-
-        await waitFor(() => {
-          registrations.forEach(registration => {
-            const row = screen.queryByTestId(`registration-${registration.id}`);
-            if (expectedStatuses.some(expectedStatus => expectedStatus === registration.status)) {
-              expect(row).toBeInTheDocument();
-            } else {
-              expect(row).not.toBeInTheDocument();
-            }
-          });
-        });
-      },
-    );
+      });
+    });
 
     it('should populate year dropdown with available years from data', async () => {
       renderComponent();
@@ -622,7 +636,7 @@ describe('RegistrationReportsPage', () => {
       fireEvent.click(filtersButton);
 
       const yearSelect = screen.getByLabelText('Year');
-      
+
       // Check that available years are present (2024, 2023 from mock data)
       expect(yearSelect).toBeInTheDocument();
       // Note: We can't easily test the options without more complex DOM queries
@@ -647,7 +661,7 @@ describe('RegistrationReportsPage', () => {
       global.URL.revokeObjectURL = mockRevokeObjectURL;
 
       const originalCreateElement = document.createElement.bind(document);
-      vi.spyOn(document, 'createElement').mockImplementation((tagName) => {
+      vi.spyOn(document, 'createElement').mockImplementation(tagName => {
         if (tagName === 'a') {
           const mockLink = originalCreateElement('a');
           mockLink.click = mockClick;
@@ -660,15 +674,15 @@ describe('RegistrationReportsPage', () => {
 
       const originalAppendChild = document.body.appendChild.bind(document.body);
       const originalRemoveChild = document.body.removeChild.bind(document.body);
-      
-      vi.spyOn(document.body, 'appendChild').mockImplementation((node) => {
+
+      vi.spyOn(document.body, 'appendChild').mockImplementation(node => {
         if ((node as Element).tagName === 'A') {
           return node;
         }
         return originalAppendChild(node);
       });
 
-      vi.spyOn(document.body, 'removeChild').mockImplementation((node) => {
+      vi.spyOn(document.body, 'removeChild').mockImplementation(node => {
         if ((node as Element).tagName === 'A') {
           return node;
         }
@@ -707,7 +721,7 @@ describe('RegistrationReportsPage', () => {
 
       expect(mockCreateObjectURL).toHaveBeenCalledWith(
         expect.objectContaining({
-          type: 'text/csv;charset=utf-8;'
+          type: 'text/csv;charset=utf-8;',
         })
       );
 
@@ -727,51 +741,55 @@ describe('RegistrationReportsPage', () => {
           ...mockRegistrations[0],
           id: 'registration-active-2026',
           year: 2026,
-          campingOptions: [{
-            id: 'camping-registration-active-2026',
-            userId: 'user1',
-            campingOptionId: 'option-active',
-            createdAt: '2026-01-15T10:00:00Z',
-            updatedAt: '2026-01-15T10:00:00Z',
-            campingOption: {
-              id: 'option-active',
-              name: 'Skydiving',
-              description: null,
-              enabled: true,
-              workShiftsRequired: 1,
-              participantDues: 600,
-              staffDues: 600,
-              maxSignups: 60,
-              createdAt: '2026-01-01T10:00:00Z',
-              updatedAt: '2026-01-01T10:00:00Z',
-              jobCategoryIds: [],
+          campingOptions: [
+            {
+              id: 'camping-registration-active-2026',
+              userId: 'user1',
+              campingOptionId: 'option-active',
+              createdAt: '2026-01-15T10:00:00Z',
+              updatedAt: '2026-01-15T10:00:00Z',
+              campingOption: {
+                id: 'option-active',
+                name: 'Skydiving',
+                description: null,
+                enabled: true,
+                workShiftsRequired: 1,
+                participantDues: 600,
+                staffDues: 600,
+                maxSignups: 60,
+                createdAt: '2026-01-01T10:00:00Z',
+                updatedAt: '2026-01-01T10:00:00Z',
+                jobCategoryIds: [],
+              },
             },
-          }],
+          ],
         },
         {
           ...mockRegistrations[1],
           id: 'registration-inactive-2026',
           year: 2026,
-          campingOptions: [{
-            id: 'camping-registration-inactive-2026',
-            userId: 'user2',
-            campingOptionId: 'option-inactive',
-            createdAt: '2026-01-16T10:00:00Z',
-            updatedAt: '2026-01-16T10:00:00Z',
-            campingOption: {
-              id: 'option-inactive',
-              name: 'RV Camping',
-              description: null,
-              enabled: false,
-              workShiftsRequired: 0,
-              participantDues: 0,
-              staffDues: 0,
-              maxSignups: 0,
-              createdAt: '2026-01-01T10:00:00Z',
-              updatedAt: '2026-01-01T10:00:00Z',
-              jobCategoryIds: [],
+          campingOptions: [
+            {
+              id: 'camping-registration-inactive-2026',
+              userId: 'user2',
+              campingOptionId: 'option-inactive',
+              createdAt: '2026-01-16T10:00:00Z',
+              updatedAt: '2026-01-16T10:00:00Z',
+              campingOption: {
+                id: 'option-inactive',
+                name: 'RV Camping',
+                description: null,
+                enabled: false,
+                workShiftsRequired: 0,
+                participantDues: 0,
+                staffDues: 0,
+                maxSignups: 0,
+                createdAt: '2026-01-01T10:00:00Z',
+                updatedAt: '2026-01-01T10:00:00Z',
+                jobCategoryIds: [],
+              },
             },
-          }],
+          ],
         },
       ]);
       vi.mocked(reports.getCampingOptionRegistrations).mockResolvedValue([
@@ -832,20 +850,22 @@ describe('RegistrationReportsPage', () => {
               },
             ],
           },
-          fieldValues: [{
-            id: 'value-active',
-            value: '20 by 30 feet',
-            fieldId: 'field-active',
-            registrationId: 'camping-registration-active-2026',
-            field: {
-              id: 'field-active',
-              displayName: 'Camping Footprint',
-              dataType: 'MULTILINE_STRING',
-              required: false,
+          fieldValues: [
+            {
+              id: 'value-active',
+              value: '20 by 30 feet',
+              fieldId: 'field-active',
+              registrationId: 'camping-registration-active-2026',
+              field: {
+                id: 'field-active',
+                displayName: 'Camping Footprint',
+                dataType: 'MULTILINE_STRING',
+                required: false,
+              },
+              createdAt: '2026-01-15T10:00:00Z',
+              updatedAt: '2026-01-15T10:00:00Z',
             },
-            createdAt: '2026-01-15T10:00:00Z',
-            updatedAt: '2026-01-15T10:00:00Z',
-          }],
+          ],
           createdAt: '2026-01-15T10:00:00Z',
           updatedAt: '2026-01-15T10:00:00Z',
         },
@@ -866,28 +886,32 @@ describe('RegistrationReportsPage', () => {
             name: 'RV Camping',
             description: null,
             enabled: false,
-            fields: [{
-              id: 'field-inactive',
-              displayName: 'Vehicle Length',
-              dataType: 'STRING',
-              required: true,
-              order: 1,
-            }],
+            fields: [
+              {
+                id: 'field-inactive',
+                displayName: 'Vehicle Length',
+                dataType: 'STRING',
+                required: true,
+                order: 1,
+              },
+            ],
           },
-          fieldValues: [{
-            id: 'value-inactive',
-            value: '24 feet',
-            fieldId: 'field-inactive',
-            registrationId: 'camping-registration-inactive-2026',
-            field: {
-              id: 'field-inactive',
-              displayName: 'Vehicle Length',
-              dataType: 'STRING',
-              required: true,
+          fieldValues: [
+            {
+              id: 'value-inactive',
+              value: '24 feet',
+              fieldId: 'field-inactive',
+              registrationId: 'camping-registration-inactive-2026',
+              field: {
+                id: 'field-inactive',
+                displayName: 'Vehicle Length',
+                dataType: 'STRING',
+                required: true,
+              },
+              createdAt: '2026-01-16T10:00:00Z',
+              updatedAt: '2026-01-16T10:00:00Z',
             },
-            createdAt: '2026-01-16T10:00:00Z',
-            updatedAt: '2026-01-16T10:00:00Z',
-          }],
+          ],
           createdAt: '2026-01-16T10:00:00Z',
           updatedAt: '2026-01-16T10:00:00Z',
         },
@@ -903,9 +927,13 @@ describe('RegistrationReportsPage', () => {
         year: 2026,
         userId: undefined,
       });
-      expect(await screen.findByTestId('column-field_field-active')).toHaveTextContent('Camping Footprint');
+      expect(await screen.findByTestId('column-field_field-active')).toHaveTextContent(
+        'Camping Footprint'
+      );
       expect(screen.getByTestId('column-field_field-inactive')).toHaveTextContent('Vehicle Length');
-      expect(screen.getByTestId('column-field_field-unfilled')).toHaveTextContent('Radio Call Sign');
+      expect(screen.getByTestId('column-field_field-unfilled')).toHaveTextContent(
+        'Radio Call Sign'
+      );
 
       const activeRegistration = screen.getByTestId('registration-registration-active-2026');
       const inactiveRegistration = screen.getByTestId('registration-registration-inactive-2026');
@@ -913,25 +941,26 @@ describe('RegistrationReportsPage', () => {
       expect(within(activeRegistration).getByText('20 by 30 feet')).toBeInTheDocument();
       expect(within(inactiveRegistration).getByText('RV Camping')).toBeInTheDocument();
       expect(within(inactiveRegistration).getByText('24 feet')).toBeInTheDocument();
-      expect(screen.getByTestId(
-        'cell-registration-active-2026-campingOptionName',
-      )).toHaveAttribute('title', 'Skydiving');
-      expect(screen.getByTestId(
-        'cell-registration-active-2026-field_field-active',
-      )).toHaveAttribute('title', '20 by 30 feet');
+      expect(screen.getByTestId('cell-registration-active-2026-campingOptionName')).toHaveAttribute(
+        'title',
+        'Skydiving'
+      );
+      expect(
+        screen.getByTestId('cell-registration-active-2026-field_field-active')
+      ).toHaveAttribute('title', '20 by 30 feet');
 
-      expect(screen.getByTestId(
-        'cell-registration-active-2026-field_field-inactive',
-      )).not.toHaveAttribute('title');
-      expect(screen.getByTestId(
-        'cell-registration-inactive-2026-field_field-active',
-      ).textContent).toBe('');
-      expect(screen.getByTestId(
-        'cell-registration-active-2026-field_field-unfilled',
-      ).textContent).toBe('');
-      expect(screen.getByTestId(
-        'cell-registration-inactive-2026-field_field-unfilled',
-      ).textContent).toBe('');
+      expect(
+        screen.getByTestId('cell-registration-active-2026-field_field-inactive')
+      ).not.toHaveAttribute('title');
+      expect(
+        screen.getByTestId('cell-registration-inactive-2026-field_field-active').textContent
+      ).toBe('');
+      expect(
+        screen.getByTestId('cell-registration-active-2026-field_field-unfilled').textContent
+      ).toBe('');
+      expect(
+        screen.getByTestId('cell-registration-inactive-2026-field_field-unfilled').textContent
+      ).toBe('');
     });
 
     it('should render registration fields when registration is closed', async () => {
@@ -962,7 +991,9 @@ describe('RegistrationReportsPage', () => {
       const [headerLine, ...dataLines] = csv.replace(/^\uFEFF/, '').split('\n');
       const headers = headerLine.split(',');
       const activeRow = dataLines.find(line => line.includes('john.doe@example.com'))!.split(',');
-      const inactiveRow = dataLines.find(line => line.includes('jane.smith@example.com'))!.split(',');
+      const inactiveRow = dataLines
+        .find(line => line.includes('jane.smith@example.com'))!
+        .split(',');
       const footprintIndex = headers.indexOf('Camping Footprint');
       const vehicleLengthIndex = headers.indexOf('Vehicle Length');
       const callSignIndex = headers.indexOf('Radio Call Sign');
@@ -977,7 +1008,7 @@ describe('RegistrationReportsPage', () => {
 
     it('should show a non-fatal error when registration field data cannot be loaded', async () => {
       vi.mocked(reports.getCampingOptionRegistrations).mockRejectedValue(
-        new Error('Camping field request failed'),
+        new Error('Camping field request failed')
       );
 
       renderComponent(2026);
