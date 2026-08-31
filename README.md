@@ -52,7 +52,7 @@ jobs, shifts, and pricing all controlled from an admin UI.
 
 To run PlayaPlan locally you'll need:
 
-- **Node.js 22+** (and the bundled `npm`)
+- **Node.js 22.13-22.x or 24+** (and the bundled `npm`)
 - **PostgreSQL 15+** — local install or container
 - A modern browser
 

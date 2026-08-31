@@ -1,5 +1,5 @@
 # Multi-stage Dockerfile for web application
-FROM node:22.12.0-alpine3.20 AS base
+FROM node:22.20.0-alpine3.22 AS base
 
 # Add build arguments for dynamic versioning
 ARG IMAGE_VERSION=dev
@@ -43,7 +43,7 @@ EXPOSE 5173
 CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
 
 # Production stage - serves built files
-FROM node:22.12.0-alpine3.20 AS production
+FROM node:22.20.0-alpine3.22 AS production
 
 WORKDIR /app/apps/web
 

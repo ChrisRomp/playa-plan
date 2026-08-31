@@ -1,6 +1,6 @@
 # API Dockerfile for local development
 # Pin to specific patch version for better reproducibility
-FROM node:22.12.0-alpine3.20
+FROM node:22.20.0-alpine3.22
 
 # Add build arguments for dynamic versioning
 ARG IMAGE_VERSION=dev
