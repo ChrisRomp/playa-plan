@@ -15,7 +15,7 @@ Before the cloud agent starts working, the `copilot-setup-steps` job:
 
 - Starts PostgreSQL for the agent session
 - Checks out the repository
-- Installs Node.js 22
+- Installs the current Node.js 22 release (22.13 or newer)
 - Creates the root `.env`
 - Installs all npm workspace dependencies
 - Generates the Prisma client

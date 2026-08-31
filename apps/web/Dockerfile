@@ -1,5 +1,5 @@
 # Multi-stage Dockerfile for web application
-FROM node:22.12.0-alpine3.20 AS base
+FROM node:22.23.2-alpine3.24 AS base
 
 # Build arguments for dynamic versioning (used in production stage labels)
 ARG IMAGE_VERSION=dev

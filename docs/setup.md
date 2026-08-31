@@ -7,7 +7,7 @@ self-host PlayaPlan. For Azure-specific assets, see
 
 ## Prerequisites
 
-- Node.js 22 or later
+- Node.js 22.13-22.x or 24+
 - npm
 - PostgreSQL 15 or later
 - A modern browser
