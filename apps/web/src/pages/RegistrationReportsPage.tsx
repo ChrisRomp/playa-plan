@@ -447,7 +447,7 @@ export function RegistrationReportsPage() {
           </button>
         );
       },
-      width: 145,
+      width: 175,
     });
 
     return baseColumns;
