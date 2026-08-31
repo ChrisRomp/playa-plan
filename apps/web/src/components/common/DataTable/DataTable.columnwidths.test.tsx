@@ -162,7 +162,7 @@ describe('DataTable column widths', () => {
         id: 'name',
         header: 'Name',
         accessor: () => <span>-</span>,
-        getCellTitle: () => undefined,
+        getCellTitle: () => '',
       },
     ];
 
