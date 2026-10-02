@@ -37,7 +37,10 @@ describe('EmailService', () => {
   let mockCoreConfigService: jest.Mocked<CoreConfigService>;
   let mockEmailAuditService: jest.Mocked<EmailAuditService>;
   let mockConfigService: jest.Mocked<ConfigService>;
-  let mockTransporter: jest.Mocked<nodemailer.Transporter>;
+  // Select the promise overload instead of Nodemailer's final callback overload.
+  let mockTransporter: jest.Mocked<nodemailer.Transporter> & {
+    sendMail: jest.Mock<Promise<Pick<nodemailer.SentMessageInfo, 'messageId'>>, [nodemailer.SendMailOptions]>;
+  };
 
   const mockEmailConfig: EmailConfiguration = {
     emailEnabled: true,
@@ -117,6 +120,52 @@ describe('EmailService', () => {
 
   afterEach(() => {
     jest.restoreAllMocks();
+  });
+
+  it('should compose messages with the installed Nodemailer CommonJS implementation', async () => {
+    const actualNodemailer = jest.requireActual<typeof nodemailer>('nodemailer');
+    const actualTransporter = actualNodemailer.createTransport({
+      streamTransport: true,
+      buffer: true,
+      newline: 'unix',
+    });
+    const actualSendMail = actualTransporter.sendMail.bind(actualTransporter);
+    const mockSendMail = jest.fn((options: nodemailer.SendMailOptions) => actualSendMail(options));
+    jest.spyOn(actualTransporter, 'sendMail').mockImplementation(mockSendMail);
+    jest.mocked(nodemailer.createTransport).mockReturnValue(actualTransporter);
+    mockCoreConfigService.getEmailConfiguration.mockResolvedValue(mockEmailConfig);
+
+    const actualSent = await service.sendEmail({
+      to: 'recipient@example.com',
+      ccEmails: ['copy@example.com'],
+      bccEmails: ['hidden@example.com'],
+      subject: 'Compatibility check',
+      text: 'Plain text content',
+      html: '<p>HTML content</p>',
+      attachments: [{
+        filename: 'receipt.txt',
+        content: Buffer.from('Receipt content'),
+        contentType: 'text/plain',
+      }],
+      notificationType: NotificationType.EMAIL_VERIFICATION,
+    });
+
+    expect(actualSent).toBe(true);
+    expect(mockSendMail).toHaveBeenCalledTimes(1);
+    const actualMessage = await mockSendMail.mock.results[0].value;
+    expect(actualMessage.envelope).toEqual({
+      from: 'noreply@playaplan.app',
+      to: ['recipient@example.com', 'copy@example.com', 'hidden@example.com'],
+    });
+    expect(Buffer.isBuffer(actualMessage.message)).toBe(true);
+    const actualContent = actualMessage.message.toString();
+    expect(actualContent).toContain('Subject: Compatibility check');
+    expect(actualContent).toContain('Plain text content');
+    expect(actualContent).toContain('<p>HTML content</p>');
+    expect(actualContent).toContain('filename=receipt.txt');
+    expect(actualContent).toContain(Buffer.from('Receipt content').toString('base64'));
+    expect(mockEmailAuditService.logEmailSent).toHaveBeenCalled();
+    expect(mockEmailAuditService.logEmailFailed).not.toHaveBeenCalled();
   });
 
   describe('getEmailConfig caching mechanism', () => {

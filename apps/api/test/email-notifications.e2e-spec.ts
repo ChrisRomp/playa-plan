@@ -22,7 +22,10 @@ describe('Email Notifications (e2e)', () => {
   let adminToken: string;
   let testUserId: string;
   let testConfigId: string;
-  let mockTransporter: jest.Mocked<nodemailer.Transporter>;
+  // Select the promise overload instead of Nodemailer's final callback overload.
+  let mockTransporter: jest.Mocked<nodemailer.Transporter> & {
+    sendMail: jest.Mock<Promise<Pick<nodemailer.SentMessageInfo, 'messageId'>>, [nodemailer.SendMailOptions]>;
+  };
 
   beforeAll(async () => {
     // Mock nodemailer transporter
