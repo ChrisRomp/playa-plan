@@ -5,12 +5,6 @@ import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/common/prisma/prisma.service';
 import { UserRole, FieldType } from '@prisma/client';
 
-// Mock SendGrid
-jest.mock('@sendgrid/mail', () => ({
-  setApiKey: jest.fn(),
-  send: jest.fn().mockResolvedValue(true),
-}));
-
 describe('CampingOptionFieldsController (e2e)', () => {
   let app: INestApplication;
   let prisma: PrismaService;
