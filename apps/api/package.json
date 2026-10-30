@@ -58,7 +58,6 @@
     "@nestjs/throttler": "^6.5.0",
     "@playa-plan/types": "file:../../libs/types",
     "@prisma/client": "^6.19.3",
-    "@sendgrid/mail": "^8.1.6",
     "@simplewebauthn/server": "^13.3.2",
     "@willsoto/nestjs-prometheus": "^6.1.0",
     "bcrypt": "^6.0.0",
