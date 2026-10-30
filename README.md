@@ -106,6 +106,17 @@ npm test              # run all unit tests
 npm run test:e2e      # run Playwright E2E tests
 ```
 
+### Dependency security
+
+Run `npm audit` after dependency updates, then check `npm run build`, `npm test`,
+and `npm run lint`. Root `package.json` overrides pin security fixes in transitive
+dependencies; parent-scoped overrides keep unrelated consumers on their existing
+major versions. Revisit these pins when upstream packages adopt the fixes.
+
+The remaining [deepmerge advisory](https://github.com/advisories/GHSA-gcqx-w48m-w2h4)
+has no patched release in the current dependency line. Avoid using
+`npm audit fix --force` to silence it by downgrading NestJS or Jest.
+
 ## Project structure
 
 ```text
